@@ -1,0 +1,30 @@
+From aaf2ff323355bd1887859dbdb60d7b07e1a831e9 Mon Sep 17 00:00:00 2001
+From: jpy <jpy@blacktop.(none)>
+Date: Fri, 14 May 2010 09:27:32 -0400
+Subject: [PATCH] removed at91sam9g20ek board inits of leds and buttons
+
+---
+ arch/arm/mach-at91/board-sam9g20ek.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+index b2117b9..b4ae581 100644
+--- a/arch/arm/mach-at91/board-sam9g20ek.c
++++ b/arch/arm/mach-at91/board-sam9g20ek.c
+@@ -299,9 +299,11 @@ static void __init ek_board_init(void)
+ 	/* I2C */
+ 	at91_add_device_i2c(ek_i2c_devices, ARRAY_SIZE(ek_i2c_devices));
+ 	/* LEDs */
+-	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
++//	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
++
+ 	/* Push Buttons */
+-	ek_add_device_buttons();
++//	ek_add_device_buttons();
++
+ 	/* PCK0 provides MCLK to the WM8731 */
+ 	at91_set_B_periph(AT91_PIN_PC1, 0);
+ 	/* SSC (for WM8731) */
+-- 
+1.6.0.4
+

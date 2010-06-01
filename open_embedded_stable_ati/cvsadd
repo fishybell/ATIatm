@@ -1,0 +1,55 @@
+#!/bin/sh
+# @(#) add files and directories recursively to the current CVS directory
+# (c) 2009 by Dirk Jagdmann <doj@cubic.org>
+
+# Version: 2009-12-30
+
+control_c()
+{
+  echo -en "\n*** Received SIGINT! Exiting... $PWD ***\n"
+  exit 1
+}
+trap control_c SIGINT
+
+if [ -z "$1" -o "$1" = "-h" -o "$1" = "--help" ] ; then
+    echo "usage: cvsadd 'import message'"
+    echo "you can set the number of files to add/commit at once with XARGS_NUM"
+    exit 1
+fi
+
+if [ -d "$2" ] ; then
+    [ -d "$2/CVS" ] || cvs add "$2"
+    cd "$2" || exit 1
+    echo "handling $PWD"
+fi
+
+if [ ! -d CVS ] ; then
+    echo "current directory needs to contain a CVS/ directory"
+    exit 1
+fi
+if [ ! -f CVS/Entries ] ; then
+    echo "CVS/Entries not found"
+    exit 1
+fi
+
+if [ -f "$2" ] ; then
+    F=${2/#\.\//}
+    if ! grep -q "^/$F/" CVS/Entries ; then
+	cvs add "$F"
+	exit $?
+    fi
+    echo "$PWD/$F already added"
+    exit 0
+fi
+
+XARGS="xargs -0 -r -t"
+if [ -z "$XARGS_NUM" ]
+then XARGS_NUM=1
+fi
+
+# first add all files in current directory
+find . -maxdepth 1 -type f -print0 | $XARGS -L 1 "$0" "$1"
+find . -maxdepth 1 -type f -print0 | $XARGS -L $XARGS_NUM cvs ci -m "$1"
+
+# then add all directories
+find . -maxdepth 1 -type d -not -name CVS -a -not -name . -print0 | $XARGS -L 1 "$0" "$1"

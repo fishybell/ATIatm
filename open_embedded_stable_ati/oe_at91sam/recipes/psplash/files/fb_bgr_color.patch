@@ -1,0 +1,20 @@
+Common subdirectories: psplash_orig/.deps and psplash/.deps
+Common subdirectories: psplash_orig/.pc and psplash/.pc
+Common subdirectories: psplash_orig/.svn and psplash/.svn
+Common subdirectories: psplash_orig/autom4te.cache and psplash/autom4te.cache
+Common subdirectories: psplash_orig/m4 and psplash/m4
+Common subdirectories: psplash_orig/patches and psplash/patches
+diff -u psplash_orig/psplash-fb.c psplash/psplash-fb.c
+--- psplash_orig/psplash-fb.c	2010-02-26 11:51:08.000000000 +0100
++++ psplash/psplash-fb.c	2010-02-26 11:55:34.000000000 +0100
+@@ -186,7 +186,8 @@
+       break;
+     case 16:
+       *(volatile uint16 *) (fb->data + off) 
+-	= ((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3);
++	/* = ((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3); */
++	= ((blue & 0xF8) << 7) | ((green & 0xF8) << 2) | ((red & 0xF8) >> 3);
+       break;
+     default:
+       /* depth not supported yet */
+Only in psplash: psplash-fb.c~
