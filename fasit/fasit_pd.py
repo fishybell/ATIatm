@@ -1,9 +1,15 @@
 from threading import Thread
+from threading import BoundedSemaphore
 import Queue
 import time
 import logging
+import os.path
+import random
 
 import fasit_packet_pd
+import fasit_audio
+
+AUDIO_DIRECTORY = "./sounds/"
 
 class FasitPd():
     """FASIT Presentation Device
@@ -228,6 +234,92 @@ class QThread(Thread):
             data = None
         return data
 
+class play_sound_thread(QThread):  
+      
+    def __init__(self, number):
+        QThread.__init__(self)
+        logger_string = "play_sound_thread" + str(number)
+        self.logger = logging.getLogger(logger_string)
+        self.keep_going = True
+        self.track_number = -1
+        self.track_path = ""
+        self.loop = 1
+        self.random = False
+        self.playing = False
+        self.playing_semaphore = BoundedSemaphore(1)
+        self.audio = fasit_audio.FasitAudio()
+        
+    def is_playing(self):
+        self.playing_semaphore.acquire()
+        playing = self.playing
+        self.playing_semaphore.release() 
+        return playing
+        
+    def set_playing(self, playing):
+        self.playing_semaphore.acquire()
+        self.playing = playing
+        self.playing_semaphore.release() 
+        
+    def play_track(self, track_number, loop = 1, random = False):
+        if (self.is_playing() == True):
+            self.logger.debug("Can't play track, player is currently playing.")
+            return False
+        if ((track_number < 0) | (track_number > 62)):
+            self.logger.debug('Track number out of range [0 - 62]: %d', track_path)
+            return False
+        if ((loop < 0) | (loop > 255)):
+            self.logger.debug('loop out of range [0 - 255]: %d', loop)
+            return False
+        if ((random != True) & (random != False)):
+            self.logger.debug('random out of range [True or False]: %d', random)
+            return False
+        
+        self.track_path = AUDIO_DIRECTORY+str(track_number)+".mp3"
+        if (os.path.isfile(self.track_path) == True):
+            self.set_playing(True)
+            self.track_number = track_number
+            self.loop = loop
+            self.random = random
+            if (self.random == True):
+                self.loop = 1
+            self.read_in()    
+            self.start()
+            return True
+        else:
+            self.logger.debug('Could not find file %s', self.track_path)
+            self.track_number = -1
+            self.track_path = ""
+            self.loop = 1
+            self.random = False
+            return False
+        
+    def run(self):
+        self.logger.debug('play_sound_thread running...')
+        if (self.track_path != ""):
+            self.audio.play(self.track_path, self.loop)
+            while (self.keep_going == True):
+                if(self.audio.poll() == True):
+                    self.logger.debug('Track has stopped playing: %s', self.track_path)
+                    if (self.random == True):
+                        wait = random.randint(1, 10)
+                        time.sleep(wait)
+                        self.audio.play(self.track_path, self.loop)
+                    else:
+                        self.keep_going = False
+                        self.track_number = -1
+                        self.track_path = ""
+                        self.loop = 1
+                        self.random = False
+                data = self.read_in()
+                self.logger.debug("data = %s", data)
+                if data == "stop":
+                    self.random = False
+                    self.audio.stop()
+                time.sleep(0.5)
+            self.logger.debug('...play_sound_thread stopped.')
+            self.set_playing(True)
+        else:
+            self.logger.debug('Track path not set before starting thread.')
 
 # TEST CODE -----------------------------------------------------------------------------------------------------
 class FasitPdTestSit(FasitPd):
@@ -289,9 +381,59 @@ class FasitPdTestSit(FasitPd):
         self.__exposure_thread__ = FasitPdTestSit.exposure_thread()
         self.__exposure_thread__.start()
         
+        self.__sound_thread_1__ = play_sound_thread(1)
+        self.__sound_thread_2__ = play_sound_thread(2)
+      
+    def get_sound_thread(self):  
+        if (self.__sound_thread_1__.is_playing() == False):  
+            return self.__sound_thread_1__
+        elif (self.__sound_thread_2__.is_playing() == False):  
+            return self.__sound_thread_2__
+        else:
+            return None
+        
+    def audio_command(self, function_code, track_number, volume, play_mode):
+        
+        if (function_code == fasit_packet_pd.PD_AUDIO_CMD_STOP_ALL):
+            if (self.__sound_thread_1__.is_playing() == True):  
+                self.__sound_thread_1__.write("stop")
+            if (self.__sound_thread_2__.is_playing() == True):  
+                self.__sound_thread_2__.write("stop")
+            return True
+       
+        elif (function_code == fasit_packet_pd.PD_AUDIO_CMD_PLAY_TRACK):
+            sound_thread = self.get_sound_thread()
+            if (sound_thread == None):
+                return False
+            if (play_mode == fasit_packet_pd.PD_AUDIO_MODE_ONCE):
+                return sound_thread.play_track(track_number, 1, False)
+            elif (play_mode == fasit_packet_pd.PD_AUDIO_MODE_REPEAT):
+                return sound_thread.play_track(track_number, 0, False)
+            elif (play_mode == fasit_packet_pd.PD_AUDIO_MODE_RANDOM):
+                return sound_thread.play_track(track_number, 1, True)
+            else:
+                return False
+                
+        elif (function_code == fasit_packet_pd.PD_AUDIO_CMD_STOP_TRACK):
+            if ((self.__sound_thread_1__.is_playing() == True) & (self.__sound_thread_1__.track_number == track_number)):  
+                self.__sound_thread_1__.write("stop")
+            if ((self.__sound_thread_2__.is_playing() == True) & (self.__sound_thread_2__.track_number == track_number)): 
+                self.__sound_thread_2__.write("stop")
+            return True
+        
+        elif (function_code == fasit_packet_pd.PD_AUDIO_CMD_SET_VOLUME):
+            return False
+        
+        else:
+            return False
+        
+        return False
+        
     def stop_threads(self):
         self.__hit_thread__.write("stop")
         self.__exposure_thread__.write("stop")
+        self.__sound_thread_1__.write("stop")
+        self.__sound_thread_2__.write("stop")
         time.sleep(1)
         
     def hit_enable(self, enable = False):
@@ -326,23 +468,3 @@ class FasitPdTestSit(FasitPd):
                 self.__exposure_needs_update__ = True
                 
         return writable_status
-            
-    
-
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-        
-    
-    
-    
-    
-    
-    

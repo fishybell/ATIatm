@@ -18,11 +18,14 @@ class FasitClient(FasitHandler):
     
     def __init__(self, host, port):
         self.logger = logging.getLogger('FasitClient')
-        #self.__device__ = fasit_pd.FasitPd()
-        self.__device__ = fasit_pd.FasitPdTestSit()
+        
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.logger.debug('connecting to %s', (host, port))
+        
         self.sock.connect((host, port))
+            
+        #self.__device__ = fasit_pd.FasitPd()
+        self.__device__ = fasit_pd.FasitPdTestSit()
         FasitHandler.__init__(self, sock=self.sock, name='FasitClient')
     
     def writable(self):
@@ -34,9 +37,11 @@ class FasitClient(FasitHandler):
         return asynchat.async_chat.writable(self)
         
     def __del__(self):
+        self.logger.debug('closing socket')
         self.sock.close()
-        self.__device__.stop_threads()
-        FasitHandler.__del__(self)
+        if (self.__device__ != None):
+            self.__device__.stop_threads()
+#        FasitHandler.__del__(self)
     
     def send_cmd_ack(self, ack = 'F'):
         self.logger.info('send_cmd_ack(%c)', ack)
@@ -239,12 +244,13 @@ class FasitClient(FasitHandler):
         
         pd_packet = fasit_packet_pd.FasitPacketPd(self.received_data)
         
-        self.__device__.audio_command(  function_code   = pd_packet.data.function_code,
+        if (self.__device__.audio_command(  function_code   = pd_packet.data.function_code,
                                         track_number    = pd_packet.data.track_number,
                                         volume          = pd_packet.data.volume,
-                                        play_mode       = pd_packet.data.play_mode)
-            
-        self.send_cmd_ack(ack = 'S')
+                                        play_mode       = pd_packet.data.play_mode) == True):
+            self.send_cmd_ack(ack = 'S')
+        else:
+            self.send_cmd_ack(ack = 'F')
 
     _msg_num_to_handler = { 
         fasit_packet.FASIT_DEV_DEF_REQUEST              :dev_def_request_handler,

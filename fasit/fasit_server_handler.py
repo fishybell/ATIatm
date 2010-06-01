@@ -34,6 +34,24 @@ class FasitServerHandler(FasitHandler):
         
         audio_command_request = fasit_packet_pd.FasitPacketPd()
         audio_command = fasit_packet_pd.FasitPacketPd.AudioCommand()
+        audio_command.function_code     = fasit_packet_pd.PD_AUDIO_CMD_PLAY_TRACK
+        audio_command.track_number      = 0
+        audio_command.volume            = 50
+        audio_command.play_mode         = fasit_packet_pd.PD_AUDIO_MODE_ONCE
+        audio_command_request.data = audio_command
+        self.push(audio_command_request.pack())
+        
+        audio_command.track_number      = 1
+        audio_command_request.data = audio_command
+        self.push(audio_command_request.pack())
+        
+#        audio_command.track_number      = 3
+#        audio_command_request.data = audio_command
+#        self.push(audio_command_request.pack())
+#        
+
+        audio_command.function_code     = fasit_packet_pd.PD_AUDIO_CMD_STOP_TRACK
+        audio_command.track_number      = 0
         audio_command_request.data = audio_command
         self.push(audio_command_request.pack())
         

@@ -19,7 +19,7 @@ address = (FASIT_TC_IP_ADDRESS, FASIT_TC_IP_PORT)
 server = FasitServer(address)
 
 try:
-    asyncore.loop()
+    asyncore.loop(timeout = 1)
 except KeyboardInterrupt:
     print "Crtl+C pressed. Shutting down."
     server.close()
