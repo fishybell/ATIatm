@@ -12,5 +12,6 @@ SRC_URI = " \
 	"
 SRC_URI_append ?= " \
     file://ati/0001-removed-at91sam9g20ek-board-inits-of-leds-and-button.patch;patch=1 \
+	file://ati/0002-removed-adding-of-usb-device-to-platform.patch;patch=1 \
     "
 

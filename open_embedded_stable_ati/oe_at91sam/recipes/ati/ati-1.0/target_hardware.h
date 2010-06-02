@@ -3,32 +3,71 @@
 #ifndef __TARGET_HARDWARE_H__
 #define __TARGET_HARDWARE_H__
 
+//---------------------------------------------------------------------------
+// LOGICAL ACTIVE STATES
+//---------------------------------------------------------------------------
+#define ACTIVE_LOW						0
+#define ACTIVE_HIGH						1
 
+//---------------------------------------------------------------------------
+// INOUT PULL-UP RESISTOR SETTING
+//---------------------------------------------------------------------------
+#define PULLUP_OFF						0
+#define PULLUP_ON						1
+
+//---------------------------------------------------------------------------
+// INPUT DEGLITCH SETTING
+//---------------------------------------------------------------------------
+#define DEGLITCH_OFF					0
+#define DEGLITCH_ON						1
+
+//---------------------------------------------------------------------------
+// LIFTER
+//---------------------------------------------------------------------------
+#define INPUT_LIFTER_POS_ACTIVE_STATE		ACTIVE_LOW
+#define INPUT_LIFTER_POS_PULLUP_STATE		PULLUP_ON
+#define INPUT_LIFTER_POS_DEGLITCH_STATE		DEGLITCH_ON
+#define	INPUT_LIFTER_POS_UP_LIMIT 			AT91_PIN_PC5
+#define	INPUT_LIFTER_POS_DOWN_LIMIT 		AT91_PIN_PC4
+
+#define OUTPUT_LIFTER_MOTOR_ACTIVE_STATE	ACTIVE_LOW
+#define	OUTPUT_LIFTER_MOTOR_FWD_POS 		AT91_PIN_PB3
+#define	OUTPUT_LIFTER_MOTOR_REV_POS 		AT91_PIN_PB19
+#define	OUTPUT_LIFTER_MOTOR_REV_NEG 		AT91_PIN_PB13
+#define	OUTPUT_LIFTER_MOTOR_FWD_NEG 		AT91_PIN_PB12
+
+//---------------------------------------------------------------------------
+// BATTERY
+//---------------------------------------------------------------------------
 #define	INPUT_ADC_LOW_BAT 				AT91_PIN_PC1
 #define	OUTPUT_LED_LOW_BAT 				AT91_PIN_PC15
 
+//---------------------------------------------------------------------------
+// USER INTERFACE
+//---------------------------------------------------------------------------
 #define	INPUT_TEST_BUTTON 				AT91_PIN_PC12
 #define	OUTPUT_TEST_INDICATOR 			AT91_PIN_PC8
 #define	INPUT_WAKEUP_BUTTON 			AT91_PIN_PB25
 
-#define	INPUT_UP_LIMIT 					AT91_PIN_PC5
-#define	INPUT_DOWN_LIMIT 				AT91_PIN_PC4
-
+//---------------------------------------------------------------------------
+// HIT SENSOR - MECHANICAL
+//---------------------------------------------------------------------------
 #define	INPUT_HIT_SENSOR 				AT91_PIN_PB24
-
-#define	INPUT_MILES_HIT 				AT91_PIN_PB23
-#define	OUTPUT_MILES_RESET 				AT91_PIN_PB22
-
 #define	INPUT_FRONT_TIRE_HIT 			AT91_PIN_PB21
 #define	INPUT_BACK_TIRE_HIT 			AT91_PIN_PB20
 #define	INPUT_ENGINE_HIT 				AT91_PIN_PA3
 
+//---------------------------------------------------------------------------
+// HIT SENSOR - MILES RECEIVER
+//---------------------------------------------------------------------------
+#define	INPUT_MILES_HIT 				AT91_PIN_PB23
+#define	OUTPUT_MILES_RESET 				AT91_PIN_PB22
+
+//---------------------------------------------------------------------------
+// MILE TRANSMITTER
+//---------------------------------------------------------------------------
 #define	OUTPUT_MILES_SHOOTBACK 			AT91_PIN_PC11
 
-#define	OUTPUT_LIFTER_MOTOR_FWD_POS 	AT91_PIN_PB3
-#define	OUTPUT_LIFTER_MOTOR_REV_POS 	AT91_PIN_PB19
-#define	OUTPUT_LIFTER_MOTOR_REV_NEG 	AT91_PIN_PB13
-#define	OUTPUT_LIFTER_MOTOR_FWD_NEG 	AT91_PIN_PB12
 
 #define	INPUT_SPEED_SENSOR1 			AT91_PIN_PB0
 #define	INPUT_SPEED_SENSOR2 			AT91_PIN_PB1

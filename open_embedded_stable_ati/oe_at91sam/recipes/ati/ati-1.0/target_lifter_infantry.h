@@ -1,6 +1,6 @@
 #ifndef __TARGET_LIFTER_INFANTRY_H__
 #define __TARGET_LIFTER_INFANTRY_H__
 
-// TODO - put #defines for pins here?
+#include "target_hardware.h"
 
 #endif // __TARGET_LIFTER_INFANTRY_H__

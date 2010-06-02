@@ -19,18 +19,19 @@
 #define LIFTER_POSITION_MOVING  2
 #define LIFTER_POSITION_ERROR   3
 
-#define PIN_POSITION_ACTIVE   	0       		// Active low
-#define PIN_POSITION_DOWN    	AT91_PIN_PA30   // BP3 on dev. board
-#define PIN_POSITION_UP     	AT91_PIN_PA31   // BP4 on dev. board
+/* for testing using eval. board buttons and LED
+#define INPUT_LIFTER_POS_ACTIVE_STATE   	ACTIVE_LOW
+#define INPUT_LIFTER_POS_DOWN_LIMIT    		AT91_PIN_PA30   // BP3 on dev. board
+#define INPUT_LIFTER_POS_UP_LIMIT     		AT91_PIN_PA31   // BP4 on dev. board
 
-#define PIN_MOTOR_ACTIVE    	0       		// Active low
+#define OUTPUT_LIFTER_MOTOR_ACTIVE_STATE    ACTIVE_LOW
 
 #ifdef DEV_BOARD_REVB
-	#define PIN_MOTOR_CONTROL    	AT91_PIN_PA6
+	#define OUTPUT_LIFTER_MOTOR_FWD_POS    	AT91_PIN_PA6
 #else
-	#define PIN_MOTOR_CONTROL    	AT91_PIN_PB8
+	#define OUTPUT_LIFTER_MOTOR_FWD_POS    	AT91_PIN_PB8
 #endif
-
+*/
 
 //---------------------------------------------------------------------------
 // This lock protects against motor control from simultaneously access from
@@ -81,7 +82,7 @@ static int hardware_motor_on(int direction)
 	// with the infantry lifter we don't care about direction,
 	// just turn on the motor
     spin_lock_irqsave(&motor_lock, flags);
-	at91_set_gpio_value(PIN_MOTOR_CONTROL, PIN_MOTOR_ACTIVE); // Turn motor on
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); // Turn motor on
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
@@ -93,7 +94,7 @@ static int hardware_motor_off(void)
 	{
 	unsigned long flags;
 	spin_lock_irqsave(&motor_lock, flags);
-	at91_set_gpio_value(PIN_MOTOR_CONTROL, !PIN_MOTOR_ACTIVE); // Turn motor off
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); // Turn motor off
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
@@ -138,7 +139,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
     {
 	// We get an interrupt on both edges, so we have to check to which edge
 	// we are responding.
-    if (at91_get_gpio_value(PIN_POSITION_DOWN) == PIN_POSITION_ACTIVE)
+    if (at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
     	timeout_timer_stop();
 
@@ -164,7 +165,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
     {
 	// We get an interrupt on both edges, so we have to check to which edge
 	// we are responding.
-    if (at91_get_gpio_value(PIN_POSITION_UP) == PIN_POSITION_ACTIVE)
+    if (at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
     	timeout_timer_stop();
 
@@ -190,39 +191,45 @@ static int hardware_init(void)
     {
     int status = 0;
 
-    // configure motor gpio for output and set initial output
-    at91_set_gpio_output(PIN_MOTOR_CONTROL, !PIN_MOTOR_ACTIVE);
+    // Configure motor gpio for output and set initial output
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
+
+    // These don't get used with the SIT but we set the initial value for completeness
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
 
     // Configure position gpios for input and deglitch for interrupts
-    at91_set_gpio_input(PIN_POSITION_DOWN, 1);
-    at91_set_deglitch(PIN_POSITION_DOWN, 1);
-    at91_set_gpio_input(PIN_POSITION_UP, 1);
-    at91_set_deglitch(PIN_POSITION_UP, 1);
+    at91_set_gpio_input(INPUT_LIFTER_POS_DOWN_LIMIT, INPUT_LIFTER_POS_PULLUP_STATE);
+    at91_set_deglitch(INPUT_LIFTER_POS_DOWN_LIMIT, INPUT_LIFTER_POS_DEGLITCH_STATE);
+    at91_set_gpio_input(INPUT_LIFTER_POS_UP_LIMIT, INPUT_LIFTER_POS_PULLUP_STATE);
+    at91_set_deglitch(INPUT_LIFTER_POS_UP_LIMIT, INPUT_LIFTER_POS_DEGLITCH_STATE);
 
-    status = request_irq(PIN_POSITION_DOWN, (void*)down_position_int, 0, "infantry_target_down", NULL);
+    // Set up interrupts for position inputs
+    status = request_irq(INPUT_LIFTER_POS_DOWN_LIMIT, (void*)down_position_int, 0, "infantry_target_down", NULL);
     if (status != 0)
         {
         if (status == -EINVAL)
             {
-            printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", PIN_POSITION_DOWN);
+            printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", INPUT_LIFTER_POS_DOWN_LIMIT);
             }
         else if (status == -EBUSY)
             {
-            printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", PIN_POSITION_DOWN);
+            printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", INPUT_LIFTER_POS_DOWN_LIMIT);
             }
         return status;
         }
 
-    status = request_irq(PIN_POSITION_UP, (void*)up_position_int, 0, "infantry_target_up", NULL);
+    status = request_irq(INPUT_LIFTER_POS_UP_LIMIT, (void*)up_position_int, 0, "infantry_target_up", NULL);
     if (status != 0)
         {
         if (status == -EINVAL)
             {
-        	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", PIN_POSITION_UP);
+        	printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", INPUT_LIFTER_POS_UP_LIMIT);
             }
         else if (status == -EBUSY)
             {
-        	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", PIN_POSITION_UP);
+        	printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", INPUT_LIFTER_POS_UP_LIMIT);
             }
 
         return status;
@@ -236,8 +243,8 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
-	free_irq(PIN_POSITION_DOWN, NULL);
-	free_irq(PIN_POSITION_UP, NULL);
+	free_irq(INPUT_LIFTER_POS_DOWN_LIMIT, NULL);
+	free_irq(INPUT_LIFTER_POS_UP_LIMIT, NULL);
 	return 0;
     }
 
@@ -269,12 +276,12 @@ static int hardware_position_get(void)
 		return LIFTER_POSITION_MOVING;
 		}
 
-    if (at91_get_gpio_value(PIN_POSITION_DOWN) == PIN_POSITION_ACTIVE)
+    if (at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
         return LIFTER_POSITION_DOWN;
         }
 
-    if (at91_get_gpio_value(PIN_POSITION_UP) == PIN_POSITION_ACTIVE)
+    if (at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
         return LIFTER_POSITION_UP;
         }
