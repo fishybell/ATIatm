@@ -2,8 +2,8 @@ import asyncore
 import logging
 import socket
 
-FASIT_TC_IP_ADDRESS                 = 'localhost'
-#FASIT_TC_IP_ADDRESS                 = '192.168.123.9'
+#FASIT_TC_IP_ADDRESS                 = 'localhost'
+FASIT_TC_IP_ADDRESS                 = '192.168.123.9'
 #FASIT_TC_IP_ADDRESS                 = '157.185.52.61'
 FASIT_TC_IP_PORT                    = 4000
 

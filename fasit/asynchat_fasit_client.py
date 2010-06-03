@@ -16,16 +16,28 @@ class FasitClient(FasitHandler):
     """
     __device__ = None
     
-    def __init__(self, host, port):
+    def __init__(self, host, port, type):
         self.logger = logging.getLogger('FasitClient')
+        self.sock = None
+        
+        # check the type here, but don't assign __device__
+        # until after the socket has been successfully opened
+        if (type != fasit_packet_pd.PD_TYPE_SIT):
+            raise ValueError('SIT is only currently supported target type')
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.logger.debug('connecting to %s', (host, port))
         
         self.sock.connect((host, port))
-            
+        
         #self.__device__ = fasit_pd.FasitPd()
-        self.__device__ = fasit_pd.FasitPdTestSit()
+        #self.__device__ = fasit_pd.FasitPdTestSit()
+        
+        if (type == fasit_packet_pd.PD_TYPE_SIT):
+            self.__device__ = fasit_pd.FasitPdSit()
+        else:
+            raise ValueError('SIT is only currently supported target type')
+            
         FasitHandler.__init__(self, sock=self.sock, name='FasitClient')
     
     def writable(self):
@@ -37,8 +49,9 @@ class FasitClient(FasitHandler):
         return asynchat.async_chat.writable(self)
         
     def __del__(self):
-        self.logger.debug('closing socket')
-        self.sock.close()
+        if (self.sock != None):
+            self.logger.debug('closing socket')
+            self.sock.close()
         if (self.__device__ != None):
             self.__device__.stop_threads()
 #        FasitHandler.__del__(self)

@@ -5,10 +5,6 @@ import dpkt
 FASIT_ICD_VERSION_WHOLE             = 1
 FASIT_ICD_VERSION_FRACT             = 1
 
-# these should be moved
-#FASIT_TC_IP_ADDRESS                 = 'localhost'
-#FASIT_TC_IP_PORT                    = 4000
-
 FASIT_DEV_DEF_REQUEST               = 100
 
 FASIT_count = 0

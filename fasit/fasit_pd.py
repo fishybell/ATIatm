@@ -3,8 +3,10 @@ from threading import BoundedSemaphore
 import Queue
 import time
 import logging
-import os.path
+import os
 import random
+import uuid
+import select
 
 import fasit_packet_pd
 import fasit_audio
@@ -170,8 +172,9 @@ class FasitPd():
         pass
 
     def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
-        if (expose != self.__exposure__):
-            self.__exposure__ = fasit_packet_pd.PD_EXPOSURE_TRANSITION
+        pass
+#        if (expose != self.__exposure__):
+#            self.__exposure__ = fasit_packet_pd.PD_EXPOSURE_TRANSITION
       
     def hit_needs_update(self):
         update = self.__hit_needs_update__
@@ -320,9 +323,160 @@ class play_sound_thread(QThread):
             self.set_playing(True)
         else:
             self.logger.debug('Track path not set before starting thread.')
+            
+#------------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------------          
+class FasitPdSit(FasitPd):
+    
+    class exposure_thread(QThread):    
+        def __init__(self):
+            QThread.__init__(self)
+            self.logger = logging.getLogger('exposure_thread')
+            self.keep_going = True
+            self.driver_path = "/sys/class/target/lifter/"
+            self.position_path = self.driver_path + "position"
+            self.fd = None
+            
+        def run(self):
+            self.logger.debug('exposure thread running...')
+            
+            if (os.path.exists(self.driver_path) == False):
+                self.logger.debug("sysfs path to driver does not exist (%s)", self.driver_path)
+                self.write_out(-1)
+                return
+            
+            # make sure this is the correct type of lifter
+            self.fd = os.open(self.driver_path + "type", os.O_RDONLY)
+            type = os.read(self.fd, 32)
+            os.close(self.fd)
+            if (type != "infantry\n"):
+                self.logger.debug("Wrong lifter type: %s", type)
+                self.write_out(-1)
+                return
+            
+            self.logger.debug('correct type...')
+            
+            # get the current position and report
+            self.fd = os.open(self.position_path, os.O_RDWR)
+            position = os.read(self.fd, 32)
+            os.close(self.fd)
+            if (position != "error\n"):
+                self.logger.debug("Current position status: %s", position)
+                if (position == "up\n"):
+                    self.write_out(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
+                elif (position == "down\n"):
+                    self.write_out(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
+                elif (position == "moving\n"):
+                    self.write_out(fasit_packet_pd.PD_EXPOSURE_TRANSITION)
+                else:
+                    self.write_out(-1)
+                    return
+            else:
+                self.logger.debug("Position error.")
+                self.write_out(-1)
+                return
+            
+            self.logger.debug('processing incoming commands...')
+            
+            # process incoming commands            
+            while self.keep_going:
+                data = self.read_in()
+                if data == fasit_packet_pd.PD_EXPOSURE_EXPOSED:
+                    self.logger.debug('expose command')
+                    self.send_command_and_wait("up")
+                elif data == fasit_packet_pd.PD_EXPOSURE_CONCEALED:
+                    self.logger.debug('conceal command')
+                    self.send_command_and_wait("down")
+                elif data == "stop":
+                    self.keep_going = False
+                    self.logger.debug('...exposure thread stopping')
+                    
+                time.sleep(1)
+        
+        def send_command_and_wait(self, command):
+            self.fd = os.open(self.position_path,os.O_RDWR)
+            position = os.read(self.fd, 32)
+            os.close(self.fd)
+            self.logger.debug("Current position: %s", position)
+            if (((command == "up") & (position != "down\n")) | ((command == "down") & (position != "up\n"))):
+                self.logger.debug("Cannot move target %s when target is status is %s", command, position)
+                return
+
+            self.fd = os.open(self.position_path,os.O_RDWR)
+            os.write(self.fd, command)
+            os.close(self.fd)
+            self.fd = os.open(self.position_path,os.O_RDWR)
+            position = os.read(self.fd, 32)
+            
+            if (position == "up\n"):
+                self.write_out(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
+            elif (position == "down\n"):
+                self.write_out(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
+            elif (position == "moving\n"):
+                self.write_out(fasit_packet_pd.PD_EXPOSURE_TRANSITION)
+            else:
+                self.write_out(-1)
+                return
+            
+            p = select.poll()
+            p.register(self.fd, select.POLLERR|select.POLLPRI)
+            s = p.poll()
+            os.close(self.fd)
+            d = os.open(self.position_path,os.O_RDWR )
+            position = os.read(self.fd, 32) 
+            
+            self.logger.debug("Current position status: %s", position)
+        
+            if (position == "up\n"):
+                self.write_out(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
+            elif (position == "down\n"):
+                self.write_out(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
+            elif (position == "moving\n"):
+                self.write_out(fasit_packet_pd.PD_EXPOSURE_TRANSITION)
+            else:
+                self.write_out(-1)
+                
+                  
+                        
+    def __init__(self):
+        FasitPd.__init__(self)
+        self.logger = logging.getLogger('FasitPdSit')
+        self.__device_id__          = uuid.getnode()
+        self.__device_type__        = fasit_packet_pd.PD_TYPE_SIT
+        self.__exposure_thread__    = FasitPdSit.exposure_thread()
+        self.__exposure_thread__.start()
+        
+    def stop_threads(self):
+        self.__exposure_thread__.write("stop")
+        
+    def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
+        FasitPd.expose(self, expose)
+        self.__exposure_thread__.write(expose)
+    
+    def writable(self):
+        writable_status = False
+                    
+        # check the exposure thread
+        exposure_status = self.__exposure_thread__.read()
+        if (exposure_status != None):
+            if (exposure_status == -1):
+                self.logger.debug("Exposure error")
+                self.__fault_code__ = fasit_packet_pd.PD_FAULT_ACTUATION_WAS_NOT_COMPLETED
+                writable_status = True
+                self.__exposure_needs_update__ = True
+            elif (exposure_status != self.__exposure__):
+                self.logger.debug("change in exposure status %d", exposure_status)
+                self.__exposure__ = exposure_status
+                writable_status = True
+                self.__exposure_needs_update__ = True
+                
+        return writable_status
+    
+    
 
 # TEST CODE -----------------------------------------------------------------------------------------------------
-class FasitPdTestSit(FasitPd):
+class FasitPdTestSitXXX(FasitPd):
     
     class hit_thread(QThread):    
         def __init__(self, seconds = 1):
