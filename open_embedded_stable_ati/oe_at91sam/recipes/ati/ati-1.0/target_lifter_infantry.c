@@ -19,19 +19,24 @@
 #define LIFTER_POSITION_MOVING  2
 #define LIFTER_POSITION_ERROR   3
 
-/* for testing using eval. board buttons and LED
+//#define TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL
+//for testing using eval. board buttons and LED
+#undef INPUT_LIFTER_POS_ACTIVE_STATE
+#undef INPUT_LIFTER_POS_DOWN_LIMIT
+#undef INPUT_LIFTER_POS_UP_LIMIT
+
+#undef OUTPUT_LIFTER_MOTOR_ACTIVE_STATE
+#undef OUTPUT_LIFTER_MOTOR_FWD_POS
+
 #define INPUT_LIFTER_POS_ACTIVE_STATE   	ACTIVE_LOW
 #define INPUT_LIFTER_POS_DOWN_LIMIT    		AT91_PIN_PA30   // BP3 on dev. board
 #define INPUT_LIFTER_POS_UP_LIMIT     		AT91_PIN_PA31   // BP4 on dev. board
 
 #define OUTPUT_LIFTER_MOTOR_ACTIVE_STATE    ACTIVE_LOW
+#define OUTPUT_LIFTER_MOTOR_FWD_POS    		AT91_PIN_PA6
+#endif // TESTING_ON_EVAL
 
-#ifdef DEV_BOARD_REVB
-	#define OUTPUT_LIFTER_MOTOR_FWD_POS    	AT91_PIN_PA6
-#else
-	#define OUTPUT_LIFTER_MOTOR_FWD_POS    	AT91_PIN_PB8
-#endif
-*/
 
 //---------------------------------------------------------------------------
 // This lock protects against motor control from simultaneously access from
