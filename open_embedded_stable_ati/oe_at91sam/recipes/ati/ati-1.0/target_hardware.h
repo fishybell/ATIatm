@@ -24,8 +24,10 @@
 //---------------------------------------------------------------------------
 // LIFTER
 //---------------------------------------------------------------------------
-#define INPUT_LIFTER_POS_ACTIVE_STATE		ACTIVE_LOW
-#define INPUT_LIFTER_POS_PULLUP_STATE		PULLUP_ON
+//#define INPUT_LIFTER_POS_ACTIVE_STATE		ACTIVE_LOW
+//#define INPUT_LIFTER_POS_PULLUP_STATE		PULLUP_ON
+#define INPUT_LIFTER_POS_ACTIVE_STATE		ACTIVE_HIGH
+#define INPUT_LIFTER_POS_PULLUP_STATE		PULLUP_OFF
 #define INPUT_LIFTER_POS_DEGLITCH_STATE		DEGLITCH_ON
 #define	INPUT_LIFTER_POS_UP_LIMIT 			AT91_PIN_PC5
 #define	INPUT_LIFTER_POS_DOWN_LIMIT 		AT91_PIN_PC4

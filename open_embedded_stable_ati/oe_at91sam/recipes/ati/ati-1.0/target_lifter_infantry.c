@@ -12,7 +12,7 @@
 #define TARGET_NAME		"infantry lifter"
 #define LIFTER_TYPE  	"infantry"
 
-#define TIMEOUT_IN_SECONDS		5
+#define TIMEOUT_IN_SECONDS		3
 
 #define LIFTER_POSITION_DOWN   	0
 #define LIFTER_POSITION_UP    	1
@@ -52,10 +52,21 @@ static DEFINE_SPINLOCK(motor_lock);
 atomic_t operating_atomic = ATOMIC_INIT(0);
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we are fully initialized
+//---------------------------------------------------------------------------
+atomic_t full_init = ATOMIC_INIT(0);
+
+//---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space of a position
 // change or error detected by the IRQs or the timeout timer.
 //---------------------------------------------------------------------------
 static struct work_struct position_work;
+
+//---------------------------------------------------------------------------
+// This delayed work queue item is used to set the initial position of the
+// lifter.
+//---------------------------------------------------------------------------
+static struct work_struct default_position;
 
 //---------------------------------------------------------------------------
 // Declaration of the function that gets called when the timeout fires.
@@ -86,7 +97,9 @@ static int hardware_motor_on(int direction)
 	unsigned long flags;
 	// with the infantry lifter we don't care about direction,
 	// just turn on the motor
+printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
     spin_lock_irqsave(&motor_lock, flags);
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); // Turn brake off
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); // Turn motor on
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
@@ -98,8 +111,10 @@ static int hardware_motor_on(int direction)
 static int hardware_motor_off(void)
 	{
 	unsigned long flags;
+printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 	spin_lock_irqsave(&motor_lock, flags);
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); // Turn motor off
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); // Turn brake on
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
@@ -124,31 +139,41 @@ static void timeout_timer_stop(void)
 // The function that gets called when the timeout fires.
 //---------------------------------------------------------------------------
 static void timeout_fire(unsigned long data)
-	{
-    // Turn the motor off
-    hardware_motor_off();
+    {
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
 
 	printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME, __func__);
+
+    // Turn the motor off
+    hardware_motor_off();
 
     // signal that the operation has finished
     atomic_set(&operating_atomic, 0);
 
     // notify user-space
     schedule_work(&position_work);
-	}
+    }
 
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
 irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
     {
+    if (!atomic_read(&full_init))
+        {
+        return IRQ_HANDLED;
+        }
+
 	// We get an interrupt on both edges, so we have to check to which edge
 	// we are responding.
+    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
     if (at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
     	timeout_timer_stop();
-
-    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
         // Turn the motor off
         hardware_motor_off();
@@ -168,13 +193,18 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 //---------------------------------------------------------------------------
 irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
     {
+    if (!atomic_read(&full_init))
+        {
+        return IRQ_HANDLED;
+        }
+
 	// We get an interrupt on both edges, so we have to check to which edge
 	// we are responding.
+    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
     if (at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
     	timeout_timer_stop();
-
-    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
         // Turn the motor off
         hardware_motor_off();
@@ -197,12 +227,12 @@ static int hardware_init(void)
     int status = 0;
 
     // Configure motor gpio for output and set initial output
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); // motor off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);  // brake on
 
     // These don't get used with the SIT but we set the initial value for completeness
     at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
 
     // Configure position gpios for input and deglitch for interrupts
     at91_set_gpio_input(INPUT_LIFTER_POS_DOWN_LIMIT, INPUT_LIFTER_POS_PULLUP_STATE);
@@ -327,7 +357,7 @@ static ssize_t position_store(struct device *dev, struct device_attribute *attr,
     	printk(KERN_ALERT "%s - %s() : user command up\n",TARGET_NAME, __func__);
         status = size;
         // TODO - need to check error condition first
-        if (hardware_position_get() == LIFTER_POSITION_DOWN)
+        if (hardware_position_get() != LIFTER_POSITION_UP)
             {
         	hardware_position_set(LIFTER_POSITION_UP);
             }
@@ -337,7 +367,7 @@ static ssize_t position_store(struct device *dev, struct device_attribute *attr,
     	printk(KERN_ALERT "%s - %s() : user command down\n",TARGET_NAME, __func__);
         status = size;
         // TODO - need to check error condition first
-        if (hardware_position_get() == LIFTER_POSITION_UP)
+        if (hardware_position_get() != LIFTER_POSITION_DOWN)
             {
             hardware_position_set(LIFTER_POSITION_DOWN);
             }
@@ -394,6 +424,20 @@ struct target_device target_device_lifter_infantry =
     };
 
 //---------------------------------------------------------------------------
+// Work item to change the position of the lifter to the default position
+//---------------------------------------------------------------------------
+static void position_default(struct work_struct * work)
+    {
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    if (hardware_position_get() != LIFTER_POSITION_DOWN)
+        {
+printk(KERN_ALERT "resetting to down\n");
+        hardware_position_set(LIFTER_POSITION_DOWN);
+        }
+    }
+
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 // Work item to notify the user-space about a position change or error
 //---------------------------------------------------------------------------
 static void position_change(struct work_struct * work)
@@ -406,10 +450,16 @@ static void position_change(struct work_struct * work)
 //---------------------------------------------------------------------------
 static int __init target_lifter_infantry_init(void)
     {
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
-	hardware_init();
-	INIT_WORK(&position_work, position_change);
-    return target_sysfs_add(&target_device_lifter_infantry);
+    int retval;
+    printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+    INIT_WORK(&position_work, position_change);
+    INIT_WORK(&default_position, position_default);
+    hardware_init();
+    retval=target_sysfs_add(&target_device_lifter_infantry);
+    // signal that we are fully initialized
+    atomic_set(&full_init, 1);
+    schedule_work(&default_position);
+    return retval;
     }
 
 //---------------------------------------------------------------------------
