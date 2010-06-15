@@ -12,13 +12,13 @@ obj-m := 	target.o \
 			target_sound.o \
 
 PWD := $(shell pwd)
-EXTRA_CFLAGS += -DDEV_BOARD_REVB
+#EXTRA_CFLAGS += -mfloat-abi=softfp -mfpu=vfp
 
 default:
 #	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
-	make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- -C $(KDIR) SUBDIRS=$(PWD) modules
+	make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- -C $(KDIR) SUBDIRS=$(PWD)  modules
 	
-export	EXTRA_CFLAGS
+#export	EXTRA_CFLAGS
 	
 clean:
 	$(RM) .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers

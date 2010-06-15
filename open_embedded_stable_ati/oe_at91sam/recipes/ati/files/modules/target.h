@@ -6,6 +6,7 @@
 #define __TARGET_H__
 
 
+
 #define TARGET_TYPE_NONE				0
 #define TARGET_TYPE_LIFTER				1
 #define TARGET_TYPE_MOVER				2
@@ -31,5 +32,10 @@ extern void target_sysfs_notify	(struct target_device * target_device, char * at
 
 extern struct atmel_tc * 	target_timer_alloc	(unsigned block, const char *name);
 extern void 				target_timer_free	(struct atmel_tc *tc);
+
+extern void 				target_hrtimer_init			(struct hrtimer *timer, clockid_t which_clock,  enum hrtimer_mode mode);
+extern int 					target_hrtimer_start		(struct hrtimer *timer, ktime_t tim, const enum hrtimer_mode mode);
+extern int 					target_hrtimer_cancel		(struct hrtimer *timer);
+extern u64					target_hrtimer_forward_now	(struct hrtimer *timer, ktime_t interval);
 
 #endif // __TARGET_H__

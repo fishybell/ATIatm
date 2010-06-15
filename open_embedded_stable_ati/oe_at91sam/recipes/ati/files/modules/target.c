@@ -5,6 +5,7 @@
 #include <linux/device.h>
 #include <linux/kdev_t.h>
 #include <linux/atmel_tc.h>
+#include <linux/hrtimer.h>
 
 #include "target.h"
 //---------------------------------------------------------------------------
@@ -58,6 +59,42 @@ void target_timer_free(struct atmel_tc *tc)
 	atmel_tc_free(tc);
 	}
 EXPORT_SYMBOL(target_timer_free);
+
+//---------------------------------------------------------------------------
+// Passthrough for hrtimer_init
+//---------------------------------------------------------------------------
+void target_hrtimer_init(struct hrtimer *timer, clockid_t which_clock, enum hrtimer_mode mode)
+	{
+	hrtimer_init(timer, which_clock,  mode);
+	}
+EXPORT_SYMBOL(target_hrtimer_init);
+
+//---------------------------------------------------------------------------
+// Passthrough for hrtimer_start
+//---------------------------------------------------------------------------
+extern int target_hrtimer_start(struct hrtimer *timer, ktime_t tim, const enum hrtimer_mode mode)
+	{
+	return hrtimer_start(timer, tim,  mode);
+	}
+EXPORT_SYMBOL(target_hrtimer_start);
+
+//---------------------------------------------------------------------------
+// Passthrough for hrtimer_forward_now
+//---------------------------------------------------------------------------
+u64 target_hrtimer_forward_now(struct hrtimer *timer, ktime_t interval)
+	{
+	return hrtimer_forward(timer, timer->base->get_time(), interval);
+	}
+EXPORT_SYMBOL(target_hrtimer_forward_now);
+
+//---------------------------------------------------------------------------
+// Passthrough for hrtimer_cancel
+//---------------------------------------------------------------------------
+int target_hrtimer_cancel(struct hrtimer *timer)
+	{
+	return hrtimer_cancel(timer);
+	}
+EXPORT_SYMBOL(target_hrtimer_cancel);
 
 //---------------------------------------------------------------------------
 //
