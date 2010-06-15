@@ -1,3 +1,0 @@
-export KDIR=/home/jpy/development/projects/open_embedded_stable_ati/tmp/work/at91sam9g20ek-angstrom-linux-gnueabi/linux-2.6.30-r1/linux-2.6.30/
-export PATH=/home/jpy/development/projects/open_embedded_stable_ati/tmp/cross/armv5te/bin:$PATH  
-
