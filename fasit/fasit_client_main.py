@@ -85,7 +85,7 @@ def main():
     while(keep_going):
         try:
             if (connect_to_server() == True):
-                asyncore.loop(timeout = 1)
+                asyncore.loop(timeout = 0.2)
                 print "...connection lost."
             else:
                 client = None
