@@ -259,8 +259,17 @@ static ssize_t type_show(struct device *dev, struct device_attribute *attr, char
 //---------------------------------------------------------------------------
 static ssize_t hit_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
-	int count = atomic_read(&hit_count_atomic);
-	atomic_sub(count, &hit_count_atomic);
+	int count;
+	if (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_ENABLED)
+		{
+		count = atomic_read(&hit_count_atomic);
+		atomic_sub(count, &hit_count_atomic);
+		}
+	else
+		{
+    	printk(KERN_ALERT "%s - %s() : hits cannot be read while sensor is disabled.\n",TARGET_NAME, __func__);
+		count = 0;
+		}
 	return sprintf(buf, "%d\n", count);
     }
 
@@ -290,6 +299,8 @@ static ssize_t enable_store(struct device *dev, struct device_attribute *attr, c
     else if (sysfs_streq(buf, "enable") && (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_DISABLED))
         {
     	printk(KERN_ALERT "%s - %s() : hit sensor enabled\n",TARGET_NAME, __func__);
+
+    	atomic_set(&hit_count_atomic, 0);
 
     	ktime_set_time(&ktime_burst_separation, sensor_burst_separation/1000, MS_TO_NS(sensor_burst_separation%1000));
     	ktime_set_time(&ktime_sample_period, setting_sample_period_ms/1000, MS_TO_NS(setting_sample_period_ms%1000));
