@@ -37,8 +37,9 @@ def connect_to_server():
             client = None
             print "...connection refused, waiting 10 seconds."
             time.sleep(10)
-        except ValueError:
-            print "Invalid Target Type"
+        except ValueError as e:
+            print e.args[0]
+            #print "Invalid Target Type"
             return False
              
 

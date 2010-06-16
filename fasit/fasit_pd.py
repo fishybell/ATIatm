@@ -11,9 +11,15 @@ import select
 import fasit_packet_pd
 import fasit_audio
 
+LIFTER_PATH         = "/sys/class/target/lifter/"
+HIT_SENSOR_PATH     = "/sys/class/target/hit_sensor/"
+
 AUDIO_DIRECTORY = "./sounds/"
 
 
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
 class FasitPd():
     """base class for FASIT Presentation Devices
     """
@@ -140,7 +146,10 @@ class FasitPd():
         change_in_settings = False
         
         if (self.__hit_onoff__ != onoff):
-            self.hit_enable(onoff)
+            if (onoff == fasit_packet_pd.PD_HIT_ONOFF_OFF):
+                self.hit_enable(False)
+            elif (onoff == fasit_packet_pd.PD_HIT_ONOFF_ON):
+                self.hit_enable(True)
         
         if  ((self.__hit_sensitivity__         != sensitivity)       |
             (self.__hit_mode__                != mode)              |
@@ -184,8 +193,6 @@ class FasitPd():
 
     def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
         pass
-#        if (expose != self.__exposure__):
-#            self.__exposure__ = fasit_packet_pd.PD_EXPOSURE_TRANSITION
       
     def hit_needs_update(self):
         update = self.__hit_needs_update__
@@ -209,7 +216,10 @@ class FasitPd():
             writable_status = True
             self.__hit_needs_update__ = True
    
-        
+
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------       
 class QThread(Thread):
     """Thread class with bi-directional queues for async communications
     """
@@ -256,6 +266,9 @@ class QThread(Thread):
             data = None
         return data
 
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
 class play_sound_thread(QThread):  
     """Class for playing sounds
     """      
@@ -344,8 +357,272 @@ class play_sound_thread(QThread):
         else:
             self.logger.debug('Track path not set before starting thread.')
 
-            
 
+# TODO - this class can be re-used by other lifter types with some small changes
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------
+class lifter_thread(QThread):    
+    def __init__(self, lifter_type):
+        QThread.__init__(self)
+        self.logger = logging.getLogger('lifter_thread')
+        self.keep_going = True
+        self.lifter_type = lifter_type
+        self.driver_path = LIFTER_PATH
+        self.position_path = self.driver_path + "position"
+        self.fd = None
+        
+    def check_driver(self):
+        if (os.path.exists(self.driver_path) == False):
+            self.logger.debug("sysfs path to driver does not exist (%s)", self.driver_path)
+            raise ValueError('Path to lifter driver not found.')
+        
+        # make sure this is the correct type of lifter
+        self.fd = os.open(self.driver_path + "type", os.O_RDONLY)
+        type = os.read(self.fd, 32)
+        os.close(self.fd)
+        if (type != self.lifter_type+"\n"):
+            self.logger.debug("Wrong lifter type: %s", type)
+            raise ValueError('Wrong lifter type.')
+        
+        self.logger.debug('correct type...')
+
+    def get_current_position(self):
+        if (self.isAlive()):
+            self.logger.debug("Cannot get settings while thread is running")
+            raise ValueError('Cannot get settings while thread is running')
+        
+        # get the current position and report
+        self.fd = os.open(self.position_path, os.O_RDWR)
+        position = os.read(self.fd, 32)
+        os.close(self.fd)
+        if (position != "error\n"):
+            self.logger.debug("Current position status: %s", position.rstrip())
+            if (position == "up\n"):
+               return fasit_packet_pd.PD_EXPOSURE_EXPOSED
+            elif (position == "down\n"):
+                return fasit_packet_pd.PD_EXPOSURE_CONCEALED
+            elif (position == "moving\n"):
+                return fasit_packet_pd.PD_EXPOSURE_TRANSITION
+            else:
+                self.logger.debug("unknown position %s", position.rstrip())
+                return -1
+        else:
+            self.logger.debug("Position error.")
+            return -1
+        
+    def run(self):
+        self.logger.debug('lifter thread running...')
+        
+        # process incoming commands            
+        while self.keep_going:
+            data = self.read_in_blocking()
+            if data == fasit_packet_pd.PD_EXPOSURE_EXPOSED:
+                self.logger.debug('expose command')
+                self.send_command_and_wait("up")
+            elif data == fasit_packet_pd.PD_EXPOSURE_CONCEALED:
+                self.logger.debug('conceal command')
+                self.send_command_and_wait("down")
+            elif data == "stop":
+                self.keep_going = False
+                self.logger.debug('...lifter thread stopping')
+                
+    def send_command_and_wait(self, command):
+        self.fd = os.open(self.position_path,os.O_RDWR)
+        position = os.read(self.fd, 32)
+        os.close(self.fd)
+        self.logger.debug("Current position: %s", position)
+        if (((command == "up") & (position != "down\n")) | ((command == "down") & (position != "up\n"))):
+            self.logger.debug("Cannot move target %s when target is status is %s", command, position)
+            return
+
+        self.fd = os.open(self.position_path,os.O_RDWR)
+        os.write(self.fd, command)
+        os.close(self.fd)
+        self.fd = os.open(self.position_path,os.O_RDWR)
+        position = os.read(self.fd, 32)
+        
+        if (position == "up\n"):
+            self.write_out(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
+        elif (position == "down\n"):
+            self.write_out(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
+        elif (position == "moving\n"):
+            self.write_out(fasit_packet_pd.PD_EXPOSURE_TRANSITION)
+        else:
+            self.write_out(-1)
+            return
+        
+        p = select.poll()
+        p.register(self.fd, select.POLLERR|select.POLLPRI)
+        s = p.poll()
+        os.close(self.fd)
+        d = os.open(self.position_path,os.O_RDWR )
+        position = os.read(self.fd, 32) 
+        
+        self.logger.debug("Current position status: %s", position)
+    
+        if (position == "up\n"):
+            self.write_out(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
+        elif (position == "down\n"):
+            self.write_out(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
+        elif (position == "moving\n"):
+            self.write_out(fasit_packet_pd.PD_EXPOSURE_TRANSITION)
+        else:
+            self.write_out(-1)
+            
+# TODO - Currently works with mechanical hit sensor only      
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------     
+class hit_thread(QThread):    
+    HIT_POLL_TIMEOUT_MS = 500
+    def __init__(self, sensor_type):
+        QThread.__init__(self)
+        self.logger = logging.getLogger('hit_thread')
+        self.keep_going = True
+        self.sensor_type = sensor_type
+        self.driver_path = HIT_SENSOR_PATH
+        self.hit_path = self.driver_path + "hit"
+        self.fd = None
+        
+    def check_driver(self):
+        if (os.path.exists(self.driver_path) == False):
+            self.logger.debug("sysfs path to driver does not exist (%s)", self.driver_path)
+            raise ValueError('Path to hit sensor driver not found.')
+                    
+        # make sure this is the correct type of hit sensor
+        self.fd = os.open(self.driver_path + "type", os.O_RDONLY)
+        type = os.read(self.fd, 32)
+        os.close(self.fd)
+        if (type != self.sensor_type+"\n"):
+            self.logger.debug("Wrong hit sensor type: %s", type)
+            raise ValueError('Wrong hit sensor type.')
+       
+        self.logger.debug('correct type...')
+        
+    def get_setting(self, setting_name):
+        if (self.isAlive()):
+            self.logger.debug("Cannot get settings while thread is running")
+            raise ValueError('Cannot get settings while thread is running')
+        
+        # get the setting 
+        self.fd = os.open(self.driver_path + setting_name, os.O_RDONLY)
+        setting = os.read(self.fd, 32)
+        os.close(self.fd)
+        return setting
+    
+    def get_setting_enabled(self):
+        setting = self.get_setting("enable")
+        if (setting == "enabled\n"):
+            self.logger.debug("Hit sensor is enabled")
+            return True
+        elif (setting == "disabled\n"):
+            self.logger.debug("Hit sensor is disabled")
+            return False
+        else:
+            self.logger.debug("Hit sensor unknown state (%s)", setting.rstrip())
+            return 
+        
+    def get_setting_sensitivity(self):
+            setting = self.get_setting("sensitivity")
+            self.logger.debug("Hit sensor sensitivity = %s", setting.rstrip())
+            return int(setting)
+
+    def get_setting_burst_separation(self):
+        setting = self.get_setting("burst_separation")
+        self.logger.debug("Hit sensor burst_separation = %s", setting.rstrip())
+        return int(setting)     
+
+    def get_setting_mode(self):
+        setting = self.get_setting("mode")
+        if (setting == "single\n"):
+            self.logger.debug("Hit sensor is in single mode")
+            return fasit_packet_pd.PD_HIT_MODE_SINGLE
+        elif (setting == "burst\n"):
+            self.logger.debug("Hit sensor is in burst mode")
+            return fasit_packet_pd.PD_HIT_MODE_BURST
+        else:
+            self.logger.debug("Hit sensor unknown mode (%s)", setting.rstrip())
+            return 
+        
+    def run(self):
+        self.logger.debug('hit thread running...')
+        
+        # clear the hit record if any by reading
+#        self.fd = os.open(self.hit_path, os.O_RDONLY)
+#        hits = os.read(self.fd, 32)
+#        os.close(self.fd)
+        
+        # process incoming commands            
+        while self.keep_going:
+            data = self.read_in_blocking()
+            if data == "enable":
+                self.logger.debug('enable command')
+                self.enable_and_wait()
+            elif data == "stop":
+                self.logger.debug('stop command')
+                self.keep_going = False
+                
+        self.logger.debug('...hit thread stopping')
+    
+    def enable_and_wait(self):
+        keep_going = True
+        self.fd = os.open(self.driver_path + "enable",os.O_RDWR)
+        os.write(self.fd, "enable")
+        os.close(self.fd)
+        
+        self.fd = os.open(self.driver_path + "enable",os.O_RDWR)
+        enable_state = os.read(self.fd, 32)
+        os.close(self.fd)
+        if (enable_state != "enabled\n"):
+            self.logger.debug('error: sensor did not enable (%s)', enable_state)
+            self.write_out(-1)
+            return
+        
+        self.logger.debug('sensor is enabled')
+        
+        while keep_going:
+            data = self.read_in()
+            
+            if(data == None):
+                self.fd = os.open(self.hit_path,os.O_RDONLY)
+                hits = os.read(self.fd, 32)
+               
+                if (int(hits) > 0):
+                    self.logger.debug('hits: %i', int(hits))
+                    self.write_out(int(hits))
+                
+                p = select.poll()
+                p.register(self.fd, select.POLLERR|select.POLLPRI)
+                s = p.poll(self.HIT_POLL_TIMEOUT_MS)
+                os.close(self.fd)
+                d = os.open(self.hit_path,os.O_RDONLY)
+                hits = os.read(self.fd, 32)
+               
+                if (int(hits) > 0):
+                    self.logger.debug('hits: %i', int(hits))
+                    self.write_out(int(hits))
+                    
+            elif data == "disable":
+                self.logger.debug('disable command')
+                self.fd = os.open(self.driver_path + "enable",os.O_RDWR)
+                os.write(self.fd, "disable")
+                os.close(self.fd)
+                
+                self.fd = os.open(self.driver_path + "enable",os.O_RDWR)
+                enable_state = os.read(self.fd, 32)
+                os.close(self.fd)
+                if (enable_state != "disabled\n"):
+                    self.logger.debug('error: sensor did not disable')
+                    self.write_out(-1)
+                    
+                keep_going = False
+                    
+            elif data == "stop":
+                self.logger.debug('stop command')
+                keep_going = False
+                self.keep_going = False
+      
                 
             
             
@@ -353,243 +630,39 @@ class play_sound_thread(QThread):
 #
 #------------------------------------------------------------------------------------          
 class FasitPdSit(FasitPd):
-    
-    # TODO - Currently works with mechanical hit sensor only           
-    class hit_thread(QThread):    
-        HIT_POLL_TIMEOUT_MS = 500
-        def __init__(self, sensor_type):
-            QThread.__init__(self)
-            self.logger = logging.getLogger('hit_thread')
-            self.keep_going = True
-            self.sensor_type = sensor_type
-            self.driver_path = "/sys/class/target/hit_sensor/"
-            self.hit_path = self.driver_path + "hit"
-            self.fd = None
-            
-        def run(self):
-            self.logger.debug('hit thread running...')
-            
-            if (os.path.exists(self.driver_path) == False):
-                self.logger.debug("sysfs path to driver does not exist (%s)", self.driver_path)
-                self.write_out(-1)
-                return
-            
-            # make sure this is the correct type of hit sensor
-            self.fd = os.open(self.driver_path + "type", os.O_RDONLY)
-            type = os.read(self.fd, 32)
-            os.close(self.fd)
-            if (type != self.sensor_type+"\n"):
-                self.logger.debug("Wrong hit sensor type: %s", type)
-                self.write_out(-1)
-                return
-            
-            self.logger.debug('correct type...')
-            
-            # clear the hit record if any by reading
-            self.fd = os.open(self.hit_path, os.O_RDONLY)
-            hits = os.read(self.fd, 32)
-            os.close(self.fd)
-            
-            self.logger.debug('processing incoming commands...')
-            
-            # process incoming commands            
-            while self.keep_going:
-                data = self.read_in_blocking()
-                if data == "enable":
-                    self.logger.debug('enable command')
-                    self.enable_and_wait()
-                elif data == "stop":
-                    self.logger.debug('stop command')
-                    self.keep_going = False
-                    
-            self.logger.debug('...hit thread stopping')
-        
-        def enable_and_wait(self):
-            keep_going = True
-            self.fd = os.open(self.driver_path + "enable",os.O_RDWR)
-            os.write(self.fd, "enable")
-            os.close(self.fd)
-            
-            self.fd = os.open(self.driver_path + "enable",os.O_RDWR)
-            enable_state = os.read(self.fd, 32)
-            os.close(self.fd)
-            if (enable_state != "enabled\n"):
-                self.logger.debug('error: sensor did not enable (%s)', enable_state)
-                self.write_out(-1)
-                return
-            
-            self.logger.debug('sensor is enabled')
-            
-            while keep_going:
-                data = self.read_in()
-                
-                if(data == None):
-                    self.fd = os.open(self.hit_path,os.O_RDONLY)
-                    hits = os.read(self.fd, 32)
-                   
-                    if (int(hits) > 0):
-                        self.logger.debug('hits: %i', int(hits))
-                        self.write_out(int(hits))
-                    
-                    p = select.poll()
-                    p.register(self.fd, select.POLLERR|select.POLLPRI)
-                    s = p.poll(FasitPdSit.hit_thread.HIT_POLL_TIMEOUT_MS)
-                    os.close(self.fd)
-                    d = os.open(self.hit_path,os.O_RDONLY)
-                    hits = os.read(self.fd, 32)
-                   
-                    if (int(hits) > 0):
-                        self.logger.debug('hits: %i', int(hits))
-                        self.write_out(int(hits))
-                        
-                elif data == "disable":
-                    self.logger.debug('disable command')
-                    self.fd = os.open(self.driver_path + "enable",os.O_RDWR)
-                    os.write(self.fd, "disable")
-                    os.close(self.fd)
-                    
-                    self.fd = os.open(self.driver_path + "enable",os.O_RDWR)
-                    enable_state = os.read(self.fd, 32)
-                    os.close(self.fd)
-                    if (enable_state != "disabled\n"):
-                        self.logger.debug('error: sensor did not disable')
-                        self.write_out(-1)
-                        
-                    keep_going = False
-                        
-                elif data == "stop":
-                    self.logger.debug('stop command')
-                    keep_going = False
-                    self.keep_going = False
-   
-    # TODO - this class can be re-used by other lifter types with some small changes
-    class exposure_thread(QThread):    
-        def __init__(self):
-            QThread.__init__(self)
-            self.logger = logging.getLogger('exposure_thread')
-            self.keep_going = True
-            self.driver_path = "/sys/class/target/lifter/"
-            self.position_path = self.driver_path + "position"
-            self.fd = None
-            
-        def run(self):
-            self.logger.debug('exposure thread running...')
-            
-            if (os.path.exists(self.driver_path) == False):
-                self.logger.debug("sysfs path to driver does not exist (%s)", self.driver_path)
-                self.write_out(-1)
-                return
-            
-            # make sure this is the correct type of lifter
-            self.fd = os.open(self.driver_path + "type", os.O_RDONLY)
-            type = os.read(self.fd, 32)
-            os.close(self.fd)
-            if (type != "infantry\n"):
-                self.logger.debug("Wrong lifter type: %s", type)
-                self.write_out(-1)
-                return
-            
-            self.logger.debug('correct type...')
-            
-            # get the current position and report
-            self.fd = os.open(self.position_path, os.O_RDWR)
-            position = os.read(self.fd, 32)
-            os.close(self.fd)
-            if (position != "error\n"):
-                self.logger.debug("Current position status: %s", position)
-                if (position == "up\n"):
-                    self.write_out(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
-                elif (position == "down\n"):
-                    self.write_out(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
-                elif (position == "moving\n"):
-                    self.write_out(fasit_packet_pd.PD_EXPOSURE_TRANSITION)
-                else:
-                    self.write_out(-1)
-                    return
-            else:
-                self.logger.debug("Position error.")
-                self.write_out(-1)
-                return
-            
-            self.logger.debug('processing incoming commands...')
-            
-            # process incoming commands            
-            while self.keep_going:
-                data = self.read_in_blocking()
-                if data == fasit_packet_pd.PD_EXPOSURE_EXPOSED:
-                    self.logger.debug('expose command')
-                    self.send_command_and_wait("up")
-                elif data == fasit_packet_pd.PD_EXPOSURE_CONCEALED:
-                    self.logger.debug('conceal command')
-                    self.send_command_and_wait("down")
-                elif data == "stop":
-                    self.keep_going = False
-                    self.logger.debug('...exposure thread stopping')
-                    
-#                time.sleep(0.5)
-        
-        def send_command_and_wait(self, command):
-            self.fd = os.open(self.position_path,os.O_RDWR)
-            position = os.read(self.fd, 32)
-            os.close(self.fd)
-            self.logger.debug("Current position: %s", position)
-            if (((command == "up") & (position != "down\n")) | ((command == "down") & (position != "up\n"))):
-                self.logger.debug("Cannot move target %s when target is status is %s", command, position)
-                return
-
-            self.fd = os.open(self.position_path,os.O_RDWR)
-            os.write(self.fd, command)
-            os.close(self.fd)
-            self.fd = os.open(self.position_path,os.O_RDWR)
-            position = os.read(self.fd, 32)
-            
-            if (position == "up\n"):
-                self.write_out(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
-            elif (position == "down\n"):
-                self.write_out(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
-            elif (position == "moving\n"):
-                self.write_out(fasit_packet_pd.PD_EXPOSURE_TRANSITION)
-            else:
-                self.write_out(-1)
-                return
-            
-            p = select.poll()
-            p.register(self.fd, select.POLLERR|select.POLLPRI)
-            s = p.poll()
-            os.close(self.fd)
-            d = os.open(self.position_path,os.O_RDWR )
-            position = os.read(self.fd, 32) 
-            
-            self.logger.debug("Current position status: %s", position)
-        
-            if (position == "up\n"):
-                self.write_out(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
-            elif (position == "down\n"):
-                self.write_out(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
-            elif (position == "moving\n"):
-                self.write_out(fasit_packet_pd.PD_EXPOSURE_TRANSITION)
-            else:
-                self.write_out(-1)
-                  
                         
     def __init__(self):
         FasitPd.__init__(self)
         self.logger = logging.getLogger('FasitPdSit')
+       
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_SIT
-        self.__exposure_thread__    = FasitPdSit.exposure_thread()
-        self.__exposure_thread__.start()
-        self.__hit_thread__  = FasitPdSit.hit_thread("mechanical")
+        
+        self.__lifter_thread__= lifter_thread("infantry")
+        self.__lifter_thread__.check_driver()
+       
+        self.__hit_thread__ = hit_thread("mechanical")
+        self.__hit_thread__.check_driver()
+            
+        # get current lifter position        
+        self.__exposure__ = self.__lifter_thread__.get_current_position()     
+        
+        # get current hit sensor settings
+        self.__hit_onoff__               = self.__hit_thread__.get_setting_enabled()
+        self.__hit_sensitivity__         = self.__hit_thread__.get_setting_sensitivity()
+        self.__hit_mode__                = self.__hit_thread__.get_setting_mode()
+        self.__hit_burst_separation__    = self.__hit_thread__.get_setting_burst_separation()  
+        
+        self.__lifter_thread__.start()
         self.__hit_thread__.start()
         
     def stop_threads(self):
-        self.__exposure_thread__.write("stop")
+        self.__lifter_thread__.write("stop")
         self.__hit_thread__.write("stop")
-        time.sleep(5)
         
     def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
         FasitPd.expose(self, expose)
-        self.__exposure_thread__.write(expose)
+        self.__lifter_thread__.write(expose)
         
     def hit_enable(self, enable = False):
         self.logger.debug("hit sensor enable = %s" % enable)
@@ -609,23 +682,29 @@ class FasitPdSit(FasitPd):
                 self.hit_enable(False)
                 self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED) 
                     
-        # check the exposure thread
-        exposure_status = self.__exposure_thread__.read()
-        if (exposure_status != None):
-            if (exposure_status == -1):
+        # check the lifter thread
+        lifter_status = self.__lifter_thread__.read()
+        if (lifter_status != None):
+            if (lifter_status == -1):
                 self.logger.debug("Exposure error")
                 self.__fault_code__ = fasit_packet_pd.PD_FAULT_ACTUATION_WAS_NOT_COMPLETED
                 writable_status = True
                 self.__exposure_needs_update__ = True
-            elif (exposure_status != self.__exposure__):
-                self.logger.debug("change in exposure status %d", exposure_status)
-                self.__exposure__ = exposure_status
+            elif (lifter_status != self.__exposure__):
+                self.logger.debug("change in exposure status %d", lifter_status)
+                
+                if ((self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_ON_POS) & (lifter_status == fasit_packet_pd.PD_EXPOSURE_EXPOSED)):
+                    self.hit_enable(True)
+                
+                if ((self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_OFF_POS) & (lifter_status == fasit_packet_pd.PD_EXPOSURE_CONCEALED)):
+                    self.hit_enable(False)
+                
+                self.__exposure__ = lifter_status
                 writable_status = True
                 self.__exposure_needs_update__ = True
                 
         return writable_status
-    
-    
+
 
 # TEST CODE -----------------------------------------------------------------------------------------------------
 class FasitPdTestSitXXX(FasitPd):
