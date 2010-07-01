@@ -10,7 +10,7 @@
 #define ACTIVE_HIGH						1
 
 //---------------------------------------------------------------------------
-// INOUT PULL-UP RESISTOR SETTING
+// PULL-UP RESISTOR SETTING
 //---------------------------------------------------------------------------
 #define PULLUP_OFF						0
 #define PULLUP_ON						1
@@ -39,8 +39,15 @@
 //---------------------------------------------------------------------------
 // BATTERY
 //---------------------------------------------------------------------------
-#define	INPUT_ADC_LOW_BAT 				AT91_PIN_PC1
-#define	OUTPUT_LED_LOW_BAT 				AT91_PIN_PC15
+#define	INPUT_ADC_LOW_BAT 					AT91_PIN_PC1
+
+#define OUTPUT_LED_LOW_BAT_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_LED_LOW_BAT 					AT91_PIN_PC15
+
+#define INPUT_CHARGING_BAT_ACTIVE_STATE			ACTIVE_LOW
+#define INPUT_CHARGING_BAT_PULLUP_STATE			PULLUP_OFF
+#define INPUT_CHARGING_BAT_DEGLITCH_STATE		DEGLITCH_ON
+#define	INPUT_CHARGING_BAT_BAT					AT91_PIN_PB8  // DOCKED
 
 //---------------------------------------------------------------------------
 // USER INTERFACE
@@ -52,24 +59,30 @@
 //---------------------------------------------------------------------------
 // HIT SENSOR - MECHANICAL
 //---------------------------------------------------------------------------
-#define INPUT_HIT_SENSOR_ACTIVE_STATE	ACTIVE_HIGH
-#define INPUT_HIT_SENSOR_PULLUP_STATE	PULLUP_ON
-#define INPUT_HIT_SENSOR_DEGLITCH_STATE	DEGLITCH_OFF
-#define	INPUT_HIT_SENSOR 				AT91_PIN_PB24
-#define	INPUT_FRONT_TIRE_HIT 			AT91_PIN_PB21
-#define	INPUT_BACK_TIRE_HIT 			AT91_PIN_PB20
-#define	INPUT_ENGINE_HIT 				AT91_PIN_PA3
+#define INPUT_HIT_SENSOR_ACTIVE_STATE		ACTIVE_HIGH
+#define INPUT_HIT_SENSOR_PULLUP_STATE		PULLUP_ON
+#define INPUT_HIT_SENSOR_DEGLITCH_STATE		DEGLITCH_ON
+#define	INPUT_HIT_SENSOR 					AT91_PIN_PB24
+#define	INPUT_FRONT_TIRE_HIT 				AT91_PIN_PB21
+#define	INPUT_BACK_TIRE_HIT 				AT91_PIN_PB20
+#define	INPUT_ENGINE_HIT 					AT91_PIN_PB25
 
 //---------------------------------------------------------------------------
 // HIT SENSOR - MILES RECEIVER
 //---------------------------------------------------------------------------
-#define	INPUT_MILES_HIT 				AT91_PIN_PB23
-#define	OUTPUT_MILES_RESET 				AT91_PIN_PB22
+#define INPUT_MILES_ACTIVE_STATE			ACTIVE_LOW
+#define INPUT_MILES_PULLUP_STATE			PULLUP_ON
+#define INPUT_MILES_DEGLITCH_STATE			DEGLITCH_ON
+#define	INPUT_MILES_HIT 					AT91_PIN_PB23
+
+#define OUTPUT_MILES_RESET_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_MILES_RESET 					AT91_PIN_PB22
 
 //---------------------------------------------------------------------------
 // MILE TRANSMITTER
 //---------------------------------------------------------------------------
-#define	OUTPUT_MILES_SHOOTBACK 			AT91_PIN_PC11
+#define OUTPUT_MILES_SHOOTBACK_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_MILES_SHOOTBACK 					AT91_PIN_PC10
 
 
 #define	INPUT_SPEED_SENSOR1 			AT91_PIN_PB0
@@ -78,8 +91,6 @@
 #define	INPUT_TRACK_SENSOR2 			AT91_PIN_PB11
 
 #define	OUTPUT_APPLY_BRAKE 				AT91_PIN_PB9
-
-#define	INPUT_DOCKED 					AT91_PIN_PB8
 
 #define	INPUT_END_OF_TRACK1 			AT91_PIN_PA30
 #define	INPUT_END_OF_TRACK2 			AT91_PIN_PA31

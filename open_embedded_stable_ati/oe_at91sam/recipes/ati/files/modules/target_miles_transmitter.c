@@ -17,12 +17,11 @@
 #define MILES_TX_STATE_ON    	1
 #define MILES_TX_STATE_ERROR  	2
 
-#define PIN_MILES_TX_ACTIVE    	0       		// Active low
 
 #ifdef DEV_BOARD_REVB
-	#define PIN_MILES_TX_CONTROL    	AT91_PIN_PA6
+	#define OUTPUT_MILES_SHOOTBACK    	AT91_PIN_PA6
 #else
-	#define PIN_MILES_TX_CONTROL    	AT91_PIN_PB8
+	#define OUTPUT_MILES_SHOOTBACK    	AT91_PIN_PB8
 #endif
 
 //---------------------------------------------------------------------------
@@ -57,7 +56,7 @@ static const char * miles_tx_state[] =
 //---------------------------------------------------------------------------
 static int hardware_miles_tx_on(void)
 	{
-	at91_set_gpio_value(PIN_MILES_TX_CONTROL, PIN_MILES_TX_ACTIVE); // Turn miles tx on
+	at91_set_gpio_value(OUTPUT_MILES_SHOOTBACK, OUTPUT_MILES_SHOOTBACK_ACTIVE_STATE); // Turn miles tx on
 	return 0;
 	}
 
@@ -66,7 +65,7 @@ static int hardware_miles_tx_on(void)
 //---------------------------------------------------------------------------
 static int hardware_miles_tx_off(void)
 	{
-	at91_set_gpio_value(PIN_MILES_TX_CONTROL, !PIN_MILES_TX_ACTIVE); // Turn miles tx off
+	at91_set_gpio_value(OUTPUT_MILES_SHOOTBACK, !OUTPUT_MILES_SHOOTBACK_ACTIVE_STATE); // Turn miles tx off
 	return 0;
 	}
 
@@ -106,7 +105,7 @@ static int hardware_init(void)
     int status = 0;
 
     // configure miles tx gpio for output and set initial output
-    at91_set_gpio_output(PIN_MILES_TX_CONTROL, !PIN_MILES_TX_ACTIVE);
+    at91_set_gpio_output(OUTPUT_MILES_SHOOTBACK, !OUTPUT_MILES_SHOOTBACK_ACTIVE_STATE);
 
     return status;
     }

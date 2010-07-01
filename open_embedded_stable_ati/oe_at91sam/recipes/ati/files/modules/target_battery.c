@@ -12,6 +12,9 @@
 
 #define TARGET_NAME		"battery"
 
+// TODO - the ADC code could be broken into its own file to allows configuration
+// and use of more than one ADC channel at a time.
+
 // TODO - make this timeout longer, we don't need to check the battery every 5 seconds
 #define TIMEOUT_IN_SECONDS	5
 
@@ -19,18 +22,40 @@
 #define BATTERY_CHARGING_YES    	1
 #define BATTERY_CHARGING_ERROR  	2
 
-#define PIN_BATTERY_CHARGING_ACTIVE    	0       		// Active low
-#define PIN_BATTERY_CHARGING 			AT91_PIN_PA30   // BP3 on dev. board
+#define TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL
+	#undef	INPUT_ADC_LOW_BAT
 
-#define PIN_LOW_BATTERY_INDICATOR_ACTIVE    	0       			// Active low
+	#undef OUTPUT_LED_LOW_BAT_ACTIVE_STATE
+	#undef	OUTPUT_LED_LOW_BAT
 
-#ifdef DEV_BOARD_REVB
-	#define PIN_LOW_BATTERY_INDICATOR    	AT91_PIN_PA6
+	#undef INPUT_CHARGING_BAT_ACTIVE_STATE
+	#undef INPUT_CHARGING_BAT_PULLUP_STATE
+	#undef INPUT_CHARGING_BAT_DEGLITCH_STATE
+	#undef INPUT_CHARGING_BAT_BAT
+
+	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC0
+
+	#define OUTPUT_LED_LOW_BAT_ACTIVE_STATE			ACTIVE_LOW
+	#define	OUTPUT_LED_LOW_BAT 						AT91_PIN_PA6 // LED on dev. board
+
+	#define INPUT_CHARGING_BAT_ACTIVE_STATE			ACTIVE_LOW
+	#define INPUT_CHARGING_BAT_PULLUP_STATE			PULLUP_OFF
+	#define INPUT_CHARGING_BAT_DEGLITCH_STATE		DEGLITCH_ON
+	#define	INPUT_CHARGING_BAT_BAT					AT91_PIN_PA30 // BP3 on dev. board
+#endif // TESTING_ON_EVAL
+
+#if 	(INPUT_ADC_LOW_BAT == AT91_PIN_PC0)
+	#define ADC_CHAN 	0
+#elif 	(INPUT_ADC_LOW_BAT == AT91_PIN_PC1)
+	#define ADC_CHAN 	1
+#elif 	(INPUT_ADC_LOW_BAT == AT91_PIN_PC2)
+	#define ADC_CHAN 	2
+#elif 	(INPUT_ADC_LOW_BAT == AT91_PIN_PC3)
+	#define ADC_CHAN 	3
 #else
-	#define PIN_LOW_BATTERY_INDICATOR    	AT91_PIN_PB8
+	#error ERROR - INPUT_ADC_LOW_BAT setting
 #endif
-
-#define PIN_BATTERY_LEVEL_ADC 				AT91_PIN_PC0
 
 // ADC memory base and clock
 void __iomem *	adc_base;
@@ -46,6 +71,8 @@ struct clk *	adc_clk;
 #define ADC_IER         0x24    // Interrupt Enable Register Offset
 #define ADC_IDR         0x28    // Interrupt Disable Register Offset
 #define ADC_IMR         0x2C    // Interrupt Mask Register Offset
+
+/*
 #define ADC_CDR0        0x30    // Channel Data Register 0 Offset
 #define ADC_CDR1        0x34    // Channel Data Register 1 Offset
 #define ADC_CDR2        0x38    // Channel Data Register 2 Offset
@@ -53,6 +80,11 @@ struct clk *	adc_clk;
 
 #define CH_EN           0x01    // Channels to Enable - channel 0, this needs to match the pin setting
 #define CH_DIS          0x0E    // Channels to Disable - channels 1,2, and 3 will be disabled
+*/
+
+#define ADC_CDR        	(0x30+(4*ADC_CHAN))   	// Channel Data Register
+#define CH_EN           (0x01<<ADC_CHAN)	 	// Channel to enable
+#define CH_DIS          (!CH_EN)				// Channels to disable
 
 #define TRGEN           0x00    // 	Hardware triggers are disabled. Starting a conversion is only possible by software.
 #define TRGSEL          0x00    // 	Trigger Select - disregarded, see above
@@ -97,7 +129,8 @@ static unsigned char hardware_adc_read(void)
 		{
 		cpu_relax();
 		}
-	return __raw_readl(adc_base + ADC_CDR0); // Read & Return the conversion
+	//return __raw_readl(adc_base + ADC_CDR0); // Read & Return the conversion
+	return __raw_readl(adc_base + ADC_CDR); // Read & Return the conversion
 	}
 
 //---------------------------------------------------------------------------
@@ -129,13 +162,13 @@ static void timeout_fire(unsigned long data)
 
 	// TODO  determine if battery is low, based on ADC value
 	// now we just toggle the LED
-	if(at91_get_gpio_value(PIN_LOW_BATTERY_INDICATOR) == PIN_LOW_BATTERY_INDICATOR_ACTIVE)
+	if(at91_get_gpio_value(OUTPUT_LED_LOW_BAT) == OUTPUT_LED_LOW_BAT_ACTIVE_STATE)
 		{
-		at91_set_gpio_value(PIN_LOW_BATTERY_INDICATOR, !PIN_LOW_BATTERY_INDICATOR_ACTIVE);
+		at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
 		}
 	else
 		{
-		at91_set_gpio_value(PIN_LOW_BATTERY_INDICATOR, PIN_LOW_BATTERY_INDICATOR_ACTIVE);
+		at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
 		}
 
 
@@ -152,9 +185,9 @@ static int hardware_adc_init(void)
 	adc_clk = clk_get(NULL, "adc_clk"); 				// Get the ADC Clock
 	clk_enable(adc_clk);
 
-	at91_set_A_periph(PIN_BATTERY_LEVEL_ADC,0); 					// Set the pin to ADC
+	at91_set_A_periph(INPUT_ADC_LOW_BAT, 0); 			// Set the pin to ADC
 
-	adc_base = ioremap(AT91SAM9260_BASE_ADC,SZ_16K); 	// Map the ADC mem region
+	adc_base = ioremap(AT91SAM9260_BASE_ADC,SZ_16K); 	// Map the ADC memory region
 
 	__raw_writel(0x01, adc_base + ADC_CR); 				// Reset the ADC
 
@@ -185,11 +218,11 @@ static int hardware_init(void)
     int status = 0;
 
     // Configure charging gpio for input / deglitch
-    at91_set_gpio_input(PIN_BATTERY_CHARGING, 1);
-    at91_set_deglitch(PIN_BATTERY_CHARGING, 1);
+    at91_set_gpio_input(INPUT_CHARGING_BAT_BAT, 1);
+    at91_set_deglitch(INPUT_CHARGING_BAT_BAT, 1);
 
     // configure low battery indicator gpio for output and set initial output
-    at91_set_gpio_output(PIN_LOW_BATTERY_INDICATOR, !PIN_LOW_BATTERY_INDICATOR_ACTIVE);
+    at91_set_gpio_output(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
 
     hardware_adc_init();
 
@@ -213,7 +246,7 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 static int hardware_charging_get(void)
     {
-	if (at91_get_gpio_value(PIN_BATTERY_CHARGING) == PIN_BATTERY_CHARGING_ACTIVE)
+	if (at91_get_gpio_value(INPUT_CHARGING_BAT_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE)
 	    {
 		return BATTERY_CHARGING_YES;
 		}

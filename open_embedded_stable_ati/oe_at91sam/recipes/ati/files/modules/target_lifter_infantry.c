@@ -14,12 +14,12 @@
 
 #define TIMEOUT_IN_SECONDS		3
 
-#define LIFTER_POSITION_DOWN   	0
-#define LIFTER_POSITION_UP    	1
-#define LIFTER_POSITION_MOVING  2
-#define LIFTER_POSITION_ERROR   3
+#define LIFTER_POSITION_DOWN   			0
+#define LIFTER_POSITION_UP    			1
+#define LIFTER_POSITION_MOVING  		2
+#define LIFTER_POSITION_ERROR_NEITHER	3	// Neither limit switch is active, but the lifter is not moving
 
-//#define FIX_FOR_JPY_IO_BOARD
+#define FIX_FOR_JPY_IO_BOARD
 #ifdef FIX_FOR_JPY_IO_BOARD
 	#undef INPUT_LIFTER_POS_UP_LIMIT
 	#define	INPUT_LIFTER_POS_UP_LIMIT 			AT91_PIN_PC3
@@ -94,7 +94,7 @@ static const char * lifter_position[] =
     "down",
     "up",
     "moving",
-    "error"
+    "neither"
     };
 
 //---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ static int hardware_motor_on(int direction)
 	unsigned long flags;
 	// with the infantry lifter we don't care about direction,
 	// just turn on the motor
-printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
     spin_lock_irqsave(&motor_lock, flags);
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); 	// Turn brake off
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); 	// Turn motor on
@@ -119,7 +119,7 @@ printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 static int hardware_motor_off(void)
 	{
 	unsigned long flags;
-printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 	spin_lock_irqsave(&motor_lock, flags);
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); 	// Turn motor off
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); 	// Turn brake on
@@ -177,7 +177,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
 	// We get an interrupt on both edges, so we have to check to which edge
 	// we are responding.
-    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
     if (at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
@@ -208,7 +208,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
 	// We get an interrupt on both edges, so we have to check to which edge
 	// we are responding.
-    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
     if (at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
@@ -329,7 +329,7 @@ static int hardware_position_get(void)
         return LIFTER_POSITION_UP;
         }
 
-    return LIFTER_POSITION_ERROR;
+    return LIFTER_POSITION_ERROR_NEITHER;
     }
 
 //---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ static void position_default(struct work_struct * work)
     printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
     if (hardware_position_get() != LIFTER_POSITION_DOWN)
         {
-printk(KERN_ALERT "resetting to down\n");
+    	printk(KERN_ALERT "resetting to down\n");
         hardware_position_set(LIFTER_POSITION_DOWN);
         }
     }
@@ -466,7 +466,7 @@ static int __init target_lifter_infantry_init(void)
     retval=target_sysfs_add(&target_device_lifter_infantry);
     // signal that we are fully initialized
     atomic_set(&full_init, 1);
-    schedule_work(&default_position);
+//    schedule_work(&default_position);
     return retval;
     }
 

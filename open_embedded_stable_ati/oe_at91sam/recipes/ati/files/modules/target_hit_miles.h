@@ -1,6 +1,6 @@
 #ifndef __TARGET_HIT_MILES_H__
 #define __TARGET_HIT_MILES_H__
 
-// TODO - put #defines for pins here?
+#include "target_hardware.h"
 
 #endif // __TARGET_HIT_MILES_H__
