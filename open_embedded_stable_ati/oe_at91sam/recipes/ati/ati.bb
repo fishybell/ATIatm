@@ -74,7 +74,7 @@ do_install(){
     install -m 0755 ${WORKDIR}/asoundrc ${D}${ROOT_USER_INSTALL_DIR}/.asoundrc
 }
 
-PACKAGE_ARCH = "at91sam9g20ek"
+PACKAGE_ARCH = "at91sam9g20ek_2mmc"
 PACKAGES = "${PN}"
 FILES_${PN} = "${TARGET_MODULES_INSTALL_DIR}"
 

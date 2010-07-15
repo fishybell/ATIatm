@@ -1,0 +1,12 @@
+--- linux-2.6.30/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c	2010-04-30 11:26:38.635094945 -0600
++++ linux-2.6/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c	2010-04-30 11:26:47.382898062 -0600
+@@ -317,7 +317,7 @@ static void __init ek_board_init(void)
+ 	/* I2C */
+ 	at91_add_device_i2c(ek_i2c_devices, ARRAY_SIZE(ek_i2c_devices));
+ 	/* LEDs */
+-	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
++	//at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
+ 	/* Push Buttons */
+-	ek_add_device_buttons();
++	//ek_add_device_buttons();
+ 	/* PCK0 provides MCLK to the WM8731 */

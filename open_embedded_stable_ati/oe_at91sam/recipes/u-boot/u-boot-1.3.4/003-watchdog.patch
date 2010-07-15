@@ -1,0 +1,30 @@
+diff -ruN u-boot-1.3.4.orig/Makefile u-boot-1.3.4/Makefile
+--- u-boot-1.3.4.orig/Makefile	2010-05-19 15:17:07.537584048 -0600
++++ u-boot-1.3.4/Makefile	2010-05-19 15:19:00.911137273 -0600
+@@ -2431,9 +2431,13 @@
+ 	@if [ "$(findstring _2mmc_,$@)" ] ; then \
+ 		echo "#define CONFIG_AT91SAM9G20EK_2MMC 1"	>>$(obj)include/config.h ; \
+ 		$(XECHO) "... AT91SAM9G20EK board with two SD/MMC slots" ; \
++		echo "#define CONFIG_AT91SAM9_WATCHDOG" >> $(obj)include/config.h ; \
++		$(XECHO) "... configured with watchdog active"; \
+ 	else \
+ 		echo "#define CONFIG_AT91SAM9G20EK 1"	>>$(obj)include/config.h ; \
+ 		$(XECHO) "... AT91SAM9G20EK Board" ; \
++		echo "#define CONFIG_AT91SAM9_WATCHDOG" >> $(obj)include/config.h ; \
++		$(XECHO) "... configured with watchdog active"; \
+ 	fi;
+ 	@$(MKCONFIG) -a at91sam9g20ek arm arm926ejs at91sam9g20ek atmel at91sam9
+ 
+diff -ruN u-boot-1.3.4.orig/include/configs/at91sam9g20ek.h u-boot-1.3.4/include/configs/at91sam9g20ek.h
+--- u-boot-1.3.4.orig/include/configs/at91sam9g20ek.h	2010-05-19 15:17:07.403243117 -0600
++++ u-boot-1.3.4/include/configs/at91sam9g20ek.h	2010-05-19 15:19:55.036542763 -0600
+@@ -194,4 +194,9 @@
+ #error CONFIG_USE_IRQ not supported
+ #endif
+ 
++/* WATCHDOG */
++#ifdef CONFIG_AT91SAM9_WATCHDOG
++#define CONFIG_HW_WATCHDOG			/* watchdog */
++#endif
++
+ #endif

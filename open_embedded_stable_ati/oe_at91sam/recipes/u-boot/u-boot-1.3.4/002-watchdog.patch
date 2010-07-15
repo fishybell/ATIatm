@@ -1,0 +1,229 @@
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj <at> jcrosoft.com>
+---
+ Makefile                             |    1 +
+ drivers/serial/atmel_usart.c         |    4 +-
+ drivers/watchdog/Makefile            |   46 ++++++++++++++++++++
+ drivers/watchdog/at91sam9_wdt.c      |   79 ++++++++++++++++++++++++++++++++++
+ include/asm-arm/arch-at91sam9/at91_wdt.h |   38 ++++++++++++++++
+ 6 files changed, 176 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/watchdog/Makefile
+ create mode 100644 drivers/watchdog/at91sam9_wdt.c
+ create mode 100644 include/asm-arm/arch-at91sam9/at91_wdt.h
+
+diff --git a/Makefile b/Makefile
+index 4a3a488..c3f089d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -266,6 +266,7 @@ LIBS += drivers/rtc/librtc.a
+ LIBS += drivers/serial/libserial.a
+ LIBS += drivers/usb/libusb.a
+ LIBS += drivers/video/libvideo.a
++LIBS += drivers/watchdog/libwatchdog.a
+ LIBS += common/libcommon.a
+ LIBS += libfdt/libfdt.a
+ LIBS += api/libapi.a
+diff --git a/drivers/serial/atmel_usart.c b/drivers/serial/atmel_usart.c
+index f3b146c..f50552a 100644
+--- a/drivers/serial/atmel_usart.c
++++ b/drivers/serial/atmel_usart.c
+@@ -16,6 +16,7 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+ #include <common.h>
++#include <watchdog.h>
+
+ #include <asm/io.h>
+ #include <asm/arch/clk.h>
+@@ -87,7 +88,8 @@ void serial_puts(const char *s)
+
+ int serial_getc(void)
+ {
+-	while (!(usart3_readl(CSR) & USART3_BIT(RXRDY))) ;
++	while (!(usart3_readl(CSR) & USART3_BIT(RXRDY)))
++		 WATCHDOG_RESET();
+ 	return usart3_readl(RHR);
+ }
+
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+new file mode 100644
+index 0000000..200968d
+--- /dev/null
++++ b/drivers/watchdog/Makefile
+@@ -0,0 +1,46 @@
++#
++# (C) Copyright 2008
++# Wolfgang Denk, DENX Software Engineering, wd <at> denx.de.
++#
++# See file CREDITS for list of people who contributed to this
++# project.
++#
++# This program is free software; you can redistribute it and/or
++# modify it under the terms of the GNU General Public License as
++# published by the Free Software Foundation; either version 2 of
++# the License, or (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++# MA 02111-1307 USA
++#
++
++include $(TOPDIR)/config.mk
++
++LIB	:= $(obj)libwatchdog.a
++
++COBJS-$(CONFIG_AT91SAM9_WATCHDOG) += at91sam9_wdt.o
++
++COBJS	:= $(COBJS-y)
++SRCS	:= $(COBJS:.o=.c)
++OBJS	:= $(addprefix $(obj),$(COBJS))
++
++all:	$(LIB)
++
++$(LIB):	$(obj).depend $(OBJS)
++	$(AR) $(ARFLAGS) $@ $(OBJS)
++
++#########################################################################
++
++# defines $(obj).depend target
++include $(SRCTREE)/rules.mk
++
++sinclude $(obj).depend
++
++#########################################################################
+diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
+new file mode 100644
+index 0000000..5bb8b77
+--- /dev/null
++++ b/drivers/watchdog/at91sam9_wdt.c
+@@ -0,0 +1,79 @@
++/*
++ * [origin: Linux kernel drivers/watchdog/at91sam9_wdt.c]
++ *
++ * Watchdog driver for Atmel AT91SAM9x processors.
++ *
++ * Copyright (C) 2008 Jean-Christophe PLAGNIOL-VILLARD <plagnioj <at> jcrosoft.com>
++ * Copyright (C) 2008 Renaud CERRATO r.cerrato <at> til-technologies.fr
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++
++/*
++ * The Watchdog Timer Mode Register can be only written to once. If the
++ * timeout need to be set from U-Boot, be sure that the bootstrap doesn't
++ * write to this register. Inform Linux to it too
++ */
++
++#include <common.h>
++#include <watchdog.h>
++#include <asm/arch/hardware.h>
++#include <asm/arch/io.h>
++#include <asm/arch/at91_wdt.h>
++
++/*
++ * AT91SAM9 watchdog runs a 12bit counter @ 256Hz,
++ * use this to convert a watchdog
++ * value from/to milliseconds.
++ */
++#define ms_to_ticks(t)	(((t << 8) / 1000) - 1)
++#define ticks_to_ms(t)	(((t + 1) * 1000) >> 8)
++
++/* Hardware timeout in seconds */
++#define WDT_HW_TIMEOUT 2
++
++/*
++ * Set the watchdog time interval in 1/256Hz (write-once)
++ * Counter is 12 bit.
++ */
++static int at91_wdt_settimeout(unsigned int timeout)
++{
++	unsigned int reg;
++	unsigned int mr;
++
++	/* Check if disabled */
++	mr = at91_sys_read(AT91_WDT_MR);
++	if (mr & AT91_WDT_WDDIS) {
++		printf("sorry, watchdog is disabled\n");
++		return -1;
++	}
++
++	/*
++	 * All counting occurs at SLOW_CLOCK / 128 = 256 Hz
++	 *
++	 * Since WDV is a 12-bit counter, the maximum period is
++	 * 4096 / 256 = 16 seconds.
++	 */
++	reg = AT91_WDT_WDRSTEN	/* causes watchdog reset */
++		/* | AT91_WDT_WDRPROC	causes processor reset only */
++		| AT91_WDT_WDDBGHLT		/* disabled in debug mode */
++		| AT91_WDT_WDD			/* restart at any time */
++		| (timeout & AT91_WDT_WDV);	/* timer value */
++	at91_sys_write(AT91_WDT_MR, reg);
++
++	return 0;
++}
++
++void hw_watchdog_reset(void)
++{
++	at91_sys_write(AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
++}
++
++void hw_watchdog_init(void)
++{
++	/* 16 seconds timer, resets enabled */
++	at91_wdt_settimeout(ms_to_ticks(WDT_HW_TIMEOUT * 1000));
++}
+diff --git a/include/asm-arm/arch-at91sam9/at91_wdt.h b/include/asm-arm/arch-at91sam9/at91_wdt.h
+new file mode 100644
+index 0000000..7e18537
+--- /dev/null
++++ b/include/asm-arm/arch-at91sam9/at91_wdt.h
+@@ -0,0 +1,38 @@
++/*
++ * [origin: Linux kernel arch/arm/mach-at91/include/mach/at91_wdt.h]
++ *
++ * Copyright (C) 2008 Jean-Christophe PLAGNIOL-VILLARD <plagnioj <at> jcrosoft.com>
++ * Copyright (C) 2007 Andrew Victor
++ * Copyright (C) 2007 Atmel Corporation.
++ *
++ * Watchdog Timer (WDT) - System peripherals regsters.
++ * Based on AT91SAM9261 datasheet revision D.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef AT91_WDT_H
++#define AT91_WDT_H
++
++#define AT91_WDT_CR		(AT91_WDT + 0x00)	/* Watchdog Control Register */
++#define		AT91_WDT_WDRSTT		(1    << 0)		/* Restart */
++#define		AT91_WDT_KEY		(0xa5 << 24)		/* KEY Password */
++
++#define AT91_WDT_MR		(AT91_WDT + 0x04)	/* Watchdog Mode Register */
++#define		AT91_WDT_WDV		(0xfff << 0)		/* Counter Value */
++#define		AT91_WDT_WDFIEN		(1     << 12)		/* Fault Interrupt Enable */
++#define		AT91_WDT_WDRSTEN	(1     << 13)		/* Reset Processor */
++#define		AT91_WDT_WDRPROC	(1     << 14)		/* Timer Restart */
++#define		AT91_WDT_WDDIS		(1     << 15)		/* Watchdog Disable */
++#define		AT91_WDT_WDD		(0xfff << 16)		/* Delta Value */
++#define		AT91_WDT_WDDBGHLT	(1     << 28)		/* Debug Halt */
++#define		AT91_WDT_WDIDLEHLT	(1     << 29)		/* Idle Halt */
++
++#define AT91_WDT_SR		(AT91_WDT + 0x08)	/* Watchdog Status Register */
++#define		AT91_WDT_WDUNF		(1 << 0)		/* Watchdog Underflow */
++#define		AT91_WDT_WDERR		(1 << 1)		/* Watchdog Error */
++
++#endif
+-- 
+1.5.6.5

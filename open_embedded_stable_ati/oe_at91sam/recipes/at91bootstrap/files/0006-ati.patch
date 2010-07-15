@@ -1,0 +1,37 @@
+diff -ruN at91bootstrap-2.11.orig/board/at91sam9g20ek/at91sam9g20ek.c at91bootstrap-2.11/board/at91sam9g20ek/at91sam9g20ek.c
+--- at91bootstrap-2.11.orig/board/at91sam9g20ek/at91sam9g20ek.c	2009-02-11 12:32:57.000000000 -0700
++++ at91bootstrap-2.11/board/at91sam9g20ek/at91sam9g20ek.c	2010-05-19 11:47:43.915217646 -0600
+@@ -70,8 +70,8 @@
+ 		{(char *) 0, 0, 0, PIO_DEFAULT, PIO_PERIPH_A},
+ 	};
+ 
+-	/* Disable watchdog */
+-	writel(AT91C_WDTC_WDDIS, AT91C_BASE_WDTC + WDTC_WDMR);
++//	/* Disable watchdog */
++//	writel(AT91C_WDTC_WDDIS, AT91C_BASE_WDTC + WDTC_WDMR);
+ 
+ 	/* At this stage the main oscillator is supposed to be enabled
+ 	 * PCK = MCK = MOSC */
+diff -ruN at91bootstrap-2.11.orig/crt0_gnu.S at91bootstrap-2.11/crt0_gnu.S
+--- at91bootstrap-2.11.orig/crt0_gnu.S	2008-12-21 13:49:35.000000000 -0700
++++ at91bootstrap-2.11/crt0_gnu.S	2010-05-19 11:47:12.655196649 -0600
+@@ -56,7 +56,7 @@
+ 	b 	swi_vector   	/* Software Interrupt */
+ 	b 	pabt_vector  	/* Prefetch Abort */
+ 	b 	dabt_vector  	/* Data Abort */
+-.word		_edata		/* Size of the image for SAM-BA */
++.word		_edata - reset	/* Size of the image for SAM-BA */
+ 	b 	irq_vector	/* IRQ : read the AIC */
+ 	b 	fiq_vector      /* FIQ */
+ 
+diff -ruN at91bootstrap-2.11.orig/include/nand_ids.h at91bootstrap-2.11/include/nand_ids.h
+--- at91bootstrap-2.11.orig/include/nand_ids.h	2010-07-15 11:54:28.422708912 -0600
++++ at91bootstrap-2.11/include/nand_ids.h	2010-07-15 11:53:44.030820071 -0600
+@@ -41,6 +41,7 @@
+ 	{0xecaa, 0x800, 0x20000, 0x800, 0x40, 0x0, "Samsung K9F2G08U0A 256Mb\0"},
+ 	{0x2cca, 0x800, 0x20000, 0x800, 0x40, 0x1, "Micron MT29F2G16AAB 256Mb\0"},	
+ 	{0x2cda, 0x800, 0x20000, 0x800, 0x40, 0x0, "Micron MT29F2G08AAC 256Mb\0"},	
++	{0x2ca1, 0x400, 0x20000, 0x800, 0x40, 0x0, "Micron 8UC12NW140 128Mb\0"},	
+ 	{0,}
+ };
+ 

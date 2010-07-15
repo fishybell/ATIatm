@@ -1,0 +1,39 @@
+diff -ruN u-boot-1.3.4.orig/drivers/mtd/nand/nand_util.c u-boot-1.3.4/drivers/mtd/nand/nand_util.c
+--- u-boot-1.3.4.orig/drivers/mtd/nand/nand_util.c	2008-08-12 08:08:38.000000000 -0600
++++ u-boot-1.3.4/drivers/mtd/nand/nand_util.c	2010-07-15 12:29:43.951654985 -0600
+@@ -540,7 +540,6 @@
+ 	int pagelen;
+ 	int baderaseblock;
+ 	int blockstart = -1;
+-	int percent_complete = -1;
+ 	loff_t offs;
+ 	size_t readlen;
+ 	ulong mtdoffset = opts->offset;
+@@ -664,27 +663,6 @@
+ 			imglen -= readlen;
+ 		}
+ 
+-		if (!opts->quiet) {
+-			unsigned long long n = (unsigned long long)
+-				 (opts->length-imglen) * 100;
+-			int percent;
+-
+-			do_div(n, opts->length);
+-			percent = (int)n;
+-
+-			/* output progress message only at whole percent
+-			 * steps to reduce the number of messages printed
+-			 * on (slow) serial consoles
+-			 */
+-			if (percent != percent_complete) {
+-			if (!opts->quiet)
+-				printf("\rReading data from 0x%lx "
+-				       "-- %3d%% complete.",
+-				       mtdoffset, percent);
+-				percent_complete = percent;
+-			}
+-		}
+-
+ 		mtdoffset += meminfo->oobblock;
+ 	}
+ 

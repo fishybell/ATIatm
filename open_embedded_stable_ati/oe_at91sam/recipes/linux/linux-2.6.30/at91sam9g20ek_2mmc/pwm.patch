@@ -1,0 +1,11 @@
+--- linux-2.6.30/drivers/misc/Kconfig	2010-05-13 11:55:39.000000000 -0600
++++ linux-2.6/drivers/misc/Kconfig	2010-05-13 12:06:19.806755836 -0600
+@@ -15,7 +15,7 @@
+ 
+ config ATMEL_PWM
+ 	tristate "Atmel AT32/AT91 PWM support"
+-	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91CAP9 || ARCH_AT91SAM9G45
++	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91CAP9 || ARCH_AT91SAM9G45 || ARCH_AT91SAM9G20 || ARCH_AT91SAM9260
+ 	help
+ 	  This option enables device driver support for the PWM channels
+ 	  on certain Atmel processors.  Pulse Width Modulation is used for

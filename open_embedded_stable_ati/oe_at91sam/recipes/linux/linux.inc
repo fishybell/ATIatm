@@ -177,3 +177,8 @@ pkg_postrm_kernel-devicetree () {
 	cd /${KERNEL_IMAGEDEST}; update-alternatives --remove devicetree devicetree-${KERNEL_VERSION} || true
 }
 
+
+do_install_append() {
+	oe_runmake DEPMOD=echo INSTALL_MOD_PATH="${D}" modules_install
+	oe_runmake DEPMOD=echo INSTALL_MOD_PATH="${D}" firmware_install
+}

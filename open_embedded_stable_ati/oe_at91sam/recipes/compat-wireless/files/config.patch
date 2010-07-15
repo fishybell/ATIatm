@@ -1,0 +1,159 @@
+--- compat-wireless-2010-05-18/config.mk.orig	2010-05-24 11:04:52.828579684 -0600
++++ compat-wireless-2010-05-18/config.mk	2010-05-24 11:06:17.204324231 -0600
+@@ -394,11 +394,11 @@
+ 
+ ifneq ($(CONFIG_SPI_MASTER),)
+ 
+-CONFIG_WL1251=m
+-ifneq ($(CONFIG_CRC7),)
+-CONFIG_WL1251_SPI=m
+-endif
+-CONFIG_WL1271_SPI=m
++#CONFIG_WL1251=m
++#ifneq ($(CONFIG_CRC7),)
++#CONFIG_WL1251_SPI=m
++#endif
++#CONFIG_WL1271_SPI=m
+ CONFIG_P54_SPI=m
+ 
+ ifdef CONFIG_COMPAT_KERNEL_27
+@@ -415,10 +415,10 @@
+ 
+ CONFIG_SSB_SDIOHOST=y
+ CONFIG_B43_SDIO=y
+-CONFIG_WL1251_SDIO=m
++#CONFIG_WL1251_SDIO=m
+ 
+ ifneq ($(CONFIG_ARM),)
+-CONFIG_WL1271_SDIO=m
++#CONFIG_WL1271_SDIO=m
+ endif
+ 
+ ifdef CONFIG_COMPAT_KERNEL_27
+@@ -463,11 +463,11 @@
+ CONFIG_ATH_COMMON=m
+ # CONFIG_ATH_DEBUG=y
+ 
+-CONFIG_WL12XX=y
+-CONFIG_WL1251=m
+-ifneq ($(CONFIG_CRC7),)
+-CONFIG_WL1271=m
+-endif
++#CONFIG_WL12XX=y
++#CONFIG_WL1251=m
++#ifneq ($(CONFIG_CRC7),)
++#CONFIG_WL1271=m
++#endif
+ 
+ ifdef CONFIG_COMPAT_KERNEL_27
+ CONFIG_LIBERTAS=n
+diff -ruN compat-wireless-2010-05-18.orig/drivers/net/wireless/Makefile compat-wireless-2010-05-18/drivers/net/wireless/Makefile
+--- compat-wireless-2010-05-18.orig/drivers/net/wireless/Makefile	2010-05-18 13:06:04.000000000 -0600
++++ compat-wireless-2010-05-18/drivers/net/wireless/Makefile	2010-05-24 11:20:11.105642443 -0600
+@@ -34,6 +34,4 @@
+ 
+ obj-$(CONFIG_MAC80211_HWSIM)	+= mac80211_hwsim.o
+ 
+-obj-$(CONFIG_WL12XX)	+= wl12xx/
+-
+ obj-$(CONFIG_IWM)	+= iwmc3200wifi/
+diff -ruN compat-wireless-2010-05-18.orig/Makefile compat-wireless-2010-05-18/Makefile
+--- compat-wireless-2010-05-18.orig/Makefile	2010-05-24 16:10:08.707487400 -0600
++++ compat-wireless-2010-05-18/Makefile	2010-05-24 16:47:57.210389791 -0600
+@@ -83,7 +83,7 @@
+ bt-install-modules: bt
+ 	$(MAKE) -C $(KLIB_BUILD) M=$(PWD) $(KMODDIR_ARG) $(KMODPATH_ARG) BT=TRUE \
+ 		modules_install
+-	@/sbin/depmod -ae
++	@#/sbin/depmod -ae
+ 	@echo
+ 	@echo "Currently detected bluetooth subsystem modules:"
+ 	@echo
+@@ -108,7 +108,7 @@
+ 	@rm -rf $(KLIB)/$(KMODDIR)/drivers/bluetooth/
+ 	@# Lets only remove the stuff we are sure we are providing
+ 	@# on the misc directory.
+-	@/sbin/depmod -ae
++	@#/sbin/depmod -ae
+ 	@echo
+ 	@echo "Your old bluetooth subsystem modules were left intact:"
+ 	@echo
+@@ -172,10 +172,10 @@
+ 	@# Mandrake doesn't have a depmod.d/ conf file to prefer
+ 	@# the updates/ dir which is what we use so we add one for it
+ 	@# (or any other distribution that doens't have this).
+-	@./scripts/check_depmod
++	@#./scripts/check_depmod
+ 	@# Udev stuff needed for the new compat_firmware_class.
+ 	@./compat/scripts/compat_firmware_install
+-	@/sbin/depmod -a
++	@#/sbin/depmod -a
+ 	@echo
+ 	@echo "Currently detected wireless subsystem modules:"
+ 	@echo 
+@@ -264,7 +264,7 @@
+ 	@rm -f $(KLIB)/$(KMODDIR)/drivers/misc/eeprom/eeprom_93cx6.ko*
+ 	@rm -f $(KLIB)/$(KMODDIR)/drivers/misc/eeprom_93cx6.ko*
+ 	@rm -f $(KLIB)/$(KMODDIR)/drivers/net/b44.ko*
+-	@/sbin/depmod -a
++	@#/sbin/depmod -a
+ 	@echo
+ 	@echo "Your old wireless subsystem modules were left intact:"
+ 	@echo 
+diff -ruN compat-wireless-2010-05-18.orig/compat/scripts/compat_firmware_install compat-wireless-2010-05-18/compat/scripts/compat_firmware_install
+--- compat-wireless-2010-05-18.orig/compat/scripts/compat_firmware_install	2010-01-20 13:08:17.000000000 -0700
++++ compat-wireless-2010-05-18/compat/scripts/compat_firmware_install	2010-05-24 16:28:35.082304286 -0600
+@@ -8,12 +8,14 @@
+ 
+ case $LSB_RED_ID in
+ "Ubuntu")
+-	cp udev/ubuntu/compat_firmware.sh /lib/udev/
+-	cp udev/ubuntu/50-compat_firmware.rules /lib/udev/rules.d/
++	install -m 755 -d ${DESTDIR}/lib/udev/rules.d
++	cp udev/ubuntu/compat_firmware.sh ${DESTDIR}/lib/udev/
++	cp udev/ubuntu/50-compat_firmware.rules ${DESTDIR}/lib/udev/rules.d/
+         ;;
+ *)
+-	cp udev/compat_firmware.sh /lib/udev/
+-	cp udev/50-compat_firmware.rules /lib/udev/rules.d/
++	install -m 755 -d ${DESTDIR}/lib/udev/rules.d
++	cp udev/compat_firmware.sh ${DESTDIR}/lib/udev/
++	cp udev/50-compat_firmware.rules ${DESTDIR}/lib/udev/rules.d/
+         ;;
+ esac
+ 
+diff -ruN compat-wireless-2010-05-18.orig/scripts/modlib.sh compat-wireless-2010-05-18/scripts/modlib.sh
+--- compat-wireless-2010-05-18.orig/scripts/modlib.sh	2010-01-06 19:24:55.000000000 -0700
++++ compat-wireless-2010-05-18/scripts/modlib.sh	2010-05-24 16:48:17.784299550 -0600
+@@ -39,7 +39,7 @@
+ 			echo -en "Disabling $MODULE ..."
+ 		fi
+ 		mv -f $i ${i}${IGNORE_SUFFIX}
+-		depmod -ae
++		#depmod -ae
+ 		CHECK_AGAIN=`modprobe -l $MODULE`
+ 		if [ "$CHECK" != "$CHECK_AGAIN" ]; then
+ 			echo -e "\t[OK]\tModule disabled:"
+@@ -65,7 +65,7 @@
+ 		echo -en "Enabling $MODULE ..."
+ 		DIR=`dirname $i`
+ 		mv $i $DIR/$MODULE_KO
+-		depmod -ae
++		#depmod -ae
+ 		CHECK=`modprobe -l $MODULE`
+ 		if [ "$DIR/$MODULE_KO" != $CHECK ]; then
+ 			if [ -z $CHECK ]; then
+diff -ruN compat-wireless-2010-05-18.orig/config.mk compat-wireless-2010-05-18/config.mk
+--- compat-wireless-2010-05-18.orig/config.mk	2010-05-25 09:33:42.675326245 -0600
++++ compat-wireless-2010-05-18/config.mk	2010-05-25 09:39:04.389431753 -0600
+@@ -12,6 +12,10 @@
+  CONFIG_SSB=m
+ else
+ include $(KLIB_BUILD)/.config
++# ATI required drivers
++ CONFIG_ATH9K_HW=m
++ CONFIG_ATH9K=m
++ CONFIG_ATH9K_COMMON=m
+ endif
+ 
+ # We will warn when you don't have MQ support or NET_SCHED enabled.

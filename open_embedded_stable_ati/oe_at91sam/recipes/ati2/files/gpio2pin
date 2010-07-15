@@ -1,0 +1,22 @@
+#!/bin/sh
+
+#a=1
+#while [ $a -lt 129 ] ; do
+#    echo $a > /sys/class/gpio/export
+#    a=`expr $a + 1`
+#done
+
+for i in `list.gpio` ; do
+    echo -n $i
+    if [ $i -lt 64 ] ; then
+        echo -n " - A"
+        i=`expr $i - 32`
+    elif [ $i -lt 96 ] ; then
+        echo -n " - B"
+        i=`expr $i - 64`
+    else
+        echo -n " - C"
+        i=`expr $i - 96`
+    fi
+    echo $i
+done

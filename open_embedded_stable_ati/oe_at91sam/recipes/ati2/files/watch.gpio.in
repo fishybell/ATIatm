@@ -1,0 +1,11 @@
+#!/bin/sh
+
+gp=/sys/class/gpio/gpio
+
+while true; do
+    echo -n ">-"
+    for i in `/usr/bin/list.gpio` ; do
+        echo -n "`cat ${gp}${i}/value`-"
+    done
+    echo "<"
+done

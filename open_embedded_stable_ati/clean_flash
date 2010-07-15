@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd ~/devel/atm/open_embedded_stable_ati/flash
+rm -v *.bin *.jffs2

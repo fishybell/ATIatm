@@ -1,6 +1,6 @@
 DESCRIPTION = "at91bootstrap"
 SRC_URI = "ftp://www.at91.com/pub/buildroot/${PN}-${PV}.tar.bz2 \
-           "
+           file://0006-ati.patch;patch=1"
 
 PR = "r1"
 SECTION = "bootloaders"
@@ -27,13 +27,15 @@ do_compile () {
 	rm -Rf ${S}/binaries
 	oe_runmake ${AT91BOOTSTRAP_BOARDNAME}_defconfig
 	oe_runmake AT91_CUSTOM_FLAGS="${AT91BOOTSTRAP_FLAGS}"
-	chmod +x ${S}/fixboot.py
-	${S}/fixboot.py ${S}/binaries/${AT91BOOTSTRAP_BOARDNAME}-${AT91BOOTSTRAP_MEMORY}boot-${PV}.bin
 }
+#	chmod +x ${S}/fixboot.py
+#	${S}/fixboot.py ${S}/binaries/${AT91BOOTSTRAP_BOARDNAME}-${AT91BOOTSTRAP_MEMORY}boot-${PV}.bin
 
 do_deploy () {
 	install -d ${DEPLOY_DIR_IMAGE}
-	install ${S}/binaries/${AT91BOOTSTRAP_BOARDNAME}-${AT91BOOTSTRAP_MEMORY}boot-${PV}.bin.fixboot \
+#	install ${S}/binaries/${AT91BOOTSTRAP_BOARDNAME}-${AT91BOOTSTRAP_MEMORY}boot-${PV}.bin.fixboot \
+#		${DEPLOY_DIR_IMAGE}/${AT91BOOTSTRAP_IMAGE}
+	install ${S}/binaries/${AT91BOOTSTRAP_BOARDNAME}-${AT91BOOTSTRAP_MEMORY}boot-${PV}.bin \
 		${DEPLOY_DIR_IMAGE}/${AT91BOOTSTRAP_IMAGE}
 	package_stagefile_shell ${DEPLOY_DIR_IMAGE}/${AT91BOOTSTRAP_IMAGE}
 	cd ${DEPLOY_DIR_IMAGE}
