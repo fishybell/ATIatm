@@ -1,0 +1,23 @@
+pcm.wm8731 {
+	type hw
+	card 0
+	rate 44100 
+}
+
+ctl.wm8731 {
+	type hw           
+	card 0
+	rate 44100
+}
+
+pcm.swmix {
+	type dmix
+	ipc_key 249
+	slave {
+		pcm wm8731
+		period_time 0
+		period_size 1024
+		buffer_size 8192
+		rate 44100
+	}
+}
