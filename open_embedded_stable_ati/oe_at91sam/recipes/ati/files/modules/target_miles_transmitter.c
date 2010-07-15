@@ -17,12 +17,10 @@
 #define MILES_TX_STATE_ON    	1
 #define MILES_TX_STATE_ERROR  	2
 
-
-#ifdef DEV_BOARD_REVB
+//#define TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL
 	#define OUTPUT_MILES_SHOOTBACK    	AT91_PIN_PA6
-#else
-	#define OUTPUT_MILES_SHOOTBACK    	AT91_PIN_PB8
-#endif
+#endif // TESTING_ON_EVAL
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that an operation is in progress,

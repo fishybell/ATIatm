@@ -22,8 +22,8 @@ class FasitClient(FasitHandler):
         
         # check the type here, but don't assign __device__
         # until after the socket has been successfully opened
-        if (type != fasit_packet_pd.PD_TYPE_SIT):
-            raise ValueError('SIT is only currently supported target type')
+        if ((type != fasit_packet_pd.PD_TYPE_SIT) & (type != fasit_packet_pd.PD_TYPE_MIT)):
+            raise ValueError('SIT and MIT are only currently supported target types')
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.logger.debug('connecting to %s', (host, port))
@@ -35,8 +35,10 @@ class FasitClient(FasitHandler):
         
         if (type == fasit_packet_pd.PD_TYPE_SIT):
             self.__device__ = fasit_pd.FasitPdSit()
+        elif (type == fasit_packet_pd.PD_TYPE_MIT):
+            self.__device__ = fasit_pd.FasitPdMit()
         else:
-            raise ValueError('SIT is only currently supported target type')
+            raise ValueError('SIT and MIT are only currently supported target types')
             
         FasitHandler.__init__(self, sock=self.sock, name='FasitClient')
     
@@ -226,13 +228,16 @@ class FasitClient(FasitHandler):
         self.logger.info('event_cmd_req_expose_handler()')
         self.__device__.expose(cmd_data.exposure)
         self.send_cmd_ack(ack = 'S')
-        self.send_device_status(False)
+        self.send_device_status(True)
     
     def event_cmd_req_dev_reset(self, cmd_data):
         self.logger.info('event_cmd_req_dev_reset()')
     
     def event_cmd_req_move(self, cmd_data):
         self.logger.info('event_cmd_req_move()')
+        self.__device__.move(cmd_data.direction, cmd_data.move, cmd_data.speed)
+        self.send_cmd_ack(ack = 'S')
+        self.send_device_status(True)
     
     def event_cmd_config_hit_sensor_handler(self, cmd_data):
         self.logger.info('event_cmd_config_hit_sensor_handler()')
@@ -245,7 +250,7 @@ class FasitClient(FasitHandler):
                                              burst_separation = cmd_data.hit_burst_separation)
         
         self.send_cmd_ack(ack = 'S')
-        self.send_device_status(False)
+        self.send_device_status(True)
         
      
     def event_cmd_req_gps_location_handler(self, cmd_data):

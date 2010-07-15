@@ -54,6 +54,7 @@ do_compile() {
 
 #_INSTALL_DIR = "${base_libdir}/modules/${KERNEL_VERSION}/kernel/drivers/test"
 TARGET_MODULES_INSTALL_DIR = "/home/root"
+ROOT_USER_INSTALL_DIR = "/home/root"
 
 do_install(){
     install -d ${D}${TARGET_MODULES_INSTALL_DIR}
@@ -69,7 +70,8 @@ do_install(){
     install -m 0644 ${S}/target_sound.ko ${D}${TARGET_MODULES_INSTALL_DIR}
     install -m 0644 ${S}/target_thermal.ko ${D}${TARGET_MODULES_INSTALL_DIR}
     install -m 0644 ${S}/target_user_interface.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0755 ${WORKDIR}/start_target_modules.sh ${D}${TARGET_MODULES_INSTALL_DIR}/start_target_modules.sh
+    install -m 0755 ${WORKDIR}/start_target_modules.sh ${D}${ROOT_USER_INSTALL_DIR}/start_target_modules.sh
+    install -m 0755 ${WORKDIR}/asoundrc ${D}${ROOT_USER_INSTALL_DIR}/.asoundrc
 }
 
 PACKAGE_ARCH = "at91sam9g20ek"

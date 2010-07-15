@@ -6,7 +6,11 @@ import subprocess
 import time
 
 PLAYER_COMMAND  = "/usr/bin/mplayer" 
+
+# this is for the real HW
 #PLAYER_ARGS     =  " -ao alsa:device=plug=swmix "
+
+#this is for testing on the desktop
 PLAYER_ARGS     =  " "
 
 class FasitAudio:

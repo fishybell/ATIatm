@@ -84,29 +84,54 @@
 #define OUTPUT_MILES_SHOOTBACK_ACTIVE_STATE		ACTIVE_LOW
 #define	OUTPUT_MILES_SHOOTBACK 					AT91_PIN_PC10
 
+//---------------------------------------------------------------------------
+// MOVER
+//---------------------------------------------------------------------------
+#define INPUT_MOVER_SPEED_SENSOR_ACTIVE_STATE		ACTIVE_LOW
+#define INPUT_MOVER_SPEED_SENSOR_PULLUP_STATE		PULLUP_ON
+#define	INPUT_MOVER_SPEED_SENSOR_1 					AT91_PIN_PB0
+#define	INPUT_MOVER_SPEED_SENSOR_2 					AT91_PIN_PB1
 
-#define	INPUT_SPEED_SENSOR1 			AT91_PIN_PB0
-#define	INPUT_SPEED_SENSOR2 			AT91_PIN_PB1
-#define	INPUT_TRACK_SENSOR1 			AT91_PIN_PB10
-#define	INPUT_TRACK_SENSOR2 			AT91_PIN_PB11
+#define INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE		ACTIVE_LOW
+#define INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE		PULLUP_ON
+#define	INPUT_MOVER_TRACK_SENSOR_1 					AT91_PIN_PB10
+#define	INPUT_MOVER_TRACK_SENSOR_2 					AT91_PIN_PB11
 
-#define	OUTPUT_APPLY_BRAKE 				AT91_PIN_PB9
+#define OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_MOVER_APPLY_BRAKE 					AT91_PIN_PB9
 
-#define	INPUT_END_OF_TRACK1 			AT91_PIN_PA30
-#define	INPUT_END_OF_TRACK2 			AT91_PIN_PA31
+#define INPUT_MOVER_END_OF_TRACK_ACTIVE_STATE		ACTIVE_LOW
+#define INPUT_MOVER_END_OF_TRACK_PULLUP_STATE		PULLUP_ON
+#define	INPUT_MOVER_END_OF_TRACK_1 					AT91_PIN_PA30
+#define	INPUT_MOVER_END_OF_TRACK_2 					AT91_PIN_PA31
 
-#define	OUTPUT_PWM_SPEED_THROTTLE 		AT91_PIN_PB2
-#define	OUTPUT_MOVER_FORWARD 			AT91_PIN_PA29
-#define	OUTPUT_MOVER_REVERSE 			AT91_PIN_PA25
+#define	OUTPUT_MOVER_PWM_SPEED_THROTTLE 			AT91_PIN_PB2
 
+#define OUTPUT_MOVER_DIRECTION_ACTIVE_STATE			ACTIVE_LOW
+#define	OUTPUT_MOVER_DIRECTION_FORWARD 				AT91_PIN_PA29
+#define	OUTPUT_MOVER_DIRECTION_REVERSE 				AT91_PIN_PA25
+
+//---------------------------------------------------------------------------
+// POWER
+//---------------------------------------------------------------------------
 #define	OUTPUT_POWER_OFF 				AT91_PIN_PA11
 
+//---------------------------------------------------------------------------
+// MUZZLE FLASH
+//---------------------------------------------------------------------------
 #define	OUTPUT_MUZZLE_FLASH 			AT91_PIN_PA10
+#define	OUTPUT_NIGHT_LIGHT 				AT91_PIN_PA6
 #define	OUTPUT_HIT_INDICATOR 			AT91_PIN_PA9
+
+//---------------------------------------------------------------------------
+// MISC.
+//---------------------------------------------------------------------------
 #define	OUTPUT_AUX 						AT91_PIN_PA8
 #define	INPUT_SPARE_IN 					AT91_PIN_PC0
-#define	OUTPUT_NIGHT_LIGHT 				AT91_PIN_PA6
+
+#define OUTPUT_THERMAL_ACTIVE_STATE		ACTIVE_LOW
 #define	OUTPUT_THERMAL 					AT91_PIN_PA5
+
 #define	OUTPUT_SMOKE 					AT91_PIN_PA4
 #define	OUTPUT_M21_RELAY 				AT91_PIN_PC2
 

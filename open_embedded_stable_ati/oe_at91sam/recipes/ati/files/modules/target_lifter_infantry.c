@@ -57,12 +57,12 @@ static DEFINE_SPINLOCK(motor_lock);
 // i.e. the lifter has been commanded to move. It is used to synchronize
 // user-space commands with the actual hardware.
 //---------------------------------------------------------------------------
-atomic_t operating_atomic = ATOMIC_INIT(0);
+atomic_t operating_atomic = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are fully initialized
 //---------------------------------------------------------------------------
-atomic_t full_init = ATOMIC_INIT(0);
+atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space of a position
@@ -159,7 +159,7 @@ static void timeout_fire(unsigned long data)
     hardware_motor_off();
 
     // signal that the operation has finished
-    atomic_set(&operating_atomic, 0);
+    atomic_set(&operating_atomic, FALSE);
 
     // notify user-space
     schedule_work(&position_work);
@@ -187,7 +187,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         hardware_motor_off();
 
         // signal that the operation has finished
-        atomic_set(&operating_atomic, 0);
+        atomic_set(&operating_atomic, FALSE);
 
         // notify user-space
         schedule_work(&position_work);
@@ -218,7 +218,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         hardware_motor_off();
 
         // signal that the operation has finished
-    	atomic_set(&operating_atomic, 0);
+    	atomic_set(&operating_atomic, FALSE);
 
         // notify user-space
         schedule_work(&position_work);
@@ -297,7 +297,7 @@ static int hardware_exit(void)
 static int hardware_position_set(int position)
     {
 	// signal that an operation is in progress
-	atomic_set(&operating_atomic, 1);
+	atomic_set(&operating_atomic, TRUE);
 
 	// with the infantry lifter we don't care about position,
 	// just turn on the motor
@@ -465,7 +465,7 @@ static int __init target_lifter_infantry_init(void)
     hardware_init();
     retval=target_sysfs_add(&target_device_lifter_infantry);
     // signal that we are fully initialized
-    atomic_set(&full_init, 1);
+    atomic_set(&full_init, TRUE);
 //    schedule_work(&default_position);
     return retval;
     }

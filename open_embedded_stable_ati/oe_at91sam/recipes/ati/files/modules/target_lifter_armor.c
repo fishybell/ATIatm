@@ -42,7 +42,7 @@ atomic_t operating_atomic = ATOMIC_INIT(LIFTER_POSITION_STOPPED);
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are fully initialized
 //---------------------------------------------------------------------------
-atomic_t full_init = ATOMIC_INIT(0);
+atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space of a position
@@ -459,7 +459,7 @@ static int __init target_lifter_armor_init(void)
     hardware_init();
     retval=target_sysfs_add(&target_device_lifter_armor);
     // signal that we are fully initialized
-    atomic_set(&full_init, 1);
+    atomic_set(&full_init, TRUE);
     schedule_work(&default_position);
     return retval;
     }

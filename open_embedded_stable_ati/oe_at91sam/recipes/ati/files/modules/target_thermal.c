@@ -17,20 +17,18 @@
 #define THERMAL_STATE_ON    	1
 #define THERMAL_STATE_ERROR  	2
 
-#define PIN_THERMAL_ACTIVE    	0       		// Active low
-
-#ifdef DEV_BOARD_REVB
-	#define PIN_THERMAL_CONTROL    	AT91_PIN_PA6
-#else
-	#define PIN_THERMAL_CONTROL    	AT91_PIN_PB8
-#endif
+#define TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL
+	#undef OUTPUT_THERMAL
+	#define OUTPUT_THERMAL    	AT91_PIN_PA6
+#endif // TESTING_ON_EVAL
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that an operation is in progress,
 // i.e. the thermal device has been commanded to turn on. It is used to
 // synchronize user-space commands with the actual hardware.
 //---------------------------------------------------------------------------
-atomic_t operating_atomic = ATOMIC_INIT(0);
+atomic_t operating_atomic = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
 // Declaration of the function that gets called when the timeout fires.
@@ -57,8 +55,8 @@ static const char * thermal_state[] =
 //---------------------------------------------------------------------------
 static int hardware_thermal_on(void)
 	{
-	at91_set_gpio_value(PIN_THERMAL_CONTROL, PIN_THERMAL_ACTIVE); // Turn thermal device on
-	return 0;
+	at91_set_gpio_value(OUTPUT_THERMAL, OUTPUT_THERMAL_ACTIVE_STATE); // Turn thermal device on
+	return TRUE;
 	}
 
 //---------------------------------------------------------------------------
@@ -66,8 +64,8 @@ static int hardware_thermal_on(void)
 //---------------------------------------------------------------------------
 static int hardware_thermal_off(void)
 	{
-	at91_set_gpio_value(PIN_THERMAL_CONTROL, !PIN_THERMAL_ACTIVE); // Turn thermal device off
-	return 0;
+	at91_set_gpio_value(OUTPUT_THERMAL, !OUTPUT_THERMAL_ACTIVE_STATE); // Turn thermal device off
+	return TRUE;
 	}
 
 //---------------------------------------------------------------------------
@@ -95,7 +93,7 @@ static void timeout_fire(unsigned long data)
     hardware_thermal_off();
 
     // signal that the operation has finished
-    atomic_set(&operating_atomic, 0);
+    atomic_set(&operating_atomic, FALSE);
 	}
 
 //---------------------------------------------------------------------------
@@ -103,12 +101,10 @@ static void timeout_fire(unsigned long data)
 //---------------------------------------------------------------------------
 static int hardware_init(void)
     {
-    int status = 0;
-
     // configure thermal device gpio for output and set initial output
-    at91_set_gpio_output(PIN_THERMAL_CONTROL, !PIN_THERMAL_ACTIVE);
+    at91_set_gpio_output(OUTPUT_THERMAL, !OUTPUT_THERMAL_ACTIVE_STATE);
 
-    return status;
+    return TRUE;
     }
 
 //---------------------------------------------------------------------------
@@ -116,7 +112,10 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
-	return 0;
+	// Don't leave the thermal on
+	hardware_thermal_off();
+
+	return TRUE;
     }
 
 //---------------------------------------------------------------------------
@@ -124,13 +123,14 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 static int hardware_state_set(void)
     {
-	// signal that an operation is in progress
-	atomic_set(&operating_atomic, 1);
+	// signal that thermal is on
+	atomic_set(&operating_atomic, TRUE);
 
 	hardware_thermal_on();
 
 	timeout_timer_start();
-	return 0;
+
+	return TRUE;
     }
 
 //---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ static int hardware_state_set(void)
 //---------------------------------------------------------------------------
 static int hardware_state_get(void)
     {
-    // check if an operation is in progress...
+    // check if thermal is on
     if (atomic_read(&operating_atomic))
 		{
 		return THERMAL_STATE_ON;
@@ -161,23 +161,20 @@ static ssize_t state_show(struct device *dev, struct device_attribute *attr, cha
 static ssize_t state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
     {
     ssize_t status;
+    status = size;
 
     // check if an operation is in progress, if so ignore any command
     if (atomic_read(&operating_atomic))
 		{
-    	status = size;
+		//
 		}
     else if (sysfs_streq(buf, "on"))
         {
     	printk(KERN_ALERT "%s - %s() : user command on\n",TARGET_NAME, __func__);
-        status = size;
         hardware_state_set();
         }
+
     // TODO - should we be able to turn it off also, or let the timer expire?
-    else
-		{
-    	status = size;
-		}
 
     return status;
     }

@@ -5,7 +5,8 @@
 #ifndef __TARGET_H__
 #define __TARGET_H__
 
-
+#define FALSE				0
+#define TRUE				1
 
 #define TARGET_TYPE_NONE				0
 #define TARGET_TYPE_LIFTER				1
