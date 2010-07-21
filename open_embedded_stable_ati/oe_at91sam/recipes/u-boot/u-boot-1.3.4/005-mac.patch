@@ -1,0 +1,19 @@
+diff -ruN u-boot-1.3.4.orig/drivers/net/macb.c u-boot-1.3.4/drivers/net/macb.c
+--- u-boot-1.3.4.orig/drivers/net/macb.c	2010-07-20 15:13:59.758629019 -0600
++++ u-boot-1.3.4/drivers/net/macb.c	2010-07-20 15:16:47.805633566 -0600
+@@ -325,7 +325,14 @@
+ 	int i;
+ 
+ 	/* Check if the PHY is up to snuff... */
+-	phy_id = macb_mdio_read(macb, MII_PHYSID1);
++	for (i = 0; i < 16 ; i++) {
++		macb->phy_addr = i;
++		phy_id = macb_mdio_read(macb, MII_PHYSID1);
++		if (phy_id != 0xffff) {
++			printf("%s: PHY found on %i\n", netdev->name, i);
++			break;
++		}
++	}
+ 	if (phy_id == 0xffff) {
+ 		printf("%s: No PHY present\n", netdev->name);
+ 		return 0;

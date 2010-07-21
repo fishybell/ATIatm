@@ -9,5 +9,6 @@ SRC_URI = "ftp://ftp.denx.de/pub/u-boot/u-boot-${PV}.tar.bz2\
           file://002-watchdog.patch;patch=1\
           file://003-watchdog.patch;patch=1\
           file://004-quick.patch;patch=1\
+          file://005-mac.patch;patch=1\
           "
 
