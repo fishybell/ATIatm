@@ -3,8 +3,9 @@
 PR = "r0"
 
 SRC_URI =  "file://*gpio*"
-SRC_URI +=  "file://issue*"
-SRC_URI += "file://ati-0.9/*"
+SRC_URI += "file://issue*"
+SRC_URI += "file://ati2-0.9/*.c"
+SRC_URI += "file://ati2-0.9/Makefile"
 SRC_URI += "file://*.fw"
 
 FILES_${PN} += "/lib/firmware/*"
