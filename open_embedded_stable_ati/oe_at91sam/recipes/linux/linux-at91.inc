@@ -104,6 +104,7 @@ SRC_URI_append_at91sam9g20ek = ${at91sam_patch}
 SRC_URI_append_at91sam9g20ek_2mmc = " \
 	${at91sam_patch} \
 	file://mingpio.patch;patch=1 \
+	file://mac.patch;patch=1 \
 	"
 #	file://noleds.patch;patch=1 \
 #	file://pwm.patch;patch=1 \
