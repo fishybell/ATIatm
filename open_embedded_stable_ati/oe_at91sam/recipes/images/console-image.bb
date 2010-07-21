@@ -19,7 +19,7 @@ DEPENDS = "task-base-extended \
            at91bootstrap \
            u-boot \
            python \
-	   ati \
+	   ati ati2\
            compat-wireless \
            ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
@@ -28,7 +28,7 @@ IMAGE_INSTALL = "task-base-extended \
 	   ${ANGSTROM_EXTRA_INSTALL} \
            python-modules \
            kernel-modules \
-	   ati \
+	   ati ati2\
            compat-wireless \
 	   ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
