@@ -11,8 +11,9 @@
 
 #define TARGET_NAME		"muzzle flash simulator"
 
-#define TIMEOUT_IN_SECONDS_SINGLE	2
-#define TIMEOUT_IN_SECONDS_BURST	5
+#define FLASH_ON_IN_MSECONDS		100
+#define FLASH_OFF_IN_MSECONDS		100
+#define FLASH_BURST_COUNT			5
 
 #define MUZZLE_FLASH_STATE_OFF   	0
 #define MUZZLE_FLASH_STATE_ON    	1
@@ -21,37 +22,62 @@
 #define MUZZLE_FLASH_MODE_SINGLE   	0
 #define MUZZLE_FLASH_MODE_BURST    	1
 
-#define PIN_FLASH_ACTIVE    	0       		// Active low
+//#define TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL
+	#undef OUTPUT_MUZZLE_FLASH
+	#define OUTPUT_MUZZLE_FLASH    	AT91_PIN_PA6
+#endif // TESTING_ON_EVAL
 
-#ifdef DEV_BOARD_REVB
-	#define PIN_FLASH_CONTROL    	AT91_PIN_PA6
-#else
-	#define PIN_FLASH_CONTROL    	AT91_PIN_PB8
-#endif
-
-
-//---------------------------------------------------------------------------
-// Keep track of the mode / repeat delay setting
-//---------------------------------------------------------------------------
-static int flash_mode 			= MUZZLE_FLASH_MODE_SINGLE;
-static int flash_repeat_delay 	= 0;
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that an operation is in progress,
 // i.e. the flash has been commanded to turn on. It is used to synchronize
 // user-space commands with the actual hardware.
 //---------------------------------------------------------------------------
-atomic_t operating_atomic = ATOMIC_INIT(0);
+atomic_t operating_atomic = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
-// Declaration of the function that gets called when the timeout fires.
+// This atomic variable is use to store the mode. It is
+// used to synchronize user-space commands with the actual hardware.
 //---------------------------------------------------------------------------
-static void timeout_fire(unsigned long data);
+atomic_t mode_atomic = ATOMIC_INIT(MUZZLE_FLASH_MODE_SINGLE);
 
 //---------------------------------------------------------------------------
-// Kernel timer for the timeout.
+// This atomic variable is use to store the initial delay (in seconds). It is
+// used to synchronize user-space commands with the actual hardware.
 //---------------------------------------------------------------------------
-static struct timer_list timeout_timer_list = TIMER_INITIALIZER(timeout_fire, 0, 0);
+atomic_t initial_delay_atomic = ATOMIC_INIT(0);
+
+//---------------------------------------------------------------------------
+// This atomic variable is use to store the repeat delay (in seconds). It is
+// used to synchronize user-space commands with the actual hardware.
+//---------------------------------------------------------------------------
+atomic_t repeat_delay_atomic = ATOMIC_INIT(0);
+
+//---------------------------------------------------------------------------
+// This atomic variable is use to store the burst count.
+//---------------------------------------------------------------------------
+atomic_t flash_count_atomic = ATOMIC_INIT(1);
+
+//---------------------------------------------------------------------------
+// Declaration of the function that gets called when the delay timeout fires.
+//---------------------------------------------------------------------------
+static void delay_timeout_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
+// Kernel timer for the delay timeout.
+//---------------------------------------------------------------------------
+static struct timer_list delay_timeout_timer_list = TIMER_INITIALIZER(delay_timeout_fire, 0, 0);
+
+//---------------------------------------------------------------------------
+// Declaration of the function that gets called when the flash timeout fires.
+//---------------------------------------------------------------------------
+static void flash_timeout_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
+// Kernel timer for the flash timeout.
+//---------------------------------------------------------------------------
+static struct timer_list flash_timeout_timer_list = TIMER_INITIALIZER(flash_timeout_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Maps the state to state name.
@@ -77,7 +103,7 @@ static const char * muzzle_flash_mode[] =
 //---------------------------------------------------------------------------
 static int hardware_flash_on(void)
 	{
-	at91_set_gpio_value(PIN_FLASH_CONTROL, PIN_FLASH_ACTIVE); // Turn flash on
+	at91_set_gpio_value(OUTPUT_MUZZLE_FLASH, OUTPUT_MUZZLE_FLASH_ACTIVE_STATE); // Turn flash on
 	return 0;
 	}
 
@@ -86,37 +112,78 @@ static int hardware_flash_on(void)
 //---------------------------------------------------------------------------
 static int hardware_flash_off(void)
 	{
-	at91_set_gpio_value(PIN_FLASH_CONTROL, !PIN_FLASH_ACTIVE); // Turn flash off
+	at91_set_gpio_value(OUTPUT_MUZZLE_FLASH, !OUTPUT_MUZZLE_FLASH_ACTIVE_STATE); // Turn flash off
 	return 0;
 	}
 
+/*
 //---------------------------------------------------------------------------
-// Starts the timeout timer.
+// Starts the delay timeout timer.
 //---------------------------------------------------------------------------
-static void timeout_timer_start(void)
+static void delay_timeout_timer_start(void)
 	{
 	// TODO - add single vs. burst setting
-	mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS_SINGLE*HZ));
+	mod_timer(&delay_timeout_timer_list, jiffies+(FLASH_ON_IN_SECONDS*HZ));
+	}
+*/
+
+//---------------------------------------------------------------------------
+// Stops the all the timeout timers.
+//---------------------------------------------------------------------------
+static void timeout_timers_stop(void)
+	{
+	del_timer(&delay_timeout_timer_list);
+	del_timer(&flash_timeout_timer_list);
+	}
+
+
+//---------------------------------------------------------------------------
+// The function that gets called when the delay timeout fires.
+//---------------------------------------------------------------------------
+static void delay_timeout_fire(unsigned long data)
+	{
+	flash_timeout_fire(0);
 	}
 
 //---------------------------------------------------------------------------
-// Stops the timeout timer.
+// The function that gets called when the flash timeout fires.
 //---------------------------------------------------------------------------
-static void timeout_timer_stop(void)
+static void flash_timeout_fire(unsigned long data)
 	{
-	del_timer(&timeout_timer_list);
-	}
+	if (at91_get_gpio_value(OUTPUT_MUZZLE_FLASH) == OUTPUT_MUZZLE_FLASH_ACTIVE_STATE)
+		{
+		at91_set_gpio_value(OUTPUT_MUZZLE_FLASH, !OUTPUT_MUZZLE_FLASH_ACTIVE_STATE); // Turn flash off
 
-//---------------------------------------------------------------------------
-// The function that gets called when the timeout fires.
-//---------------------------------------------------------------------------
-static void timeout_fire(unsigned long data)
-	{
-    // Turn the flash off
-    hardware_flash_off();
-
-    // signal that the operation has finished
-    atomic_set(&operating_atomic, 0);
+		if (atomic_dec_and_test(&flash_count_atomic) == TRUE)
+			{
+			if(atomic_read(&repeat_delay_atomic) > 0)
+				{
+				if (atomic_read(&mode_atomic) == MUZZLE_FLASH_MODE_BURST)
+					{
+					atomic_set(&flash_count_atomic, FLASH_BURST_COUNT);
+					}
+				else
+					{
+					atomic_set(&flash_count_atomic, 1);
+					}
+				mod_timer(&flash_timeout_timer_list, jiffies+(atomic_read(&repeat_delay_atomic)*HZ));
+				}
+			else
+				{
+				// signal that the operation has finished
+				atomic_set(&operating_atomic, FALSE);
+				}
+			}
+		else
+			{
+			mod_timer(&flash_timeout_timer_list, jiffies+(FLASH_OFF_IN_MSECONDS*HZ/1000));
+			}
+		}
+	else
+		{
+		at91_set_gpio_value(OUTPUT_MUZZLE_FLASH, OUTPUT_MUZZLE_FLASH_ACTIVE_STATE); // Turn flash on
+		mod_timer(&flash_timeout_timer_list, jiffies+(FLASH_ON_IN_MSECONDS*HZ/1000));
+		}
 	}
 
 //---------------------------------------------------------------------------
@@ -127,7 +194,7 @@ static int hardware_init(void)
     int status = 0;
 
     // configure flash gpio for output and set initial output
-    at91_set_gpio_output(PIN_FLASH_CONTROL, !PIN_FLASH_ACTIVE);
+    at91_set_gpio_output(OUTPUT_MUZZLE_FLASH, !OUTPUT_MUZZLE_FLASH_ACTIVE_STATE);
 
     return status;
     }
@@ -143,14 +210,50 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
-static int hardware_state_set(void)
+static int hardware_state_set(int on)
     {
-	// signal that an operation is in progress
-	atomic_set(&operating_atomic, 1);
+	if (on == TRUE)
+		{
+		// check if an operation is in progress, if so ignore any command
+		if (atomic_read(&operating_atomic) == FALSE)
+			{
+			// signal that the operation is in progress
+			atomic_set(&operating_atomic, TRUE);
 
-	hardware_flash_on();
+			at91_set_gpio_value(OUTPUT_MUZZLE_FLASH, !OUTPUT_MUZZLE_FLASH_ACTIVE_STATE); // Turn flash off
 
-	timeout_timer_start();
+			if (atomic_read(&mode_atomic) == MUZZLE_FLASH_MODE_BURST)
+				{
+				atomic_set(&flash_count_atomic, FLASH_BURST_COUNT);
+				}
+			else
+				{
+				atomic_set(&flash_count_atomic, 1);
+				}
+
+			if (atomic_read(&initial_delay_atomic) > 0)
+				{
+				mod_timer(&delay_timeout_timer_list, jiffies+(atomic_read(&initial_delay_atomic)*HZ));
+				}
+			else
+				{
+				mod_timer(&delay_timeout_timer_list, jiffies+(100*HZ/1000));
+				}
+			}
+		}
+	else if (on == FALSE)
+		{
+		timeout_timers_stop();
+		at91_set_gpio_value(OUTPUT_MUZZLE_FLASH, !OUTPUT_MUZZLE_FLASH_ACTIVE_STATE); // Turn flash off
+
+	    // signal that the operation has finished
+	    atomic_set(&operating_atomic, FALSE);
+		}
+	else
+		{
+		printk(KERN_ALERT "%s - %s() : unrecognized command\n",TARGET_NAME, __func__);
+		}
+
 	return 0;
     }
 
@@ -182,21 +285,21 @@ static ssize_t state_show(struct device *dev, struct device_attribute *attr, cha
 static ssize_t state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
     {
     ssize_t status;
+    status = size;
 
-    // check if an operation is in progress, if so ignore any command
-    if (atomic_read(&operating_atomic))
-		{
-    	status = size;
-		}
-    else if (sysfs_streq(buf, "on"))
+    if (sysfs_streq(buf, "on"))
         {
     	printk(KERN_ALERT "%s - %s() : user command on\n",TARGET_NAME, __func__);
-        status = size;
-        hardware_state_set();
+        hardware_state_set(TRUE);
         }
+    else if (sysfs_streq(buf, "off"))
+		{
+		printk(KERN_ALERT "%s - %s() : user command off\n",TARGET_NAME, __func__);
+        hardware_state_set(FALSE);
+		}
     else
 		{
-    	status = size;
+		printk(KERN_ALERT "%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
 		}
 
     return status;
@@ -207,7 +310,7 @@ static ssize_t state_store(struct device *dev, struct device_attribute *attr, co
 //---------------------------------------------------------------------------
 static ssize_t mode_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
-    return sprintf(buf, "%s\n", muzzle_flash_mode[flash_mode]);
+    return sprintf(buf, "%s\n", muzzle_flash_mode[atomic_read(&mode_atomic)]);
     }
 
 //---------------------------------------------------------------------------
@@ -217,26 +320,21 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr, con
     {
     ssize_t status;
 
-    // check if an operation is in progress, if so ignore any command
-    if (atomic_read(&operating_atomic))
-		{
-    	status = size;
-		}
-    else if (sysfs_streq(buf, "single"))
+    status = size;
+
+    if (sysfs_streq(buf, "single"))
         {
     	printk(KERN_ALERT "%s - %s() : mode set to single\n",TARGET_NAME, __func__);
-    	flash_mode = MUZZLE_FLASH_MODE_SINGLE;
-    	status = size;
+    	atomic_set(&mode_atomic, MUZZLE_FLASH_MODE_SINGLE);
         }
     else if (sysfs_streq(buf, "burst"))
         {
     	printk(KERN_ALERT "%s - %s() : mode set to burst\n",TARGET_NAME, __func__);
-    	flash_mode = MUZZLE_FLASH_MODE_BURST;
-    	status = size;
+    	atomic_set(&mode_atomic, MUZZLE_FLASH_MODE_BURST);
         }
     else
 		{
-    	status = size;
+		printk(KERN_ALERT "%s - %s() : mode setting unrecognized\n",TARGET_NAME, __func__);
 		}
 
     return status;
@@ -247,7 +345,7 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr, con
 //---------------------------------------------------------------------------
 static ssize_t repeat_delay_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
-	return sprintf(buf, "%d\n", flash_repeat_delay);
+	return sprintf(buf, "%d\n", atomic_read(&repeat_delay_atomic));
     }
 
 //---------------------------------------------------------------------------
@@ -258,22 +356,49 @@ static ssize_t repeat_delay_store(struct device *dev, struct device_attribute *a
     long value;
     ssize_t status;
 
-    // check if an operation is in progress, if so ignore any command
-    if (atomic_read(&operating_atomic))
-		{
-    	status = size;
-		}
-    else if ((strict_strtol(buf, 0, &value) == 0) &&
+    status = size;
+
+    if ((strict_strtol(buf, 0, &value) == 0) &&
 			(value >= 0) &&
 			(value <= 60))
 		{
-		flash_repeat_delay = value;
-		status = size;
+		atomic_set(&repeat_delay_atomic, value);
 		}
 	else
 		{
 		printk(KERN_ALERT "%s - %s() : repeat delay out of range 0-60 (%s)\n",TARGET_NAME, __func__, buf);
-		status = size;
+		}
+
+    return status;
+    }
+
+//---------------------------------------------------------------------------
+// Handles reads to the flash initial delay attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t initial_delay_show(struct device *dev, struct device_attribute *attr, char *buf)
+    {
+	return sprintf(buf, "%d\n", atomic_read(&initial_delay_atomic));
+    }
+
+//---------------------------------------------------------------------------
+// Handles writes to the initial delay attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t initial_delay_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+    {
+    long value;
+    ssize_t status;
+
+    status = size;
+
+    if ((strict_strtol(buf, 0, &value) == 0) &&
+			(value >= 0) &&
+			(value <= 60))
+		{
+		atomic_set(&initial_delay_atomic, value);
+		}
+	else
+		{
+		printk(KERN_ALERT "%s - %s() : initial delay out of range 0-60 (%s)\n",TARGET_NAME, __func__, buf);
 		}
 
     return status;
@@ -285,6 +410,7 @@ static ssize_t repeat_delay_store(struct device *dev, struct device_attribute *a
 static DEVICE_ATTR(state, 0644, state_show, state_store);
 static DEVICE_ATTR(mode, 0644, mode_show, mode_store);
 static DEVICE_ATTR(repeat_delay, 0644, repeat_delay_show, repeat_delay_store);
+static DEVICE_ATTR(initial_delay, 0644, initial_delay_show, initial_delay_store);
 
 //---------------------------------------------------------------------------
 // Defines the attributes of the muzzle flash for sysfs
@@ -294,6 +420,7 @@ static const struct attribute * muzzle_flash_attrs[] =
     &dev_attr_state.attr,
     &dev_attr_mode.attr,
     &dev_attr_repeat_delay.attr,
+    &dev_attr_initial_delay.attr,
     NULL,
     };
 

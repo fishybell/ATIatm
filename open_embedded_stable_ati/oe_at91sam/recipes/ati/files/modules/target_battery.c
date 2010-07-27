@@ -32,7 +32,7 @@
 	#undef INPUT_CHARGING_BAT_ACTIVE_STATE
 	#undef INPUT_CHARGING_BAT_PULLUP_STATE
 	#undef INPUT_CHARGING_BAT_DEGLITCH_STATE
-	#undef INPUT_CHARGING_BAT_BAT
+	#undef INPUT_CHARGING_BAT
 
 	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC0
 
@@ -42,7 +42,7 @@
 	#define INPUT_CHARGING_BAT_ACTIVE_STATE			ACTIVE_LOW
 	#define INPUT_CHARGING_BAT_PULLUP_STATE			PULLUP_OFF
 	#define INPUT_CHARGING_BAT_DEGLITCH_STATE		DEGLITCH_ON
-	#define	INPUT_CHARGING_BAT_BAT					AT91_PIN_PA30 // BP3 on dev. board
+	#define	INPUT_CHARGING_BAT					AT91_PIN_PA30 // BP3 on dev. board
 #endif // TESTING_ON_EVAL
 
 #if 	(INPUT_ADC_LOW_BAT == AT91_PIN_PC0)
@@ -218,8 +218,8 @@ static int hardware_init(void)
     int status = 0;
 
     // Configure charging gpio for input / deglitch
-    at91_set_gpio_input(INPUT_CHARGING_BAT_BAT, 1);
-    at91_set_deglitch(INPUT_CHARGING_BAT_BAT, 1);
+    at91_set_gpio_input(INPUT_CHARGING_BAT, 1);
+    at91_set_deglitch(INPUT_CHARGING_BAT, 1);
 
     // configure low battery indicator gpio for output and set initial output
     at91_set_gpio_output(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
@@ -246,7 +246,7 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 static int hardware_charging_get(void)
     {
-	if (at91_get_gpio_value(INPUT_CHARGING_BAT_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE)
+	if (at91_get_gpio_value(INPUT_CHARGING_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE)
 	    {
 		return BATTERY_CHARGING_YES;
 		}

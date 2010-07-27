@@ -47,7 +47,7 @@
 #define INPUT_CHARGING_BAT_ACTIVE_STATE			ACTIVE_LOW
 #define INPUT_CHARGING_BAT_PULLUP_STATE			PULLUP_OFF
 #define INPUT_CHARGING_BAT_DEGLITCH_STATE		DEGLITCH_ON
-#define	INPUT_CHARGING_BAT_BAT					AT91_PIN_PB8  // DOCKED
+#define	INPUT_CHARGING_BAT						AT91_PIN_PB8  // DOCKED
 
 //---------------------------------------------------------------------------
 // USER INTERFACE
@@ -119,9 +119,10 @@
 //---------------------------------------------------------------------------
 // MUZZLE FLASH
 //---------------------------------------------------------------------------
-#define	OUTPUT_MUZZLE_FLASH 			AT91_PIN_PA10
-#define	OUTPUT_NIGHT_LIGHT 				AT91_PIN_PA6
-#define	OUTPUT_HIT_INDICATOR 			AT91_PIN_PA9
+#define	OUTPUT_MUZZLE_FLASH_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_MUZZLE_FLASH 					AT91_PIN_PA10
+#define	OUTPUT_NIGHT_LIGHT 						AT91_PIN_PA6
+#define	OUTPUT_HIT_INDICATOR 					AT91_PIN_PA9
 
 //---------------------------------------------------------------------------
 // MISC.

@@ -7,14 +7,11 @@
 #include <mach/gpio.h>
 #include <linux/atmel_tc.h>
 #include <linux/clk.h>
-
+#include <linux/atmel_pwm.h>
 
 #include "target.h"
 #include "target_mover_infantry.h"
 //---------------------------------------------------------------------------
-
-#define NO_HARDWARE_TEST
-
 #define TARGET_NAME		"infantry mover"
 #define MOVER_TYPE  	"infantry"
 
@@ -64,11 +61,13 @@
 	#define PIN_MOTOR_CONTROL    	AT91_PIN_PB8
 #endif
 
+
 // TODO - map pwm output pin to block/channel
 #define MOTOR_PWM_BLOCK			1		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
 #define MOTOR_PWM_CHANNEL		2		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 
 static struct atmel_tc * motor_pwm_tc = NULL;
+
 
 //---------------------------------------------------------------------------
 // This variable is a parameter that can be set at module loading to reverse
@@ -202,7 +201,6 @@ static void timeout_timer_stop(void)
 //---------------------------------------------------------------------------
 static int hardware_motor_on(int direction)
 	{
-#ifndef NO_HARDWARE_TEST
 	unsigned long flags;
 
     spin_lock_irqsave(&motor_lock, flags);
@@ -232,7 +230,6 @@ static int hardware_motor_on(int direction)
     	}
 
 	spin_unlock_irqrestore(&motor_lock, flags);
-#endif // #ifndef NO_HARDWARE_TEST
 	return 0;
 	}
 
@@ -241,7 +238,6 @@ static int hardware_motor_on(int direction)
 //---------------------------------------------------------------------------
 static int hardware_motor_off(void)
 	{
-#ifndef NO_HARDWARE_TEST
 	unsigned long flags;
 	spin_lock_irqsave(&motor_lock, flags);
 
@@ -251,7 +247,6 @@ static int hardware_motor_off(void)
 	at91_set_gpio_output(OUTPUT_MOVER_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
 	
 	spin_unlock_irqrestore(&motor_lock, flags);
-#endif // #ifndef NO_HARDWARE_TEST
 	return 0;
 	}
 
@@ -289,17 +284,8 @@ static void timeout_fire(unsigned long data)
         return;
         }
 
-#ifndef NO_HARDWARE_TEST
 	printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME, __func__);
 	hardware_movement_stop(FALSE);
-#else
-
-	atomic_add(6, &position_atomic);
-	printk(KERN_ALERT "mover pos = %i\n", atomic_read(&position_atomic));
-	schedule_work(&position_work);
-	mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS*HZ));
-
-#endif // #ifndef NO_HARDWARE_TEST
 	}
 
 //---------------------------------------------------------------------------
@@ -454,10 +440,14 @@ irqreturn_t emergency_stop_movement_int(int irq, void *dev_id, struct pt_regs *r
 // Initialize the timer counter as PWM output for motor control
 //---------------------------------------------------------------------------
 static int hardware_motor_pwm_init(void)
-    {
+    {unsigned int mck_freq;
     // initialize timer counter
     motor_pwm_tc = target_timer_alloc(MOTOR_PWM_BLOCK, "gen_tc");
     printk(KERN_ALERT "timer_alloc(): %08x\n", (unsigned int) motor_pwm_tc);
+
+
+    mck_freq = clk_get_rate(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
+    printk(KERN_ALERT "mck_freq: %i\n", (unsigned int) mck_freq);
 
     if (!motor_pwm_tc)
 		{
@@ -483,7 +473,7 @@ static int hardware_motor_pwm_init(void)
             at91_set_B_periph(AT91_PIN_PB2, 0);		// TIOA4
             at91_set_B_periph(AT91_PIN_PB18, 0);	// TIOB4
         #elif MOTOR_PWM_CHANNEL == 2
-            at91_set_B_periph(AT91_PIN_PB3, 0);		// TIOA5
+//            at91_set_B_periph(AT91_PIN_PB3, 0);		// TIOA5
             at91_set_B_periph(AT91_PIN_PB19, 0);	// TIOB5
         #endif
     #endif
@@ -491,7 +481,7 @@ static int hardware_motor_pwm_init(void)
 	clk_enable(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
 
 	// initialize clock
-	__raw_writel(ATMEL_TC_TIMER_CLOCK1				// Master clock / 2 : 66 mhz
+	__raw_writel(ATMEL_TC_TIMER_CLOCK4			// Master clock / 2 : 66 mhz
 					| ATMEL_TC_WAVE					// output mode
 					| ATMEL_TC_ACPA_SET				// set TIOA high when counter reaches "A"
 					| ATMEL_TC_ACPC_CLEAR			// set TIOA low when counter reaches "C"
@@ -504,7 +494,7 @@ static int hardware_motor_pwm_init(void)
 	__raw_writel(ATMEL_TC_CLKEN, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));
 	__raw_writel(ATMEL_TC_SYNC, motor_pwm_tc->regs + ATMEL_TC_BCR);
 	__raw_writel(0x0002, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	__raw_writel(0x7ff0, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+	__raw_writel(0x4001/*0x7ff0*/, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
 	__raw_writel(0x8002, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
 
 	// disable irqs and start timer
@@ -553,7 +543,6 @@ static int hardware_init(void)
     {
     int status = 0;
 
-#ifndef NO_HARDWARE_TEST
     /*
     #define INPUT_MOVER_SPEED_SENSOR_ACTIVE_STATE		ACTIVE_LOW
     #define INPUT_MOVER_SPEED_SENSOR_PULLUP_STATE		PULLUP_ON
@@ -578,7 +567,6 @@ static int hardware_init(void)
 
     // setup motor PWM output
     status = hardware_motor_pwm_init();
-#endif // #ifndef NO_HARDWARE_TEST
 
     return status;
     }
@@ -588,14 +576,14 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
-#ifndef NO_HARDWARE_TEST
+
 	free_irq(INPUT_MOVER_TRACK_SENSOR_FRONT, NULL);
 	free_irq(INPUT_MOVER_TRACK_SENSOR_REAR, NULL);
 	free_irq(INPUT_MOVER_TRACK_HOME, NULL);
 	free_irq(INPUT_MOVER_TRACK_END, NULL);
 
 	target_timer_free(motor_pwm_tc);
-#endif // #ifndef NO_HARDWARE_TEST
+
 	return 0;
     }
 

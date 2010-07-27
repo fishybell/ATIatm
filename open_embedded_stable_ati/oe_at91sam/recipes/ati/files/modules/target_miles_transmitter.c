@@ -11,14 +11,13 @@
 
 #define TARGET_NAME		"miles transmitter"
 
-#define TIMEOUT_IN_SECONDS	5
-
 #define MILES_TX_STATE_OFF   	0
 #define MILES_TX_STATE_ON    	1
 #define MILES_TX_STATE_ERROR  	2
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
+	#undef OUTPUT_MILES_SHOOTBACK
 	#define OUTPUT_MILES_SHOOTBACK    	AT91_PIN_PA6
 #endif // TESTING_ON_EVAL
 
@@ -27,7 +26,13 @@
 // i.e. the transmitter has been commanded to turn on. It is used to
 // synchronize user-space commands with the actual hardware.
 //---------------------------------------------------------------------------
-atomic_t operating_atomic = ATOMIC_INIT(0);
+atomic_t operating_atomic = ATOMIC_INIT(FALSE);
+
+//---------------------------------------------------------------------------
+// This atomic variable is use to store the fire delay (in seconds). It is
+// used to synchronize user-space commands with the actual hardware.
+//---------------------------------------------------------------------------
+atomic_t delay_atomic = ATOMIC_INIT(0);
 
 //---------------------------------------------------------------------------
 // Declaration of the function that gets called when the timeout fires.
@@ -72,7 +77,7 @@ static int hardware_miles_tx_off(void)
 //---------------------------------------------------------------------------
 static void timeout_timer_start(void)
 	{
-	mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS*HZ));
+	mod_timer(&timeout_timer_list, jiffies+(atomic_read(&delay_atomic)*HZ));
 	}
 
 //---------------------------------------------------------------------------
@@ -88,11 +93,8 @@ static void timeout_timer_stop(void)
 //---------------------------------------------------------------------------
 static void timeout_fire(unsigned long data)
 	{
-    // Turn the miles tx off
-    hardware_miles_tx_off();
-
-    // signal that the operation has finished
-    atomic_set(&operating_atomic, 0);
+    // Turn the miles tx on
+    hardware_miles_tx_on();
 	}
 
 //---------------------------------------------------------------------------
@@ -119,14 +121,38 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
-static int hardware_state_set(void)
+static int hardware_state_set(unsigned int on)
     {
-	// signal that an operation is in progress
-	atomic_set(&operating_atomic, 1);
+	if (on == TRUE)
+		{
+		// check if an operation is in progress, if so ignore any command
+		if (atomic_read(&operating_atomic) == FALSE)
+			{
+			if (atomic_read(&delay_atomic) > 0)
+				{
+				timeout_timer_start();
+				}
+			else
+				{
+				hardware_miles_tx_on();
+				}
+			// signal that the operation is in progress
+			atomic_set(&operating_atomic, TRUE);
+			}
+		}
+	else if (on == FALSE)
+		{
+		timeout_timer_stop();
+		hardware_miles_tx_off();
 
-	hardware_miles_tx_on();
+	    // signal that the operation has finished
+	    atomic_set(&operating_atomic, FALSE);
+		}
+	else
+		{
+		printk(KERN_ALERT "%s - %s() : unrecognized command\n",TARGET_NAME, __func__);
+		}
 
-	timeout_timer_start();
 	return 0;
     }
 
@@ -158,31 +184,60 @@ static ssize_t state_show(struct device *dev, struct device_attribute *attr, cha
 static ssize_t state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
     {
     ssize_t status;
+    status = size;
 
-    // check if an operation is in progress, if so ignore any command
-    if (atomic_read(&operating_atomic))
-		{
-    	status = size;
-		}
-    else if (sysfs_streq(buf, "on"))
+    if (sysfs_streq(buf, "on"))
         {
     	printk(KERN_ALERT "%s - %s() : user command on\n",TARGET_NAME, __func__);
-        status = size;
-        hardware_state_set();
+        hardware_state_set(TRUE);
         }
-    // TODO - should we be able to turn it off also, or let the timer expire?
+    else if (sysfs_streq(buf, "off"))
+		{
+		printk(KERN_ALERT "%s - %s() : user command off\n",TARGET_NAME, __func__);
+		hardware_state_set(FALSE);
+		}
     else
 		{
-    	status = size;
+		printk(KERN_ALERT "%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
 		}
 
     return status;
     }
 
 //---------------------------------------------------------------------------
+// Handles reads to the fire delay attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t delay_show(struct device *dev, struct device_attribute *attr, char *buf)
+    {
+	return sprintf(buf, "%d\n", atomic_read(&delay_atomic));
+    }
+
+//---------------------------------------------------------------------------
+// Handles writes to the fire delay attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t delay_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+    {
+	long value;
+    ssize_t status;
+
+	status = strict_strtol(buf, 0, &value);
+	if ((status == 0)	&&
+		(value >= 0)	&&
+		(value <= 60))
+
+		{
+	    atomic_set(&delay_atomic, value);
+		}
+
+	status = size;
+	return status;
+    }
+
+//---------------------------------------------------------------------------
 // maps attributes, r/w permissions, and handler functions
 //---------------------------------------------------------------------------
 static DEVICE_ATTR(state, 0644, state_show, state_store);
+static DEVICE_ATTR(delay, 0644, delay_show, delay_store);
 
 //---------------------------------------------------------------------------
 // Defines the attributes of the miles tx for sysfs
@@ -190,6 +245,7 @@ static DEVICE_ATTR(state, 0644, state_show, state_store);
 static const struct attribute * miles_transmitter_attrs[] =
     {
     &dev_attr_state.attr,
+    &dev_attr_delay.attr,
     NULL,
     };
 
