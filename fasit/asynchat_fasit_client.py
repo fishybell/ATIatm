@@ -22,23 +22,24 @@ class FasitClient(FasitHandler):
         
         # check the type here, but don't assign __device__
         # until after the socket has been successfully opened
-        if ((type != fasit_packet_pd.PD_TYPE_SIT) & (type != fasit_packet_pd.PD_TYPE_MIT)):
-            raise ValueError('SIT and MIT are only currently supported target types')
+        if ((type != fasit_packet_pd.PD_TYPE_SIT) & 
+            (type != fasit_packet_pd.PD_TYPE_MIT) &
+            (type != fasit_packet_pd.PD_TYPE_SES)):
+            raise ValueError('SIT, MIT and SES are only currently supported target types')
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.logger.debug('connecting to %s', (host, port))
         
         self.sock.connect((host, port))
-        
-        #self.__device__ = fasit_pd.FasitPd()
-        #self.__device__ = fasit_pd.FasitPdTestSit()
-        
+ 
         if (type == fasit_packet_pd.PD_TYPE_SIT):
             self.__device__ = fasit_pd.FasitPdSit()
         elif (type == fasit_packet_pd.PD_TYPE_MIT):
             self.__device__ = fasit_pd.FasitPdMit()
+        elif (type == fasit_packet_pd.PD_TYPE_SES):
+            self.__device__ = fasit_pd.FasitPdSes()
         else:
-            raise ValueError('SIT and MIT are only currently supported target types')
+            raise ValueError('SIT, MIT and SES are only currently supported target types')
             
         FasitHandler.__init__(self, sock=self.sock, name='FasitClient')
     
@@ -170,9 +171,6 @@ class FasitClient(FasitHandler):
         self.logger.info('config_muzzle_flash_handler()')
         
         pd_packet = fasit_packet_pd.FasitPacketPd(self.received_data)
-        
-        #print `pd_packet`
-
         self.__device__.configure_muzzle_flash(onoff            = pd_packet.data.on_off,
                                                mode             = pd_packet.data.mode,
                                                initial_delay    = pd_packet.data.initial_delay,

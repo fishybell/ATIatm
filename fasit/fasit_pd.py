@@ -14,6 +14,8 @@ import fasit_audio
 LIFTER_PATH         = "/sys/class/target/lifter/"
 MOVER_PATH          = "/sys/class/target/mover/"
 HIT_SENSOR_PATH     = "/sys/class/target/hit_sensor/"
+MILES_TX_PATH       = "/sys/class/target/miles_transmitter/"
+MUZZLE_FLASH_PATH   = "/sys/class/target/muzzle_flash/"
 
 AUDIO_DIRECTORY = "./sounds/"
 
@@ -179,7 +181,7 @@ class FasitPd():
             self.set_hit_enable(True)
         
     def get_hit_enable(self):
-        pass    
+        return False    
     
     def set_hit_enable(self, enable = fasit_packet_pd.PD_HIT_ONOFF_OFF):
         pass
@@ -191,6 +193,12 @@ class FasitPd():
         pass
     
     def set_hit_burst_separation(self, burst_separation):
+        pass
+    
+    def set_miles_transmitter(self, on_off):
+        pass
+    
+    def set_muzzle_flash(self, on_off):
         pass
   
     def configure_miles(self, basic_code, ammo_type, player_id, fire_delay):
@@ -375,7 +383,7 @@ class play_sound_thread(QThread):
                         self.loop = 1
                         self.random = False
                 data = self.read_in()
-                self.logger.debug("data = %s", data)
+                #self.logger.debug("data = %s", data)
                 if data == "stop":
                     self.random = False
                     self.audio.stop()
@@ -537,7 +545,7 @@ class lifter_thread(QThread):
             
      
 #------------------------------------------------------------------------------
-# TODO - Currently tested with mechanical hit sensor only 
+#
 #------------------------------------------------------------------------------     
 class hit_thread(QThread):    
     HIT_POLL_TIMEOUT_MS = 200
@@ -565,7 +573,7 @@ class hit_thread(QThread):
             self.logger.debug("Wrong hit sensor type: %s", type)
             raise ValueError('Wrong hit sensor type.')
        
-        self.logger.debug('correct type...')
+        self.logger.debug('correct hit sensor type...')
         
     def get_setting(self, setting_name):
         # get the setting 
@@ -587,26 +595,38 @@ class hit_thread(QThread):
             return False
         
     def get_setting_sensitivity(self):
-        setting = self.get_setting("sensitivity")
-        self.logger.debug("Hit sensor sensitivity = %s", setting.rstrip())
-        return int(setting)
+        if (self.sensor_type == "miles"):
+            self.logger.debug("MILES hit does not support sensitivity setting")
+            return 0
+        else:
+            setting = self.get_setting("sensitivity")
+            self.logger.debug("Hit sensor sensitivity = %s", setting.rstrip())
+            return int(setting)
 
     def get_setting_burst_separation(self):
-        setting = self.get_setting("burst_separation")
-        self.logger.debug("Hit sensor burst_separation = %s", setting.rstrip())
-        return int(setting)     
+        if (self.sensor_type == "miles"):
+            self.logger.debug("MILES hit does not support burst separation setting")
+            return 0
+        else:
+            setting = self.get_setting("burst_separation")
+            self.logger.debug("Hit sensor burst_separation = %s", setting.rstrip())
+            return int(setting)     
 
     def get_setting_mode(self):
-        setting = self.get_setting("mode")
-        if (setting == "single\n"):
-            self.logger.debug("Hit sensor is in single mode")
+        if (self.sensor_type == "miles"):
+            self.logger.debug("MILES hit does not support mode setting")
             return fasit_packet_pd.PD_HIT_MODE_SINGLE
-        elif (setting == "burst\n"):
-            self.logger.debug("Hit sensor is in burst mode")
-            return fasit_packet_pd.PD_HIT_MODE_BURST
         else:
-            self.logger.debug("Hit sensor unknown mode (%s)", setting.rstrip())
-            return 
+            setting = self.get_setting("mode")
+            if (setting == "single\n"):
+                self.logger.debug("Hit sensor is in single mode")
+                return fasit_packet_pd.PD_HIT_MODE_SINGLE
+            elif (setting == "burst\n"):
+                self.logger.debug("Hit sensor is in burst mode")
+                return fasit_packet_pd.PD_HIT_MODE_BURST
+            else:
+                self.logger.debug("Hit sensor unknown mode (%s)", setting.rstrip())
+                return fasit_packet_pd.PD_HIT_MODE_SINGLE 
         
     def set_setting(self, setting_name, setting):
         if (self.get_setting_enabled() != False):
@@ -620,16 +640,27 @@ class hit_thread(QThread):
         return True
         
     def set_setting_sensitivity(self, sensitivity):
-        return self.set_setting("sensitivity", str(sensitivity) + "\n")
+        if (self.sensor_type == "miles"):
+            self.logger.debug("MILES hit does not support sensitivity setting")
+            return False
+        else:
+            return self.set_setting("sensitivity", str(sensitivity) + "\n")
 
     def set_setting_burst_separation(self, burst_separation):
-        return self.set_setting("burst_separation", str(burst_separation) + "\n")
+        if (self.sensor_type == "miles"):
+            self.logger.debug("MILES hit does not support burst separation setting")
+            return False
+        else:
+            return self.set_setting("burst_separation", str(burst_separation) + "\n")
 
     def set_setting_mode(self, mode):
-        if (mode == fasit_packet_pd.PD_HIT_MODE_SINGLE):
+        if (self.sensor_type == "miles"):
+            self.logger.debug("MILES hit does not support mode setting")
+            return False
+        elif (mode == fasit_packet_pd.PD_HIT_MODE_SINGLE):
             setting = "single\n"
         elif (mode == fasit_packet_pd.PD_HIT_MODE_BURST):
-            setting == "burst\n"
+            setting = "burst\n"
         else:
             self.logger.debug("Setting hit sensor unknown mode (%i)", mode)
             return False
@@ -711,8 +742,8 @@ class hit_thread(QThread):
                 self.logger.debug('stop command')
                 keep_going = False
                 self.keep_going = False
-         
-            
+    
+           
 #------------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------------          
@@ -724,13 +755,36 @@ class FasitPdSit(FasitPd):
        
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_SIT
-        
+
+        # Check if we have MILES TX
+        if (os.path.exists(MILES_TX_PATH + "delay") == True):
+            self.logger.debug("MILES Transmitter driver found.")
+            self.__miles_fire_delay__ = self.get_setting_int(MILES_TX_PATH + "delay")
+            self.__capabilities__ = (self.__capabilities__ | fasit_packet_pd.PD_CAP_MILES_SHOOTBACK)
+        else:
+            self.logger.debug("MILES Transmitter driver not found.")
+            
+        # Check if we have Muzzle Flash
+        if (os.path.exists(MUZZLE_FLASH_PATH) == True):
+            self.logger.debug("Muzzle Flash Simulator driver found.")
+            if (self.get_setting_string(MUZZLE_FLASH_PATH + "state") == "on"):
+                self.__muzzle_flash_onoff__ = 1
+            if (self.get_setting_string(MUZZLE_FLASH_PATH + "mode") == "burst"):
+                self.__muzzle_flash_mode__ = fasit_packet_pd.PD_MUZZLE_FLASH_MODE_BURST
+            self.__muzzle_flash_init_delay__  = self.get_setting_int(MUZZLE_FLASH_PATH + "initial_delay")
+            self.__muzzle_flash_repeat_delay__  = self.get_setting_int(MUZZLE_FLASH_PATH + "repeat_delay")    
+            self.__capabilities__ = (self.__capabilities__ | fasit_packet_pd.PD_CAP_MUZZLE_FLASH)
+        else:
+            self.logger.debug("Muzzle Flash Simulator driver not found.")
+       
         self.__lifter_thread__= lifter_thread("infantry")
         self.__lifter_thread__.check_driver()
         
-        # TODO - check which hit sensors are available? - if MILES or NCHS is present, use it?
-        # For now we use mechanical...
-        self.__hit_sensor_type__ = "mechanical"
+        # Check which type of hit sensor is in use
+        if (os.path.exists(HIT_SENSOR_PATH + "type") == True):
+            self.logger.debug("Hit sensor driver found.")
+            self.__hit_sensor_type__ = self.get_setting_string(HIT_SENSOR_PATH + "type")
+            self.logger.debug("Hit sensor type is %s", self.__hit_sensor_type__)
        
         self.__hit_thread__ = hit_thread(self.__hit_sensor_type__)
         self.__hit_thread__.check_driver()
@@ -743,14 +797,31 @@ class FasitPdSit(FasitPd):
             self.__exposure__ = current_position
         
         # get current hit sensor settings
+        self.__hit_onoff__ = self.__hit_thread__.get_setting_enabled()
         if (self.__hit_sensor_type__ == "mechanical"):
-            self.__hit_onoff__               = self.__hit_thread__.get_setting_enabled()
             self.__hit_sensitivity__         = self.__hit_thread__.get_setting_sensitivity()
             self.__hit_mode__                = self.__hit_thread__.get_setting_mode()
             self.__hit_burst_separation__    = self.__hit_thread__.get_setting_burst_separation()  
         
         self.__lifter_thread__.start()
         self.__hit_thread__.start()
+        
+    def get_setting_string(self, path):
+        fd = os.open(path, os.O_RDONLY)
+        setting = os.read(fd, 32)
+        os.close(fd)
+        return setting.rstrip()
+    
+    def get_setting_int(self, path):
+        return int(self.get_setting_string(path))
+    
+    def set_setting_string(self, path, setting):
+        fd = os.open(path, os.O_RDWR)
+        os.write(fd, setting + "\n")
+        os.close(fd)
+    
+    def set_setting_int(self, path, setting):
+        self.set_setting_string(path, str(setting))
         
     def stop_threads(self):
         self.__lifter_thread__.write("stop")
@@ -759,6 +830,22 @@ class FasitPdSit(FasitPd):
     def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
         FasitPd.expose(self, expose)
         self.__lifter_thread__.write(expose)
+        
+    def configure_miles(self, basic_code, ammo_type, player_id, fire_delay):
+        FasitPd.configure_miles(self, basic_code, ammo_type, player_id, fire_delay)
+        self.set_setting_int(MILES_TX_PATH + "delay", fire_delay)
+        
+    def configure_muzzle_flash(self, onoff, mode, initial_delay, repeat_delay):
+        self.logger.info('FasitPdSit.config_muzzle_flash()')
+        FasitPd.configure_muzzle_flash(self, onoff, mode, initial_delay, repeat_delay)
+        
+        if (mode == fasit_packet_pd.PD_MUZZLE_FLASH_MODE_SINGLE):
+            self.set_setting_string(MUZZLE_FLASH_PATH + "mode", "single")
+        else:
+            self.set_setting_string(MUZZLE_FLASH_PATH + "mode", "burst")
+            
+        self.set_setting_int(MUZZLE_FLASH_PATH + "initial_delay", initial_delay)
+        self.set_setting_int(MUZZLE_FLASH_PATH + "repeat_delay", repeat_delay)
         
     def get_hit_enable(self):
         return self.__hit_thread__.get_setting_enabled()
@@ -778,6 +865,12 @@ class FasitPdSit(FasitPd):
     
     def set_hit_burst_separation(self, burst_separation):
         return self.__hit_thread__.set_setting_burst_separation(burst_separation) 
+    
+    def set_miles_transmitter(self, on_off):
+        self.set_setting_string(MILES_TX_PATH + "state", on_off)
+        
+    def set_muzzle_flash(self, on_off):
+        self.set_setting_string(MUZZLE_FLASH_PATH + "state", on_off)
     
     def writable(self):
         writable_status = False
@@ -803,11 +896,26 @@ class FasitPdSit(FasitPd):
             elif (lifter_status != self.__exposure__):
                 self.logger.debug("Change in exposure status %d", lifter_status)
                 
-                if ((self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_ON_POS) & (lifter_status == fasit_packet_pd.PD_EXPOSURE_EXPOSED)):
-                    self.set_hit_enable(True)
-                
-                if ((self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_OFF_POS) & (lifter_status == fasit_packet_pd.PD_EXPOSURE_CONCEALED)):
-                    self.set_hit_enable(False)
+                if (lifter_status == fasit_packet_pd.PD_EXPOSURE_EXPOSED):
+                    if (self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_ON_POS):
+                        self.set_hit_enable(True)
+                        
+                    if (self.__capabilities__ & fasit_packet_pd.PD_CAP_MILES_SHOOTBACK == fasit_packet_pd.PD_CAP_MILES_SHOOTBACK):
+                        self.set_miles_transmitter("on")
+                        
+                    if ((self.__capabilities__ & fasit_packet_pd.PD_CAP_MUZZLE_FLASH == fasit_packet_pd.PD_CAP_MUZZLE_FLASH)
+                        & (self.__muzzle_flash_onoff__ == 1)):
+                        self.set_muzzle_flash("on")
+                        
+                if (lifter_status == fasit_packet_pd.PD_EXPOSURE_CONCEALED):
+                    if (self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_OFF_POS):
+                        self.set_hit_enable(False)
+                        
+                    if (self.__capabilities__ & fasit_packet_pd.PD_CAP_MILES_SHOOTBACK == fasit_packet_pd.PD_CAP_MILES_SHOOTBACK):
+                        self.set_miles_transmitter("off")
+                        
+                    if (self.__capabilities__ & fasit_packet_pd.PD_CAP_MUZZLE_FLASH == fasit_packet_pd.PD_CAP_MUZZLE_FLASH):
+                        self.set_muzzle_flash("off")
                 
                 self.__exposure__ = lifter_status
                 writable_status = True
@@ -1107,11 +1215,11 @@ class FasitPdMit(FasitPd):
 #------------------------------------------------------------------------------------
 #
 #------------------------------------------------------------------------------------   
-class FasitPdSES(FasitPd):
+class FasitPdSes(FasitPd):
                         
     def __init__(self):
         FasitPd.__init__(self)
-        self.logger = logging.getLogger('FasitPdSES')
+        self.logger = logging.getLogger('FasitPdSes')
         self.__device_type__ = fasit_packet_pd.PD_TYPE_SIT
        
         self.__sound_thread_1__ = play_sound_thread(1)
@@ -1126,7 +1234,6 @@ class FasitPdSES(FasitPd):
             return None
         
     def audio_command(self, function_code, track_number, volume, play_mode):
-        
         if (function_code == fasit_packet_pd.PD_AUDIO_CMD_STOP_ALL):
             if (self.__sound_thread_1__.is_playing() == True):  
                 self.__sound_thread_1__.write("stop")
@@ -1155,7 +1262,8 @@ class FasitPdSES(FasitPd):
             return True
         
         elif (function_code == fasit_packet_pd.PD_AUDIO_CMD_SET_VOLUME):
-            return False
+            fasit_audio.set_volume(volume)
+            return True
         
         else:
             return False

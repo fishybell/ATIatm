@@ -7,9 +7,6 @@ from optparse import OptionParser
 from asynchat_fasit_client import FasitClient
 import fasit_packet_pd
 
-#FASIT_TC_IP_ADDRESS                 = 'localhost'
-#FASIT_TC_IP_ADDRESS                 = '192.168.123.9'
-#FASIT_TC_IP_ADDRESS                 = '157.185.52.61'
 FASIT_TC_IP_ADDRESS                 = '192.168.0.1'
 FASIT_TC_IP_PORT                    = 4000
 
@@ -39,7 +36,6 @@ def connect_to_server():
             time.sleep(10)
         except ValueError as e:
             print e.args[0]
-            #print "Invalid Target Type"
             return False
              
 
@@ -51,7 +47,7 @@ def main():
     
     usage = "usage: %prog [options]"
     parser = OptionParser(usage = usage)
-    parser.add_option("-t", "--type", dest = "target_type", help = "Set target type to TARGET_TYPE: SIT, MIT, LSAT, HSAT or MAT [default: %default]", metavar = "TARGET_TYPE", default = "SIT")
+    parser.add_option("-t", "--type", dest = "target_type", help = "Set target type to TARGET_TYPE: SIT, MIT, LSAT, HSAT, MAT or SES [default: %default]", metavar = "TARGET_TYPE", default = "SIT")
     parser.add_option("-s", "--server", dest = "server_ip", help = "Set the FASIT server IP address [default: %default]", metavar = "IP_ADDRESS", default = FASIT_TC_IP_ADDRESS)
     parser.add_option("-p", "--port", dest = "server_port", help = "Set the FASIT server port number [default: %default]", metavar = "PORT_NUMBER", default = FASIT_TC_IP_PORT) 
     (options, args) = parser.parse_args()
@@ -66,15 +62,13 @@ def main():
         type = fasit_packet_pd.PD_TYPE_SAT_HEAVY
     elif (options.target_type == "MAT"):
         type = fasit_packet_pd.PD_TYPE_MAT
+    elif (options.target_type == "SES"):
+        type = fasit_packet_pd.PD_TYPE_SES
     else:
         print "\nERROR: Incorrect target type specified.\n"
         parser.print_help()
         return 0
     
-#    if (options.target_type != "SIT"):
-#        print "\nERROR: Only SIT is currently supported!\n"
-#        return 0
-
     ip = options.server_ip
     port = options.server_port
    

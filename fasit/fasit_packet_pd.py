@@ -20,6 +20,8 @@ PD_TYPE_MIT                     = 2
 PD_TYPE_SAT_LIGHT               = 3
 PD_TYPE_SAT_HEAVY               = 4
 PD_TYPE_MAT                     = 5
+PD_TYPE_SES                     = 100  # made up
+
 
 EVENT_CMD_NONE                  = 0
 EVENT_CMD_RESERVED              = 1

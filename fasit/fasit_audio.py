@@ -8,10 +8,10 @@ import time
 PLAYER_COMMAND  = "/usr/bin/mplayer" 
 
 # this is for the real HW
-#PLAYER_ARGS     =  " -ao alsa:device=plug=swmix "
+PLAYER_ARGS     =  " -ao alsa:device=plug=swmix "
 
 #this is for testing on the desktop
-PLAYER_ARGS     =  " "
+#PLAYER_ARGS     =  " "
 
 class FasitAudio:
     def __init__(self):
@@ -52,7 +52,19 @@ class FasitAudio:
                 self.proc = None
                 self.stopped = True
                 return True
-                
+   
+   
+def set_volume(volume):           
+    if (volume < 0):
+        volume = 0
+    elif (volume > 100):
+        volume = 100
+    # the mixer volume level is between 0 and 127    
+    volume = volume * 1.27    
+    subprocess.call(["amixer", "set", "Master", str(volume)])
+        
+        
+             
 
 # TEST
 def main():
