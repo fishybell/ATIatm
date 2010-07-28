@@ -52,9 +52,18 @@
 //---------------------------------------------------------------------------
 // USER INTERFACE
 //---------------------------------------------------------------------------
-#define	INPUT_TEST_BUTTON 				AT91_PIN_PC12
-#define	OUTPUT_TEST_INDICATOR 			AT91_PIN_PC8
-#define	INPUT_WAKEUP_BUTTON 			AT91_PIN_PB25
+#define	INPUT_TEST_BUTTON_ACTIVE_STATE		ACTIVE_LOW
+#define INPUT_TEST_BUTTON_PULLUP_STATE		PULLUP_OFF
+#define INPUT_TEST_BUTTON_DEGLITCH_STATE	DEGLITCH_ON
+#define	INPUT_TEST_BUTTON 					AT91_PIN_PC12
+
+#define	OUTPUT_TEST_INDICATOR_ACTIVE_STATE	ACTIVE_LOW
+#define	OUTPUT_TEST_INDICATOR 				AT91_PIN_PC8
+
+#define	INPUT_WAKEUP_BUTTON_ACTIVE_STATE	ACTIVE_LOW
+#define INPUT_WAKEUP_BUTTON_PULLUP_STATE	PULLUP_OFF
+#define INPUT_WAKEUP_BUTTON_DEGLITCH_STATE	DEGLITCH_ON
+#define	INPUT_WAKEUP_BUTTON 				AT91_PIN_PB25
 
 //---------------------------------------------------------------------------
 // HIT SENSOR - MECHANICAL

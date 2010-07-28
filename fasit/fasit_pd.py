@@ -16,6 +16,7 @@ MOVER_PATH          = "/sys/class/target/mover/"
 HIT_SENSOR_PATH     = "/sys/class/target/hit_sensor/"
 MILES_TX_PATH       = "/sys/class/target/miles_transmitter/"
 MUZZLE_FLASH_PATH   = "/sys/class/target/muzzle_flash/"
+USER_INTERFACE_PATH   = "/sys/class/target/user_interface/"
 
 AUDIO_DIRECTORY = "./sounds/"
 
@@ -742,7 +743,79 @@ class hit_thread(QThread):
                 self.logger.debug('stop command')
                 keep_going = False
                 self.keep_going = False
-    
+  
+  
+#------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------     
+class user_interface_thread(QThread):    
+    UI_POLL_TIMEOUT_MS = 500
+    def __init__(self):
+        QThread.__init__(self)
+        self.logger = logging.getLogger('user_interface_thread')
+        self.keep_going = True
+        self.driver_path = USER_INTERFACE_PATH
+        self.bit_button_path = self.driver_path + "bit_button"
+        self.bit_button_fd = None
+        
+    def check_driver(self):
+        if (os.path.exists(self.driver_path) == False):
+            self.logger.debug("sysfs path to driver does not exist (%s)", self.driver_path)
+            raise ValueError('Path to user interface driver not found.')
+
+    def get_setting(self, setting_name):
+        fd = os.open(self.driver_path + setting_name, os.O_RDONLY)
+        setting = os.read(fd, 32)
+        os.close(fd)
+        return setting
+        
+    def set_setting(self, setting_name, setting):
+        fd = os.open(self.driver_path + setting_name, os.O_RDWR)
+        os.write(fd, setting)
+        os.close(fd)
+        return True
+        
+    def run(self):
+        self.logger.debug('user interface thread running...')
+        
+        # clear any previous button presses on startup
+        self.get_setting("bit_button")
+        
+        # process incoming commands            
+        while self.keep_going:
+            data = self.read_in()
+            
+            if(data == None):
+                self.bit_button_fd = os.open(self.bit_button_path,os.O_RDONLY)
+                bit_button_status = os.read(self.bit_button_fd, 32)
+                
+                if (bit_button_status == "pressed\n"):
+                    self.logger.debug('bit button pressed')
+                    self.write_out("pressed")
+                    os.close(self.bit_button_fd)
+                else:
+                    p = select.poll()
+                    p.register(self.bit_button_fd, select.POLLERR|select.POLLPRI)
+                    s = p.poll(self.UI_POLL_TIMEOUT_MS)
+                    os.close(self.bit_button_fd)
+                    
+                    while (len(s) > 0):
+                        fd, event = s.pop()
+                        
+                        if (fd == self.bit_button_fd):
+                            self.logger.debug("Change in bit button status...")
+                            bit_button_status = self.get_setting("bit_button")
+                            if (bit_button_status == "pressed\n"):
+                                self.logger.debug('bit button pressed')
+                                self.write_out("pressed")
+                                                     
+                        else:
+                            # TODO - report error
+                            self.logger.debug("Error: unknown file descriptor")
+                  
+            elif data == "stop":
+                self.logger.debug('stop command')
+                self.keep_going = False  
            
 #------------------------------------------------------------------------------------
 #
@@ -755,6 +828,11 @@ class FasitPdSit(FasitPd):
        
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_SIT
+        
+        self.__ui_thread__= user_interface_thread()
+        self.__ui_thread__.check_driver()
+        
+        self.__ui_thread__.set_setting("bit_status", "blink")
 
         # Check if we have MILES TX
         if (os.path.exists(MILES_TX_PATH + "delay") == True):
@@ -805,6 +883,8 @@ class FasitPdSit(FasitPd):
         
         self.__lifter_thread__.start()
         self.__hit_thread__.start()
+        self.__ui_thread__.start()
+        self.__ui_thread__.set_setting("bit_status", "on")
         
     def get_setting_string(self, path):
         fd = os.open(path, os.O_RDONLY)
@@ -826,6 +906,7 @@ class FasitPdSit(FasitPd):
     def stop_threads(self):
         self.__lifter_thread__.write("stop")
         self.__hit_thread__.write("stop")
+        self.__ui_thread__.write("stop")
         
     def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
         FasitPd.expose(self, expose)
@@ -875,13 +956,27 @@ class FasitPdSit(FasitPd):
     def writable(self):
         writable_status = False
         
+        # check the ui thread
+        bit_status = self.__ui_thread__.read()
+        if (bit_status == "pressed"):
+            current_position = self.__lifter_thread__.get_current_position() 
+            if (current_position == fasit_packet_pd.PD_EXPOSURE_CONCEALED):
+                self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED) 
+            elif (current_position == fasit_packet_pd.PD_EXPOSURE_EXPOSED):
+                    self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
+        
         # check the hit thread
         new_hits = self.__hit_thread__.read()
-        if (new_hits > 0):
+        if ((new_hits != None) & (new_hits > 0)):
             FasitPd.new_hit_handler(self, new_hits)
             if (self.__hit_count__ >= self.__hits_to_kill__):
-                self.set_hit_enable(False)
-                self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED) 
+                #self.set_hit_enable(False)
+                self.logger.debug("hits-to-kill exceeded %d", self.__hit_count__)
+                if (self.__hit_reaction__ != fasit_packet_pd.PD_HIT_REACTION_STOP):
+                    self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED) 
+                    
+            elif (self.__hit_reaction__ == fasit_packet_pd.PD_HIT_REACTION_BOB):
+                    self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
                     
         # check the lifter thread
         lifter_status = 0
@@ -897,8 +992,9 @@ class FasitPdSit(FasitPd):
                 self.logger.debug("Change in exposure status %d", lifter_status)
                 
                 if (lifter_status == fasit_packet_pd.PD_EXPOSURE_EXPOSED):
-                    if (self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_ON_POS):
-                        self.set_hit_enable(True)
+                    #if (self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_ON_POS):
+                    # TODO - right now we just enable the hit sensor when up, awaiting clarification 
+                    self.set_hit_enable(True)
                         
                     if (self.__capabilities__ & fasit_packet_pd.PD_CAP_MILES_SHOOTBACK == fasit_packet_pd.PD_CAP_MILES_SHOOTBACK):
                         self.set_miles_transmitter("on")
@@ -908,14 +1004,21 @@ class FasitPdSit(FasitPd):
                         self.set_muzzle_flash("on")
                         
                 if (lifter_status == fasit_packet_pd.PD_EXPOSURE_CONCEALED):
-                    if (self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_OFF_POS):
-                        self.set_hit_enable(False)
+                    #if (self.__hit_onoff__ == fasit_packet_pd.PD_HIT_ONOFF_OFF_POS):
+                    # TODO - right now we just disable the hit sensor when down, awaiting clarification 
+                    self.set_hit_enable(False)
                         
                     if (self.__capabilities__ & fasit_packet_pd.PD_CAP_MILES_SHOOTBACK == fasit_packet_pd.PD_CAP_MILES_SHOOTBACK):
                         self.set_miles_transmitter("off")
                         
                     if (self.__capabilities__ & fasit_packet_pd.PD_CAP_MUZZLE_FLASH == fasit_packet_pd.PD_CAP_MUZZLE_FLASH):
                         self.set_muzzle_flash("off")
+                        
+                    #self.logger.debug("hit count = %d, htk = %d", self.__hit_count__, self.__hits_to_kill__)
+                    #self.logger.debug("self.__hit_reaction__ = %d", self.__hit_reaction__)
+                    if ((self.__hit_count__ < self.__hits_to_kill__) &
+                        (self.__hit_reaction__ == fasit_packet_pd.PD_HIT_REACTION_BOB)):
+                        self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
                 
                 self.__exposure__ = lifter_status
                 writable_status = True

@@ -9,7 +9,6 @@ obj-m := 	target.o \
 			target_hit_mechanical.o \
 			target_hit_miles.o \
 			target_user_interface.o \
-			target_sound.o \
 
 PWD := $(shell pwd)
 #EXTRA_CFLAGS += -mfloat-abi=softfp -mfpu=vfp
