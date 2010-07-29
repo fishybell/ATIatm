@@ -50,14 +50,22 @@ class FasitClient(FasitHandler):
                  self.__device__.exposure_needs_update())):
                 self.send_device_status(False)
         return asynchat.async_chat.writable(self)
-        
-    def __del__(self):
+    
+    def handle_close(self):
+        self.logger.debug("disconnected from server")
         if (self.sock != None):
             self.logger.debug('closing socket')
             self.sock.close()
+        self.stop_threads()
+        FasitHandler.handle_close(self)
+            
+    def stop_threads(self):
         if (self.__device__ != None):
+            self.logger.debug('stopping threads')
             self.__device__.stop_threads()
-#        FasitHandler.__del__(self)
+        
+    def __del__(self):
+        self.stop_threads()
     
     def send_cmd_ack(self, ack = 'F'):
         self.logger.info('send_cmd_ack(%c)', ack)
@@ -190,22 +198,22 @@ class FasitClient(FasitHandler):
             #self._event_cmd_to_handler[self.in_packet.data.command_id](self, self.in_packet.data.command_data)
             self._event_cmd_to_handler[pd_packet.data.command_id](self, pd_packet.data)
         except (KeyError):
-            self.event_cmd_default_handler(self)
+            self.event_cmd_default_handler()
        
         #event_cmd = None   
           
         
     def event_cmd_default_handler(self):
         self.logger.info('event_cmd_default_handler()')
-        send_cmd_ack(ack = 'F')
+        self.send_cmd_ack(ack = 'F')
         
     def event_cmd_none_handler(self, cmd_data):
         self.logger.info('event_cmd_none_handler()')
-        send_cmd_ack(ack = 'S')
+        self.send_cmd_ack(ack = 'S')
         
     def event_cmd_reserved_handler(self, cmd_data):
         self.logger.info('event_cmd_reserved_handler()')
-        send_cmd_ack(ack = 'F')
+        self.send_cmd_ack(ack = 'F')
         
     def event_cmd_req_status_handler(self, cmd_data):
         self.logger.info('event_cmd_req_status_handler()')

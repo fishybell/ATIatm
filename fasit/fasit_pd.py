@@ -64,6 +64,9 @@ class FasitPd():
         self.__hit_needs_update__       = False
         self.__move_needs_update__      = False
         self.__exposure_needs_update__  = False
+        
+    def __del__(self):
+        self.stop_threads()
 
     def get_device_id(self):
         return self.__device_id__
@@ -156,10 +159,10 @@ class FasitPd():
             change_in_settings = True
 
         if (change_in_settings == True):
-            self.set_hit_enable(False)
-            
             while (self.get_hit_enable() == True):
-                pass
+                self.set_hit_enable(False)
+                time.sleep(0.3)
+                
             
             if  (self.__hit_sensitivity__ != sensitivity):
                 self.set_hit_sensitivity(sensitivity)
@@ -465,7 +468,7 @@ class lifter_thread(QThread):
                 self.send_command_and_wait("down")
             elif data == "stop":
                 self.keep_going = False
-                self.logger.debug('...lifter thread stopping')
+                self.logger.debug('...stopping')
                 
     def send_command_and_wait(self, command):
         self.fd = os.open(self.position_path,os.O_RDWR)
@@ -681,7 +684,7 @@ class hit_thread(QThread):
                 self.logger.debug('stop command')
                 self.keep_going = False
                 
-        self.logger.debug('...hit thread stopping')
+        self.logger.debug('...stopping')
     
     def enable_and_wait(self):
         keep_going = True
@@ -814,7 +817,7 @@ class user_interface_thread(QThread):
                             self.logger.debug("Error: unknown file descriptor")
                   
             elif data == "stop":
-                self.logger.debug('stop command')
+                self.logger.debug('...stopping')
                 self.keep_going = False  
            
 #------------------------------------------------------------------------------------
@@ -829,10 +832,9 @@ class FasitPdSit(FasitPd):
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_SIT
         
-        self.__ui_thread__= user_interface_thread()
-        self.__ui_thread__.check_driver()
-        
-        self.__ui_thread__.set_setting("bit_status", "blink")
+#        self.__ui_thread__= user_interface_thread()
+#        self.__ui_thread__.check_driver()
+#        self.__ui_thread__.set_setting("bit_status", "blink")
 
         # Check if we have MILES TX
         if (os.path.exists(MILES_TX_PATH + "delay") == True):
@@ -883,8 +885,8 @@ class FasitPdSit(FasitPd):
         
         self.__lifter_thread__.start()
         self.__hit_thread__.start()
-        self.__ui_thread__.start()
-        self.__ui_thread__.set_setting("bit_status", "on")
+#        self.__ui_thread__.start()
+#        self.__ui_thread__.set_setting("bit_status", "on")
         
     def get_setting_string(self, path):
         fd = os.open(path, os.O_RDONLY)
@@ -904,9 +906,20 @@ class FasitPdSit(FasitPd):
         self.set_setting_string(path, str(setting))
         
     def stop_threads(self):
+        self.logger.info('stop_threads()')
         self.__lifter_thread__.write("stop")
         self.__hit_thread__.write("stop")
-        self.__ui_thread__.write("stop")
+#        self.__ui_thread__.write("stop")
+        
+        if (self.__lifter_thread__.isAlive()):
+            self.__lifter_thread__.join()
+            
+        if (self.__hit_thread__.isAlive()):
+            self.__hit_thread__.join()
+            
+#        if (self.__ui_thread__.isAlive()):
+#            self.__ui_thread__.join()
+        
         
     def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
         FasitPd.expose(self, expose)
@@ -957,13 +970,13 @@ class FasitPdSit(FasitPd):
         writable_status = False
         
         # check the ui thread
-        bit_status = self.__ui_thread__.read()
-        if (bit_status == "pressed"):
-            current_position = self.__lifter_thread__.get_current_position() 
-            if (current_position == fasit_packet_pd.PD_EXPOSURE_CONCEALED):
-                self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED) 
-            elif (current_position == fasit_packet_pd.PD_EXPOSURE_EXPOSED):
-                    self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
+#        bit_status = self.__ui_thread__.read()
+#        if (bit_status == "pressed"):
+#            current_position = self.__lifter_thread__.get_current_position() 
+#            if (current_position == fasit_packet_pd.PD_EXPOSURE_CONCEALED):
+#                self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED) 
+#            elif (current_position == fasit_packet_pd.PD_EXPOSURE_EXPOSED):
+#                    self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
         
         # check the hit thread
         new_hits = self.__hit_thread__.read()
@@ -1123,7 +1136,7 @@ class mover_thread(QThread):
                 self.send_command_and_wait("stop")
             elif data == "stop":
                 self.keep_going = False
-                self.logger.debug('...mover thread stopping')
+                self.logger.debug('...stopping')
                 
     def send_command_and_wait(self, command):
         self.fd = os.open(self.movement_path,os.O_RDWR)

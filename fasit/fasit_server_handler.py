@@ -30,7 +30,15 @@ class FasitServerHandler(FasitHandler):
         device_status_request = fasit_packet_pd.FasitPacketPd()
         status_request = fasit_packet_pd.FasitPacketPd.EventCommand()
         status_request.command_id = fasit_packet_pd.EVENT_CMD_REQ_STATUS
+        device_status_request.data = status_request
+        self.push(device_status_request.pack())
         
+        # this is an unrecognized command
+        status_request.command_id = 20
+        device_status_request.data = status_request
+        self.push(device_status_request.pack())
+        
+        return
         
         audio_command_request = fasit_packet_pd.FasitPacketPd()
         audio_command = fasit_packet_pd.FasitPacketPd.AudioCommand()

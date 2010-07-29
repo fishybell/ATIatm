@@ -44,6 +44,7 @@ def main():
     global ip
     global port
     global type
+    global client
     
     usage = "usage: %prog [options]"
     parser = OptionParser(usage = usage)
@@ -82,11 +83,15 @@ def main():
             if (connect_to_server() == True):
                 asyncore.loop(timeout = 0.2)
                 print "...connection lost."
+                client = None
             else:
                 client = None
                 keep_going = False
         except KeyboardInterrupt:
             print "Crtl+C pressed. Shutting down."
+            if (client != None):
+                client.stop_threads()
+            
             client = None
             keep_going = False
 

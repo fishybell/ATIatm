@@ -15,7 +15,7 @@ class FasitHandler(asynchat.async_chat):
         self.in_packet = fasit_packet.FasitPacket()
         self.received_data = ''
         self.logger = logging.getLogger('%s %s' %(name, str(sock.getsockname())))
-        self.logger.setLevel(logging.INFO)
+        self.logger.setLevel(logging.DEBUG)
         asynchat.async_chat.__init__(self, sock)
         # Start looking for the FASIT header 
         self.process_data = self._process_header
@@ -28,7 +28,7 @@ class FasitHandler(asynchat.async_chat):
         return self.sequence_id
     
     def handle_close(self):
-        self.logger.debug("disconnected from %s" % str(self.getpeername()))
+        self.logger.debug("disconnected from server")
         asynchat.async_chat.handle_close(self)
 
     def collect_incoming_data(self, data):
