@@ -19,34 +19,38 @@ class FasitClient(FasitHandler):
     def __init__(self, host, port, type):
         self.logger = logging.getLogger('FasitClient')
         self.sock = None
+        self.target_type = type
         
         # check the type here, but don't assign __device__
         # until after the socket has been successfully opened
-        if ((type != fasit_packet_pd.PD_TYPE_SIT) & 
-            (type != fasit_packet_pd.PD_TYPE_MIT) &
+        if ((type != fasit_packet_pd.PD_TYPE_NONE) and 
+            (type != fasit_packet_pd.PD_TYPE_SIT) and
+            (type != fasit_packet_pd.PD_TYPE_MIT) and
             (type != fasit_packet_pd.PD_TYPE_SES)):
-            raise ValueError('SIT, MIT and SES are only currently supported target types')
+            raise ValueError('NONE, SIT, MIT and SES are only currently supported target types')
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.logger.debug('connecting to %s', (host, port))
         
         self.sock.connect((host, port))
  
-        if (type == fasit_packet_pd.PD_TYPE_SIT):
+        if (type == fasit_packet_pd.PD_TYPE_NONE):
+            self.__device__ = fasit_pd.FasitPd()
+        elif (type == fasit_packet_pd.PD_TYPE_SIT):
             self.__device__ = fasit_pd.FasitPdSit()
         elif (type == fasit_packet_pd.PD_TYPE_MIT):
             self.__device__ = fasit_pd.FasitPdMit()
         elif (type == fasit_packet_pd.PD_TYPE_SES):
             self.__device__ = fasit_pd.FasitPdSes()
         else:
-            raise ValueError('SIT, MIT and SES are only currently supported target types')
+            raise ValueError('NONE, SIT, MIT and SES are only currently supported target types')
             
         FasitHandler.__init__(self, sock=self.sock, name='FasitClient')
     
     def writable(self):
         if (self.__device__.writable() == True):
-            if ((self.__device__.hit_needs_update() | 
-                 self.__device__.move_needs_update() | 
+            if ((self.__device__.hit_needs_update() or 
+                 self.__device__.move_needs_update() or 
                  self.__device__.exposure_needs_update())):
                 self.send_device_status(False)
         return asynchat.async_chat.writable(self)
@@ -163,10 +167,13 @@ class FasitClient(FasitHandler):
     def config_miles_shootback_handler(self):
         self.logger.info('config_miles_shootback_handler()')
         
+        capabilities = self.__device__.get_device_capabilities()
+        if ((capabilities & fasit_packet_pd.PD_CAP_MILES_SHOOTBACK) != fasit_packet_pd.PD_CAP_MILES_SHOOTBACK):
+            self.send_cmd_ack(ack = 'F')
+            return
+        
         pd_packet = fasit_packet_pd.FasitPacketPd(self.received_data)
         
-        #print `pd_packet`
-
         self.__device__.configure_miles(basic_code  = pd_packet.data.basic_miles_code, 
                                         ammo_type   = pd_packet.data.ammo_type,  
                                         player_id   = pd_packet.data.player_id,  
@@ -177,6 +184,11 @@ class FasitClient(FasitHandler):
         
     def config_muzzle_flash_handler(self):
         self.logger.info('config_muzzle_flash_handler()')
+        
+        capabilities = self.__device__.get_device_capabilities()
+        if ((capabilities & fasit_packet_pd.PD_CAP_MUZZLE_FLASH) != fasit_packet_pd.PD_CAP_MUZZLE_FLASH):
+            self.send_cmd_ack(ack = 'F')
+            return
         
         pd_packet = fasit_packet_pd.FasitPacketPd(self.received_data)
         self.__device__.configure_muzzle_flash(onoff            = pd_packet.data.on_off,
@@ -195,13 +207,10 @@ class FasitClient(FasitHandler):
         #print `pd_packet`
         
         try:
-            #self._event_cmd_to_handler[self.in_packet.data.command_id](self, self.in_packet.data.command_data)
             self._event_cmd_to_handler[pd_packet.data.command_id](self, pd_packet.data)
         except (KeyError):
             self.event_cmd_default_handler()
-       
-        #event_cmd = None   
-          
+         
         
     def event_cmd_default_handler(self):
         self.logger.info('event_cmd_default_handler()')
@@ -224,10 +233,10 @@ class FasitClient(FasitHandler):
         # if the device supports MILES Shootback and/or Muzzle Flash,
         # we send status for them also
         capabilities = self.__device__.get_device_capabilities()
-        if (capabilities & fasit_packet_pd.PD_CAP_MILES_SHOOTBACK):
+        if ((capabilities & fasit_packet_pd.PD_CAP_MILES_SHOOTBACK) == fasit_packet_pd.PD_CAP_MILES_SHOOTBACK):
             self.send_miles_shootback_status()
             
-        if (capabilities & fasit_packet_pd.PD_CAP_MUZZLE_FLASH):
+        if ((capabilities & fasit_packet_pd.PD_CAP_MUZZLE_FLASH) == fasit_packet_pd.PD_CAP_MUZZLE_FLASH):
             self.send_muzzle_flash_status()    
         
     def event_cmd_req_expose_handler(self, cmd_data):
@@ -265,6 +274,10 @@ class FasitClient(FasitHandler):
         
     def audio_command_handler(self):
         self.logger.info('audio_command_handler()')
+        
+        if (self.target_type != fasit_packet_pd.PD_TYPE_SES):
+            self.send_cmd_ack(ack = 'F')
+            return
         
         pd_packet = fasit_packet_pd.FasitPacketPd(self.received_data)
         

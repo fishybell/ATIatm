@@ -1,6 +1,6 @@
 """FASIT Packet for Pyrotechnic Devices ICD Release 2.1"""
 
-import dpkt
+import fasit_dpkt
 import fasit_packet
 
 PYRO_CMD                        = 2000
@@ -18,14 +18,14 @@ FASIT_count = 0
 
 class FasitPacketPyro(fasit_packet.FasitPacket):
 
-    class Command(dpkt.Packet):
+    class Command(fasit_dpkt.Packet):
         __message_number__ = PYRO_EVENT_CMD
         __hdr__ = (
             ('command_id', 'B', 0), 
             ('fire_zone', 'H', 0)
             )
         
-    class CommandAck(dpkt.Packet):
+    class CommandAck(fasit_dpkt.Packet):
         __message_number__ = PYRO_EVENT_CMD_ACK
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -33,7 +33,7 @@ class FasitPacketPyro(fasit_packet.FasitPacket):
             ('ack_resp', 'c', 'F')
             )
 
-    class DeviceIdAndCapabilities(dpkt.Packet):
+    class DeviceIdAndCapabilities(fasit_dpkt.Packet):
         __message_number__ = PYRO_DEV_ID_AND_CAPS 
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -42,7 +42,7 @@ class FasitPacketPyro(fasit_packet.FasitPacket):
             ('device_capabilities', 'B', 0)
             )
         
-    class DeviceStatus(dpkt.Packet):
+    class DeviceStatus(fasit_dpkt.Packet):
         __message_number__ = PYRO_DEV_STATUS
         __hdr__ = (
             ('resp_message_number', 'H', 0),

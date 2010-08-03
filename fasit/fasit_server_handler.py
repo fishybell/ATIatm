@@ -2,7 +2,7 @@ import asynchat
 import logging
 import socket
 
-import dpkt
+import fasit_dpkt
 import fasit_packet
 import fasit_packet_pd
 

@@ -15,7 +15,7 @@ logger = logging.getLogger('fasit_client_main')
 
 ip = FASIT_TC_IP_ADDRESS
 port = FASIT_TC_IP_PORT
-type = fasit_packet_pd.PD_TYPE_SIT
+type = fasit_packet_pd.PD_TYPE_NONE
 client = None
 
 def connect_to_server():
@@ -48,12 +48,14 @@ def main():
     
     usage = "usage: %prog [options]"
     parser = OptionParser(usage = usage)
-    parser.add_option("-t", "--type", dest = "target_type", help = "Set target type to TARGET_TYPE: SIT, MIT, LSAT, HSAT, MAT or SES [default: %default]", metavar = "TARGET_TYPE", default = "SIT")
+    parser.add_option("-t", "--type", dest = "target_type", help = "Set target type to TARGET_TYPE: NONE, SIT, MIT, LSAT, HSAT, MAT or SES [default: %default]", metavar = "TARGET_TYPE", default = "NONE")
     parser.add_option("-s", "--server", dest = "server_ip", help = "Set the FASIT server IP address [default: %default]", metavar = "IP_ADDRESS", default = FASIT_TC_IP_ADDRESS)
     parser.add_option("-p", "--port", dest = "server_port", help = "Set the FASIT server port number [default: %default]", metavar = "PORT_NUMBER", default = FASIT_TC_IP_PORT) 
     (options, args) = parser.parse_args()
     
-    if (options.target_type == "SIT"):
+    if (options.target_type == "NONE"):
+        type = fasit_packet_pd.PD_TYPE_NONE
+    elif (options.target_type == "SIT"):
         type = fasit_packet_pd.PD_TYPE_SIT
     elif (options.target_type == "MIT"):
         type = fasit_packet_pd.PD_TYPE_MIT

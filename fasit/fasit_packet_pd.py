@@ -1,6 +1,6 @@
 """FASIT Packet for Presentation Devices ICD Release 1.1"""
 
-import dpkt
+import fasit_dpkt
 import fasit_packet
 
 PD_EVENT_CMD                    = 2100
@@ -112,123 +112,123 @@ FASIT_count = 0
 
 class FasitPacketPd(fasit_packet.FasitPacket):
 
-    class EventCommand(dpkt.Packet):
+    class EventCommand(fasit_dpkt.Packet):
         __message_number__ = PD_EVENT_CMD
         __hdr__ = (
-            ('command_id', 'B', 0), 
-            ('exposure', 'B', 0),
-            ('aspect', 'h', 0),
-            ('direction', 'H', 0),
-            ('move', 'B', 0),
-            ('speed', 'f', 0),
-            ('hit_onoff', 'B', 0),
-            ('hit_count', 'H', 0),
-            ('hit_reaction', 'B', 0),
-            ('hits_to_kill', 'H', 0),
-            ('hit_sensitivity', 'H', 0),
-            ('hit_mode', 'B', 0),
-            ('hit_burst_separation', 'H', 0)
+            ('command_id', 'B', EVENT_CMD_NONE, [EVENT_CMD_NONE, EVENT_CMD_REQ_GPS_LOCATION]), 
+            ('exposure', 'B', 0, [0, 90]),
+            ('aspect', 'h', 0, [-180, 180]),
+            ('direction', 'H', 0, [0, 359]),
+            ('move', 'B', PD_MOVE_STOP, [PD_MOVE_STOP, PD_MOVE_REVERSE]),
+            ('speed', 'f', 0, [0, 20]),
+            ('hit_onoff', 'B', PD_HIT_ONOFF_OFF, [PD_HIT_ONOFF_OFF, PD_HIT_ONOFF_OFF_POS]),
+            ('hit_count', 'H', 0, [0, 10]),
+            ('hit_reaction', 'B', PD_HIT_REACTION_FALL, [PD_HIT_REACTION_FALL, PD_HIT_REACTION_BOB]),
+            ('hits_to_kill', 'H', 1, [1, 10]),
+            ('hit_sensitivity', 'H', 1, [1, 15]),
+            ('hit_mode', 'B', PD_HIT_MODE_SINGLE, [PD_HIT_MODE_NCHS, PD_HIT_MODE_BURST]),
+            ('hit_burst_separation', 'H', 250, [100, 10000])
             )
         
-    class EventCommandAck(dpkt.Packet):
+    class EventCommandAck(fasit_dpkt.Packet):
         __message_number__ = PD_EVENT_CMD_ACK
         __hdr__ = (
-            ('resp_message_number', 'H', 0),
-            ('resp_sequence_id', 'I', 0),
-            ('ack_resp', 'c', 'F')
+            ('resp_message_number', 'H', 0, None),
+            ('resp_sequence_id', 'I', 0, None),
+            ('ack_resp', 'c', 'F', None)
             )
 
-    class DeviceIdAndCapabilities(dpkt.Packet):
+    class DeviceIdAndCapabilities(fasit_dpkt.Packet):
         __message_number__ = PD_DEV_ID_AND_CAPS 
         __hdr__ = (
-            ('resp_message_number', 'H', 0),
-            ('resp_sequence_id', 'I', 0),
-            ('device_id', 'Q', 0),              # make sure the Q (C long long) is supported on embedded platform
-            ('device_capabilities', 'B', 0)
+            ('resp_message_number', 'H', 0, None),
+            ('resp_sequence_id', 'I', 0, None),
+            ('device_id', 'Q', 0, None),              # make sure the Q (C long long) is supported on embedded platform
+            ('device_capabilities', 'B', 0, None)
             )
         
-    class DeviceStatus(dpkt.Packet):
+    class DeviceStatus(fasit_dpkt.Packet):
         __message_number__ = PD_DEV_STATUS
         __hdr__ = (
-            ('resp_message_number', 'H', 0),
-            ('resp_sequence_id', 'I', 0),
-            ('power_status', 'B', 0), 
-            ('oem_fault_code', 'H', 0), 
-            ('exposure', 'B', 0),
-            ('aspect', 'h', 0),
-            ('direction', 'H', 0),
-            ('move', 'B', 0),
-            ('speed', 'f', 0),
-            ('track_position', 'H', 0), 
-            ('device_type', 'B', 0), 
-            ('hit_count', 'H', 0),
-            ('hit_onoff', 'B', 0),
-            ('hit_reaction', 'B', 0),
-            ('hits_to_kill', 'H', 0),
-            ('hit_sensitivity', 'H', 0),
-            ('hit_mode', 'B', 0),
-            ('hit_burst_separation', 'H', 0)
+            ('resp_message_number', 'H', 0, None),
+            ('resp_sequence_id', 'I', 0, None),
+            ('power_status', 'B', 0, None), 
+            ('oem_fault_code', 'H', 0, None), 
+            ('exposure', 'B', 0, None),
+            ('aspect', 'h', 0, None),
+            ('direction', 'H', 0, None),
+            ('move', 'B', 0, None),
+            ('speed', 'f', 0, None),
+            ('track_position', 'H', 0, None), 
+            ('device_type', 'B', 0, None), 
+            ('hit_count', 'H', 0, None),
+            ('hit_onoff', 'B', 0, None),
+            ('hit_reaction', 'B', 0, None),
+            ('hits_to_kill', 'H', 0, None),
+            ('hit_sensitivity', 'H', 0, None),
+            ('hit_mode', 'B', 0, None),
+            ('hit_burst_separation', 'H', 0, None)
             )
         
-    class ConfigureMilesShootback(dpkt.Packet):
+    class ConfigureMilesShootback(fasit_dpkt.Packet):
         __message_number__ = PD_CONFIG_MILES_SHOOTBACK 
         __hdr__ = (
-            ('basic_miles_code', 'B', 0),
-            ('ammo_type', 'B', 0),
-            ('player_id', 'H', 0),
-            ('fire_delay', 'B', 0)
+            ('basic_miles_code', 'B', 0, [0, 36]),
+            ('ammo_type', 'B', 0, [0, 255]),
+            ('player_id', 'H', 1, [1, 330]),
+            ('fire_delay', 'B', 0, [0, 60])
             )
         
-    class MilesShootbackStatus(dpkt.Packet):
+    class MilesShootbackStatus(fasit_dpkt.Packet):
         __message_number__ = PD_MILES_SHOOTBACK_STATUS 
         __hdr__ = (
-            ('resp_message_number', 'H', 0),
-            ('resp_sequence_id', 'I', 0),
-            ('basic_miles_code', 'B', 0),             
-            ('ammo_type', 'B', 0),
-            ('player_id', 'H', 0),
-            ('fire_delay', 'B', 0)
+            ('resp_message_number', 'H', 0, None),
+            ('resp_sequence_id', 'I', 0, None),
+            ('basic_miles_code', 'B', 0, None),             
+            ('ammo_type', 'B', 0, None),
+            ('player_id', 'H', 0, None),
+            ('fire_delay', 'B', 0, None)
             )
         
-    class ConfigureMuzzleFlash(dpkt.Packet):
+    class ConfigureMuzzleFlash(fasit_dpkt.Packet):
         __message_number__ = PD_CONFIG_MUZZLE_FLASH 
         __hdr__ = (
-            ('on_off', 'B', 0),
-            ('mode', 'B', 0),
-            ('initial_delay', 'B', 0),
-            ('repeat_delay', 'B', 0)
+            ('on_off', 'B', 0, [0, 1]),
+            ('mode', 'B', PD_MUZZLE_FLASH_MODE_SINGLE, [PD_MUZZLE_FLASH_MODE_SINGLE, PD_MUZZLE_FLASH_MODE_BURST]),
+            ('initial_delay', 'B', 0, [0, 60]),
+            ('repeat_delay', 'B', 0, [0, 60])
             )
 
-    class MuzzleFlashStatus(dpkt.Packet):
+    class MuzzleFlashStatus(fasit_dpkt.Packet):
         __message_number__ = PD_MUZZLE_FLASH_STATUS 
         __hdr__ = (
-            ('resp_message_number', 'H', 0),
-            ('resp_sequence_id', 'I', 0),
-            ('on_off', 'B', 0),
-            ('mode', 'B', 0),
-            ('initial_delay', 'B', 0),
-            ('repeat_delay', 'B', 0)
+            ('resp_message_number', 'H', 0, None),
+            ('resp_sequence_id', 'I', 0, None),
+            ('on_off', 'B', 0, None),
+            ('mode', 'B', 0, None),
+            ('initial_delay', 'B', 0, None),
+            ('repeat_delay', 'B', 0, None)
             ) 
         
-    class GpsLocation(dpkt.Packet):
+    class GpsLocation(fasit_dpkt.Packet):
         __message_number__ = PD_GPS_LOCATION 
         __hdr__ = (
-            ('resp_message_number', 'H', 0),
-            ('resp_sequence_id', 'I', 0),
-            ('gps_fom', 'B', 0),
-            ('integral_latitude', 'H', 0),
-            ('fractional_latitude', 'I', 0),
-            ('integral_longitude', 'H', 0),
-            ('fractional_longitude', 'I', 0)
+            ('resp_message_number', 'H', 0, None),
+            ('resp_sequence_id', 'I', 0, None),
+            ('gps_fom', 'B', 0, None),
+            ('integral_latitude', 'H', 0, None),
+            ('fractional_latitude', 'I', 0, None),
+            ('integral_longitude', 'H', 0, None),
+            ('fractional_longitude', 'I', 0, None)
             )    
         
-    class AudioCommand(dpkt.Packet):
+    class AudioCommand(fasit_dpkt.Packet):
         __message_number__ = PD_AUDIO_CMD 
         __hdr__ = (
-            ('function_code', 'B', 0),
-            ('track_number', 'B', 1),
-            ('volume', 'B', 0),
-            ('play_mode', 'B', 0)
+            ('function_code', 'B', PD_AUDIO_CMD_STOP_ALL, [PD_AUDIO_CMD_STOP_ALL, PD_AUDIO_CMD_SET_VOLUME]),
+            ('track_number', 'B', 1, [1, 255]),
+            ('volume', 'B', 0, [0, 100]),
+            ('play_mode', 'B', PD_AUDIO_MODE_ONCE, [PD_AUDIO_MODE_ONCE, PD_AUDIO_MODE_RANDOM])
             )    
         
     _msg_num_to_type = { 

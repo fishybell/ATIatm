@@ -1,7 +1,7 @@
 import asynchat
 import logging
 
-#import dpkt
+#import fasit_dpkt
 import fasit_packet
 import fasit_packet_pd
 
@@ -63,17 +63,13 @@ class FasitHandler(asynchat.async_chat):
     def _process_packet(self):
         """We have read the entire packet"""
         self.logger.debug('_process_packet()')
+
         self.in_packet = fasit_packet.FasitPacket(self.received_data)
         
-#        if self.in_packet.data:
-#            print dpkt.hexdump(str(self.in_packet.data))
-        
-        pd_packet = fasit_packet_pd.FasitPacketPd(self.received_data)
-        self.logger.debug(`pd_packet`)
+        self.logger.debug(`fasit_packet_pd.FasitPacketPd(self.received_data)`)
         
         try:
-            #self._msg_num_to_handler[self.in_packet.message_number](self)
-            self._msg_num_to_handler[pd_packet.message_number](self)
+            self._msg_num_to_handler[self.in_packet.message_number](self)
         except (KeyError):
            self.default_handler()
          

@@ -1,6 +1,6 @@
 """FASIT Packet for Presentation Devices ICD Release 2.0"""
 
-import dpkt
+import fasit_dpkt
 import fasit_packet
 
 FASIT_PD_SIMPLE_CMD                 = 3100
@@ -66,14 +66,14 @@ FASIT_count = 0
 
 class FasitPacketPd(fasit_packet.FasitPacket):
     
-    class Simple(dpkt.Packet):
+    class Simple(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_SIMPLE_CMD
         __hdr__ = (
             ('command_id', 'B', 0), 
             ('command_data', 'H', 0)
             )
 
-    class ConfigureHitSensor(dpkt.Packet):
+    class ConfigureHitSensor(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_CONFIG_HIT_SENSOR
         __hdr__ = (
             ('on_off', '?', 0),
@@ -84,7 +84,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('burst_separation', 'H', 0)
             )
 
-    class EventCommandAck(dpkt.Packet):
+    class EventCommandAck(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_EVENT_CMD_ACK
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -92,7 +92,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('ack_resp', 'c', 'F')
             )
 
-    class DeviceIdAndCapabilities(dpkt.Packet):
+    class DeviceIdAndCapabilities(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_DEV_ID_AND_CAPS 
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -105,7 +105,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('device_capabilities', 'B', 0)
             )
 
-    class GeneralStatus(dpkt.Packet):
+    class GeneralStatus(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_GENERAL_STATUS 
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -121,7 +121,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('aspect', 'B', 0)
             )
 
-    class MovementStatus(dpkt.Packet):
+    class MovementStatus(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_MOVEMENT_STATUS 
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -131,7 +131,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('track_position', 'H', 0)
             )
 
-    class ConfigureHitSensorStatus(dpkt.Packet):
+    class ConfigureHitSensorStatus(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_CONFIG_HIT_SENSOR_STATUS 
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -144,7 +144,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('burst_separation', 'H', 0)
             )
 
-    class HitStatus(dpkt.Packet):
+    class HitStatus(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_HIT_STATUS 
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -153,7 +153,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('hit_location', 'B', 0)
             )
 
-    class ConfigureMilesShootback(dpkt.Packet):
+    class ConfigureMilesShootback(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_CONFIG_MILES_SHOOTBACK 
         __hdr__ = (
             ('on_off', '?', 0),
@@ -164,7 +164,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('fire_delay', 'B', 0)
             )
         
-    class MilesShootbackStatus(dpkt.Packet):
+    class MilesShootbackStatus(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_MILES_SHOOTBACK_STATUS 
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -177,7 +177,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('fire_delay', 'B', 0)
             )
 
-    class ConfigureMuzzleFlash(dpkt.Packet):
+    class ConfigureMuzzleFlash(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_CONFIG_MUZZLE_FLASH 
         __hdr__ = (
             ('on_off', '?', 0),
@@ -186,7 +186,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('flashes_per_burst', 'B', 0)
             )
         
-    class MuzzleFlashStatus(dpkt.Packet):
+    class MuzzleFlashStatus(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_MUZZLE_FLASH_STATUS 
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -197,7 +197,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('flashes_per_burst', 'B', 0)
             )
         
-    class GpsLocation(dpkt.Packet):
+    class GpsLocation(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_GPS_LOCATION 
         __hdr__ = (
             ('resp_message_number', 'H', 0),
@@ -209,7 +209,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('fractional_longitude', 'I', 0)
             )
 
-    class VendorSpecific(dpkt.Packet):
+    class VendorSpecific(fasit_dpkt.Packet):
         __message_number__ = FASIT_PD_VENDOR_SPECIFIC 
         __hdr__ = (
             ('vendor_id', 'H', 0),

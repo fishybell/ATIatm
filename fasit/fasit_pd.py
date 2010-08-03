@@ -152,9 +152,9 @@ class FasitPd():
         
         change_in_settings = False
         
-        if  ((self.__hit_onoff__                != onoff)               |     
-             (self.__hit_sensitivity__          != sensitivity)         |
-             (self.__hit_mode__                 != mode)                |
+        if  ((self.__hit_onoff__                != onoff)               or     
+             (self.__hit_sensitivity__          != sensitivity)         or
+             (self.__hit_mode__                 != mode)                or
              (self.__hit_burst_separation__     != burst_separation)):
             change_in_settings = True
 
@@ -340,13 +340,13 @@ class play_sound_thread(QThread):
         if (self.is_playing() == True):
             self.logger.debug("Can't play track, player is currently playing.")
             return False
-        if ((track_number < 0) | (track_number > 62)):
+        if ((track_number < 0) or (track_number > 62)):
             self.logger.debug('Track number out of range [0 - 62]: %d', track_path)
             return False
-        if ((loop < 0) | (loop > 255)):
+        if ((loop < 0) or (loop > 255)):
             self.logger.debug('loop out of range [0 - 255]: %d', loop)
             return False
-        if ((random != True) & (random != False)):
+        if ((random != True) and (random != False)):
             self.logger.debug('random out of range [True or False]: %d', random)
             return False
         
@@ -476,7 +476,7 @@ class lifter_thread(QThread):
         os.close(self.fd)
         
         self.logger.debug("Current position: %s", position)
-        if (((command == "up") & (position == "up\n")) | ((command == "down") & (position == "down\n"))):
+        if (((command == "up") and (position == "up\n")) or ((command == "down") and (position == "down\n"))):
             self.logger.debug("Cannot move target %s when target status is %s", command, position)
             # we would write an error code back to TRACR, but no error code exists for this case for 
             # the infantry lifter either way, the target is already in the commanded position...
@@ -508,11 +508,11 @@ class lifter_thread(QThread):
                 self.write_out(-1*fasit_packet_pd.PD_FAULT_DID_NOT_REACH_CONCEAL_SWITCH)
                 self.logger.debug("Error: did not reach conceal switch")
                 
-        elif ((command == "up") & (position == "down\n")):
+        elif ((command == "up") and (position == "down\n")):
                 self.write_out(-1*fasit_packet_pd.PD_FAULT_DID_NOT_LEAVE_CONCEAL_SWITCH)
                 self.logger.debug("Error: did not leave conceal switch")
                 
-        elif ((command == "down") & (position == "up\n")):
+        elif ((command == "down") and (position == "up\n")):
                 self.write_out(-1*fasit_packet_pd.PD_FAULT_DID_NOT_LEAVE_EXPOSE_SWITCH)
                 self.logger.debug("Error: did not leave expose switch")
                 
@@ -980,7 +980,7 @@ class FasitPdSit(FasitPd):
         
         # check the hit thread
         new_hits = self.__hit_thread__.read()
-        if ((new_hits != None) & (new_hits > 0)):
+        if ((new_hits != None) and (new_hits > 0)):
             FasitPd.new_hit_handler(self, new_hits)
             if (self.__hit_count__ >= self.__hits_to_kill__):
                 #self.set_hit_enable(False)
@@ -1013,7 +1013,7 @@ class FasitPdSit(FasitPd):
                         self.set_miles_transmitter("on")
                         
                     if ((self.__capabilities__ & fasit_packet_pd.PD_CAP_MUZZLE_FLASH == fasit_packet_pd.PD_CAP_MUZZLE_FLASH)
-                        & (self.__muzzle_flash_onoff__ == 1)):
+                        and (self.__muzzle_flash_onoff__ == 1)):
                         self.set_muzzle_flash("on")
                         
                 if (lifter_status == fasit_packet_pd.PD_EXPOSURE_CONCEALED):
@@ -1029,7 +1029,7 @@ class FasitPdSit(FasitPd):
                         
                     #self.logger.debug("hit count = %d, htk = %d", self.__hit_count__, self.__hits_to_kill__)
                     #self.logger.debug("self.__hit_reaction__ = %d", self.__hit_reaction__)
-                    if ((self.__hit_count__ < self.__hits_to_kill__) &
+                    if ((self.__hit_count__ < self.__hits_to_kill__) and
                         (self.__hit_reaction__ == fasit_packet_pd.PD_HIT_REACTION_BOB)):
                         self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
                 
@@ -1145,7 +1145,7 @@ class mover_thread(QThread):
         
         movement = movement.rstrip()
         self.logger.debug("Current movement: %s", movement)
-        if ((command != "stop") & (movement != "stopped")):
+        if ((command != "stop") and (movement != "stopped")):
             self.logger.debug("Cannot move target %s when target mover status is %s", command, movement)
             # TODO - write an error code back to TRACR...
             return
@@ -1158,7 +1158,7 @@ class mover_thread(QThread):
         # if there is an error, return (the error gets reported back by the function)
         # TODO - check if stopped?
         movement = self.get_current_movement_thread(close_fd = True)
-        if  ((movement == "stopped") | (movement == "fault") | (movement == "error")):
+        if  ((movement == "stopped") or (movement == "fault") or (movement == "error")):
             #os.close(self.fd)
             return
         
@@ -1193,7 +1193,7 @@ class mover_thread(QThread):
                         self.logger.debug("Change in movement...")
 
                         movement = self.get_current_movement_thread(close_fd = True)
-                        if ((movement == "stopped") | (movement == "fault") | (movement == "error")):
+                        if ((movement == "stopped") or (movement == "fault") or (movement == "error")):
                             keep_going = False
                                             
                     elif (fd == position_fd):
@@ -1293,6 +1293,9 @@ class FasitPdMit(FasitPd):
     def stop_threads(self):
         self.__mover_thread__.write("stop")
         
+        if (self.__mover_thread__.isAlive()):
+            self.__mover_thread__.join()
+        
     def move(self, direction = 0, movement = fasit_packet_pd.PD_MOVE_STOP, speed = 0):
         FasitPd.move(self, direction, movement, speed)
         self.__mover_thread__.set_setting_speed(speed)  
@@ -1371,9 +1374,9 @@ class FasitPdSes(FasitPd):
                 return False
                 
         elif (function_code == fasit_packet_pd.PD_AUDIO_CMD_STOP_TRACK):
-            if ((self.__sound_thread_1__.is_playing() == True) & (self.__sound_thread_1__.track_number == track_number)):  
+            if ((self.__sound_thread_1__.is_playing() == True) and (self.__sound_thread_1__.track_number == track_number)):  
                 self.__sound_thread_1__.write("stop")
-            if ((self.__sound_thread_2__.is_playing() == True) & (self.__sound_thread_2__.track_number == track_number)): 
+            if ((self.__sound_thread_2__.is_playing() == True) and (self.__sound_thread_2__.track_number == track_number)): 
                 self.__sound_thread_2__.write("stop")
             return True
         
@@ -1389,7 +1392,13 @@ class FasitPdSes(FasitPd):
     def stop_threads(self):
         self.__sound_thread_1__.write("stop")
         self.__sound_thread_2__.write("stop")
-        time.sleep(1)
+        
+        if (self.__sound_thread_1__.isAlive()):
+            self.__sound_thread_1__.join()
+            
+        if (self.__sound_thread_2__.isAlive()):
+            self.__sound_thread_2__.join()
+        
         
 
 
@@ -1487,9 +1496,9 @@ class FasitPdTestSitXXX(FasitPd):
                 return False
                 
         elif (function_code == fasit_packet_pd.PD_AUDIO_CMD_STOP_TRACK):
-            if ((self.__sound_thread_1__.is_playing() == True) & (self.__sound_thread_1__.track_number == track_number)):  
+            if ((self.__sound_thread_1__.is_playing() == True) and (self.__sound_thread_1__.track_number == track_number)):  
                 self.__sound_thread_1__.write("stop")
-            if ((self.__sound_thread_2__.is_playing() == True) & (self.__sound_thread_2__.track_number == track_number)): 
+            if ((self.__sound_thread_2__.is_playing() == True) and (self.__sound_thread_2__.track_number == track_number)): 
                 self.__sound_thread_2__.write("stop")
             return True
         

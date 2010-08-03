@@ -4,7 +4,7 @@ import socket
 
 import random
 
-#import dpkt
+#import fasit_dpkt
 import fasit_packet
 import fasit_packet_pd_20
 
@@ -50,7 +50,7 @@ class FasitClient(FasitHandler):
         self.temp_packet.sequence_id = self.get_new_sequence_id()
         self.temp_packet.data = id_and_caps
 
-#        print dpkt.hexdump(str(id_and_caps))
+#        print fasit_dpkt.hexdump(str(id_and_caps))
 #        self.logger.debug(`self.temp_packet`)
         
         self.push(self.temp_packet.pack())
