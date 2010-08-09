@@ -159,7 +159,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('direction', 'H', 0, None),
             ('move', 'B', 0, None),
             ('speed', 'f', 0, None),
-            ('track_position', 'H', 0, None), 
+            ('position', 'H', 0, None), 
             ('device_type', 'B', 0, None), 
             ('hit_count', 'H', 0, None),
             ('hit_onoff', 'B', 0, None),

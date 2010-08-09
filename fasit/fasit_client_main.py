@@ -16,16 +16,22 @@ logger = logging.getLogger('fasit_client_main')
 ip = FASIT_TC_IP_ADDRESS
 port = FASIT_TC_IP_PORT
 type = fasit_packet_pd.PD_TYPE_NONE
+remote = False
 client = None
 
 def connect_to_server():
+    global ip
+    global port
+    global type
+    global remote
     global client
+    
     connected = False
     while (connected == False):
         client = None
         try:
             print "Trying to connect to server..."
-            client = FasitClient(ip, port, type)
+            client = FasitClient(ip, int(port), type, remote)
             connected = True
             print "...connected."
             return True
@@ -44,6 +50,7 @@ def main():
     global ip
     global port
     global type
+    global remote
     global client
     
     usage = "usage: %prog [options]"
@@ -51,6 +58,7 @@ def main():
     parser.add_option("-t", "--type", dest = "target_type", help = "Set target type to TARGET_TYPE: NONE, SIT, MIT, LSAT, HSAT, MAT or SES [default: %default]", metavar = "TARGET_TYPE", default = "NONE")
     parser.add_option("-s", "--server", dest = "server_ip", help = "Set the FASIT server IP address [default: %default]", metavar = "IP_ADDRESS", default = FASIT_TC_IP_ADDRESS)
     parser.add_option("-p", "--port", dest = "server_port", help = "Set the FASIT server port number [default: %default]", metavar = "PORT_NUMBER", default = FASIT_TC_IP_PORT) 
+    parser.add_option("-r", "--remote", dest = "use_remote", help = "connect to a remote target [default: %default]", action = "store_true", default = False) 
     (options, args) = parser.parse_args()
     
     if (options.target_type == "NONE"):
@@ -74,10 +82,12 @@ def main():
     
     ip = options.server_ip
     port = options.server_port
+    remote = options.use_remote
    
     logger.debug("Target Type:        %s (%d)", options.target_type, type)
     logger.debug("Server IP Address:  %s", ip)
     logger.debug("Server Port:        %s", port)
+    logger.debug("Remote:             %s", remote)
     
     keep_going = True
     while(keep_going):

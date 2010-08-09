@@ -10,6 +10,7 @@ import select
 
 import fasit_packet_pd
 import fasit_audio
+from remote_target import *
 
 LIFTER_PATH         = "/sys/class/target/lifter/"
 MOVER_PATH          = "/sys/class/target/mover/"
@@ -223,7 +224,7 @@ class FasitPd():
     def stop_threads(self):
         pass
     
-    def writable(self):
+    def check_for_updates(self):
         return False  
 
     def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
@@ -253,7 +254,6 @@ class FasitPd():
         if (new_hits > 0):
             print "new hit(s) %d" % new_hits
             self.__hit_count__ = self.__hit_count__ + new_hits
-            writable_status = True
             self.__hit_needs_update__ = True
    
 
@@ -966,8 +966,8 @@ class FasitPdSit(FasitPd):
     def set_muzzle_flash(self, on_off):
         self.set_setting_string(MUZZLE_FLASH_PATH + "state", on_off)
     
-    def writable(self):
-        writable_status = False
+    def check_for_updates(self):
+        check_for_updates_status = False
         
         # check the ui thread
 #        bit_status = self.__ui_thread__.read()
@@ -999,7 +999,7 @@ class FasitPdSit(FasitPd):
                 lifter_status = abs(lifter_status)
                 self.logger.debug("Exposure error %d", lifter_status)
                 self.__fault_code__ = lifter_status
-                writable_status = True
+                check_for_updates_status = True
                 self.__exposure_needs_update__ = True
             elif (lifter_status != self.__exposure__):
                 self.logger.debug("Change in exposure status %d", lifter_status)
@@ -1034,10 +1034,10 @@ class FasitPdSit(FasitPd):
                         self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED)
                 
                 self.__exposure__ = lifter_status
-                writable_status = True
+                check_for_updates_status = True
                 self.__exposure_needs_update__ = True
                 
-        return writable_status
+        return check_for_updates_status
   
     
 #------------------------------------------------------------------------------
@@ -1301,8 +1301,8 @@ class FasitPdMit(FasitPd):
         self.__mover_thread__.set_setting_speed(speed)  
         self.__mover_thread__.write(movement)
         
-    def writable(self):
-        writable_status = False
+    def check_for_updates(self):
+        check_for_updates_status = False
                    
         # check the mover thread
         mover_status = 0
@@ -1312,7 +1312,7 @@ class FasitPdMit(FasitPd):
                 mover_status = abs(mover_status)
                 self.logger.debug("move error %d", mover_status)
                 self.__fault_code__ = mover_status
-                writable_status = True
+                check_for_updates_status = True
                 self.__move_needs_update__ = True
                 
             elif (mover_status == "position"):
@@ -1320,16 +1320,64 @@ class FasitPdMit(FasitPd):
                 self.logger.debug("position update %d", new_position)
                 if (new_position != self.__position__):
                     self.__position__ = new_position
-                    writable_status = True
+                    check_for_updates_status = True
                     self.__move_needs_update__ = True
                  
             elif (mover_status != self.__move__):
                 self.logger.debug("Change in move status %d", mover_status)
                 self.__move__ = mover_status
-                writable_status = True
+                check_for_updates_status = True
                 self.__move_needs_update__ = True
                 
-        return writable_status   
+        return check_for_updates_status   
+    
+#------------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------------          
+#class FasitPdMitRemote(FasitPd, RemoteTargetServer):
+class FasitPdMitRemote(FasitPdSit, RemoteTargetServer):                        
+    def __init__(self):
+        FasitPdSit.__init__(self)
+        self.logger = logging.getLogger('FasitPdMitRemote')
+       
+        self.__device_id__          = uuid.getnode()
+        self.__device_type__        = fasit_packet_pd.PD_TYPE_MIT
+         
+        RemoteTargetServer.__init__(self, None)
+        
+#    def stop_threads(self):
+#        # TODO - close connection?
+#        pass
+        
+    def move(self, direction = 0, movement = fasit_packet_pd.PD_MOVE_STOP, speed = 0):
+        FasitPd.move(self, direction, movement, speed)
+        move_packet = fasit_packet_pd.FasitPacketPd()
+        move_request = fasit_packet_pd.FasitPacketPd.EventCommand()
+        move_request.command_id = fasit_packet_pd.EVENT_CMD_REQ_MOVE
+        move_request.direction = direction
+        move_request.move = movement
+        move_request.speed = speed        
+        move_packet.data = move_request
+        self.handler.push(move_packet.pack())
+        
+    def check_for_updates(self):
+        check_for_updates_status = FasitPdSit.check_for_updates(self)
+                   
+        if (self.handler != None):
+            if (self.handler.command_status_packet != None):
+                self.logger.debug("Received status from remote target.")
+                self.__fault_code__          = self.handler.command_status_packet.data.oem_fault_code
+                self.__direction__           = self.handler.command_status_packet.data.direction
+                self.__move__                = self.handler.command_status_packet.data.move
+                self.__move_speed__          = self.handler.command_status_packet.data.speed
+                self.__position__            = self.handler.command_status_packet.data.position
+                self.handler.command_status_packet = None
+                check_for_updates_status = True
+                self.__move_needs_update__ = True
+                
+#            if (self.handler.command_ack_packet != None)):
+                      
+        return check_for_updates_status
    
 #------------------------------------------------------------------------------------
 #
@@ -1528,8 +1576,8 @@ class FasitPdTestSitXXX(FasitPd):
         FasitPd.expose(self, expose)
         self.__exposure_thread__.write(expose)
     
-    def writable(self):
-        writable_status = False
+    def check_for_updates(self):
+        check_for_updates_status = False
         
         # check the hit thread
         new_hits = self.__hit_thread__.read()
@@ -1545,7 +1593,7 @@ class FasitPdTestSitXXX(FasitPd):
             if (exposure_status != self.__exposure__):
                 print "change in exposure status %d" % exposure_status
                 self.__exposure__ = exposure_status
-                writable_status = True
+                check_for_updates_status = True
                 self.__exposure_needs_update__ = True
                 
-        return writable_status
+        return check_for_updates_status

@@ -16,7 +16,7 @@ class FasitClient(FasitHandler):
     """
     __device__ = None
     
-    def __init__(self, host, port, type):
+    def __init__(self, host, port, type, remote):
         self.logger = logging.getLogger('FasitClient')
         self.sock = None
         self.target_type = type
@@ -39,7 +39,12 @@ class FasitClient(FasitHandler):
         elif (type == fasit_packet_pd.PD_TYPE_SIT):
             self.__device__ = fasit_pd.FasitPdSit()
         elif (type == fasit_packet_pd.PD_TYPE_MIT):
-            self.__device__ = fasit_pd.FasitPdMit()
+            if (remote == True):
+                self.logger.debug('Remote connection specified')
+                self.__device__ = fasit_pd.FasitPdMitRemote()
+            else:
+                self.logger.debug('Local connection specified')
+                self.__device__ = fasit_pd.FasitPdMit()
         elif (type == fasit_packet_pd.PD_TYPE_SES):
             self.__device__ = fasit_pd.FasitPdSes()
         else:
@@ -48,7 +53,7 @@ class FasitClient(FasitHandler):
         FasitHandler.__init__(self, sock=self.sock, name='FasitClient')
     
     def writable(self):
-        if (self.__device__.writable() == True):
+        if (self.__device__.check_for_updates() == True):
             if ((self.__device__.hit_needs_update() or 
                  self.__device__.move_needs_update() or 
                  self.__device__.exposure_needs_update())):
@@ -100,7 +105,7 @@ class FasitClient(FasitHandler):
         status.direction            = self.__device__.get_direction_setting()
         status.move                 = self.__device__.get_move_setting()
         status.speed                = self.__device__.get_move_speed()
-        status.track_position       = self.__device__.get_position()
+        status.position             = self.__device__.get_position()
         status.device_type          = self.__device__.get_device_type()
         status.hit_count            = self.__device__.get_hit_count()
         status.hit_onoff            = self.__device__.get_hit_onoff()
@@ -243,7 +248,7 @@ class FasitClient(FasitHandler):
         self.logger.info('event_cmd_req_expose_handler()')
         self.__device__.expose(cmd_data.exposure)
         self.send_cmd_ack(ack = 'S')
-        self.send_device_status(True)
+#        self.send_device_status(True)
     
     def event_cmd_req_dev_reset(self, cmd_data):
         self.logger.info('event_cmd_req_dev_reset()')
@@ -252,7 +257,7 @@ class FasitClient(FasitHandler):
         self.logger.info('event_cmd_req_move()')
         self.__device__.move(cmd_data.direction, cmd_data.move, cmd_data.speed)
         self.send_cmd_ack(ack = 'S')
-        self.send_device_status(True)
+#        self.send_device_status(True)
     
     def event_cmd_config_hit_sensor_handler(self, cmd_data):
         self.logger.info('event_cmd_config_hit_sensor_handler()')
@@ -265,7 +270,7 @@ class FasitClient(FasitHandler):
                                              burst_separation = cmd_data.hit_burst_separation)
         
         self.send_cmd_ack(ack = 'S')
-        self.send_device_status(True)
+#        self.send_device_status(True)
         
      
     def event_cmd_req_gps_location_handler(self, cmd_data):

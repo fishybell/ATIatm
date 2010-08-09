@@ -128,7 +128,7 @@ class FasitPacketPd(fasit_packet.FasitPacket):
             ('resp_sequence_id', 'I', 0),
             ('move_Setting', 'B', 0),   
             ('speed_mph', 'B', 0),
-            ('track_position', 'H', 0)
+            ('position', 'H', 0)
             )
 
     class ConfigureHitSensorStatus(fasit_dpkt.Packet):
