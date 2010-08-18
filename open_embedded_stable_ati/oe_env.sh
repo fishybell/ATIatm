@@ -1,6 +1,6 @@
-if [ `id -g` != 207 ] ; then
-    echo "Changed groups to SRC, please re-source this file"
-    newgrp src
+if [ `id -g` != 206 ] ; then
+    echo "Changed groups to ENG, please re-source this file"
+    newgrp eng
     echo "Group restored"
 fi
 export OE_DIR=${PWD}
