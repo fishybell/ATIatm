@@ -1,0 +1,1 @@
+cp -v flash/*.jffs2 flash/*.bin /ati/share/Research\ \&\ Development/ATM/
