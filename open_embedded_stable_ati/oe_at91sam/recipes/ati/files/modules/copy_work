@@ -1,0 +1,25 @@
+#!/usr/bin/tclsh
+package require Expect
+package require Tclx
+fconfigure stdin -blocking 1            ;#expect bug?
+
+puts -nonewline "which one (0-9,A-F)? "
+flush stdout
+gets stdin num
+
+system sed -i -e "s/^sam$num.*//" ~/.ssh/known_hosts
+eval spawn scp *.ko root@sam$num:/home/root
+set timeout 3.5
+while 1 {
+    expect {
+        -re {.*word:.*} {
+            send "\r"
+        }
+        -re {.*yes/no.*} {
+            send "yes\r"
+        }
+        default {
+            break
+        }
+    }
+}
