@@ -1,6 +1,5 @@
 obj-m := 	target.o \
 			target_lifter_infantry.o \
-			target_lifter_armor.o \
 			target_mover_infantry.o \
 			target_muzzle_flash.o \
 			target_miles_transmitter.o \
@@ -9,6 +8,7 @@ obj-m := 	target.o \
 			target_hit_mechanical.o \
 			target_hit_miles.o \
 			target_user_interface.o \
+#			target_lifter_armor.o \
 
 PWD := $(shell pwd)
 #EXTRA_CFLAGS += -mfloat-abi=softfp -mfpu=vfp

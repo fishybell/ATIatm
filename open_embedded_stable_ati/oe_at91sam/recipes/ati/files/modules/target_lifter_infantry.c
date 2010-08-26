@@ -32,15 +32,15 @@
 	#undef INPUT_LIFTER_POS_DOWN_LIMIT
 	#undef INPUT_LIFTER_POS_UP_LIMIT
 
-	#undef OUTPUT_LIFTER_MOTOR_ACTIVE_STATE
+	#undef OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE
 	#undef OUTPUT_LIFTER_MOTOR_FWD_POS
 
 	#define INPUT_LIFTER_POS_ACTIVE_STATE   	ACTIVE_LOW
 	#define INPUT_LIFTER_POS_DOWN_LIMIT    		AT91_PIN_PA30   // BP3 on dev. board
 	#define INPUT_LIFTER_POS_UP_LIMIT     		AT91_PIN_PA31   // BP4 on dev. board
 
-	#define OUTPUT_LIFTER_MOTOR_ACTIVE_STATE    ACTIVE_LOW
-	#define OUTPUT_LIFTER_MOTOR_FWD_POS    		AT91_PIN_PA6
+	#define OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE    ACTIVE_LOW
+	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PA6
 #endif // TESTING_ON_EVAL
 
 
@@ -107,8 +107,8 @@ static int hardware_motor_on(int direction)
 	// just turn on the motor
 	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
     spin_lock_irqsave(&motor_lock, flags);
-	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); 	// Turn brake off
-	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); 	// Turn motor on
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake off
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor on
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
@@ -121,8 +121,8 @@ static int hardware_motor_off(void)
 	unsigned long flags;
 	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 	spin_lock_irqsave(&motor_lock, flags);
-	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); 	// Turn motor off
-	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); 	// Turn brake on
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor off
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake on
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
@@ -235,12 +235,12 @@ static int hardware_init(void)
     int status = 0;
 
     // Configure motor gpio for output and set initial output
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE); // motor off
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);  // brake on
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // motor off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);  // brake on
 
     // These don't get used with the SIT but we set the initial value for completeness
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
 
     // Configure position gpios for input and deglitch for interrupts
     at91_set_gpio_input(INPUT_LIFTER_POS_DOWN_LIMIT, INPUT_LIFTER_POS_PULLUP_STATE);

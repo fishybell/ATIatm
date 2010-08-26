@@ -480,8 +480,10 @@ static int hardware_motor_pwm_init(void)
 
 	clk_enable(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
 
+	// approx 1.8MHz with 50% duty-cycle
+
 	// initialize clock
-	__raw_writel(ATMEL_TC_TIMER_CLOCK4			// Master clock / 2 : 66 mhz
+	__raw_writel(ATMEL_TC_TIMER_CLOCK1				// Master clock/2 = 132MHz/2 = 66MHz
 					| ATMEL_TC_WAVE					// output mode
 					| ATMEL_TC_ACPA_SET				// set TIOA high when counter reaches "A"
 					| ATMEL_TC_ACPC_CLEAR			// set TIOA low when counter reaches "C"
@@ -493,9 +495,9 @@ static int hardware_motor_pwm_init(void)
 
 	__raw_writel(ATMEL_TC_CLKEN, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));
 	__raw_writel(ATMEL_TC_SYNC, motor_pwm_tc->regs + ATMEL_TC_BCR);
-	__raw_writel(0x0002, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	__raw_writel(0x4001/*0x7ff0*/, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
-	__raw_writel(0x8002, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
+	__raw_writel(0x0025, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	__raw_writel(0x0025, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+	__raw_writel(0x0049, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
 
 	// disable irqs and start timer
 	__raw_writel(0xff, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, IDR));				// irq register
