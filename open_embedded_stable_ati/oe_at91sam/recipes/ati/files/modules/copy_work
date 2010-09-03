@@ -3,12 +3,12 @@ package require Expect
 package require Tclx
 fconfigure stdin -blocking 1            ;#expect bug?
 
-puts -nonewline "which one (0-9,A-F)? "
+puts -nonewline "which one (1-9, a-f)? "
 flush stdout
 gets stdin num
 
 system sed -i -e "s/^sam$num.*//" ~/.ssh/known_hosts
-eval spawn scp *.ko root@sam$num:/home/root
+eval spawn scp [glob *.ko] root@sam$num:/home/root
 set timeout 3.5
 while 1 {
     expect {
@@ -23,3 +23,4 @@ while 1 {
         }
     }
 }
+sleep 3

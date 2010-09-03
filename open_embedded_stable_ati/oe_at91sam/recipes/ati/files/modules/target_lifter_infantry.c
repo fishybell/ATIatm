@@ -19,7 +19,7 @@
 #define LIFTER_POSITION_MOVING  		2
 #define LIFTER_POSITION_ERROR_NEITHER	3	// Neither limit switch is active, but the lifter is not moving
 
-#define FIX_FOR_JPY_IO_BOARD
+//#define FIX_FOR_JPY_IO_BOARD
 #ifdef FIX_FOR_JPY_IO_BOARD
 	#undef INPUT_LIFTER_POS_UP_LIMIT
 	#define	INPUT_LIFTER_POS_UP_LIMIT 			AT91_PIN_PC3
@@ -233,6 +233,10 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 static int hardware_init(void)
     {
     int status = 0;
+
+    // set lines for the correct peripherals
+    //at91_set_A_periph(INPUT_LIFTER_POS_DOWN_LIMIT, 1);
+    //at91_set_A_periph(INPUT_LIFTER_POS_UP_LIMIT, 1);
 
     // Configure motor gpio for output and set initial output
     at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // motor off
