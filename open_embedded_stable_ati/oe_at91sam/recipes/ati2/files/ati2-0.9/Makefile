@@ -1,6 +1,10 @@
 # Makefile for Action Target specific files
 
 
-all: hello.c readtty.c
-	${CC} ${CFLAGS} ${LDFLAGS} hello.c -o hello
-#	${CC} ${CFLAGS} ${LDFLAGS} readtty.c -o readtty
+radio_conv: connection.cpp  epoll.cpp  fasit.cpp  fasit_serial.cpp  fasit_tcp.cpp  serial.cpp  tcp_factory.cpp  timeout.cpp
+	${CXX} ${CFLAGS} ${LDFLAGS} connection.cpp  epoll.cpp  fasit.cpp  fasit_serial.cpp  fasit_tcp.cpp  serial.cpp  tcp_factory.cpp  timeout.cpp -o radio_conv
+
+all: radio_conv
+
+clean:
+	rm -rv radio_conv
