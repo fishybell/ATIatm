@@ -8,11 +8,9 @@ using namespace std;
 #include <list>
 
 FASIT_Serial::FASIT_Serial(char *fname) : SerialConnection(fname) {
-// TODO -- other initialization
 }
 
 FASIT_Serial::~FASIT_Serial() {
-// TODO -- other uninitialization
 }
 
 void FASIT_Serial::defHeader(int mnum, FASIT_header *fhdr) {

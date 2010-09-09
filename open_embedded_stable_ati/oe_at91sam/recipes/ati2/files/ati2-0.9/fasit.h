@@ -34,6 +34,7 @@ protected :
 
 // we need to add the packed attribute to anything over 1 byte to ensure proper packing
 #define PCKD __attribute__ ((packed))
+#define PCKD8
 
 /****************************************************************************************/
 /* FASIT commands                                                                       */
@@ -51,9 +52,9 @@ typedef struct FASIT_header {
    __uint16_t length PCKD;
 } FASIT_header;
 typedef struct ATI_header {
-   __uint8_t  magic:3 PCKD;         // byte 1, bits 0-2
-   __uint8_t  parity:1 PCKD;        // byte 1, bit 3
-   __uint8_t  length:4 PCKD;        // used as delay value when needed
+   __uint8_t  magic:3 PCKD8;         // byte 1, bits 0-2
+   __uint8_t  parity:1 PCKD8;        // byte 1, bit 3
+   __uint8_t  length:4 PCKD8;        // used as delay value when needed
    __uint16_t num PCKD;             // bytes 2,3
    __uint16_t source PCKD;		// bytes 4,5
 } ATI_header;
@@ -259,10 +260,10 @@ typedef struct FASIT_2102 {
    FASIT_2102b body;
 } FASIT_2102;
 typedef struct ATI_2102 {       // if possible, this extremely shortened version is sent alone
-   __uint8_t  pstatus;       // byte 1
-   __uint8_t  exp:2 PCKD;    // byte 2, bits 1,2
-   __uint8_t  move:1 PCKD;   // byte 2, bit 3
-   __uint8_t  type:3 PCKD;   // byte 2, bits 4,5,6
+   __uint16_t pstatus:8 PCKD;       // byte 1
+   __uint16_t exp:2 PCKD;    // byte 2, bits 1,2
+   __uint16_t move:1 PCKD;   // byte 2, bit 3
+   __uint16_t type:3 PCKD;   // byte 2, bits 4,5,6
    __uint16_t pos:10 PCKD;   // byte 2, bits 7,8, byte 3
    __uint16_t speed:12 PCKD; // byte 4, byte 5, bits 1,2,3,4
    __uint16_t hit:12 PCKD;   // byte 5, bits 5,6,7,8, byte 6
@@ -400,8 +401,8 @@ typedef struct ATI_16004 {
 /********************************************/
 typedef struct ATI_16005 {
    __uint16_t dest PCKD;
-   __uint8_t  broadcast:1 PCKD;
-   __uint8_t  channel:7 PCKD;
+   __uint8_t  broadcast:1 PCKD8;
+   __uint8_t  channel:7 PCKD8;
 } ATI_16005;
 
 #endif

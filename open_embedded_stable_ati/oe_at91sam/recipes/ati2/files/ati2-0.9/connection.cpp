@@ -176,7 +176,8 @@ int Connection::handleReady(epoll_event *ev) {
          ret = -1;
       }
    }
-   if (ev->events & EPOLLRDHUP || ev->events & EPOLLERR || ev->events & EPOLLHUP) {
+   //if (ev->events & EPOLLRDHUP || ev->events & EPOLLERR || ev->events & EPOLLHUP) {
+   if (ev->events & EPOLLERR || ev->events & EPOLLHUP) {
       ret = -1;
    }
    return ret;

@@ -21,7 +21,6 @@ FASIT_TCP_Factory::FASIT_TCP_Factory(char *destIP, int port) : Connection(0xDEAD
 }
 
 FASIT_TCP_Factory::~FASIT_TCP_Factory() {
-// TODO -- anything?
 }
 
 FASIT_TCP *FASIT_TCP_Factory::newConn() {

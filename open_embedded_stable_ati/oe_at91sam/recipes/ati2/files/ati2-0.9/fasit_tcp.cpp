@@ -12,7 +12,6 @@ list<ATI_2100m> FASIT_TCP::commandList;
 multimap<ATI_2100m, int, struct_comp<ATI_2100m> > FASIT_TCP::commandMap;
 
 FASIT_TCP::FASIT_TCP(int fd) : Connection(fd) {
-// TODO -- other initialization
    seq = 0;
 
    // new connection, send new connection message over serial
@@ -26,14 +25,12 @@ FASIT_TCP::FASIT_TCP(int fd) : Connection(fd) {
 
 // special case constructor where we already know the target number
 FASIT_TCP::FASIT_TCP(int fd, int tnum) : Connection(fd) {
-// TODO -- other initialization
    seq = 0;
 
    setTnum(tnum);
 }
 
 FASIT_TCP::~FASIT_TCP() {
-// TODO -- other uninitialization
 }
 
 // macro used in parseData

@@ -56,6 +56,8 @@ int main(int argc, char *argv[]) {
    struct sockaddr_in serveraddr, local;
    struct sched_param sp;
 
+   // TODO -- add debug output
+
    /* TODO -- parse argv for command line arguments:
     *  -p X   -- listen on port X rather than the default
     *  -s X   -- connect serial device X (multiple may be called)
