@@ -1,3 +1,4 @@
+PWD=`pwd`
 cd
 
 rmmod *.ko 2>/dev/null
@@ -8,6 +9,8 @@ insmod target.ko
 insmod target_lifter_armor.ko
 insmod target_hit_mechanical.ko
 
-if cd fasit ; then
+if cd fasit 2>/dev/null ; then
     python fasit_client_main.py -t HSAT
 fi
+
+cd $PWD
