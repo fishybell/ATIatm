@@ -1,0 +1,7 @@
+#!/bin/bash
+echo -n "which sam (0-9,A-F)? "
+read i
+
+sed -i -e "s/^sam$i.*//" ~/.ssh/known_hosts
+while ! ping -c1 -W1 sam$i 2>&1 >/dev/null; do sleep 1 ; done
+while ! ssh -o "StrictHostKeyChecking no" -l root sam$i ; do sleep 1 ; done
