@@ -4,16 +4,20 @@ using namespace std;
 #include "fasit_tcp.h"
 #include "tcp_factory.h"
 #include "common.h"
-#include <stdio.h>
 #include <list>
 
 FASIT_Serial::FASIT_Serial(char *fname) : SerialConnection(fname) {
+FUNCTION_START("::FASIT_Serial(char *fname) : SerialConnection(fname)")
+FUNCTION_END("::FASIT_Serial(char *fname) : SerialConnection(fname)")
 }
 
 FASIT_Serial::~FASIT_Serial() {
+FUNCTION_START("::~FASIT_Serial()")
+FUNCTION_END("::~FASIT_Serial()")
 }
 
 void FASIT_Serial::defHeader(int mnum, FASIT_header *fhdr) {
+FUNCTION_START("::defHeader(int mnum, FASIT_header *fhdr)")
    fhdr->num = mnum;
    fhdr->icd1 = 1;
    fhdr->icd2 = 1;
@@ -27,14 +31,16 @@ void FASIT_Serial::defHeader(int mnum, FASIT_header *fhdr) {
          fhdr->icd1 = 2;
          break;
    }
+FUNCTION_END("::defHeader(int mnum, FASIT_header *fhdr)")
 }
 
 // macro used in parseData
 #define HANDLE_FASIT(FASIT_NUM) case FASIT_NUM : if ( handle_ ## FASIT_NUM (start, end) == -1 ) { return -1; } ; break;
 
 int FASIT_Serial::parseData(int size, char *buf) {
-   printf("Serial %i read %i bytes of data\n", fd, size);
-   printf("TCP %i read %i bytes of data\n", fd, size);
+FUNCTION_START("::parseData(int size, char *buf)")
+   IMSG("Serial %i read %i bytes of data\n", fd, size)
+   IMSG("TCP %i read %i bytes of data\n", fd, size)
 
    addToBuffer(size, buf);
 
@@ -68,10 +74,12 @@ int FASIT_Serial::parseData(int size, char *buf) {
          HANDLE_FASIT (16004)
          HANDLE_FASIT (16005)
          default:
-            printf("message valid, but not handled: %i\n", mnum);
+            IMSG("message valid, but not handled: %i\n", mnum)
+            break;
       }
       clearBuffer(end); // clear out last message
    }
+FUNCTION_END("::parseData(int size, char *buf)")
 }
 
 // macros used in validMessage function to check just the message length field of the header and call it good
@@ -81,7 +89,7 @@ int FASIT_Serial::parseData(int size, char *buf) {
 
 // the start and end values may be set even if no valid message is found
 int FASIT_Serial::validMessage(int *start, int *end) {
-// TODO -- partially valid messages should cause a resend?
+FUNCTION_START("::validMessage(int *start, int *end)")
    *start = 0;
    // loop through entire buffer, parsing starting at each character
    while (*start < (rsize - sizeof(ATI_header))) { // end when not big enough to contain an entire header
@@ -110,6 +118,7 @@ int FASIT_Serial::validMessage(int *start, int *end) {
       }
 
       // do checks for individual messages
+HERE
       switch (hdr.num) {
          case 2005:
             if (hdr.length != sizeof(ATI_2005s) && hdr.length != sizeof(ATI_2005f)) { break; }
@@ -171,6 +180,7 @@ int FASIT_Serial::validMessage(int *start, int *end) {
 
       *start++;
    }
+FUNCTION_INT("::validMessage(int *start, int *end)", 0)
    return 0;
 }
 
@@ -179,6 +189,7 @@ int FASIT_Serial::validMessage(int *start, int *end) {
 ***********************************************************/
 
 int FASIT_Serial::handle_100(int start, int end) {
+FUNCTION_START("::handle_100(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_100 *msg = (ATI_100*)(rbuf + start + sizeof(ATI_header));
@@ -186,6 +197,7 @@ int FASIT_Serial::handle_100(int start, int end) {
    // do we have the correct destination?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(msg->dest);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -196,10 +208,12 @@ int FASIT_Serial::handle_100(int start, int end) {
    // send
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
 
+FUNCTION_INT("::handle_100(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2000(int start, int end) {
+FUNCTION_START("::handle_2000(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2000 *msg = (ATI_2000*)(rbuf + start + sizeof(ATI_header));
@@ -207,6 +221,7 @@ int FASIT_Serial::handle_2000(int start, int end) {
    // do we have the correct destination?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(msg->dest);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -219,10 +234,12 @@ int FASIT_Serial::handle_2000(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2000));
 
+FUNCTION_INT("::handle_2000(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2004(int start, int end) {
+FUNCTION_START("::handle_2004(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2004 *msg = (ATI_2004*)(rbuf + start + sizeof(ATI_header));
@@ -230,6 +247,7 @@ int FASIT_Serial::handle_2004(int start, int end) {
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -244,10 +262,12 @@ int FASIT_Serial::handle_2004(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2004));
 
+FUNCTION_INT("::handle_2004(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2005(int start, int end) {
+FUNCTION_START("::handle_2005(int start, int end)")
    FASIT_2005b body;
 
    // map header
@@ -275,6 +295,7 @@ int FASIT_Serial::handle_2005(int start, int end) {
    // are we the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -289,10 +310,12 @@ int FASIT_Serial::handle_2005(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2005));
 
+FUNCTION_INT("::handle_2005(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2006(int start, int end) {
+FUNCTION_START("::handle_2006(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2006 *msg = (ATI_2006*)(rbuf + start + sizeof(ATI_header));
@@ -300,6 +323,7 @@ int FASIT_Serial::handle_2006(int start, int end) {
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // remember zone data for this tcp connection
    tcp->set2006base(msg->embed); // remember zone header data
@@ -322,10 +346,12 @@ int FASIT_Serial::handle_2006(int start, int end) {
    queueMsgAll(&reqh, sizeof(ATI_header));
    queueMsgAll(&req, sizeof(ATI_63556));
 
+FUNCTION_INT("::handle_2006(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2100(int start, int end) {
+FUNCTION_START("::handle_2100(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2100 *msg = (ATI_2100*)(rbuf + start + sizeof(ATI_header));
@@ -350,6 +376,7 @@ int FASIT_Serial::handle_2100(int start, int end) {
       }
    }
    if (tcps.empty()) { return 0; }
+HERE
 
    // TODO -- evaluate delay field (as set in the ATI_header length field)
 
@@ -377,38 +404,46 @@ int FASIT_Serial::handle_2100(int start, int end) {
       }
    }
 
+FUNCTION_INT("::handle_2100(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2101(int start, int end) {
+FUNCTION_START("::handle_2101(int start, int end)")
    // map header (no message body)
    ATI_header *hdr = (ATI_header*)(rbuf + start);
 
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // handle as a "good" 2101
    FASIT_2101b fmsg;
    fmsg.resp = 'S';
+FUNCTION_INT("::handle_2101(int start, int end)", 0)
    return handle_as_2101(fmsg, tcp);
 }
 
 int FASIT_Serial::handle_43061(int start, int end) {
+FUNCTION_START("::handle_43061(int start, int end)")
    // map header (no message body)
    ATI_header *hdr = (ATI_header*)(rbuf + start);
 
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // handle as a "bad" 2101
    FASIT_2101b fmsg;
    fmsg.resp = 'F';
+FUNCTION_INT("::handle_43061(int start, int end)", 0)
    return handle_as_2101(fmsg, tcp);
 }
 
 int FASIT_Serial::handle_47157(int start, int end) {
+FUNCTION_START("::handle_47157(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_47157 *msg = (ATI_47157*)(rbuf + start + sizeof(ATI_header));
@@ -416,13 +451,16 @@ int FASIT_Serial::handle_47157(int start, int end) {
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // handle as an "other" 2101
    FASIT_2101b fmsg = msg->embed;
+FUNCTION_INT("::handle_47157(int start, int end)", 0)
    return handle_as_2101(fmsg, tcp);
 }
 
 int FASIT_Serial::handle_as_2101(FASIT_2101b bmsg, FASIT_TCP *tcp) {
+FUNCTION_START("::handle_as_2101(FASIT_2101b bmsg, FASIT_TCP *tcp)")
    // recombobulate to TCP message
    FASIT_header fhdr;
    defHeader(2101,&fhdr);
@@ -436,10 +474,12 @@ int FASIT_Serial::handle_as_2101(FASIT_2101b bmsg, FASIT_TCP *tcp) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2101));
 
+FUNCTION_INT("::handle_as_2101(FASIT_2101b bmsg, FASIT_TCP *tcp)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2111(int start, int end) {
+FUNCTION_START("::handle_2111(int start, int end)")
    FASIT_2111b body;
 
    // map header
@@ -467,6 +507,7 @@ int FASIT_Serial::handle_2111(int start, int end) {
    // are we the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -481,10 +522,12 @@ int FASIT_Serial::handle_2111(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2111));
 
+FUNCTION_INT("::handle_2111(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2102(int start, int end) {
+FUNCTION_START("::handle_2102(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2102 *msg = (ATI_2102*)(rbuf + start + sizeof(ATI_header));
@@ -498,6 +541,7 @@ int FASIT_Serial::handle_2102(int start, int end) {
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -533,10 +577,12 @@ int FASIT_Serial::handle_2102(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2102));
 
+FUNCTION_INT("::handle_2102(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2114(int start, int end) {
+FUNCTION_START("::handle_2114(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2114 *msg = (ATI_2114*)(rbuf + start + sizeof(ATI_header));
@@ -544,6 +590,7 @@ int FASIT_Serial::handle_2114(int start, int end) {
    // do we have the correct destination?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(msg->dest);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -556,10 +603,12 @@ int FASIT_Serial::handle_2114(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2114));
 
+FUNCTION_INT("::handle_2114(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2115(int start, int end) {
+FUNCTION_START("::handle_2115(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2115 *msg = (ATI_2115*)(rbuf + start + sizeof(ATI_header));
@@ -567,6 +616,7 @@ int FASIT_Serial::handle_2115(int start, int end) {
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -581,10 +631,12 @@ int FASIT_Serial::handle_2115(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2115));
 
+FUNCTION_INT("::handle_2115(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2110(int start, int end) {
+FUNCTION_START("::handle_2110(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2110 *msg = (ATI_2110*)(rbuf + start + sizeof(ATI_header));
@@ -592,6 +644,7 @@ int FASIT_Serial::handle_2110(int start, int end) {
    // do we have the correct destination?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(msg->dest);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -604,10 +657,12 @@ int FASIT_Serial::handle_2110(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2110));
 
+FUNCTION_INT("::handle_2110(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2112(int start, int end) {
+FUNCTION_START("::handle_2112(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2112 *msg = (ATI_2112*)(rbuf + start + sizeof(ATI_header));
@@ -615,6 +670,7 @@ int FASIT_Serial::handle_2112(int start, int end) {
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -629,10 +685,12 @@ int FASIT_Serial::handle_2112(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2112));
 
+FUNCTION_INT("::handle_2112(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_2113(int start, int end) {
+FUNCTION_START("::handle_2113(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_2113 *msg = (ATI_2113*)(rbuf + start + sizeof(ATI_header));
@@ -640,6 +698,7 @@ int FASIT_Serial::handle_2113(int start, int end) {
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // recombobulate to TCP message
    FASIT_header fhdr;
@@ -654,10 +713,12 @@ int FASIT_Serial::handle_2113(int start, int end) {
    tcp->queueMsg(&fhdr, sizeof(FASIT_header));
    tcp->queueMsg(&fmsg, sizeof(FASIT_2113));
 
+FUNCTION_INT("::handle_2113(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_63556(int start, int end) {
+FUNCTION_START("::handle_63556(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_63556 *msg = (ATI_63556*)(rbuf + start + sizeof(ATI_header));
@@ -665,6 +726,7 @@ int FASIT_Serial::handle_63556(int start, int end) {
    // do we have the correct destination?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(msg->dest);
    if (tcp == NULL) { return 0; }
+HERE
 
    // retrieve the zone items remembered for this tcp connection
    vector<struct FASIT_2006z> *zones = tcp->get2006zones();
@@ -683,10 +745,12 @@ int FASIT_Serial::handle_63556(int start, int end) {
    queueMsgAll(&reqh, sizeof(ATI_header));
    queueMsgAll(&req, sizeof(ATI_42966));
 
+FUNCTION_INT("::handle_63556(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_42966(int start, int end) {
+FUNCTION_START("::handle_42966(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_42966 *msg = (ATI_42966*)(rbuf + start + sizeof(ATI_header));
@@ -694,6 +758,7 @@ int FASIT_Serial::handle_42966(int start, int end) {
    // do we have the correct source?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(hdr->source);
    if (tcp == NULL) { return 0; }
+HERE
 
    // retrieve the zone items and remember for this tcp connection
    vector<struct FASIT_2006z> *zones = tcp->get2006zones();
@@ -746,10 +811,12 @@ int FASIT_Serial::handle_42966(int start, int end) {
       }
    }
 
+FUNCTION_INT("::handle_42966(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_16000(int start, int end) {
+FUNCTION_START("::handle_16000(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_16000 *msg = (ATI_16000*)(rbuf + start + sizeof(ATI_header));
@@ -757,13 +824,16 @@ int FASIT_Serial::handle_16000(int start, int end) {
    // do we have the correct destination?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(msg->dest);
    if (tcp == NULL) { return 0; }
+HERE
 
    // TODO -- enable or disable according to msg->enable
 
+FUNCTION_INT("::handle_16000(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_16001(int start, int end) {
+FUNCTION_START("::handle_16001(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_16001 *msg = (ATI_16001*)(rbuf + start + sizeof(ATI_header));
@@ -771,13 +841,16 @@ int FASIT_Serial::handle_16001(int start, int end) {
    // do we have the correct destination?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(msg->dest);
    if (tcp == NULL) { return 0; }
+HERE
 
    // TODO -- connect to shutdown switch driver to turn off power to board
 
+FUNCTION_INT("::handle_16001(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_16002(int start, int end) {
+FUNCTION_START("::handle_16002(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_16002 *msg = (ATI_16002*)(rbuf + start + sizeof(ATI_header));
@@ -785,13 +858,19 @@ int FASIT_Serial::handle_16002(int start, int end) {
    // do we have the correct destination?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(msg->dest);
    if (tcp == NULL) { return 0; }
+HERE
 
-   // TODO -- resend prior message
+   // resend prior message
+   if (lwbuf != NULL) {
+      queueMsgAll(lwbuf, lwsize);
+   }
 
+FUNCTION_INT("::handle_16002(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_16003(int start, int end) {
+FUNCTION_START("::handle_16003(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_16003 *msg = (ATI_16003*)(rbuf + start + sizeof(ATI_header));
@@ -799,10 +878,12 @@ int FASIT_Serial::handle_16003(int start, int end) {
    // the source is unassigned, so this will find the spawning class if we're the base station
    FASIT_TCP_Factory *factory = (FASIT_TCP_Factory*)findByTnum(hdr->source);
    if (factory == NULL) { return 0; }
+HERE
 
    // spawn off a new connection to create a new FASIT_TCP
    FASIT_TCP *tcp = factory->newConn();
    if (tcp == NULL) { return 0; } // could not connect
+HERE
 
    // send the assign message back
    ATI_16004 rep;
@@ -814,10 +895,12 @@ int FASIT_Serial::handle_16003(int start, int end) {
    queueMsgAll(&reph, sizeof(ATI_header));
    queueMsgAll(&rep, sizeof(ATI_16004));
 
+FUNCTION_INT("::handle_16003(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_16004(int start, int end) {
+FUNCTION_START("::handle_16004(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_16004 *msg = (ATI_16004*)(rbuf + start + sizeof(ATI_header));
@@ -825,14 +908,17 @@ int FASIT_Serial::handle_16004(int start, int end) {
    // do we have the correct destination?
    FASIT_TCP *tcp = (FASIT_TCP*)findByRnum(msg->rand);
    if (tcp == NULL) { return 0; }
+HERE
 
    // apply assignment
    tcp->setTnum(msg->id);
 
+FUNCTION_INT("::handle_16004(int start, int end)", 0)
    return 0;
 }
 
 int FASIT_Serial::handle_16005(int start, int end) {
+FUNCTION_START("::handle_16005(int start, int end)")
    // map header and message
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_16005 *msg = (ATI_16005*)(rbuf + start + sizeof(ATI_header));
@@ -840,9 +926,11 @@ int FASIT_Serial::handle_16005(int start, int end) {
    // do we have the correct destination or is this a broadcast change?
    FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(msg->dest);
    if (tcp == NULL && msg->dest != 0xffff && !msg->broadcast) { return 0; }
+HERE
 
    // TODO -- change channel to msg->channel
 
+FUNCTION_INT("::handle_16005(int start, int end)", 0)
    return 0;
 }
 
