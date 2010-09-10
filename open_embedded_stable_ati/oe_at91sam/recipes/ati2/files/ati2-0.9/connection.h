@@ -45,6 +45,8 @@ protected:
    __uint16_t tnum; // random assigned number to find this connection by
    char *wbuf; // write buffer
    int wsize; // write buffer size
+   char *lwbuf; // last write buffer (in case a resend is required)
+   int lwsize; // last write buffer size (in case a resend is required)
 };
 
 #endif
