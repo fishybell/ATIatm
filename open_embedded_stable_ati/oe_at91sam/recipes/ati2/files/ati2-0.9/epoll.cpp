@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <sys/epoll.h>
 #include <stdlib.h>
 #include <sched.h>
@@ -28,6 +27,7 @@ using namespace std;
 
 // utility function to properly configure a client TCP connection
 void setnonblocking(int sock) {
+FUNCTION_START("setnonblocking(int sock)")
    int opts;
 
    opts = fcntl(sock, F_GETFL);
@@ -41,6 +41,7 @@ void setnonblocking(int sock) {
       exit(EXIT_FAILURE);
    }
    return;
+FUNCTION_END("setnonblocking(int sock)")
 }
 
 /**********************************
@@ -48,6 +49,7 @@ void setnonblocking(int sock) {
 **********************************/
 
 int main(int argc, char *argv[]) {
+PROG_START
    struct epoll_event ev, events[MAX_EVENTS];
    int client, listener, kdpfd; // file descriptors
    fd_set sfds; // select file descriptors
@@ -56,7 +58,7 @@ int main(int argc, char *argv[]) {
    struct sockaddr_in serveraddr, local;
    struct sched_param sp;
 
-   // TODO -- add debug output
+// TODO -- messages from base station with no reply after X seconds should cause a resend request
 
    /* TODO -- parse argv for command line arguments:
     *  -p X   -- listen on port X rather than the default
@@ -107,8 +109,7 @@ int main(int argc, char *argv[]) {
    ev.events = EPOLLIN;
    ev.data.ptr = NULL; // indicates listener fd
    if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, listener, &ev) < 0) {
-      fprintf(stderr, "epoll listener insertion error: fd=%d\n",
-              listener);
+      IERROR("epoll listener insertion error: fd=%d\n", listener)
       return -1;
    }
    
@@ -123,12 +124,12 @@ int main(int argc, char *argv[]) {
    for(;;) {
       // prepare the select set (it's modified by select directly)
       FD_ZERO(&sfds);
-      FD_SET(listener, &sfds);
+      FD_SET(kdpfd, &sfds);
 
       // grab the global timeout for use in select
       timeval timeout = Timeout::getTimeout();
       timeval *p_timeout = timeout.tv_sec + timeout.tv_usec > 0 ? &timeout : NULL; // if the timeout is zero, pass a NULL to select
-      if (select(listener+1, &sfds, &sfds, NULL, p_timeout) == -1) {
+      if (select(kdpfd+1, &sfds, &sfds, NULL, p_timeout) == -1) {
             perror("Server-select() error ");
             exit(1);
       }
@@ -142,7 +143,7 @@ int main(int argc, char *argv[]) {
       // no timeout, handle epoll
       nfds = epoll_wait(kdpfd, events, MAX_EVENTS, -1);
       for(n = 0; n < nfds; ++n) {
-         if(events[n].data.ptr == NULL) {
+         if(events[n].data.ptr == NULL) { // NULL inidicates the listener fd
             addrlen = sizeof(local);
             client = accept(listener, (struct sockaddr *) &local,
                         &addrlen);
@@ -155,11 +156,10 @@ int main(int argc, char *argv[]) {
             ev.events = EPOLLIN;
             ev.data.ptr = (void*)fasit_tcp;
             if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, client, &ev) < 0) {
-               fprintf(stderr, "epoll set insertion error: fd=%d\n",
-                     client);
+               IERROR("epoll set insertion error: fd=%d\n", client)
                return -1;
             }
-            printf("Accepted new client %i\n", client);
+            IMSG("Accepted new client %i\n", client)
          } else {
             FASIT_TCP *fasit_tcp = (FASIT_TCP*)events[n].data.ptr;
             int ret = fasit_tcp->handleReady(&events[n]);
