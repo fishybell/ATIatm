@@ -6,18 +6,23 @@ using namespace std;
 int FASIT::messageSeq = 0;
 
 FASIT::FASIT() {
+FUNCTION_START("::FASIT()")
    rbuf = NULL;
    rsize = 0;
+FUNCTION_END("::FASIT()")
 }
 
 FASIT::~FASIT() {
+FUNCTION_START("::~FASIT()")
    // free the read buffer
    if (rbuf) {
       delete [] rbuf;
    }
+FUNCTION_END("::~FASIT()")
 }
 
 void FASIT::addToBuffer(int rsize, char *rbuf) {
+FUNCTION_START("::addToBuffer(int rsize, char *rbuf)")
    if (this->rsize > 0) {
       // this->rbuf exists? add new data
       char *tbuf = new char[(this->rsize + rsize)];
@@ -32,10 +37,12 @@ void FASIT::addToBuffer(int rsize, char *rbuf) {
       memcpy(this->rbuf, rbuf, rsize);
       this->rsize = rsize;
    }
+FUNCTION_END("::addToBuffer(int rsize, char *rbuf)")
 }
 
 // we don't worry about clearing the data before a valid message, just up to the end
 void FASIT::clearBuffer(int end) {
+FUNCTION_START("::clearBuffer(int end)")
    if (end >= rsize) {
       // clear the entire buffer
       delete [] rbuf;
@@ -49,6 +56,7 @@ void FASIT::clearBuffer(int end) {
       rbuf = tbuf;
       rsize -= end;
    }
+FUNCTION_END("::clearBuffer(int end)")
 }
 
 // See http://www.ross.net/crc/download/crc_v3.txt for crc howto.
@@ -98,7 +106,7 @@ __uint32_t reflect(__uint32_t data, int width) {
       data = (data >> 1);
    } while (bit++ < width);
 
-   return (reflection);
+   return reflection;
 }
 
 
@@ -205,6 +213,7 @@ int FASIT::parity(void *buf, int size) {
 // it may need tweaking in certain circumstances
 // if any tweaking is done, the parity bit needs to be recalculated
 struct ATI_header FASIT::createHeader(int mnum, int source, void *data, int size) {
+FUNCTION_START("::createHeader(int mnum, int source, void *data, int size)")
    ATI_header hdr;
    hdr.magic = 7;
    hdr.parity = 0;
@@ -219,5 +228,6 @@ struct ATI_header FASIT::createHeader(int mnum, int source, void *data, int size
    // combine the header parity with the parity of the first 10 bytes of data
    hdr.parity = parity(&hdr, sizeof(ATI_header)) ^ parity(data, max(size, 10));
 
+FUNCTION_HEX("::createHeader(int mnum, int source, void *data, int size)", &hdr)
    return hdr;
 }

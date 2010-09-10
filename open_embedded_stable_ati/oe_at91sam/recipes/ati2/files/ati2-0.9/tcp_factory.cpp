@@ -9,6 +9,7 @@ using namespace std;
 #define MAX_CONN 1200
 
 FASIT_TCP_Factory::FASIT_TCP_Factory(char *destIP, int port) : Connection(0xDEADBEEF) { // always invalid fd will close with an error, but do so silently
+FUNCTION_START("::FASIT_TCP_Factory(char *destIP, int port) : Connection(0xDEADBEEF)")
    memset(&server, 0, sizeof(server));
    server.sin_family = AF_INET;
    server.sin_addr.s_addr = inet_addr(destIP);
@@ -18,21 +19,27 @@ FASIT_TCP_Factory::FASIT_TCP_Factory(char *destIP, int port) : Connection(0xDEAD
    last_tnum = 0;
 
    setTnum(UNASSIGNED); // so unassigned tnums point to this as the source
+FUNCTION_END("::FASIT_TCP_Factory(char *destIP, int port) : Connection(0xDEADBEEF)")
 }
 
 FASIT_TCP_Factory::~FASIT_TCP_Factory() {
+FUNCTION_START("::~FASIT_TCP_Factory()")
+FUNCTION_END("::~FASIT_TCP_Factory()")
 }
 
 FASIT_TCP *FASIT_TCP_Factory::newConn() {
+FUNCTION_START("::newConn()")
    int sock;
 
    // create the TCP socket
    if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+FUNCTION_HEX("::newConn()", NULL)
       return NULL;
    }
 
    // connect TCP socket to given IP and port
    if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
+FUNCTION_HEX("::newConn()", NULL)
       return NULL;
    }
    setnonblocking(sock);
@@ -45,9 +52,11 @@ FASIT_TCP *FASIT_TCP_Factory::newConn() {
    ev.data.ptr = (void*)tcp;
    if (epoll_ctl(efd, EPOLL_CTL_ADD, sock, &ev) < 0) {
       delete tcp;
+FUNCTION_HEX("::newConn()", NULL)
       return NULL;
    }
 
    // return the result
+FUNCTION_HEX("::newConn()", tcp)
    return tcp;
 }

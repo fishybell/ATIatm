@@ -11,16 +11,21 @@ int Timeout::events = 0;
 
 // set's the timeout's start time to now
 void Timeout::setStartTimeNow() {
+FUNCTION_START("::setStartTimeNow()")
     gettimeofday(&g_startTime, NULL);
+FUNCTION_END("::setStartTimeNow()")
 }
 
 // get the start time
 timeval Timeout::getStartTime() {
+FUNCTION_START("::getStartTime()")
+FUNCTION_HEX("::getStartTime()", &g_startTime)
    return g_startTime;
 }
 
 // maximum amount of milliseconds to wait since setStartTime was called
 void Timeout::setMaxWait(int msec) {
+FUNCTION_START("::setMaxWait(int msec)")
    g_maxTime.tv_sec = g_startTime.tv_sec;
    g_maxTime.tv_usec = g_startTime.tv_usec + (msec * 1000);
    if (g_maxTime.tv_usec >= 1000000) {
@@ -28,10 +33,12 @@ void Timeout::setMaxWait(int msec) {
       g_maxTime.tv_sec += g_maxTime.tv_usec / 1000000;
       g_maxTime.tv_usec %= 1000000;
    }
+FUNCTION_END("::setMaxWait(int msec)")
 }
 
 // get a timeout based on the start time and maximum wait
 timeval Timeout::getTimeout() {
+FUNCTION_START("::getTimeout()")
    // subtract current time from max time to acquire the timeout value
    timeval timeout;
    gettimeofday(&timeout, NULL);
@@ -51,37 +58,48 @@ timeval Timeout::getTimeout() {
 
    // can't have a negative timeout
    if (timeout.tv_sec < 0) { timeout.tv_sec = 0; }
+FUNCTION_END("::getTimeout()")
 }
 
 // non globally accessible functions follow
 
 // returns 1 if the max time has passed, 0 if not, and -1 if there is no max time
 int Timeout::timedOut() {
+FUNCTION_START("::timedOut()")
    // no timeout set
-   if (g_maxTime.tv_sec + g_maxTime.tv_usec == 0) { return -1; }
+   if (g_maxTime.tv_sec + g_maxTime.tv_usec == 0) {
+FUNCTION_INT("::timedOut()", -1)
+      return -1;
+   }
 
    // get the current time
    timeval ct;
    gettimeofday(&ct, NULL);
 
    if (ct.tv_sec > g_maxTime.tv_sec) {
+FUNCTION_INT("::timedOut()", 1)
       return 1;
    } else if (ct.tv_sec == g_maxTime.tv_sec) {
       if (ct.tv_usec >= g_maxTime.tv_usec) {
+FUNCTION_INT("::timedOut()", 1)
          return 1;
       } 
    }
 
+FUNCTION_INT("::timedOut()", 0)
    return 0;
 }
 
 void Timeout::clearTimeout() {
+FUNCTION_START("::clearTimeout()")
    g_maxTime.tv_sec = 0;
    g_maxTime.tv_usec = 0;
    events = 0;
+FUNCTION_END("::clearTimeout()")
 }
 
 void Timeout::clearTimeout(int event) {
+FUNCTION_START("::clearTimeout(int event)")
    // remove this specific event flag
    if (events & event) {
       events ^= event;
@@ -91,13 +109,17 @@ void Timeout::clearTimeout(int event) {
    if (events == 0) {
       clearTimeout();
    }
+FUNCTION_END("::clearTimeout(int event)")
 }
 
 void Timeout::addTimeoutEvent(int event) {
+FUNCTION_START("::addTimeoutEvent(int event)")
    events |= event;
+FUNCTION_END("::addTimeoutEvent(int event)")
 }
 
 void Timeout::handleTimeoutEvents() {
+FUNCTION_START("::handleTimeoutEvents()")
    // clear the timeout first as the individual events may set a new timeout
    int ev = events;
    clearTimeout();
@@ -107,5 +129,6 @@ void Timeout::handleTimeoutEvents() {
       FASIT_TCP::Bake_2100();
    }
 
+FUNCTION_END("::handleTimeoutEvents()")
 }
 
