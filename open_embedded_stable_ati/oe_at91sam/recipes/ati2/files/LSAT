@@ -1,0 +1,13 @@
+cd
+
+rmmod *.ko 2>/dev/null
+rmmod *.ko 2>/dev/null
+
+insmod target.ko
+#insmod target_user_interface.ko
+insmod target_lifter_armor.ko
+insmod target_hit_mechanical.ko
+
+if cd fasit ; then
+    python fasit_client_main.py -t LSAT
+fi
