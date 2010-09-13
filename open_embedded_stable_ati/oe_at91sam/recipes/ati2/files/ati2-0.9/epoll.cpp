@@ -12,6 +12,7 @@ using namespace std;
 #include "serial.h"
 #include "fasit_serial.h"
 #include "fasit_tcp.h"
+#include "tcp_factory.h"
 #include "common.h"
 #include "timeout.h"
 
@@ -40,7 +41,6 @@ FUNCTION_START("setnonblocking(int sock)")
       perror("fcntl(F_SETFL)");
       exit(EXIT_FAILURE);
    }
-   return;
 FUNCTION_END("setnonblocking(int sock)")
 }
 
@@ -57,49 +57,96 @@ PROG_START
    socklen_t addrlen;
    struct sockaddr_in serveraddr, local;
    struct sched_param sp;
+   FASIT_TCP_Factory *factory;
 
 // TODO -- messages from base station with no reply after X seconds should cause a resend request
 
-   /* TODO -- parse argv for command line arguments:
-    *  -p X   -- listen on port X rather than the default
-    *  -s X   -- connect serial device X (multiple may be called)
-    *  -r     -- act as a serial relay only
-    *  -b X:Y -- act as a base station only, connecting to IP address X, port Y
-    */
+   /* parse argv for command line arguments: */
+   int port = PORT;
+   list<FASIT_Serial*> serials;
+   int base = 0;
+const char *usage = "Usage: %s [options]\n\
+\t-p X   -- use port X rather than the default \n\
+\t-s X   -- connect serial device X (multiple may be called) \n\
+\t-r     -- act as a serial relay only \n\
+\t-b X   -- act as a base station only, connecting to IP address X\n\
+\t-h     -- print out usage information\n";
+   for (int i = 1; i < argc; i++) {
+      if (argv[i][0] != '-') {
+         IERROR("invalid argument (%i)\n", i)
+         return 1;
+      }
+      switch (argv[i][1]) {
+         case 'p' :
+            if (sscanf(argv[++i], "%i", &port) != 1) {
+               IERROR("invalid argument (%i)\n", i)
+               return 1;
+            }
+            break;
+         case 's' :
+            serials.push_back(new FASIT_Serial(argv[++i]));
+            break;
+         case 'r' :
+            // TODO -- impliment serial relay program
+            printf("Serial relay not implimented, sorry\n");
+            return 0;
+            break;
+         case 'b' :
+            base = ++i; // remember the base paramter for later
+            break;
+         case 'h' :
+            printf(usage);
+            return 0;
+            break;
+         case '-' :
+            if (argv[i][2] == 'h') {
+               printf(usage);
+               return 0;
+            }
+         default :
+            IERROR("invalid argument (%i)\n", i)
+            return 1;
+      }
+   }
 
    /* clear the global timer */
    Timeout::clearTimeout();
 
-   /* get the listener */
-   if((listener = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-      perror("Server-socket() error ");
+   /* start as either a base station or a "target" */
+   if (!base) {
+      /* get the listener */
+      if((listener = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+         perror("Server-socket() error ");
 
-      /*just exit  */
-      exit(1);
-   }
+         /*just exit  */
+         return 1;
+      }
 
-   /* "address already in use" error message */
-   if(setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-      perror("Server-setsockopt() error ");
-      exit(1);
-   }
+      /* "address already in use" error message */
+      if(setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+         perror("Server-setsockopt() error ");
+         return 1;
+      }
 
-   /* bind */
-   serveraddr.sin_family = AF_INET;
-   serveraddr.sin_addr.s_addr = INADDR_ANY;
-   serveraddr.sin_port = htons(PORT);
-   memset(&(serveraddr.sin_zero), '\0', 8);
+      /* bind */
+      serveraddr.sin_family = AF_INET;
+      serveraddr.sin_addr.s_addr = INADDR_ANY;
+      serveraddr.sin_port = htons(port);
+      memset(&(serveraddr.sin_zero), '\0', 8);
 
-   if(bind(listener, (struct sockaddr *)&serveraddr, sizeof(serveraddr))
-       == -1) {
-      perror("Server-bind() error ");
-      exit(1);
-   }
+      if(bind(listener, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) == -1) {
+         perror("Server-bind() error ");
+         return 1;
+      }
 
-   /* listen */
-   if(listen(listener, 10) == -1) {
-      perror("Server-listen() error ");
-      exit(1);
+      /* listen */
+      if(listen(listener, 10) == -1) {
+         perror("Server-listen() error ");
+         return 1;
+      }
+   } else {
+      /* start the factory */
+      factory = new FASIT_TCP_Factory(argv[base], port);
    }
 
 
@@ -107,10 +154,24 @@ PROG_START
    kdpfd = epoll_create(MAX_EVENTS);
    memset(&ev, 0, sizeof(ev));
    ev.events = EPOLLIN;
-   ev.data.ptr = NULL; // indicates listener fd
-   if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, listener, &ev) < 0) {
-      IERROR("epoll listener insertion error: fd=%d\n", listener)
-      return -1;
+   if (!base) {
+      // not the base, listen to the listener
+      ev.data.ptr = NULL; // indicates listener fd
+      if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, listener, &ev) < 0) {
+         IERROR("epoll listener insertion error: fd=%d\n", listener)
+         return 1;
+      }
+   }
+   list<FASIT_Serial*>::iterator sIt = serials.begin();
+   while (sIt != serials.end()) {
+      memset(&ev, 0, sizeof(ev));
+      ev.events = EPOLLIN;
+      ev.data.ptr = (*sIt);
+      if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, (*sIt)->getFD(), &ev) < 0) {
+         IERROR("epoll serial insertion error: fd=%d\n", (*sIt)->getFD())
+         return 1;
+      }
+      sIt++;
    }
    
 #if REALTIME
@@ -131,7 +192,7 @@ PROG_START
       timeval *p_timeout = timeout.tv_sec + timeout.tv_usec > 0 ? &timeout : NULL; // if the timeout is zero, pass a NULL to select
       if (select(kdpfd+1, &sfds, &sfds, NULL, p_timeout) == -1) {
             perror("Server-select() error ");
-            exit(1);
+            return 1;
       }
 
       // did we timeout?
@@ -157,7 +218,7 @@ PROG_START
             ev.data.ptr = (void*)fasit_tcp;
             if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, client, &ev) < 0) {
                IERROR("epoll set insertion error: fd=%d\n", client)
-               return -1;
+               return 1;
             }
             IMSG("Accepted new client %i\n", client)
          } else {
@@ -169,4 +230,5 @@ PROG_START
          }
       }
    }
+   return 0;
 }
