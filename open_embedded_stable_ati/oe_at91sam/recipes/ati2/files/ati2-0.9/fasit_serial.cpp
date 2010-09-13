@@ -4,6 +4,7 @@ using namespace std;
 #include "fasit_tcp.h"
 #include "tcp_factory.h"
 #include "common.h"
+#include "radio.h"
 #include <list>
 
 FASIT_Serial::FASIT_Serial(char *fname) : SerialConnection(fname) {
@@ -51,8 +52,8 @@ FUNCTION_START("::parseData(int size, char *buf)")
    while ((mnum = validMessage(&start, &end)) != 0) {
       if (ignoreAll && mnum != 16000) {
          clearBuffer(end); // clear out last message
-FUNCTION_END("::parseData(int size, char *buf)")
-         return;
+FUNCTION_INT("::parseData(int size, char *buf)", 0)
+         return 0;
       }
       switch (mnum) {
          HANDLE_FASIT (100)
@@ -85,7 +86,8 @@ FUNCTION_END("::parseData(int size, char *buf)")
       }
       clearBuffer(end); // clear out last message
    }
-FUNCTION_END("::parseData(int size, char *buf)")
+FUNCTION_INT("::parseData(int size, char *buf)", 0)
+   return 0;
 }
 
 // macros used in validMessage function to check just the message length field of the header and call it good
@@ -394,11 +396,11 @@ FUNCTION_START("::handle_2100(int start, int end)")
    setTimeNow(); // delay next-send-time from right now
    static int mults[8] = {15, 30, 60, 120, 240, 480, 960, 1920};
    int mult = mults[0x7 & hdr->length]; // only look at 3 bits worth
-   minDelay(mult * slot); // wait for correct place in line
-   timeSlot(mult / 10); // 10% overage alowed for the timeslot
-   retryDelay(mult * (tslot-slot)); // wait for the end of the line (tslot ends up as the last slot)
+   SerialConnection::minDelay(mult * slot); // wait for correct place in line
+   SerialConnection::timeslot(mult / 10); // 10% overage alowed for the timeslot
+   SerialConnection::retryDelay(mult * tslot); // wait for the same place in line the next time around (tslot ends up as the last slot)
    int cmax = mult * 10; // fixed point math for 600 characters per second max
-   setMaxChar((cmax / 32) + 1); // fixed point math for 600 characters per second max (with 50% "clear-channel" margin, rounded up)
+   SerialConnection::setMaxChar((cmax / 32) + 1); // fixed point math for 600 characters per second max (with 50% "clear-channel" margin, rounded up)
 
    // message not for me
    if (tcps.empty()) { return 0; }
@@ -937,7 +939,7 @@ HERE
 
    // apply assignment
    tcp->setTnum(msg->id);
-   if (getTnum == 0 || getTnum() > msg->id) {
+   if (getTnum() == 0 || getTnum() > msg->id) {
       setTnum(msg->id);
    }
 
@@ -958,7 +960,7 @@ HERE
 
    // change channel (will block for several seconds)
    Radio radio(fd);
-   fd.changeChannel(msg->channel);
+   radio.changeChannel(msg->channel);
 
 FUNCTION_INT("::handle_16005(int start, int end)", 0)
    return 0;

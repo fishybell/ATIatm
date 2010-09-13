@@ -1,5 +1,6 @@
 #include "radio.h"
 #include "common.h"
+#include <errno.h>
 #include <unistd.h>
 
 Radio::Radio(int fd) {
@@ -45,7 +46,7 @@ FUNCTION_INT("::changeChannel(int channel", -1)
    }
 
    // turn on software selectable channels
-   char *cmd1 = "*0202B520\n"; // write (*02) address 0x02B5 with 0x20
+   const char *cmd1 = "*0202B520\n"; // write (*02) address 0x02B5 with 0x20
    int ret;
    do {
       ret = write(fd, cmd1, 10);
@@ -58,9 +59,8 @@ FUNCTION_INT("::changeChannel(int channel", -1)
    // ignore answer
 
    // change channels
-   char *cmd2 = "*0202B800\n"; // write (*02) address 0x02B8 with 0x00
+   char cmd2[11] = "*0202B800\n"; // write (*02) address 0x02B8 with 0x00
    cmd2[8] += (channel - 1); // convert to ascii version of zero based hex number
-   int ret;
    do {
       ret = write(fd, cmd2, 10);
    } while (ret == -1 && errno == EAGAIN); // retry writing
