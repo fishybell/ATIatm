@@ -139,12 +139,14 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
             char *tbuf = wbuf;
             wbuf = new char[charMax];
             memcpy(wbuf, tbuf, charMax);
+            int twsize = wsize;
+            wsize = charMax;
 
             // send the new buffer right now (consumed and freed)
             int ret = Connection::handleWrite(ev);
 
             // create a new write buffer containing just the next chunk of data
-            wsize -= charMax;
+            wsize = twsize - charMax;
             wbuf = new char[wsize];
             memcpy(wbuf, tbuf+(sizeof(char) * charMax), wsize);
 
@@ -154,13 +156,23 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
             // set the next time to send
             delay = mdelay + rdelay;
             mdelay += rdelay + (mdelay - delay);
-            delay = rdelay;
+
+            // did we max out the radio's buffer?
+            if (charMax == 256) {
+               addDelay(427);
+            }
 
 FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
             return ret;
          } else {
             // send it all now
             resetDelay();
+
+            // will we max out the radio's buffer?
+            if (wsize == 256) {
+               addDelay(427);
+            }
+
             int ret = Connection::handleWrite(ev);
 FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
             return ret;
@@ -210,7 +222,9 @@ FUNCTION_END("::setTimeNow()")
 // resets delay related variables and the last send time variables
 void SerialConnection::resetDelay() {
 FUNCTION_START("::resetDelay()")
-   charMax = mdelay = rdelay = retries = 0;
+   charMax = 256;
+   delay = (3 * getTnum() % 512) + (getTnum() > 512 ? 2 : 0);
+   mdelay = rdelay = retries = 0;
    setTimeNow();
 FUNCTION_END("::resetDelay()")
 }
