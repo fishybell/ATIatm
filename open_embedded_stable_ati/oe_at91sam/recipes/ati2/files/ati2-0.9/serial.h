@@ -19,7 +19,7 @@ public:
    void setMaxChar(int max); // sets the maximum characters allowed to be sent in the next delay slot
 
 private:
-   int handleWrite(epoll_event *ev); // overrides (and then calls) Connection::hanldeWrite
+   int handleWrite(epoll_event *ev); // overrides (and then calls) Connection::handleWrite
 
    // for linked list
    SerialConnection *link; // link to next
@@ -32,7 +32,7 @@ private:
    // precise timing specific variables
    int charMax; // maximum amount of characters allowed in the allotted timeslot
    int mdelay; // max delay since last time we sent (in milliseconds)
-   int delay; // delay since last time we sent (in milliseconds)
+   int delay; // min delay since last time we sent (in milliseconds)
    int rdelay; // retry delay time needed if timeslot is missed (in milliseconds)
    int retries; // amount of times retrying to send the data
    int last_time_s; // the last time we sent (seconds part)
