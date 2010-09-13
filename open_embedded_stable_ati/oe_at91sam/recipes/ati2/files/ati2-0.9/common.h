@@ -25,13 +25,14 @@
 #define TRACE 1
 #define DEBUG 1
 #define INFO 1
+#define ERRORS 1
 
 // for run time tracing of application
 #ifdef TRACE
 #define FUNCTION_START(arg) TRACE && printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__);
 #define FUNCTION_END(arg) TRACE && printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__);
 #define FUNCTION_INT(arg, ret) TRACE && printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__);
-#define FUNCTION_HEX(arg, ret) TRACE && printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", ret, __FILE__, (int)__LINE__);
+#define FUNCTION_HEX(arg, ret) TRACE && printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__);
 #define FUNCTION_STR(arg, ret) TRACE && printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__);
 #define HERE TRACE && printf("TRACE: Here! %s %i\n", __FILE__, __LINE__);
 #else
@@ -63,11 +64,16 @@
 #ifdef INFO
 #define PROG_START INFO && printf("INFO: Starting in %s, compiled at %s %s MST\n\n", __FILE__, __DATE__, __TIME__);
 #define IMSG(...) INFO && printf("INFO: " __VA_ARGS__);
-#define IERROR(...) INFO && fprintf(stderr, "INFO: " __VA_ARGS__);
 #else
 #define PROG_START
 #define IMSG(...)
-#define IERROR(...)
+#endif
+
+// for run time viewing of application errors
+#ifdef ERRORS
+#define IERROR(...) ERRORS && fprintf(stderr, "ERROR at %s %i:\n", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__);
+#else
+#define IERROR(...) fprintf(stderr, __VA_ARGS__);
 #endif
 
 // utility function to properly configure a client TCP connection
