@@ -51,7 +51,7 @@ FUNCTION_START("::parseData(int size, char *buf)")
    
    // read all available valid messages
 HERE
-   while (validMessage(&start, &end) != 0) {
+   while ((mnum = validMessage(&start, &end)) != 0) {
       switch (mnum) {
          HANDLE_FASIT (100)
          HANDLE_FASIT (2000)
