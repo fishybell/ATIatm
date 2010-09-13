@@ -45,6 +45,9 @@ private :
 
    // for commands 2101, 43061, and 47157
    int handle_as_2101(struct FASIT_2101b bmsg, class FASIT_TCP *tcp);
+
+   // for determining whether or not we're ignore all commands
+   bool ignoreAll; // actually ignores all but the re-enable command
 };
 
 #endif
