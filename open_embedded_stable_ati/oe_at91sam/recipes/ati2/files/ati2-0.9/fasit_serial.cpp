@@ -8,6 +8,7 @@ using namespace std;
 
 FASIT_Serial::FASIT_Serial(char *fname) : SerialConnection(fname) {
 FUNCTION_START("::FASIT_Serial(char *fname) : SerialConnection(fname)")
+   ignoreAll = false;
 FUNCTION_END("::FASIT_Serial(char *fname) : SerialConnection(fname)")
 }
 
@@ -47,7 +48,12 @@ FUNCTION_START("::parseData(int size, char *buf)")
    int start, end, mnum;
    
    // read all available valid messages
-   while (validMessage(&start, &end) != 0) {
+   while ((mnum = validMessage(&start, &end)) != 0) {
+      if (ignoreAll && mnum != 16000) {
+         clearBuffer(end); // clear out last message
+FUNCTION_END("::parseData(int size, char *buf)")
+         return;
+      }
       switch (mnum) {
          HANDLE_FASIT (100)
          HANDLE_FASIT (2000)
@@ -364,21 +370,39 @@ FUNCTION_START("::handle_2100(int start, int end)")
    // find all destinations that we have (loop over 1200 bit flag group looking)
    list<FASIT_TCP*> tcps;
    int t = 1; // start at 1 as 0 represents unassigned
+   int slot = 0; // our slot in this list
+   int tslot = 0; // temporary holding slot
    for (int i = 149; i>=0; i++) { // the entire group is big endien
       for (int k = 0 ; k < 8; k++) { // 8 bits per int
          if (msg->dest[i] & (1 << k)) {
+            tslot++;
             FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(t);
             if (tcp != NULL) {
+               if (slot == 0) { slot = tslot; } // use the first allowable slot
                tcps.push_back(tcp);
             }
          }
          t++;
       }
    }
+   if (slot == 0) {
+      // we still need a specific spot even if we didn't find one
+      slot = tslot + getRnum() % tslot;
+   }
+
+   // evaluate delay field (as set in the ATI_header length field)
+   setTimeNow(); // delay next-send-time from right now
+   static int mults[8] = {15, 30, 60, 120, 240, 480, 960, 1920};
+   int mult = mults[0x7 & hdr->length]; // only look at 3 bits worth
+   minDelay(mult * slot); // wait for correct place in line
+   timeSlot(mult / 10); // 10% overage alowed for the timeslot
+   retryDelay(mult * (tslot-slot)); // wait for the end of the line (tslot ends up as the last slot)
+   int cmax = mult * 10; // fixed point math for 600 characters per second max
+   setMaxChar((cmax / 32) + 1); // fixed point math for 600 characters per second max (with 50% "clear-channel" margin, rounded up)
+
+   // message not for me
    if (tcps.empty()) { return 0; }
 HERE
-
-   // TODO -- evaluate delay field (as set in the ATI_header length field)
 
    // send each message found to each destination found, the order doesn't really matter:
    //    all the messages will be actually sent in the order the individual TCP sockets
@@ -826,7 +850,8 @@ FUNCTION_START("::handle_16000(int start, int end)")
    if (tcp == NULL) { return 0; }
 HERE
 
-   // TODO -- enable or disable according to msg->enable
+   // set the ignoreAll flag
+   ignoreAll = !msg->enable; // ignore all other messages if we're not enabled
 
 FUNCTION_INT("::handle_16000(int start, int end)", 0)
    return 0;
@@ -912,6 +937,9 @@ HERE
 
    // apply assignment
    tcp->setTnum(msg->id);
+   if (getTnum == 0 || getTnum() > msg->id) {
+      setTnum(msg->id);
+   }
 
 FUNCTION_INT("::handle_16004(int start, int end)", 0)
    return 0;
@@ -928,7 +956,9 @@ FUNCTION_START("::handle_16005(int start, int end)")
    if (tcp == NULL && msg->dest != 0xffff && !msg->broadcast) { return 0; }
 HERE
 
-   // TODO -- change channel to msg->channel
+   // change channel (will block for several seconds)
+   Radio radio(fd);
+   fd.changeChannel(msg->channel);
 
 FUNCTION_INT("::handle_16005(int start, int end)", 0)
    return 0;
