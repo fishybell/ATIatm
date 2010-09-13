@@ -356,7 +356,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
       // add command to the static list
       commandList.push_back(cmd);
    }
-   commandMap.insert(pair<ATI_2100m,int>(cmd,this->tnum)); // destination is this connection
+   commandMap.insert(pair<ATI_2100m,int>(cmd,this->tnum-1)); // destination is this connection (convert tnum to zero based)
 
    // check timeout timer
    if (Timeout::timedOut() == -1) {
