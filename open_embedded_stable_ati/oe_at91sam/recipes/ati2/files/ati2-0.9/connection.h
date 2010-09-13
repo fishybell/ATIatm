@@ -29,6 +29,7 @@ public:
    void setTnum(__uint16_t tnum); // if none is already set, this will set the tnum and add it to the map
    static void Init(int efd); // initialize with the global event fd
    int handleReady(epoll_event *ev); // called when either ready to read or write; returns -1 if needs to be deleted afterwards
+   int getFD() { return fd; }; // retrieve the file descriptor for use in epoll or select or similar
 
 protected:
    virtual int handleWrite(epoll_event *ev); // could be overwritten
