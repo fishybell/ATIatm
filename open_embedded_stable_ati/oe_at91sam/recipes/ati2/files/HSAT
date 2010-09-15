@@ -13,4 +13,5 @@ if cd fasit 2>/dev/null ; then
     python fasit_client_main.py -t HSAT
 fi
 
+cd
 cd $PWD
