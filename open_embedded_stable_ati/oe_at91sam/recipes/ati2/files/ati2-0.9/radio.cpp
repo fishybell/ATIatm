@@ -32,7 +32,9 @@ FUNCTION_END("::Radio(int fd)")
 
 Radio::~Radio() {
 FUNCTION_START("::~Radio()")
-   // TODO -- exit programming mode
+   // exit programming mode (resets radio)
+   write(fd, "*00\r", 4);
+   sleep(1);
 FUNCTION_END("::~Radio()")
 }
 
@@ -46,7 +48,7 @@ FUNCTION_INT("::changeChannel(int channel", -1)
    }
 
    // turn on software selectable channels
-   const char *cmd1 = "*0202B520\n"; // write (*02) address 0x02B5 with 0x20
+   const char *cmd1 = "*0202B520\r"; // write (*02) address 0x02B5 with 0x20
    int ret;
    do {
       ret = write(fd, cmd1, 10);
@@ -56,10 +58,10 @@ FUNCTION_INT("::changeChannel(int channel", -1)
       return -1;
    }
 
-   // ignore answer
+   // TODO -- write to EEROM instead of RAM and read result to verify
 
    // change channels
-   char cmd2[11] = "*0202B800\n"; // write (*02) address 0x02B8 with 0x00
+   char cmd2[11] = "*0202B800\r"; // write (*02) address 0x02B8 with 0x00
    cmd2[8] += (channel - 1); // convert to ascii version of zero based hex number
    do {
       ret = write(fd, cmd2, 10);
@@ -69,7 +71,7 @@ FUNCTION_INT("::changeChannel(int channel", -1)
       return -1;
    }
 
-   // ignore answer
+   // TODO -- write to EEROM instead of RAM and read result to verify
 
 FUNCTION_INT("::changeChannel(int channel", 0)
    return 0;
