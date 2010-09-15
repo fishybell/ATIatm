@@ -562,8 +562,7 @@ static int __init target_hit_mechanical_init(void)
 	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	// we are disabled until user-space enables us
-//	atomic_set(&sensor_enable_atomic, HIT_SENSOR_DISABLED);
-	atomic_set(&sensor_enable_atomic, HIT_SENSOR_ENABLED);
+	atomic_set(&sensor_enable_atomic, HIT_SENSOR_DISABLED);
 
 	INIT_WORK(&hit_work, hit_change);
 

@@ -22,7 +22,7 @@
 #define BATTERY_CHARGING_YES    	1
 #define BATTERY_CHARGING_ERROR  	2
 
-#define TESTING_ON_EVAL
+//#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
 	#undef	INPUT_ADC_LOW_BAT
 
@@ -34,7 +34,8 @@
 	#undef INPUT_CHARGING_BAT_DEGLITCH_STATE
 	#undef INPUT_CHARGING_BAT
 
-	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC0
+//	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC0
+	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC3
 
 	#define OUTPUT_LED_LOW_BAT_ACTIVE_STATE			ACTIVE_LOW
 	#define	OUTPUT_LED_LOW_BAT 						AT91_PIN_PA6 // LED on dev. board
@@ -125,7 +126,7 @@ static const char * battery_charging_state[] =
 static unsigned char hardware_adc_read(void)
 	{
 	__raw_writel(0x02, adc_base + ADC_CR); // Start the ADC
-	while(!(__raw_readl(adc_base + ADC_SR) & 0x01))
+	while(!(__raw_readl(adc_base + ADC_SR) & CH_EN /*0x01*/))
 		{
 		cpu_relax();
 		}
