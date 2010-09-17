@@ -46,18 +46,21 @@
 
 // for run time debugging of application
 #ifdef DEBUG
-#define PRINT_HEX(arg) DEBUG && ({ \
-        int _x = sizeof(arg); \
+#define PRINT_HEXB(data, size) DEBUG && ({ \
         printf("DEBUG: 0x"); \
-        while (_x--) { \
-           printf("%02x", arg[_x]); \
+        for (int _i=0; _i<size; _i++) { \
+           printf("%02x", data[_i]); \
         } \
         printf(" in %s at line %i\n", __FILE__, __LINE__); \
-        })
+        });
+#define PRINT_HEX(arg) PRINT_HEXB(arg, sizeof(arg))
 #define BLIP DEBUG && printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__);
+#define DMSG(...) INFO && printf("DEBUG: " __VA_ARGS__);
 #else
+#define PRINT_HEXB(data, size)
 #define PRINT_HEX(arg)
 #define BLIP
+#define DMSG(...)
 #endif
 
 // for run time information viewing of application

@@ -73,37 +73,45 @@ const char *usage = "Usage: %s [options]\n\
 \t-h     -- print out usage information\n";
    for (int i = 1; i < argc; i++) {
       if (argv[i][0] != '-') {
+HERE
          IERROR("invalid argument (%i)\n", i)
          return 1;
       }
       switch (argv[i][1]) {
          case 'p' :
+HERE
             if (sscanf(argv[++i], "%i", &port) != 1) {
                IERROR("invalid argument (%i)\n", i)
                return 1;
             }
             break;
          case 's' :
+HERE
             serials.push_back(new FASIT_Serial(argv[++i]));
             break;
          case 'r' :
+HERE
             // TODO -- impliment serial relay program
             printf("Serial relay not implimented, sorry\n");
             return 0;
             break;
          case 'b' :
+HERE
             base = ++i; // remember the base paramter for later
             break;
          case 'h' :
+HERE
             printf(usage);
             return 0;
             break;
          case '-' :
+HERE
             if (argv[i][2] == 'h') {
                printf(usage);
                return 0;
             }
          default :
+HERE
             IERROR("invalid argument (%i)\n", i)
             return 1;
       }
@@ -162,6 +170,7 @@ const char *usage = "Usage: %s [options]\n\
          return 1;
       }
    }
+   Connection::Init(kdpfd);
    list<FASIT_Serial*>::iterator sIt = serials.begin();
    while (sIt != serials.end()) {
       memset(&ev, 0, sizeof(ev));
@@ -171,6 +180,7 @@ const char *usage = "Usage: %s [options]\n\
          IERROR("epoll serial insertion error: fd=%d\n", (*sIt)->getFD())
          return 1;
       }
+DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getFD(), 0);
       sIt++;
    }
    

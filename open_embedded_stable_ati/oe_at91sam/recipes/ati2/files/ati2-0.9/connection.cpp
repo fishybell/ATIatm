@@ -144,6 +144,7 @@ FUNCTION_START("::handleRead(epoll_event *ev)")
    char buf[BUF_SIZE+1];
    int rsize=0;
    rsize = read(fd, buf, BUF_SIZE);
+PRINT_HEXB(buf, rsize)
    if (rsize > 0) {
       int ret = parseData(rsize, buf);
 FUNCTION_INT("::handleRead(epoll_event *ev)", ret)
@@ -237,11 +238,12 @@ FUNCTION_INT("::handleReady(epoll_event *ev)", ret)
 //   message and be sure that the entire message is sent
 void Connection::queueMsg(char *msg, int size) {
 FUNCTION_START("::queueMsg(char *msg, int size)")
+PRINT_HEXB(msg, size)
    if (wsize > 0) {
       // append
       char *tbuf = new char[(size+wsize)];
       memcpy(tbuf, wbuf, wsize);
-      memcpy(tbuf+(sizeof(char) * size), msg, size);
+      memcpy(tbuf+(sizeof(char) * size) + 1, msg, size);
       wsize += size;
       delete [] wbuf;
       wbuf = tbuf;
@@ -254,9 +256,21 @@ FUNCTION_START("::queueMsg(char *msg, int size)")
 
    // set this connection to watch for writeability
    epoll_event ev;
+   memset(&ev, 0, sizeof(ev));
    ev.data.ptr = (void*)this;
    ev.events = EPOLLIN | EPOLLOUT;
-   epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
+   int ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
+DMSG("epoll_ctl(%i, EPOLL_CTL_MOD, %i, &ev) returned: %i\n", efd, fd, ret);
+   if (ret == -1) {
+      switch (errno) {
+         case EBADF : IERROR("EBADF\n") ; break;
+         case EEXIST : IERROR("EEXIST\n") ; break;
+         case EINVAL : IERROR("EINVAL\n") ; break;
+         case ENOENT : IERROR("ENOENT\n") ; break;
+         case ENOMEM : IERROR("ENOMEM\n") ; break;
+         case EPERM : IERROR("EPERM\n") ; break;
+      }
+   }
 FUNCTION_END("::queueMsg(char *msg, int size)")
 }
 

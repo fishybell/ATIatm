@@ -20,6 +20,7 @@ FUNCTION_START("::FASIT_TCP(int fd) : Connection(fd)")
    ATI_header hdr = createHeader(16003, UNASSIGNED, &msg, sizeof(ATI_16003)); // source unassigned for 16003
    SerialConnection::queueMsgAll(&hdr, sizeof(ATI_header));
    SerialConnection::queueMsgAll(&msg, sizeof(ATI_16003));
+   // TODO -- no response from server after 10 seconds? disconnect
    
 FUNCTION_END("::FASIT_TCP(int fd) : Connection(fd)")
 }
@@ -78,7 +79,7 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0)
 }
 
 // macro used in validMessage function to check just the message length field of the header and call it good
-#define CHECK_LENGTH(FASIT_NUM) case FASIT_NUM : if (hdr.length != hl + sizeof( FASIT_ ## FASIT_NUM )) { break; }; if (hdr.length > (rsize - *start)) { return 0; }; return hdr.num; break;
+#define CHECK_LENGTH(FASIT_NUM) case FASIT_NUM : if (hdr.length != hl + sizeof( FASIT_ ## FASIT_NUM )) { break; }; if (hdr.length > (rsize - *start)) { break; }; return hdr.num; break;
 
 // the start and end values may be set even if no valid message is found
 int FASIT_TCP::validMessage(int *start, int *end) {
@@ -124,7 +125,7 @@ FUNCTION_START("::validMessage(int *start, int *end)")
       /* look for FASIT message */
       if (*start < (rsize - sizeof(FASIT_header))) {
          // if not big enough to hold a full message header don't look for a valid FASIT message
-         *start++;
+         *start = *start + 1;
          continue;
       }
       FASIT_header hdr;
@@ -140,7 +141,7 @@ FUNCTION_START("::validMessage(int *start, int *end)")
             if (hdr.length != hl) { break; } // invalid message length
             return hdr.num;
          case 2006:         // don't check against length of FASIT_2006 struct
-            if (hdr.length > (rsize - *start)) { return 0; } // have the beginning of a valid message
+            if (hdr.length > (rsize - *start)) { break; } // have the beginning of a valid message
             return hdr.num;
          // these ones just look at msg length
          CHECK_LENGTH (2000)
@@ -158,7 +159,7 @@ FUNCTION_START("::validMessage(int *start, int *end)")
          default:      // not a valid number, not a valid header
             break;
       }
-      *start++;
+      *start = *start + 1;
    }
 FUNCTION_INT("::validMessage(int *start, int *end)", 0)
    return 0;

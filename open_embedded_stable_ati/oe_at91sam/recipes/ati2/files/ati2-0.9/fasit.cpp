@@ -43,6 +43,7 @@ FUNCTION_END("::addToBuffer(int rsize, char *rbuf)")
 // we don't worry about clearing the data before a valid message, just up to the end
 void FASIT::clearBuffer(int end) {
 FUNCTION_START("::clearBuffer(int end)")
+DMSG("clearing rbuf to %i of %i\n", end, rsize)
    if (end >= rsize) {
       // clear the entire buffer
       delete [] rbuf;
@@ -50,11 +51,13 @@ FUNCTION_START("::clearBuffer(int end)")
       rsize = 0;
    } else {
       // clear out everything up to and including end
+DMSG("new buffer of %i bytes\n", rsize - end)
       char *tbuf = new char[(rsize - end)];
       memcpy(tbuf, rbuf + (sizeof(char) * end), rsize - end);
       delete [] rbuf;
       rbuf = tbuf;
       rsize -= end;
+DMSG("ending with %i left\n", rsize)
    }
 FUNCTION_END("::clearBuffer(int end)")
 }

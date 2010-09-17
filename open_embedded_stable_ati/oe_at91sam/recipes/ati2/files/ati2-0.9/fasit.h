@@ -40,6 +40,8 @@ protected :
 /* FASIT commands                                                                       */
 /****************************************************************************************/
 
+// the byte order of the device and the host are the same, but may be non-obviously the same as described below
+
 /********************************************/
 /* FASIT Message Header                     */
 /********************************************/

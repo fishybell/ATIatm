@@ -42,7 +42,6 @@ FUNCTION_END("::defHeader(int mnum, FASIT_header *fhdr)")
 int FASIT_Serial::parseData(int size, char *buf) {
 FUNCTION_START("::parseData(int size, char *buf)")
    IMSG("Serial %i read %i bytes of data\n", fd, size)
-   IMSG("TCP %i read %i bytes of data\n", fd, size)
 
    addToBuffer(size, buf);
 
@@ -92,7 +91,7 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0)
 
 // macros used in validMessage function to check just the message length field of the header and call it good
 #define END_CHECKS return hdr.num; break;
-#define CHECK_LENGTH(FASIT_NUM) case FASIT_NUM : if (hdr.length != hl + sizeof( ATI_ ## FASIT_NUM )) { break; } ; if (hdr.length > (rsize - *start)) { return 0; } ; END_CHECKS
+#define CHECK_LENGTH(FASIT_NUM) case FASIT_NUM : if (hdr.length != hl + sizeof( ATI_ ## FASIT_NUM )) { DMSG("not %i\n", hdr.num) break; } ; if (hdr.length > (rsize - *start)) { DMSG("maybe %i\n", hdr.num) break; } ; END_CHECKS
 #define CHECK_CRC(CRCL) if (*end <= rsize && crc ## CRCL (rbuf, *start, *end) == 0 ) { END_CHECKS }
 
 // the start and end values may be set even if no valid message is found
@@ -100,18 +99,18 @@ int FASIT_Serial::validMessage(int *start, int *end) {
 FUNCTION_START("::validMessage(int *start, int *end)")
    *start = 0;
    // loop through entire buffer, parsing starting at each character
-   while (*start < (rsize - sizeof(ATI_header))) { // end when not big enough to contain an entire header
+   while (*start < rsize && rsize - *start >= sizeof(ATI_header)) { // end when not big enough to contain an entire header
       // unlike TCP messages, all serial messages have the same header
       if (rbuf[*start] & 240 != 240) {
          // first 3 bits of header not 
-         *start++;
+         *start = *start + 1;
          continue;
       }
       
       ATI_header hdr;
       int hl = sizeof(ATI_header); // keep for later
       memcpy(&hdr, rbuf + *start, hl);
-      if (hdr.length < hl) { *start++; continue; } // invalid message length
+      if (hdr.length < hl) { *start = *start + 1; continue; } // invalid message length
       *end = *start + hdr.length;
 
       // if we're reasonably sure this message might be done, check the parity now
@@ -120,17 +119,16 @@ FUNCTION_START("::validMessage(int *start, int *end)")
          memcpy(buf, rbuf + *start, min(15, (int)hdr.length));
          if (parity(buf, min(15, (int)hdr.length)) != 0) {
             // invalid parity, move on
-            *start++;
+            *start = *start + 1;
             continue;
          }
       }
 
       // do checks for individual messages
-HERE
       switch (hdr.num) {
          case 2005:
             if (hdr.length != sizeof(ATI_2005s) && hdr.length != sizeof(ATI_2005f)) { break; }
-            if (hdr.length > (rsize - *start)) { return 0; }
+            if (hdr.length > (rsize - *start)) { break; }
             END_CHECKS
          case 63556:
             *end = *start + sizeof(ATI_63556);
@@ -153,15 +151,15 @@ HERE
          case 2101:
          case 43061:
             if (hdr.length != sizeof(ATI_header)) { break; }
-            if (hdr.length > (rsize - *start)) { return 0; }
+            if (hdr.length > (rsize - *start)) { break; }
             END_CHECKS
          case 2111:
             if (hdr.length != sizeof(ATI_2111s) && hdr.length != sizeof(ATI_2111f)) { break; }
-            if (hdr.length > (rsize - *start)) { return 0; }
+            if (hdr.length > (rsize - *start)) { break; }
             END_CHECKS
          case 2102:
             if (hdr.length == sizeof(ATI_2102)) {
-               if (hdr.length > (rsize - *start)) { return 0; }
+               if (hdr.length > (rsize - *start)) { break; }
                END_CHECKS
             }
             *end = *start + sizeof(ATI_2102) + sizeof(ATI_2102x);
@@ -186,7 +184,7 @@ HERE
          CHECK_LENGTH (16005)
       }
 
-      *start++;
+      *start = *start + 1;
    }
 FUNCTION_INT("::validMessage(int *start, int *end)", 0)
    return 0;

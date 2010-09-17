@@ -22,6 +22,7 @@ FUNCTION_START("::SerialConnection(char *fname) : Connection(0)")
    link = NULL;
    if (flink == NULL) {
       // we're first
+DMSG("first link in chain 0x%08x\n", this);
       flink = this;
    } else {
       // we're last (find old last and link from there)
@@ -30,6 +31,7 @@ FUNCTION_START("::SerialConnection(char *fname) : Connection(0)")
          tlink = tlink->link;
       }
       tlink->link = this;
+DMSG("last link in chain 0x%08x\n", this);
    }
 
    // initialize local variables
@@ -44,13 +46,14 @@ FUNCTION_START("::SerialConnection(char *fname) : Connection(0)")
    tcgetattr (fd, &oldtio);
    memset (&newtio, 0, sizeof (newtio));
    newtio.c_cflag = BAUDRATE | CRTSCTS | CS8 | CLOCAL | CREAD;
-   newtio.c_iflag = IGNPAR;
+   newtio.c_iflag = 0;
    newtio.c_oflag = 0;
-   newtio.c_lflag = ICANON;    /* set input mode (canonical, no echo,...) */
+   newtio.c_lflag = 0;
    newtio.c_cc[VTIME] = 0;     /* inter-character timer unused */
-   newtio.c_cc[VMIN] = 5;      /* blocking read until 5 chars received */
+   newtio.c_cc[VMIN] = 1;      /* read a minimum of 1 character */
    tcflush (fd, TCIFLUSH);
    tcsetattr (fd, TCSANOW, &newtio);
+   setnonblocking(fd);
 FUNCTION_END("::SerialConnection(char *fname) : Connection(0)")
 }
 
@@ -79,15 +82,19 @@ void SerialConnection::queueMsgAll(char *msg, int size) {
 FUNCTION_START("::queueMsgAll(char *msg, int size)")
    // no serial connection to send to
    if (flink == NULL) {
+DMSG("no links");
+FUNCTION_END("::queueMsgAll(char *msg, int size)")
       return;
    }
 
    // queue to first one
+DMSG("queueing %i bytes on first 0x%08x\n", size, flink)
    flink->queueMsg(msg, size);
 
    // queue to the rest
    SerialConnection *tlink;
    while ((tlink = flink->link) != NULL) {
+DMSG("queueing %i bytes on link 0x%08x\n", size, tlink)
       tlink->queueMsg(msg, size);
    }
 FUNCTION_END("::queueMsgAll(char *msg, int size)")
@@ -98,8 +105,8 @@ int SerialConnection::handleWrite(epoll_event *ev) {
 FUNCTION_START("::handleWrite(epoll_event *ev)")
    int sec = delay / 1000;
    int nows, nowm; // current time in seconds and milliseconds
-   int diff = nowm - ((nows - last_time_s) * 1000 + last_time_m); // time differential in milliseconds
    timeNow(&nows, &nowm);
+   int diff = nowm - ((nows - last_time_s) * 1000 + last_time_m); // time differential in milliseconds
 
    // wsize is 0, need to adjust epoll and return
    if (wsize <= 0) {
