@@ -65,6 +65,17 @@ atomic_t operating_atomic = ATOMIC_INIT(FALSE);
 atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to store the current movement
+//---------------------------------------------------------------------------
+#define IGNORE_MOVE_INTERRUPT
+#ifdef IGNORE_MOVE_INTERRUPT
+	#define LIFTER_MOVEMENT_NONE			0
+	#define LIFTER_MOVEMENT_UP				1
+	#define LIFTER_MOVEMENT_DOWN			2
+	atomic_t movement_atomic = ATOMIC_INIT(LIFTER_MOVEMENT_NONE);
+#endif // IGNORE_MOVE_INTERRUPT
+
+//---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space of a position
 // change or error detected by the IRQs or the timeout timer.
 //---------------------------------------------------------------------------
@@ -106,8 +117,20 @@ static int hardware_motor_on(int direction)
 	// with the infantry lifter we don't care about direction,
 	// just turn on the motor
 	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
+#ifdef IGNORE_MOVE_INTERRUPT
+	if (direction == LIFTER_POSITION_UP)
+		{
+		atomic_set(&movement_atomic, LIFTER_MOVEMENT_UP);
+		}
+	else if (direction == LIFTER_POSITION_DOWN)
+		{
+		atomic_set(&movement_atomic, LIFTER_MOVEMENT_DOWN);
+		}
+#endif // IGNORE_MOVE_INTERRUPT
+
     spin_lock_irqsave(&motor_lock, flags);
-	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake off
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor on
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
@@ -123,6 +146,11 @@ static int hardware_motor_off(void)
 	spin_lock_irqsave(&motor_lock, flags);
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor off
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake on
+
+#ifdef IGNORE_MOVE_INTERRUPT
+    atomic_set(&movement_atomic, LIFTER_MOVEMENT_NONE);
+#endif // IGNORE_MOVE_INTERRUPT
+
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
@@ -175,12 +203,20 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-	// We get an interrupt on both edges, so we have to check to which edge
-	// we are responding.
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+#ifdef IGNORE_MOVE_INTERRUPT
+	if (atomic_read(&movement_atomic) ==  LIFTER_MOVEMENT_UP)
+		{
+		printk(KERN_ALERT "%s - %s() ignoring...\n",TARGET_NAME, __func__);
+		return IRQ_HANDLED;
+		}
+#endif // IGNORE_MOVE_INTERRUPT
 
+    // We get an interrupt on both edges, so we have to check to which edge
+	// we are responding.
     if (at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
+	    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
     	timeout_timer_stop();
 
         // Turn the motor off
@@ -192,6 +228,10 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         // notify user-space
         schedule_work(&position_work);
         }
+    else
+    	{
+		printk(KERN_ALERT "%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
+    	}
 
     return IRQ_HANDLED;
     }
@@ -206,12 +246,21 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-	// We get an interrupt on both edges, so we have to check to which edge
-	// we are responding.
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
+#ifdef IGNORE_MOVE_INTERRUPT
+	if (atomic_read(&movement_atomic) ==  LIFTER_MOVEMENT_DOWN)
+		{
+		printk(KERN_ALERT "%s - %s() ignoring...\n",TARGET_NAME, __func__);
+		return IRQ_HANDLED;
+		}
+#endif // IGNORE_MOVE_INTERRUPT
+
+    // We get an interrupt on both edges, so we have to check to which edge
+	// we are responding.
     if (at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
+		printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
     	timeout_timer_stop();
 
         // Turn the motor off
@@ -223,6 +272,10 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         // notify user-space
         schedule_work(&position_work);
         }
+    else
+    	{
+		printk(KERN_ALERT "%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
+    	}
 
     return IRQ_HANDLED;
     }
@@ -233,10 +286,6 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 static int hardware_init(void)
     {
     int status = 0;
-
-    // set lines for the correct peripherals
-    //at91_set_A_periph(INPUT_LIFTER_POS_DOWN_LIMIT, 1);
-    //at91_set_A_periph(INPUT_LIFTER_POS_UP_LIMIT, 1);
 
     // Configure motor gpio for output and set initial output
     at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // motor off
@@ -305,7 +354,7 @@ static int hardware_position_set(int position)
 
 	// with the infantry lifter we don't care about position,
 	// just turn on the motor
-	hardware_motor_on(0);
+	hardware_motor_on(position);
 
 	timeout_timer_start();
 

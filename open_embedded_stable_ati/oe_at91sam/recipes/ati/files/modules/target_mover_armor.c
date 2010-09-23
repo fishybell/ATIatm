@@ -48,23 +48,9 @@
 #define FAULT_STOPPED_DUE_TO_STOP_COMMAND                  13
 
 
-
-#define PIN_MOVEMENT_ACTIVE   			0       		// Active low
-#define PIN_MOVEMENT_END    			AT91_PIN_PA30   // BP3 on dev. board
-#define PIN_MOVEMENT_EMERGENCY_STOP		AT91_PIN_PA31   // BP4 on dev. board
-
-#define PIN_MOTOR_ACTIVE    	0       		// Active low
-
-#ifdef DEV_BOARD_REVB
-	#define PIN_MOTOR_CONTROL    	AT91_PIN_PA6
-#else
-	#define PIN_MOTOR_CONTROL    	AT91_PIN_PB8
-#endif
-
-
 // TODO - map pwm output pin to block/channel
 #define MOTOR_PWM_BLOCK			1		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
-#define MOTOR_PWM_CHANNEL		2		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+#define MOTOR_PWM_CHANNEL		1		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 
 static struct atmel_tc * motor_pwm_tc = NULL;
 
@@ -81,8 +67,12 @@ module_param(reverse, bool, S_IRUGO);
 #define INPUT_MOVER_TRACK_END	(reverse ? INPUT_MOVER_END_OF_TRACK_1 : INPUT_MOVER_END_OF_TRACK_2)
 
 // map motor controller reverse and forward signals based on the 'reverse' parameter
-#define OUTPUT_MOVER_FORWARD	(reverse ? OUTPUT_MOVER_DIRECTION_REVERSE : OUTPUT_MOVER_DIRECTION_FORWARD)
-#define OUTPUT_MOVER_REVERSE	(reverse ? OUTPUT_MOVER_DIRECTION_FORWARD : OUTPUT_MOVER_DIRECTION_REVERSE)
+#define OUTPUT_MOVER_FORWARD_POS	(reverse ? OUTPUT_MOVER_MOTOR_REV_POS : OUTPUT_MOVER_MOTOR_FWD_POS)
+#define OUTPUT_MOVER_REVERSE_POS	(reverse ? OUTPUT_MOVER_MOTOR_FWD_POS : OUTPUT_MOVER_MOTOR_REV_POS)
+
+// map motor controller reverse and forward signals based on the 'reverse' parameter
+#define OUTPUT_MOVER_FORWARD_NEG	(reverse ? OUTPUT_MOVER_MOTOR_REV_NEG : OUTPUT_MOVER_MOTOR_FWD_NEG)
+#define OUTPUT_MOVER_REVERSE_NEG	(reverse ? OUTPUT_MOVER_MOTOR_FWD_NEG : OUTPUT_MOVER_MOTOR_REV_NEG)
 
 // map mover track sensor signals based on the 'reverse' parameter
 #define INPUT_MOVER_TRACK_SENSOR_FRONT 	(reverse ? INPUT_MOVER_TRACK_SENSOR_2 : INPUT_MOVER_TRACK_SENSOR_1)
@@ -205,28 +195,32 @@ static int hardware_motor_on(int direction)
 
     spin_lock_irqsave(&motor_lock, flags);
 
+    // de-assert the neg inputs to the h-bridge
+    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+
     // we always turn both signals off first to ensure that both don't ever get turned
     // on at the same time
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 
     if (direction == MOVER_DIRECTION_REVERSE)
 		{
-		at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, !OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE); // remove brake
-		at91_set_gpio_output(OUTPUT_MOVER_REVERSE, OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+		at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 
 	    atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_REVERSE);
+	    printk(KERN_ALERT "%s - %s() - reverse\n",TARGET_NAME, __func__);
 		}
     else if (direction == MOVER_DIRECTION_FORWARD)
 		{
-		at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, !OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE); // remove brake
-		at91_set_gpio_output(OUTPUT_MOVER_FORWARD, OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+		at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 
     	atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
+    	printk(KERN_ALERT "%s - %s() - forward\n",TARGET_NAME, __func__);
 		}
     else
     	{
-		// TODO - error
+		printk(KERN_ALERT "%s - %s() - error\n",TARGET_NAME, __func__);
     	}
 
 	spin_unlock_irqrestore(&motor_lock, flags);
@@ -239,13 +233,20 @@ static int hardware_motor_on(int direction)
 static int hardware_motor_off(void)
 	{
 	unsigned long flags;
+
+	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
 	spin_lock_irqsave(&motor_lock, flags);
 
-    at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
+    // de-assert the all inputs to the h-bridge
+    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 
-	at91_set_gpio_output(OUTPUT_MOVER_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
-	at91_set_gpio_output(OUTPUT_MOVER_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 	
+	atomic_set(&movement_atomic, MOVER_MOVEMENT_STOPPED);
+
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
@@ -262,8 +263,6 @@ static int hardware_movement_stop(int stop_timer)
 
 	// turn off the motor
 	hardware_motor_off();
-
-	atomic_set(&movement_atomic, MOVER_MOVEMENT_STOPPED);
 
 	// signal that an operation is done
 	atomic_set(&moving_atomic, FALSE);
@@ -298,11 +297,14 @@ irqreturn_t movement_sensor_front_int(int irq, void *dev_id, struct pt_regs *reg
         return IRQ_HANDLED;
         }
 
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
     if (at91_get_gpio_value(INPUT_MOVER_TRACK_SENSOR_FRONT) != INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE)
         {
 		return IRQ_HANDLED;
         }
 
+/*
 	if (atomic_read(&last_track_sensor_atomic) == INPUT_MOVER_TRACK_SENSOR_REAR)
 		{
 		atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
@@ -311,6 +313,7 @@ irqreturn_t movement_sensor_front_int(int irq, void *dev_id, struct pt_regs *reg
 		}
 
 	atomic_set(&last_track_sensor_atomic, INPUT_MOVER_TRACK_SENSOR_FRONT);
+*/
 	return IRQ_HANDLED;
     }
 
@@ -324,11 +327,14 @@ irqreturn_t movement_sensor_rear_int(int irq, void *dev_id, struct pt_regs *regs
         return IRQ_HANDLED;
         }
 
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
     if (at91_get_gpio_value(INPUT_MOVER_TRACK_SENSOR_REAR) != INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE)
         {
 		return IRQ_HANDLED;
         }
 
+/*
 	if (atomic_read(&last_track_sensor_atomic) == INPUT_MOVER_TRACK_SENSOR_REAR)
 		{
 		atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
@@ -337,6 +343,7 @@ irqreturn_t movement_sensor_rear_int(int irq, void *dev_id, struct pt_regs *regs
 		}
 
 	atomic_set(&last_track_sensor_atomic, INPUT_MOVER_TRACK_SENSOR_FRONT);
+*/
 	return IRQ_HANDLED;
     }
 
@@ -349,6 +356,10 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
         {
         return IRQ_HANDLED;
         }
+
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
+    hardware_movement_stop(TRUE);
 
 	return IRQ_HANDLED;
     }
@@ -363,88 +374,23 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
+    hardware_movement_stop(TRUE);
+
 	return IRQ_HANDLED;
-    }
-
-//---------------------------------------------------------------------------
-//
-//---------------------------------------------------------------------------
-irqreturn_t end_movement_int(int irq, void *dev_id, struct pt_regs *regs)
-    {
-#ifdef TEST_PWM
-    unsigned int start;
-    if (!motor_pwm_tc) return IRQ_HANDLED;
-    printk(KERN_ALERT "@: x%04x\n", __raw_readl(motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CV)));
-    if (at91_get_gpio_value(PIN_MOVEMENT_END) == PIN_MOVEMENT_ACTIVE)
-        {
-        start = __raw_readl(motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	if (start > 0x0002)
-            {
-            start -= 0x1000;
-            printk(KERN_ALERT "moving back 0x1000 to 0x%04x\n", start);
-            __raw_writel(start, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-//            __raw_writel(start / 2, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
-            }
-        }
-    return IRQ_HANDLED;
-#else
-	// We get an interrupt on both edges, so we have to check to which edge
-	// we are responding.
-    if (at91_get_gpio_value(PIN_MOVEMENT_END) == PIN_MOVEMENT_ACTIVE)
-        {
-    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
-
-    	hardware_movement_stop(TRUE);
-        }
-
-    return IRQ_HANDLED;
-#endif // TEST_PWM
-    }
-
-//---------------------------------------------------------------------------
-//
-//---------------------------------------------------------------------------
-irqreturn_t emergency_stop_movement_int(int irq, void *dev_id, struct pt_regs *regs)
-    {
-#ifdef TEST_PWM
-    unsigned int start;
-    if (!motor_pwm_tc) return IRQ_HANDLED;
-    printk(KERN_ALERT "@: x%04x\n", __raw_readl(motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CV)));
-    if (at91_get_gpio_value(PIN_MOVEMENT_EMERGENCY_STOP) == PIN_MOVEMENT_ACTIVE)
-        {
-        start = __raw_readl(motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	if (start < 0x8002)
-            {
-            start += 0x1000;
-            printk(KERN_ALERT "moving forward 0x1000 to 0x%04x\n", start);
-            __raw_writel(start, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-//            __raw_writel(start / 2, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
-            }
-        }
-    return IRQ_HANDLED;
-#else
-	// We get an interrupt on both edges, so we have to check to which edge
-	// we are responding.
-    if (at91_get_gpio_value(PIN_MOVEMENT_EMERGENCY_STOP) == PIN_MOVEMENT_ACTIVE)
-        {
-    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
-
-    	hardware_movement_stop(TRUE);
-        }
-
-    return IRQ_HANDLED;
-#endif // TEST_PWM
     }
 
 //---------------------------------------------------------------------------
 // Initialize the timer counter as PWM output for motor control
 //---------------------------------------------------------------------------
 static int hardware_motor_pwm_init(void)
-    {unsigned int mck_freq;
+    {
+	unsigned int mck_freq;
+
     // initialize timer counter
     motor_pwm_tc = target_timer_alloc(MOTOR_PWM_BLOCK, "gen_tc");
     printk(KERN_ALERT "timer_alloc(): %08x\n", (unsigned int) motor_pwm_tc);
-
 
     mck_freq = clk_get_rate(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
     printk(KERN_ALERT "mck_freq: %i\n", (unsigned int) mck_freq);
@@ -495,9 +441,9 @@ static int hardware_motor_pwm_init(void)
 
 	__raw_writel(ATMEL_TC_CLKEN, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));
 	__raw_writel(ATMEL_TC_SYNC, motor_pwm_tc->regs + ATMEL_TC_BCR);
-	__raw_writel(0x0025, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	__raw_writel(0x0025, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
-	__raw_writel(0x0049, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
+	__raw_writel(0x0042, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	__raw_writel(0x0042, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+	__raw_writel(0x0064, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
 
 	// disable irqs and start timer
 	__raw_writel(0xff, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, IDR));				// irq register
@@ -545,18 +491,13 @@ static int hardware_init(void)
     {
     int status = 0;
 
-    /*
-    #define INPUT_MOVER_SPEED_SENSOR_ACTIVE_STATE		ACTIVE_LOW
-    #define INPUT_MOVER_SPEED_SENSOR_PULLUP_STATE		PULLUP_ON
-    #define	INPUT_MOVER_SPEED_SENSOR_1 					AT91_PIN_PB0
-    #define	INPUT_MOVER_SPEED_SENSOR_2 					AT91_PIN_PB1
-     */
+    // de-assert the neg inputs to the h-bridge
+    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 
     // configure motor gpio for output and set initial output
-    at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);	// apply brake on start-up
-
-    at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 
     // TODO - add speed sensors
     if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_SENSOR_FRONT, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE, movement_sensor_front_int, "movement_sensor_front_int") == FALSE) 	||
@@ -578,6 +519,16 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
+	// de-assert the neg inputs to the h-bridge
+    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+
+	// de-assert the forward/reverse signals (pos signals to h-bridge)
+    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+
+    // change pwm back to gpio
+    at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 
 	free_irq(INPUT_MOVER_TRACK_SENSOR_FRONT, NULL);
 	free_irq(INPUT_MOVER_TRACK_SENSOR_REAR, NULL);
@@ -594,13 +545,6 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 static int hardware_movement_set(int movement)
     {
-/*
-    if (at91_get_gpio_value(PIN_MOVEMENT_EMERGENCY_STOP) == PIN_MOVEMENT_ACTIVE)
-    	{
-		printk(KERN_ALERT "%s - %s() : Cannot move target because of emergency stop.\n",TARGET_NAME, __func__);
-		return FALSE;
-		}
-*/
 	if ((movement == MOVER_DIRECTION_REVERSE) || (movement == MOVER_DIRECTION_FORWARD))
 		{
 		// TODO - check our sensors (and possibly the last command) to ensure that we can move in the requested direction
@@ -616,16 +560,6 @@ static int hardware_movement_set(int movement)
 		atomic_set(&moving_atomic, TRUE);
 
 		hardware_motor_on(movement);
-
-		if (movement == MOVER_DIRECTION_REVERSE)
-			{
-			atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_REVERSE);
-			}
-
-		if (movement == MOVER_DIRECTION_FORWARD)
-			{
-			atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
-			}
 
 		// notify user-space
 		schedule_work(&movement_work);
@@ -646,25 +580,6 @@ static int hardware_movement_set(int movement)
 static int hardware_movement_get(void)
     {
 	return atomic_read(&movement_atomic);
-/*
-    // check if an operation is in progress...
-    if (atomic_read(&moving_atomic))
-		{
-		return MOVER_MOVEMENT_MOVING;
-		}
-
-    if (at91_get_gpio_value(PIN_MOVEMENT_EMERGENCY_STOP) == PIN_MOVEMENT_ACTIVE)
-        {
-        return MOVER_MOVEMENT_EMERGENCY_STOP;
-        }
-
-    if (at91_get_gpio_value(PIN_MOVEMENT_END) == PIN_MOVEMENT_ACTIVE)
-        {
-        return MOVER_MOVEMENT_END;
-        }
-
-    return MOVER_MOVEMENT_STOPPED;
-*/
     }
 
 //---------------------------------------------------------------------------

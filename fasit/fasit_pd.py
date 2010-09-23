@@ -286,12 +286,14 @@ class QThread(Thread):
             data = None
         return data    
     
+    # called within the thread
     def write_out(self, data):
         try:
             self.out_q.put(data, True, 2)
         except (Queue.Full):
             self.logger.debug('write to OUT Q timed out, or Q was full')
     
+    # called within the thread
     def read_in(self):
         try:
             data = self.in_q.get_nowait()
@@ -1131,9 +1133,9 @@ class mover_thread(QThread):
             elif data == fasit_packet_pd.PD_MOVE_REVERSE:
                 self.logger.debug('mover reverse command')
                 self.send_command_and_wait("reverse")
-            elif data == fasit_packet_pd.PD_MOVE_STOP:
-                self.logger.debug('mover stop command')
-                self.send_command_and_wait("stop")
+#            elif data == fasit_packet_pd.PD_MOVE_STOP:
+#                self.logger.debug('mover stop command')
+#                self.send_command_and_wait("stop")
             elif data == "stop":
                 self.keep_going = False
                 self.logger.debug('...stopping')
@@ -1143,12 +1145,12 @@ class mover_thread(QThread):
         movement = os.read(self.fd, 32)
         os.close(self.fd)
         
-        movement = movement.rstrip()
-        self.logger.debug("Current movement: %s", movement)
-        if ((command != "stop") and (movement != "stopped")):
-            self.logger.debug("Cannot move target %s when target mover status is %s", command, movement)
-            # TODO - write an error code back to TRACR...
-            return
+#        movement = movement.rstrip()
+#        self.logger.debug("Current movement: %s", movement)
+#        if ((command != "stop") and (movement != "stopped")):
+#            self.logger.debug("Cannot move target %s when target mover status is %s", command, movement)
+#            # TODO - write an error code back to TRACR...
+#            return
 
         # write out the command...
         self.fd = os.open(self.movement_path,os.O_RDWR)
@@ -1157,12 +1159,14 @@ class mover_thread(QThread):
 
         # if there is an error, return (the error gets reported back by the function)
         # TODO - check if stopped?
-        movement = self.get_current_movement_thread(close_fd = True)
-        if  ((movement == "stopped") or (movement == "fault") or (movement == "error")):
-            #os.close(self.fd)
-            return
+#        movement = self.get_current_movement_thread(close_fd = True)
+#        if  ((movement == "stopped") or (movement == "fault")):
+#            self.logger.debug("stopped, fault, or error (%s)", movement)
+#            #os.close(self.fd)
+#            return
         
         keep_going = True
+        wait_for_stop = False
         while keep_going:
             data = self.read_in()
             
@@ -1172,9 +1176,13 @@ class mover_thread(QThread):
                 movement_fd = os.open(self.movement_path,os.O_RDONLY)
                 position_fd = os.open(self.position_path,os.O_RDONLY)
                 
-                # TODO - catch any changes here?
-                os.read(movement_fd, 32)
+                movement = os.read(movement_fd, 32)
                 os.read(position_fd, 32)
+                
+                self.logger.debug("RACE?: movement = %s", movement)
+                if (wait_for_stop == True):
+                    if((movement == "stopped\n") or (movement == "fault\n")):
+                        keep_going = False
                 
                 p = select.poll()
                 
@@ -1193,7 +1201,7 @@ class mover_thread(QThread):
                         self.logger.debug("Change in movement...")
 
                         movement = self.get_current_movement_thread(close_fd = True)
-                        if ((movement == "stopped") or (movement == "fault") or (movement == "error")):
+                        if ((movement == "stopped") or (movement == "fault")):
                             keep_going = False
                                             
                     elif (fd == position_fd):
@@ -1210,6 +1218,7 @@ class mover_thread(QThread):
                 self.fd = os.open( self.movement_path ,os.O_RDWR)
                 os.write(self.fd, "stop")
                 os.close(self.fd)
+                wait_for_stop = True
                     
             elif data == "stop":
                 self.logger.debug('mover thread stop command')
@@ -1277,6 +1286,74 @@ class FasitPdMit(FasitPd):
         self.__device_type__        = fasit_packet_pd.PD_TYPE_MIT
         
         self.__mover_thread__= mover_thread("infantry")
+        self.__mover_thread__.check_driver()
+            
+        # get current mover movement       
+        current_movement = self.__mover_thread__.get_current_movement() 
+        if (current_movement < 0):
+            self.__fault_code__ = abs(current_movement)   
+        else:
+            self.__move__ = current_movement
+            
+        self.__speed__ = self.__mover_thread__.get_setting_speed() 
+       
+        self.__mover_thread__.start()
+        
+    def stop_threads(self):
+        self.__mover_thread__.write("stop")
+        
+        if (self.__mover_thread__.isAlive()):
+            self.__mover_thread__.join()
+        
+    def move(self, direction = 0, movement = fasit_packet_pd.PD_MOVE_STOP, speed = 0):
+        FasitPd.move(self, direction, movement, speed)
+        self.__mover_thread__.set_setting_speed(speed)  
+        self.__mover_thread__.write(movement)
+        
+    def check_for_updates(self):
+        check_for_updates_status = False
+                   
+        # check the mover thread
+        mover_status = 0
+        mover_status = self.__mover_thread__.read()
+        if (mover_status != None):
+            if (mover_status < 0):
+                mover_status = abs(mover_status)
+                self.logger.debug("move error %d", mover_status)
+                self.__fault_code__ = mover_status
+                check_for_updates_status = True
+                self.__move_needs_update__ = True
+                
+            elif (mover_status == "position"):
+                new_position = self.__mover_thread__.read()
+                self.logger.debug("position update %d", new_position)
+                if (new_position != self.__position__):
+                    self.__position__ = new_position
+                    check_for_updates_status = True
+                    self.__move_needs_update__ = True
+                 
+            elif (mover_status != self.__move__):
+                self.logger.debug("Change in move status %d", mover_status)
+                self.__move__ = mover_status
+                check_for_updates_status = True
+                self.__move_needs_update__ = True
+                
+        return check_for_updates_status   
+ 
+    
+#------------------------------------------------------------------------------------
+#
+#------------------------------------------------------------------------------------          
+class FasitPdMat(FasitPd):
+                        
+    def __init__(self):
+        FasitPd.__init__(self)
+        self.logger = logging.getLogger('FasitPdMat')
+       
+        self.__device_id__          = uuid.getnode()
+        self.__device_type__        = fasit_packet_pd.PD_TYPE_MIT
+        
+        self.__mover_thread__= mover_thread("armor")
         self.__mover_thread__.check_driver()
             
         # get current mover movement       

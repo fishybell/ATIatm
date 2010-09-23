@@ -23,7 +23,7 @@
 #define HIT_SENSOR_MODE_BURST    		1
 
 #define SAMPLE_COUNT_MAX_DEFAULT 		50
-#define SAMPLE_PERIOD_IN_MS_DEFAULT 	4
+#define SAMPLE_PERIOD_IN_MS_DEFAULT 	2
 
 //---------------------------------------------------------------------------
 // Keep track settings

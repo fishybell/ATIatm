@@ -26,6 +26,7 @@ class FasitClient(FasitHandler):
         if ((type != fasit_packet_pd.PD_TYPE_NONE) and 
             (type != fasit_packet_pd.PD_TYPE_SIT) and
             (type != fasit_packet_pd.PD_TYPE_MIT) and
+            (type != fasit_packet_pd.PD_TYPE_MAT) and
             (type != fasit_packet_pd.PD_TYPE_SES)):
             raise ValueError('NONE, SIT, MIT and SES are only currently supported target types')
         
@@ -45,10 +46,12 @@ class FasitClient(FasitHandler):
             else:
                 self.logger.debug('Local connection specified')
                 self.__device__ = fasit_pd.FasitPdMit()
+        elif (type == fasit_packet_pd.PD_TYPE_MAT):
+            self.__device__ = fasit_pd.FasitPdMat()
         elif (type == fasit_packet_pd.PD_TYPE_SES):
             self.__device__ = fasit_pd.FasitPdSes()
         else:
-            raise ValueError('NONE, SIT, MIT and SES are only currently supported target types')
+            raise ValueError('NONE, SIT, MIT, MAT and SES are only currently supported target types')
             
         FasitHandler.__init__(self, sock=self.sock, name='FasitClient')
     
