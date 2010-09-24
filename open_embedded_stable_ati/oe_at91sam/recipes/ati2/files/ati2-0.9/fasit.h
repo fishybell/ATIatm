@@ -1,10 +1,12 @@
 #ifndef _FASIT_H_
 #define _FASIT_H_
 
-#include "bits/types.h"
+#include <sys/epoll.h>
+#include <bits/types.h>
 #include <map>
 
 #define UNASSIGNED 0x0000
+#define BAD_TNUM 0x5000
 #define BASE_STATION 0xffff
 
 // generic base class for parsing and generating FASIT protocol messages
@@ -19,6 +21,10 @@ public :
    static __uint32_t crc32(void *buf, int start, int end); // create a 32 bit crc for the given buffer
    static __uint8_t crc8(void *buf, int start, int end); // create an 8 bit crc for the given buffer
    static int parity(void *buf, int size); // create a single parity bit for the given buffer
+
+   static __uint64_t swap64(__uint64_t s); // swap the byte order to switch between network and host modes
+
+   virtual int handleReady(epoll_event *ev) = 0; // called when either ready to read or write; returns -1 if needs to be deleted afterwards
 
 protected :
    void addToBuffer(int rsize, char *rbuf); // appends data to read buffer
@@ -406,5 +412,19 @@ typedef struct ATI_16005 {
    __uint8_t  broadcast:1 PCKD8;
    __uint8_t  channel:7 PCKD8;
 } ATI_16005;
+
+/********************************************/
+/* 16006 - Close Connection                 */
+/********************************************/
+typedef struct ATI_16006 {
+   __uint16_t dest PCKD;
+} ATI_16006;
+
+/********************************************/
+/* 16007 - Heartbeat                        */
+/********************************************/
+typedef struct ATI_16007 {
+   __uint8_t sequence PCKD8;
+} ATI_16007;
 
 #endif
