@@ -106,35 +106,43 @@ FUNCTION_START("::handleWrite(epoll_event *ev)")
    int sec = delay / 1000;
    int nows, nowm; // current time in seconds and milliseconds
    timeNow(&nows, &nowm);
-   int diff = nowm - ((nows - last_time_s) * 1000 + last_time_m); // time differential in milliseconds
+   int diff = ((nows - last_time_s) * 1000) + (nowm - last_time_m); // time differential in milliseconds
 
    // wsize is 0, need to adjust epoll and return
    if (wsize <= 0) {
       return Connection::handleWrite(ev);
    }
 
+DMSG("Sec: %i, MinDelay: %i, MaxDelay: %i, Diff: %i\n", sec, delay, mdelay, diff);
    // have we reached our allotted time?
-   if (delay > diff) {
+   if (delay <= diff) {
       // are we past our allotted time?
-      if (diff >= mdelay) {
-         if (retries > 2) {
-            // too many retries, delay a random amount of time one last time so as to not send at the same time as other radios
-            timespec ts;
-            ts.tv_sec = 0;
-            ts.tv_nsec = rand() % 20000; // 20 millisecond max delay
-            nanosleep(&ts, NULL);
-FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
-            return 0; // wait again to make sure the device is ready for writing
-         } else if (retries > 3) {
+      if (mdelay > 0 && diff >= mdelay) {
+         if (retries > 3) {
+DMSG("retry way too many times: %i\n", retries)
             // too many retries, send everything now come hell or high water
             resetDelay();
             int ret = Connection::handleWrite(ev);
 FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
             return ret;
+         } else if (retries > 2) {
+DMSG("retry too many times: %i\n", retries)
+            // too many retries, delay a random amount of time one last time so as to not send at the same time as other radios
+            if (diff - mdelay > 30) {
+               timespec ts;
+               ts.tv_sec = 0;
+               ts.tv_nsec = rand() % 20000; // 20 millisecond max delay
+               nanosleep(&ts, NULL);
+            }
+            retries++;
+FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
+            return 0; // wait again to make sure the device is ready for writing
          } else {
+ DMSG("retry later: %i\n", retries)
             // retry again at our next slot
+            int space = mdelay - delay;
             delay = mdelay + rdelay;
-            mdelay += rdelay + (mdelay - delay);
+            mdelay = delay + space;
             retries++;
 FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
             return 0;
@@ -161,8 +169,9 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
             delete [] tbuf;
 
             // set the next time to send
+            int space = mdelay - delay;
             delay = mdelay + rdelay;
-            mdelay += rdelay + (mdelay - delay);
+            mdelay = delay + space;
 
             // did we max out the radio's buffer?
             if (charMax == 256) {
@@ -187,6 +196,7 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
       }
    }
 
+DMSG("%i - %i < %i || (%i - %i == %i && %i > 1)\n", nows, last_time_s, sec, nows, last_time_s, sec, sec);
    // the time has not yet come, we should spend most of it sleeping
    if (nows - last_time_s < sec || (nows - last_time_s == sec && sec > 1)) {
       // at least two second delay, sleep for one second and return to fight again later
@@ -209,10 +219,12 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
 FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
          return 0;
       } else {
-         // the time is now very soon, sleep all but 2 milliseconds and return to fight again later
-         // the 2 milliseconds is so epoll has enough time to re-poll the device (the radio may stop being ready)
-         ts.tv_nsec = (rest-2) * 1000; // 1000 nanoseconds per millisecond
-         nanosleep(&ts, NULL);
+         // the time is now very soon, sleep all but 10 milliseconds and return to fight again later
+         // the 10 milliseconds is so epoll has enough time to re-poll the device (the radio may stop being ready)
+         ts.tv_nsec = (rest-10) * 1000; // 1000 nanoseconds per millisecond
+         if (rest > 10) {
+            nanosleep(&ts, NULL);
+         }
 FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
          return 0;
       }
@@ -250,6 +262,7 @@ FUNCTION_END("::timeNow(int *sec, int *msec)")
 void SerialConnection::addDelay(int delay) {
 FUNCTION_START("::addDelay(int delay)")
    this->delay += delay;
+   this->mdelay += delay;
 FUNCTION_END("::addDelay(int delay)")
 }
 
