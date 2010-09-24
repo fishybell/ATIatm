@@ -5,6 +5,7 @@ using namespace std;
 #include "common.h"
 #include "timeout.h"
 #include <sys/time.h>
+#include <arpa/inet.h>
 
 // initialize static members
 list<ATI_2100m> FASIT_TCP::commandList;
@@ -12,7 +13,7 @@ multimap<ATI_2100m, int, struct_comp<ATI_2100m> > FASIT_TCP::commandMap;
 
 FASIT_TCP::FASIT_TCP(int fd) : Connection(fd) {
 FUNCTION_START("::FASIT_TCP(int fd) : Connection(fd)")
-   seq = 0;
+   seq = needDelete = 0;
 
    // new connection, send new connection message over serial
    ATI_16003 msg;
@@ -28,14 +29,28 @@ FUNCTION_END("::FASIT_TCP(int fd) : Connection(fd)")
 // special case constructor where we already know the target number
 FASIT_TCP::FASIT_TCP(int fd, int tnum) : Connection(fd) {
 FUNCTION_START("::FASIT_TCP(int fd, int tnum) : Connection(fd)")
-   seq = 0;
+   seq = needDelete = 0;
 
    setTnum(tnum);
 FUNCTION_END("::FASIT_TCP(int fd, int tnum) : Connection(fd)")
 }
 
+// called when either ready to read or write; returns -1 if needs to be deleted afterwards
+int FASIT_TCP::handleReady(epoll_event *ev) {
+HERE
+   return Connection::handleReady(ev);
+}
+
 FASIT_TCP::~FASIT_TCP() {
 FUNCTION_START("::~FASIT_TCP()")
+
+   // disconnecting, tell the other side of the radio connection
+   ATI_16006 msg;
+   msg.dest = tnum; // send to myself
+   ATI_header hdr = createHeader(16006, tnum, &msg, sizeof(ATI_16006));
+   SerialConnection::queueMsgAll(&hdr, sizeof(ATI_header));
+   SerialConnection::queueMsgAll(&msg, sizeof(ATI_16006));
+
 FUNCTION_END("::~FASIT_TCP()")
 }
 
@@ -45,6 +60,10 @@ FUNCTION_END("::~FASIT_TCP()")
 int FASIT_TCP::parseData(int size, char *buf) {
 FUNCTION_START("::parseData(int size, char *buf)")
    IMSG("TCP %i read %i bytes of data\n", fd, size)
+
+   if (needDelete) { // have we been marked for deletion?
+      return -1; // -1 represents a "delete me" flag
+   }
 
    addToBuffer(size, buf);
 
@@ -79,7 +98,8 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0)
 }
 
 // macro used in validMessage function to check just the message length field of the header and call it good
-#define CHECK_LENGTH(FASIT_NUM) case FASIT_NUM : if (hdr.length != hl + sizeof( FASIT_ ## FASIT_NUM )) { break; }; if (hdr.length > (rsize - *start)) { break; }; return hdr.num; break;
+#define END_CHECKS DMSG("%i from %i to %i\n", hdr.num, *start, *end) return hdr.num; break;
+#define CHECK_LENGTH(FASIT_NUM) case FASIT_NUM : if (hdr.length != hl + sizeof( FASIT_ ## FASIT_NUM )) { break; }; if (hdr.length > (rsize - *start)) { break; }; END_CHECKS; break;
 
 // the start and end values may be set even if no valid message is found
 int FASIT_TCP::validMessage(int *start, int *end) {
@@ -123,26 +143,34 @@ FUNCTION_START("::validMessage(int *start, int *end)")
       }
 
       /* look for FASIT message */
-      if (*start < (rsize - sizeof(FASIT_header))) {
+      if (*start > (rsize - sizeof(FASIT_header))) {
          // if not big enough to hold a full message header don't look for a valid FASIT message
+TMSG("too short: %i > (%i - %i)\n", *start, rsize, sizeof(FASIT_header))
          *start = *start + 1;
          continue;
       }
       FASIT_header hdr;
       int hl = sizeof(FASIT_header); // keep for later
-      memcpy(&hdr, rbuf +*start, hl);
-      if (hdr.icd1 > 2) { *start++; continue; }    // invalid icd major version number
-      if (hdr.icd2 > 1) { *start++; continue; }    // invalid icd minor version number
-      if (hdr.rsrvd != 0) { *start++; continue; }   // invalid reserved field
-      if (hdr.length < hl) { *start++; continue; } // invalid message length
+      memcpy(&hdr, rbuf + *start, hl);
+      // convert header from network byte order to host byte order
+      hdr.num = ntohs(hdr.num);
+      hdr.icd1 = ntohs(hdr.icd1);
+      hdr.icd2 = ntohs(hdr.icd2);
+      hdr.seq = ntohl(hdr.seq);
+      hdr.rsrvd = ntohl(hdr.rsrvd);
+      hdr.length = ntohs(hdr.length);
+      if (hdr.icd1 > 2) { *start = *start + 1; continue; }    // invalid icd major version number
+      if (hdr.icd2 > 1) { *start = *start + 1; continue; }    // invalid icd minor version number
+      if (hdr.rsrvd != 0) { *start = *start + 1; continue; }   // invalid reserved field
+      if (hdr.length < hl) { *start = *start + 1; continue; } // invalid message length
       *end = *start + hdr.length;
       switch (hdr.num) {
          case 100:          // just look at header length
             if (hdr.length != hl) { break; } // invalid message length
-            return hdr.num;
+            END_CHECKS;
          case 2006:         // don't check against length of FASIT_2006 struct
             if (hdr.length > (rsize - *start)) { break; } // have the beginning of a valid message
-            return hdr.num;
+            END_CHECKS;
          // these ones just look at msg length
          CHECK_LENGTH (2000)
          CHECK_LENGTH (2004)
@@ -159,6 +187,7 @@ FUNCTION_START("::validMessage(int *start, int *end)")
          default:      // not a valid number, not a valid header
             break;
       }
+
       *start = *start + 1;
    }
 FUNCTION_INT("::validMessage(int *start, int *end)", 0)
@@ -176,8 +205,8 @@ FUNCTION_START("::getResponse(int mnum)")
    rIt = respMap.find(mnum);
    if (rIt != respMap.end()) {
       // use last remembered response for this message number
-      resp.rnum = mnum;
-      resp.rseq = rIt->second;
+      resp.rnum = htons(mnum);
+      resp.rseq = htonl(rIt->second);
 
       // this is a one shot deal, delete it now
       respMap.erase(rIt);
@@ -203,7 +232,7 @@ FUNCTION_START("::handle_100(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
 
    // remember sequence for this connection
-   seqForResp(100, hdr->seq);
+   seqForResp(100, ntohl(hdr->seq));
 
    // discombobulate to radio message
    ATI_100 rmsg;
@@ -225,7 +254,7 @@ FUNCTION_START("::handle_2000(int start, int end)")
    FASIT_2000 *msg = (FASIT_2000*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2000, hdr->seq);
+   seqForResp(2000, ntohl(hdr->seq));
 
    // discombobulate to radio message
    ATI_2000 rmsg;
@@ -248,7 +277,7 @@ FUNCTION_START("::handle_2004(int start, int end)")
    FASIT_2004 *msg = (FASIT_2004*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2004, hdr->seq);
+   seqForResp(2004, ntohl(hdr->seq));
 
    // discombobulate to radio message
    ATI_2004 rmsg;
@@ -270,21 +299,22 @@ FUNCTION_START("::handle_2005(int start, int end)")
    FASIT_2005 *msg = (FASIT_2005*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2005, hdr->seq);
+   seqForResp(2005, ntohl(hdr->seq));
 
    // determine if we only need to send the last 3 bytes of the device id
    bool isShort = false;
-   __uint64_t devid = msg->body.devid;
+   __uint64_t devid = swap64(msg->body.devid);
    devid = (devid >> 24) & 0xffffff;
    isShort = (devid == (ATI_MAC1 << 16) | (ATI_MAC2 << 8) | (ATI_MAC3));
+   devid = swap64(msg->body.devid);
    
    // discombobulate to radio message
    if (isShort) {
       ATI_2005s rmsg;
       rmsg.flags = msg->body.flags;
-      rmsg.mac[0] = ((msg->body.devid & ((__uint64_t)0xff << 16)) >> 16);
-      rmsg.mac[1] = ((msg->body.devid & ((__uint64_t)0xff << 8)) >> 8);
-      rmsg.mac[2] = (msg->body.devid & ((__uint64_t)0xff));
+      rmsg.mac[0] = ((devid & ((__uint64_t)0xff << 16)) >> 16);
+      rmsg.mac[1] = ((devid & ((__uint64_t)0xff << 8)) >> 8);
+      rmsg.mac[2] = (devid & ((__uint64_t)0xff));
       ATI_header rhdr = createHeader(2005, tnum, &rmsg, sizeof(ATI_2005s)); // source is this connection
 
       // send message on all serial devices
@@ -293,12 +323,12 @@ FUNCTION_START("::handle_2005(int start, int end)")
    } else {
       ATI_2005f rmsg;
       rmsg.flags = msg->body.flags;
-      rmsg.mac[0] = ((msg->body.devid & ((__uint64_t)0xff << 40)) >> 40);
-      rmsg.mac[1] = ((msg->body.devid & ((__uint64_t)0xff << 32)) >> 32);
-      rmsg.mac[2] = ((msg->body.devid & ((__uint64_t)0xff << 24)) >> 24);
-      rmsg.mac[3] = ((msg->body.devid & ((__uint64_t)0xff << 16)) >> 16);
-      rmsg.mac[4] = ((msg->body.devid & ((__uint64_t)0xff << 8)) >> 8);
-      rmsg.mac[5] = (msg->body.devid & ((__uint64_t)0xff));
+      rmsg.mac[0] = ((devid & ((__uint64_t)0xff << 40)) >> 40);
+      rmsg.mac[1] = ((devid & ((__uint64_t)0xff << 32)) >> 32);
+      rmsg.mac[2] = ((devid & ((__uint64_t)0xff << 24)) >> 24);
+      rmsg.mac[3] = ((devid & ((__uint64_t)0xff << 16)) >> 16);
+      rmsg.mac[4] = ((devid & ((__uint64_t)0xff << 8)) >> 8);
+      rmsg.mac[5] = (devid & ((__uint64_t)0xff));
       ATI_header rhdr = createHeader(2005, tnum, &rmsg, sizeof(ATI_2005f)); // source is this connection
 
       // send message on all serial devices
@@ -317,10 +347,10 @@ FUNCTION_START("::handle_2006(int start, int end)")
    FASIT_2006 *msg = (FASIT_2006*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2006, hdr->seq);
+   seqForResp(2006, ntohl(hdr->seq));
 
    // remember zone data
-   int znum = msg->body.zones;
+   int znum = ntohs(msg->body.zones);
    FASIT_2006z *zone = (FASIT_2006z*)(rbuf + start + sizeof(FASIT_header) + sizeof(FASIT_2006));
    while (znum--) {
       zones.push_back(*zone);
@@ -347,7 +377,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
    FASIT_2100 *msg = (FASIT_2100*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2100, hdr->seq);
+   seqForResp(2100, ntohl(hdr->seq));
 
    // make sure we map this destination
    ATI_2100m cmd;
@@ -357,7 +387,8 @@ FUNCTION_START("::handle_2100(int start, int end)")
       // add command to the static list
       commandList.push_back(cmd);
    }
-   commandMap.insert(pair<ATI_2100m,int>(cmd,this->tnum-1)); // destination is this connection (convert tnum to zero based)
+   commandMap.insert(pair<ATI_2100m,int>(cmd,this->tnum - 1)); // destination is this connection (convert tnum to zero based)
+DMSG("sending hit configuration: %i %i %i %i %i\n", cmd.embed.on, cmd.embed.react, cmd.embed.sens, cmd.embed.mode, cmd.embed.burst)
 
    // check timeout timer
    if (Timeout::timedOut() == -1) {
@@ -387,6 +418,7 @@ FUNCTION_INT("::handle_2100(int start, int end)", 0)
 void FASIT_TCP::Bake_2100() {
 FUNCTION_START("::Bake_2100()")
    ATI_2100 destinations;
+   memset(&destinations, 0, sizeof(ATI_2100));
    ATI_2100m messages[4];
    memset(&messages, 0, sizeof(ATI_2100m) * 4);
 
@@ -417,20 +449,26 @@ FUNCTION_START("::Bake_2100()")
 
       // find all destinations for this command
       if (mnum == 0) {
+DMSG("adding first message:\n")
+PRINT_HEX(*cIt)
          // first message, fill in main destination list
          for (multimap<ATI_2100m, int, struct_comp<ATI_2100m> >::iterator mIt = ppp.first; mIt != ppp.second; mIt++) {
-            int index = 150 - ((*mIt).second/8); // inverse index in list to maintain destinations as a 1200-bit big endian bit field
+            int index = 149 - ((*mIt).second/8); // inverse index in list to maintain destinations as a 1200-bit big endian bit field
             destinations.dest[index] |= (1 << ((*mIt).second % 8)); // set individual bit
+DMSG("adding bit for tnum %i at index %i bit %i: %02x\n", (*mIt).second, index, ((*mIt).second % 8), destinations.dest[index])
          }
 
          // add to message list
          messages[mnum] = *cIt;
       } else {
+DMSG("adding secondary message\n")
+PRINT_HEX(*cIt)
          // not first message, fill in a secondary destination list
          ATI_2100 sdests;
          for (multimap<ATI_2100m, int, struct_comp<ATI_2100m> >::iterator mIt = ppp.first; mIt != ppp.second; mIt++) {
-            int index = 150 - ((*mIt).second/8); // inverse index in list to maintain destinations as a 1200-bit big endian bit field
+            int index = 149 - ((*mIt).second/8); // inverse index in list to maintain destinations as a 1200-bit big endian bit field
             sdests.dest[index] |= (1 << ((*mIt).second % 8)); // set individual bit
+DMSG("adding bit for tnum %i at index %i bit %i: %02x\n", (*mIt).second, index, ((*mIt).second % 8), destinations.dest[index])
          }
  
          // compare the two lists
@@ -450,6 +488,8 @@ FUNCTION_START("::Bake_2100()")
          // add to message list if the main destination list is just a subset of the secondary list
          if (subset) {
             messages[mnum] = *cIt;
+         } else {
+            mnum--; // try to fill this message slot with a different message
          }
       }
 
@@ -570,6 +610,7 @@ FUNCTION_START("::Bake_2100()")
    hdr.length |= 0x08;
 
    // recalculate parity for header
+   hdr.parity = 0;
    hdr.parity = parity(&hdr, sizeof(ATI_header)) ^ parity(&destinations, 10);
 
    // combine and crc
@@ -597,7 +638,7 @@ FUNCTION_START("::handle_2101(int start, int end)")
    FASIT_2101 *msg = (FASIT_2101*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2101, hdr->seq);
+   seqForResp(2101, ntohl(hdr->seq));
 
    // discombobulate to radio message
    ATI_header rhdr;
@@ -639,21 +680,23 @@ FUNCTION_START("::handle_2111(int start, int end)")
    FASIT_2111 *msg = (FASIT_2111*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2111, hdr->seq);
+   seqForResp(2111, ntohl(hdr->seq));
 
    // determine if we only need to send the last 3 bytes of the device id
    bool isShort = false;
-   __uint64_t devid = msg->body.devid;
+   __uint64_t devid = swap64(msg->body.devid);
    devid = (devid >> 24) & 0xffffff;
    isShort = (devid == (ATI_MAC1 << 16) | (ATI_MAC2 << 8) | (ATI_MAC3));
+   devid = swap64(msg->body.devid);
    
    // discombobulate to radio message
+DMSG("sending %s version of 2111\n", isShort ? "short" : "long")
    if (isShort) {
       ATI_2111s rmsg;
       rmsg.flags = msg->body.flags;
-      rmsg.mac[0] = ((msg->body.devid & (0xff << 16)) >> 16);
-      rmsg.mac[1] = ((msg->body.devid & (0xff << 8)) >> 8);
-      rmsg.mac[2] = (msg->body.devid & (0xff));
+      rmsg.mac[0] = ((devid & (0xff << 16)) >> 16);
+      rmsg.mac[1] = ((devid & (0xff << 8)) >> 8);
+      rmsg.mac[2] = (devid & (0xff));
       ATI_header rhdr = createHeader(2111, tnum, &rmsg, sizeof(ATI_2111s)); // source is this connection
 
       // send message on all serial devices
@@ -662,12 +705,12 @@ FUNCTION_START("::handle_2111(int start, int end)")
    } else {
       ATI_2111f rmsg;
       rmsg.flags = msg->body.flags;
-      rmsg.mac[0] = ((msg->body.devid & ((__uint64_t)0xff << 40)) >> 40);
-      rmsg.mac[1] = ((msg->body.devid & ((__uint64_t)0xff << 32)) >> 32);
-      rmsg.mac[2] = ((msg->body.devid & ((__uint64_t)0xff << 24)) >> 24);
-      rmsg.mac[3] = ((msg->body.devid & ((__uint64_t)0xff << 16)) >> 16);
-      rmsg.mac[4] = ((msg->body.devid & ((__uint64_t)0xff << 8)) >> 8);
-      rmsg.mac[5] = (msg->body.devid & ((__uint64_t)0xff));
+      rmsg.mac[0] = ((devid & ((__uint64_t)0xff << 40)) >> 40);
+      rmsg.mac[1] = ((devid & ((__uint64_t)0xff << 32)) >> 32);
+      rmsg.mac[2] = ((devid & ((__uint64_t)0xff << 24)) >> 24);
+      rmsg.mac[3] = ((devid & ((__uint64_t)0xff << 16)) >> 16);
+      rmsg.mac[4] = ((devid & ((__uint64_t)0xff << 8)) >> 8);
+      rmsg.mac[5] = (devid & ((__uint64_t)0xff));
       ATI_header rhdr = createHeader(2111, tnum, &rmsg, sizeof(ATI_2111f)); // source is this connection
 
       // send message on all serial devices
@@ -686,7 +729,7 @@ FUNCTION_START("::handle_2102(int start, int end)")
    FASIT_2102 *msg = (FASIT_2102*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2102, hdr->seq);
+   seqForResp(2102, ntohl(hdr->seq));
 
    // do we need to create the extended message as well?
    bool shortOnly = true;
@@ -696,8 +739,8 @@ FUNCTION_START("::handle_2102(int start, int end)")
    rmsg.pstatus = msg->body.pstatus;
    rmsg.type = msg->body.type;
    if (rmsg.type != msg->body.type) { shortOnly = false; } // check that the 3 bits allocated were enough
-   rmsg.pos = msg->body.pos;
-   if (rmsg.pos != msg->body.pos) { shortOnly = false; } // check that the 10 bits allocated were enough
+   rmsg.pos = ntohs(msg->body.pos);
+   if (rmsg.pos != ntohs(msg->body.pos)) { shortOnly = false; } // check that the 10 bits allocated were enough
    switch (msg->body.exp) {
       case 0 : rmsg.exp = 0; break;
       case 45 : rmsg.exp = 1; break;
@@ -715,11 +758,14 @@ FUNCTION_START("::handle_2102(int start, int end)")
    }
    rmsg.speed = static_cast<__uint16_t> (msg->body.speed * 100);
    if (rmsg.speed != static_cast<__uint16_t> (msg->body.speed * 100)) { shortOnly = false; } // check that the 12 bits allocated were enough
-   rmsg.hit = msg->body.hit;
-   if (rmsg.hit != msg->body.hit) { shortOnly = false; } // check that the 12 bits allocated were enough
+   rmsg.hit = ntohs(msg->body.hit);
+   if (rmsg.hit != ntohs(msg->body.hit)) { shortOnly = false; } // check that the 12 bits allocated were enough
    if (memcmp(&msg->body.hit_conf, &hitReq, sizeof(hitReq)) != 0) {
       shortOnly = false;
+DMSG("orig: %i %i %i %i %i\n", hitReq.on, hitReq.react, hitReq.sens, hitReq.mode, hitReq.burst)
+DMSG("new: %i %i %i %i %i\n", msg->body.hit_conf.on, msg->body.hit_conf.react, msg->body.hit_conf.sens, msg->body.hit_conf.mode, msg->body.hit_conf.burst)
    }
+DMSG("short 2102? %s\n", shortOnly ? "yes" : "no")
    ATI_header rhdr = createHeader(2102, tnum, &rmsg, sizeof(ATI_2102)); // source is this connection
 
    // doe we need to send extended message?
@@ -747,6 +793,20 @@ FUNCTION_INT("::handle_2102(int start, int end)", 0)
    return 0;
 }
 
+FASIT_2102h FASIT_TCP::getHitReq() {
+FUNCTION_START("::getHitReq()")
+   // when this is used, it needs to be in network byte order
+   FASIT_2102h hitr;
+   hitr.on = hitReq.on;
+   hitr.react = hitReq.react;
+   hitr.tokill = htons(hitReq.tokill);
+   hitr.sens = htons(hitReq.sens);
+   hitr.mode = hitReq.mode;
+   hitr.burst = htons(hitReq.burst);
+FUNCTION_HEX("::getHitReq()", &hitr)
+   return hitr;
+}
+
 int FASIT_TCP::handle_2114(int start, int end) {
 FUNCTION_START("::handle_2114(int start, int end)")
    // map header and message
@@ -754,7 +814,7 @@ FUNCTION_START("::handle_2114(int start, int end)")
    FASIT_2114 *msg = (FASIT_2114*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2114, hdr->seq);
+   seqForResp(2114, ntohl(hdr->seq));
 
    // discombobulate to radio message
    ATI_2114 rmsg;
@@ -777,7 +837,7 @@ FUNCTION_START("::handle_2115(int start, int end)")
    FASIT_2115 *msg = (FASIT_2115*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2115, hdr->seq);
+   seqForResp(2115, ntohl(hdr->seq));
 
    // discombobulate to radio message
    ATI_2115 rmsg;
@@ -799,7 +859,7 @@ FUNCTION_START("::handle_2110(int start, int end)")
    FASIT_2110 *msg = (FASIT_2110*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2110, hdr->seq);
+   seqForResp(2110, ntohl(hdr->seq));
 
    // discombobulate to radio message
    ATI_2110 rmsg;
@@ -822,7 +882,7 @@ FUNCTION_START("::handle_2112(int start, int end)")
    FASIT_2112 *msg = (FASIT_2112*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2112, hdr->seq);
+   seqForResp(2112, ntohl(hdr->seq));
 
    // discombobulate to radio message
    ATI_2112 rmsg;
@@ -844,7 +904,7 @@ FUNCTION_START("::handle_2113(int start, int end)")
    FASIT_2113 *msg = (FASIT_2113*)(rbuf + start + sizeof(FASIT_header));
 
    // remember sequence for this connection
-   seqForResp(2113, hdr->seq);
+   seqForResp(2113, ntohl(hdr->seq));
 
    // discombobulate to radio message
    ATI_2113 rmsg;
