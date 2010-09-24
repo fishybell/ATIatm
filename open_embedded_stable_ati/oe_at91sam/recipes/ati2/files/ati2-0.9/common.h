@@ -35,6 +35,7 @@
 #define FUNCTION_HEX(arg, ret) TRACE && printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__);
 #define FUNCTION_STR(arg, ret) TRACE && printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__);
 #define HERE TRACE && printf("TRACE: Here! %s %i\n", __FILE__, __LINE__);
+#define TMSG(...) TRACE && printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); TRACE && printf(__VA_ARGS__);
 #else
 #define FUNCTION_START(arg)
 #define FUNCTION_END(arg)
@@ -42,20 +43,22 @@
 #define FUNCTION_HEX(arg, ret)
 #define FUNCTION_STR(arg, ret)
 #define HERE
+#define TMSG(...)
 #endif
 
 // for run time debugging of application
 #ifdef DEBUG
 #define PRINT_HEXB(data, size) DEBUG && ({ \
         printf("DEBUG: 0x"); \
+        char *_data = (char*)data; \
         for (int _i=0; _i<size; _i++) { \
-           printf("%02x", data[_i]); \
+           printf("%02x", (__uint8_t)_data[_i]); \
         } \
         printf(" in %s at line %i\n", __FILE__, __LINE__); \
         });
-#define PRINT_HEX(arg) PRINT_HEXB(arg, sizeof(arg))
+#define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
 #define BLIP DEBUG && printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__);
-#define DMSG(...) INFO && printf("DEBUG: " __VA_ARGS__);
+#define DMSG(...) DEBUG && printf("DEBUG: " __VA_ARGS__);
 #else
 #define PRINT_HEXB(data, size)
 #define PRINT_HEX(arg)
