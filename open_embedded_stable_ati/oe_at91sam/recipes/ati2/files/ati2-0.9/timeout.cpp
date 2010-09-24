@@ -4,6 +4,12 @@ using namespace std;
 #include "fasit_tcp.h"
 #include <sys/time.h>
 
+// disable tracing for now
+#ifdef TRACE
+#undef TRACE
+#define TRACE 0
+#endif
+
 // initialize static members
 timeval Timeout::g_startTime;
 timeval Timeout::g_maxTime;
@@ -41,24 +47,34 @@ timeval Timeout::getTimeout() {
 FUNCTION_START("::getTimeout()")
    // subtract current time from max time to acquire the timeout value
    timeval timeout;
-   gettimeofday(&timeout, NULL);
 
-   // subtract seconds straight out
-   timeout.tv_sec = g_maxTime.tv_sec - timeout.tv_sec;
+   // do we have a timeout ?
+   if (timedOut() != -1) {
+      gettimeofday(&timeout, NULL);
 
-   // subtract microseconds, possibly "carrying the one"
-   if (g_maxTime.tv_usec < timeout.tv_usec) {
-      // we need to carry
-      timeout.tv_usec -= g_maxTime.tv_usec;
-      timeout.tv_sec--;
+      // subtract seconds straight out
+      timeout.tv_sec = g_maxTime.tv_sec - timeout.tv_sec;
+
+      // subtract microseconds, possibly "carrying the one"
+      if (g_maxTime.tv_usec < timeout.tv_usec) {
+         // we need to carry
+         timeout.tv_usec -= g_maxTime.tv_usec;
+         timeout.tv_sec--;
+      } else {
+         // we don't need to carry
+         timeout.tv_usec = g_maxTime.tv_usec - timeout.tv_usec;
+      }
    } else {
-      // we don't need to carry
-      timeout.tv_usec = g_maxTime.tv_usec - timeout.tv_usec;
+      timeout.tv_sec = timeout.tv_usec = 0;
    }
 
-   // can't have a negative timeout
-   if (timeout.tv_sec < 0) { timeout.tv_sec = 0; }
-FUNCTION_END("::getTimeout()")
+   // can't have a negative timeout, this means we've finished : create a 1 microsecond timeout
+   if (timeout.tv_sec < 0) {
+      timeout.tv_sec = 0;
+      timeout.tv_usec = 1;
+   }
+FUNCTION_HEX("::getTimeout()", &timeout)
+   return timeout;
 }
 
 // non globally accessible functions follow
