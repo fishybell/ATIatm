@@ -12,6 +12,8 @@ public :
    virtual ~FASIT_Serial();
    int parseData(int size, char *buf); // returns -1 if needs to be deleted afterwards
    virtual int validMessage(int *start, int* end); // does the buffer contain valid data? message number on yes, 0 on no; sets start and end for where in the buffer it is
+
+   virtual int handleReady(epoll_event *ev); // called when either ready to read or write; returns -1 if needs to be deleted afterwards
    
 private :
    static void defHeader(int mnum, FASIT_header *fhdr); // sets the message number, correct ICD major and minor version numbers, and reserved for the given message number
@@ -42,6 +44,8 @@ private :
    int handle_16003(int start, int end);
    int handle_16004(int start, int end);
    int handle_16005(int start, int end);
+   int handle_16006(int start, int end);
+   int handle_16007(int start, int end);
 
    // for commands 2101, 43061, and 47157
    int handle_as_2101(struct FASIT_2101b bmsg, class FASIT_TCP *tcp);
