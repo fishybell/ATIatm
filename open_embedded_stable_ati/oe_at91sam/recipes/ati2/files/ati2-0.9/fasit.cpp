@@ -3,6 +3,18 @@ using namespace std;
 #include "fasit.h"
 #include "common.h"
 
+// disable DEBUG
+#ifdef DEBUG
+#undef DEBUG
+#define DEBUG 0
+#endif
+
+// disable TRACE
+#ifdef TRACE
+#undef TRACE
+#define TRACE 0
+#endif
+
 int FASIT::messageSeq = 0;
 
 FASIT::FASIT() {
@@ -91,7 +103,6 @@ FUNCTION_END("::clearBuffer(int end)")
 //
 // Usage: Add the computed crc on transmission and check for a computed crc of 0 on receipt
 
-
 // utility function for crc32 computation
 // see section 11 of the above link for an almost explanation of why we are reflecting various bytes
 // simple answer: it's what the ethernet crc standard does, and it's a very proven algorithm
@@ -151,11 +162,14 @@ __uint32_t FASIT::crc32(void *buf, int start, int end) {
    };
    char *data = (char*)buf + (sizeof(char) * start);
    int size = end - start;
+PRINT_HEXB(data, size)
    __uint32_t crc = 0;
 
    while (size--) {
-      crc = crc32_table[((__uint8_t)reflect(*data++, 8)) ^ (crc >> 24)] ^ (crc << 8);
+      crc = crc32_table[(__uint8_t)(((__uint8_t)reflect(*data, 8)) ^ (crc >> 24))] ^ (crc << 8);
+      data++;
    }
+DMSG("...has 32 bit crc of 0x%08x\n", reflect(crc, 32))
 
    return reflect(crc, 32);
 }
@@ -182,11 +196,14 @@ __uint8_t FASIT::crc8(void *buf, int start, int end) {
    };
    char *data = (char*)buf + (sizeof(char) * start);
    int size = end - start;
+PRINT_HEXB(data, size)
    __uint8_t crc = 0; // initial value of 0
 
    while (size--) {
-      crc = crc8_table[crc ^ *data++];
+      crc = crc8_table[(__uint8_t)(crc ^ *data)];
+      data++;
    }
+DMSG("...has 8 bit crc of 0x%02x\n", crc)
    return crc;
 }
 
@@ -205,9 +222,13 @@ int FASIT::parity(void *buf, int size) {
    };
    char *data = (char*)buf;
    int par = 0;
+DMSG("parity called for %i bytes:\n", size)
+PRINT_HEXB(data, size)
    while(size--) {
-      par ^= parity_table[*data++];
+      par ^= parity_table[(__uint8_t)*data];
+      data++;
    }
+DMSG("...has parity of %i\n", par)
 
    return par;
 }
@@ -229,8 +250,26 @@ FUNCTION_START("::createHeader(int mnum, int source, void *data, int size)")
    hdr.source = source;
 
    // combine the header parity with the parity of the first 10 bytes of data
-   hdr.parity = parity(&hdr, sizeof(ATI_header)) ^ parity(data, max(size, 10));
+   hdr.parity = parity(&hdr, sizeof(ATI_header)) ^ parity(data, min(size, 10));
 
 FUNCTION_HEX("::createHeader(int mnum, int source, void *data, int size)", &hdr)
    return hdr;
 }
+
+// swap the byte order to switch between network and host modes
+__uint64_t FASIT::swap64(__uint64_t s) {
+   __uint64_t r;
+   char *a, *b;
+   a = (char*) &r;
+   b = (char*) &s;
+
+   // swap every byte
+   int l = sizeof(__uint64_t) - 1;
+   for(int i=0; i<sizeof(__uint64_t); i++) {
+      a[i] = b[l--];
+   }
+
+FUNCTION_HEX("::swap64(__uint64_t s)", &r)
+   return r;
+}
+

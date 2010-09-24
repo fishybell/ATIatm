@@ -26,7 +26,7 @@ public :
    // for handling of the super-compact 2102 message
    int getMoveReq() { return moveReq; }
    void setMoveReq(int moveReq) { this->moveReq = moveReq; }
-   struct FASIT_2102h getHitReq() { return hitReq; }
+   struct FASIT_2102h getHitReq();
    void setHitReq(struct FASIT_2102h hitReq) { this->hitReq = hitReq; }
 
    // for handling of the multi-part 2006 message
@@ -34,6 +34,10 @@ public :
    void set2006base(struct FASIT_2006b base) {zbase = base;};
    vector<struct FASIT_2006z> *get2006zones() {return &zones;}; // returns pointer so the caller can add to list or loop over list
    void clearZones() {zones.clear();};
+
+   void deleteLater() { needDelete = 1; }// cause this tcp to be deleted at a later point in time
+
+   virtual int handleReady(epoll_event *ev); // called when either ready to read or write; returns -1 if needs to be deleted afterwards
    
 private :
    // individual message handlers, all return -1 if needs to be deleted afterwards
@@ -68,6 +72,9 @@ private :
    // for handling of the potentially multi-message 2100 message
    static list<ATI_2100m> commandList; // for keeping the order of messages
    static multimap<ATI_2100m, int, struct_comp<struct ATI_2100m> > commandMap; // for keeping track of all destinations
+
+   // for delayed disconnection
+   int needDelete;
 };
 
 #endif
