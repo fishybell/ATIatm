@@ -73,45 +73,37 @@ const char *usage = "Usage: %s [options]\n\
 \t-h     -- print out usage information\n";
    for (int i = 1; i < argc; i++) {
       if (argv[i][0] != '-') {
-HERE
          IERROR("invalid argument (%i)\n", i)
          return 1;
       }
       switch (argv[i][1]) {
          case 'p' :
-HERE
             if (sscanf(argv[++i], "%i", &port) != 1) {
                IERROR("invalid argument (%i)\n", i)
                return 1;
             }
             break;
          case 's' :
-HERE
             serials.push_back(new FASIT_Serial(argv[++i]));
             break;
          case 'r' :
-HERE
             // TODO -- impliment serial relay program
             printf("Serial relay not implimented, sorry\n");
             return 0;
             break;
          case 'b' :
-HERE
             base = ++i; // remember the base paramter for later
             break;
          case 'h' :
-HERE
             printf(usage);
             return 0;
             break;
          case '-' :
-HERE
             if (argv[i][2] == 'h') {
                printf(usage);
                return 0;
             }
          default :
-HERE
             IERROR("invalid argument (%i)\n", i)
             return 1;
       }
@@ -201,14 +193,20 @@ DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getF
       timeval timeout = Timeout::getTimeout();
       timeval *p_timeout = timeout.tv_sec + timeout.tv_usec > 0 ? &timeout : NULL; // if the timeout is zero, pass a NULL to select
       if (select(kdpfd+1, &sfds, &sfds, NULL, p_timeout) == -1) {
-            perror("Server-select() error ");
-            return 1;
+         perror("Server-select() error ");
+         return 1;
       }
 
       // did we timeout?
-      if (Timeout::timedOut() == 1) {
-         Timeout::handleTimeoutEvents();
-         continue;
+      switch (Timeout::timedOut() == 1) {
+         case 0 :
+            if (p_timeout != NULL) {
+               if (!FD_ISSET(kdpfd, &sfds)) { continue; }
+            }
+            break;
+         case 1 :
+            Timeout::handleTimeoutEvents();
+            continue;
       }
 
       // no timeout, handle epoll
@@ -232,10 +230,10 @@ DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getF
             }
             IMSG("Accepted new client %i\n", client)
          } else {
-            FASIT_TCP *fasit_tcp = (FASIT_TCP*)events[n].data.ptr;
-            int ret = fasit_tcp->handleReady(&events[n]);
+            FASIT *fasit = (FASIT*)events[n].data.ptr;
+            int ret = fasit->handleReady(&events[n]);
             if (ret == -1) {
-               delete fasit_tcp;
+               delete fasit;
             }
          }
       }
