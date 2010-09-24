@@ -36,6 +36,7 @@ FUNCTION_START("::~Connection()")
    // clear this item out of maps
    map<__uint64_t,Connection *>::iterator uIt;
    map<__uint32_t,Connection *>::iterator rIt;
+   map<__uint16_t,Connection *>::iterator nIt;
 
    uIt = uuidMap.find(uuid);
    if(uIt != uuidMap.end()) {
@@ -45,6 +46,11 @@ FUNCTION_START("::~Connection()")
    rIt = rnumMap.find(rnum);
    if(rIt != rnumMap.end()) {
       rnumMap.erase(rIt);
+   }
+
+   nIt = tnumMap.find(tnum);
+   if(nIt != tnumMap.end()) {
+      tnumMap.erase(nIt);
    }
 
    // stop watching for the connection and close it
@@ -144,7 +150,11 @@ FUNCTION_START("::handleRead(epoll_event *ev)")
    char buf[BUF_SIZE+1];
    int rsize=0;
    rsize = read(fd, buf, BUF_SIZE);
+DMSG("%i read %i bytes:\n", fd, rsize)
 PRINT_HEXB(buf, rsize)
+   if (rsize == -1) {
+      DMSG("Read error: %s\n", strerror(errno))
+   }
    if (rsize > 0) {
       int ret = parseData(rsize, buf);
 FUNCTION_INT("::handleRead(epoll_event *ev)", ret)
@@ -182,6 +192,8 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", -1)
          return -1;
       }
    }
+DMSG("%i wrote %i bytes:\n", fd, s)
+PRINT_HEXB(wbuf, s)
 
    // copy what we did write to the "last write buffer"
    if (lwbuf != NULL) { delete [] lwbuf; } // clear out old buffer
@@ -238,12 +250,13 @@ FUNCTION_INT("::handleReady(epoll_event *ev)", ret)
 //   message and be sure that the entire message is sent
 void Connection::queueMsg(char *msg, int size) {
 FUNCTION_START("::queueMsg(char *msg, int size)")
+DMSG("%i queued %i bytes:\n", fd, size)
 PRINT_HEXB(msg, size)
    if (wsize > 0) {
       // append
-      char *tbuf = new char[(size+wsize)];
+      char *tbuf = new char[size + wsize];
       memcpy(tbuf, wbuf, wsize);
-      memcpy(tbuf+(sizeof(char) * size) + 1, msg, size);
+      memcpy(tbuf + (sizeof(char) * wsize), msg, size);
       wsize += size;
       delete [] wbuf;
       wbuf = tbuf;
@@ -260,7 +273,7 @@ PRINT_HEXB(msg, size)
    ev.data.ptr = (void*)this;
    ev.events = EPOLLIN | EPOLLOUT;
    int ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
-DMSG("epoll_ctl(%i, EPOLL_CTL_MOD, %i, &ev) returned: %i\n", efd, fd, ret);
+//DMSG("epoll_ctl(%i, EPOLL_CTL_MOD, %i, &ev) returned: %i\n", efd, fd, ret);
    if (ret == -1) {
       switch (errno) {
          case EBADF : IERROR("EBADF\n") ; break;
