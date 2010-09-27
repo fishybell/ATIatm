@@ -16,7 +16,7 @@ class FasitClient(FasitHandler):
     """
     __device__ = None
     
-    def __init__(self, host, port, type, remote):
+    def __init__(self, host, port, type, remote, local_ip, local_port):
         self.logger = logging.getLogger('FasitClient')
         self.sock = None
         self.target_type = type
@@ -42,7 +42,7 @@ class FasitClient(FasitHandler):
         elif (type == fasit_packet_pd.PD_TYPE_MIT):
             if (remote == True):
                 self.logger.debug('Remote connection specified')
-                self.__device__ = fasit_pd.FasitPdMitRemote()
+                self.__device__ = fasit_pd.FasitPdMitRemote(local_ip, local_port)
             else:
                 self.logger.debug('Local connection specified')
                 self.__device__ = fasit_pd.FasitPdMit()

@@ -6,7 +6,7 @@ import socket
 import fasit_packet_pd
 from asynchat_fasit_handler import FasitHandler
 
-REMOTE_TARGET_SERVER_IP_ADDRESS     = '192.168.1.10'
+REMOTE_TARGET_SERVER_IP_ADDRESS     = '192.168.4.98'
 REMOTE_TARGET_SERVER_IP_PORT        = 4444
 
 class RemoteTargetServerHandler(FasitHandler):

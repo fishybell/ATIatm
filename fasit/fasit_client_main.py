@@ -7,7 +7,8 @@ from optparse import OptionParser
 from asynchat_fasit_client import FasitClient
 import fasit_packet_pd
 
-FASIT_TC_IP_ADDRESS                 = '192.168.0.1'
+#FASIT_TC_IP_ADDRESS                 = '192.168.4.17'
+FASIT_TC_IP_ADDRESS                 = '127.0.0.1'
 FASIT_TC_IP_PORT                    = 4000
 
 logging.basicConfig(level=logging.DEBUG,format='%(name)s: %(message)s',)
@@ -25,13 +26,15 @@ def connect_to_server():
     global type
     global remote
     global client
+    global local_ip
+    global local_port
     
     connected = False
     while (connected == False):
         client = None
         try:
             print "Trying to connect to server..."
-            client = FasitClient(ip, int(port), type, remote)
+            client = FasitClient(ip, int(port), type, remote, local_ip, int(local_port))
             connected = True
             print "...connected."
             return True
@@ -52,6 +55,8 @@ def main():
     global type
     global remote
     global client
+    global local_ip
+    global local_port
     
     usage = "usage: %prog [options]"
     parser = OptionParser(usage = usage)
@@ -59,6 +64,8 @@ def main():
     parser.add_option("-s", "--server", dest = "server_ip", help = "Set the FASIT server IP address [default: %default]", metavar = "IP_ADDRESS", default = FASIT_TC_IP_ADDRESS)
     parser.add_option("-p", "--port", dest = "server_port", help = "Set the FASIT server port number [default: %default]", metavar = "PORT_NUMBER", default = FASIT_TC_IP_PORT) 
     parser.add_option("-r", "--remote", dest = "use_remote", help = "connect to a remote target [default: %default]", action = "store_true", default = False) 
+    parser.add_option("-l", "--local", dest = "local_ip", help = "listen on ip [default: %default]", metavar = "LOCAL_IP", default = "none") 
+    parser.add_option("-b", "--bind", dest = "local_port", help = "listen on port [default: %default]", metavar = "LOCAL_PORT", default = 4444) 
     (options, args) = parser.parse_args()
     
     if (options.target_type == "NONE"):
@@ -83,6 +90,8 @@ def main():
     ip = options.server_ip
     port = options.server_port
     remote = options.use_remote
+    local_ip = options.local_ip
+    local_port = options.local_port
    
     logger.debug("Target Type:        %s (%d)", options.target_type, type)
     logger.debug("Server IP Address:  %s", ip)

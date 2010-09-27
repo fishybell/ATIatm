@@ -1413,14 +1413,14 @@ class FasitPdMat(FasitPd):
 #------------------------------------------------------------------------------------          
 #class FasitPdMitRemote(FasitPd, RemoteTargetServer):
 class FasitPdMitRemote(FasitPdSit, RemoteTargetServer):                        
-    def __init__(self):
+    def __init__(self, local_ip, local_port):
         FasitPdSit.__init__(self)
         self.logger = logging.getLogger('FasitPdMitRemote')
        
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_MIT
          
-        RemoteTargetServer.__init__(self, None)
+        RemoteTargetServer.__init__(self, (local_ip, local_port))
         
 #    def stop_threads(self):
 #        # TODO - close connection?
