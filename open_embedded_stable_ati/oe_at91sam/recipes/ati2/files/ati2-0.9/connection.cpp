@@ -225,6 +225,7 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
 int Connection::handleReady(epoll_event *ev) {
 FUNCTION_START("::handleReady(epoll_event *ev)")
    int ret = 0;
+PRINT_HEX(ev->events)
    // handle writing out first as it is potentially time sensitive
    if (ev->events & EPOLLOUT) {
       if (handleWrite(ev) == -1) {
