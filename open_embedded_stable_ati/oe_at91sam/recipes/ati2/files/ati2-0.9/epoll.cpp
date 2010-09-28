@@ -24,7 +24,7 @@ using namespace std;
 #define PORT 4000
 
 // define REALTIME as 1 or 0 to enable or disable running as a realtime process
-#define REALTIME 0
+#define REALTIME 1
 
 // utility function to properly configure a client TCP connection
 void setnonblocking(int sock) {
@@ -95,12 +95,12 @@ const char *usage = "Usage: %s [options]\n\
             base = ++i; // remember the base paramter for later
             break;
          case 'h' :
-            printf(usage);
+            printf(usage, argv[0]);
             return 0;
             break;
          case '-' :
             if (argv[i][2] == 'h') {
-               printf(usage);
+               printf(usage, argv[0]);
                return 0;
             }
          default :
@@ -210,9 +210,11 @@ DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getF
       }
 
       // no timeout, handle epoll
+HERE
       nfds = epoll_wait(kdpfd, events, MAX_EVENTS, -1);
       for(n = 0; n < nfds; ++n) {
          if(events[n].data.ptr == NULL) { // NULL inidicates the listener fd
+HERE
             addrlen = sizeof(local);
             client = accept(listener, (struct sockaddr *) &local,
                         &addrlen);
@@ -230,8 +232,9 @@ DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getF
             }
             IMSG("Accepted new client %i\n", client)
          } else {
+HERE
             FASIT *fasit = (FASIT*)events[n].data.ptr;
-            int ret = fasit->handleReady(&events[n]);
+            int ret = fasit->handleEvent(&events[n]);
             if (ret == -1) {
                delete fasit;
             }
