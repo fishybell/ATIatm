@@ -26,8 +26,6 @@ SRC_URI = " \
 		file://modules/target_mover_infantry.h \
 		file://modules/target_muzzle_flash.c \
 		file://modules/target_muzzle_flash.h \
-		file://modules/target_sound.c \
-		file://modules/target_sound.h \
 		file://modules/target_thermal.c \
 		file://modules/target_thermal.h \
 		file://modules/target_user_interface.c \
