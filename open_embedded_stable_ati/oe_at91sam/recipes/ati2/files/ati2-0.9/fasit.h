@@ -24,7 +24,7 @@ public :
 
    static __uint64_t swap64(__uint64_t s); // swap the byte order to switch between network and host modes
 
-   virtual int handleReady(epoll_event *ev) = 0; // called when either ready to read or write; returns -1 if needs to be deleted afterwards
+   virtual int handleEvent(epoll_event *ev) = 0; // called when either ready to read or write; returns -1 if needs to be deleted afterwards
 
 protected :
    void addToBuffer(int rsize, char *rbuf); // appends data to read buffer

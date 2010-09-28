@@ -37,7 +37,7 @@ public :
 
    void deleteLater() { needDelete = 1; }// cause this tcp to be deleted at a later point in time
 
-   virtual int handleReady(epoll_event *ev); // called when either ready to read or write; returns -1 if needs to be deleted afterwards
+   virtual int handleEvent(epoll_event *ev); // called when either ready to read or write; returns -1 if needs to be deleted afterwards
    
 private :
    // individual message handlers, all return -1 if needs to be deleted afterwards

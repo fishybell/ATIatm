@@ -110,7 +110,9 @@ FUNCTION_START("::handleWrite(epoll_event *ev)")
 
    // wsize is 0, need to adjust epoll and return
    if (wsize <= 0) {
-      return Connection::handleWrite(ev);
+      int ret = Connection::handleWrite(ev);
+FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
+      return ret;
    }
 
 DMSG("Sec: %i, MinDelay: %i, MaxDelay: %i, Diff: %i\n", sec, delay, mdelay, diff);

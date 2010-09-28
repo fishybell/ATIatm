@@ -36,9 +36,9 @@ FUNCTION_END("::FASIT_TCP(int fd, int tnum) : Connection(fd)")
 }
 
 // called when either ready to read or write; returns -1 if needs to be deleted afterwards
-int FASIT_TCP::handleReady(epoll_event *ev) {
+int FASIT_TCP::handleEvent(epoll_event *ev) {
 HERE
-   return Connection::handleReady(ev);
+   return handleReady(ev);
 }
 
 FASIT_TCP::~FASIT_TCP() {

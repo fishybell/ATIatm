@@ -19,9 +19,9 @@ FUNCTION_END("::~FASIT_Serial()")
 }
 
 // called when either ready to read or write; returns -1 if needs to be deleted afterwards
-int FASIT_Serial::handleReady(epoll_event *ev) {
+int FASIT_Serial::handleEvent(epoll_event *ev) {
 HERE
-   return Connection::handleReady(ev);
+   return handleReady(ev);
 }
 
 void FASIT_Serial::defHeader(int mnum, FASIT_header *fhdr) {
