@@ -6,6 +6,7 @@ DEPENDS = "virtual/kernel"
 
 #        file://ati-1.0.tar.gz  \
 SRC_URI = " \
+		file://asoundrc \
 		file://modules/Makefile \
 		file://modules/target_battery.c \
 		file://modules/target_battery.h \
@@ -22,6 +23,8 @@ SRC_URI = " \
 		file://modules/target_lifter_infantry.h \
 		file://modules/target_miles_transmitter.c \
 		file://modules/target_miles_transmitter.h \
+		file://modules/target_mover_armor.c \
+		file://modules/target_mover_armor.h \
 		file://modules/target_mover_infantry.c \
 		file://modules/target_mover_infantry.h \
 		file://modules/target_muzzle_flash.c \
@@ -65,7 +68,6 @@ do_install(){
     install -m 0644 ${S}/target_miles_transmitter.ko ${D}${TARGET_MODULES_INSTALL_DIR}
     install -m 0644 ${S}/target_mover_infantry.ko ${D}${TARGET_MODULES_INSTALL_DIR}
     install -m 0644 ${S}/target_muzzle_flash.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_sound.ko ${D}${TARGET_MODULES_INSTALL_DIR}
     install -m 0644 ${S}/target_thermal.ko ${D}${TARGET_MODULES_INSTALL_DIR}
     install -m 0644 ${S}/target_user_interface.ko ${D}${TARGET_MODULES_INSTALL_DIR}
     install -m 0755 ${WORKDIR}/start_target_modules.sh ${D}${ROOT_USER_INSTALL_DIR}/start_target_modules.sh
