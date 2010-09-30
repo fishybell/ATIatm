@@ -133,14 +133,15 @@ DMSG("retry too many times: %i\n", retries)
             if (diff - mdelay > 30) {
                timespec ts;
                ts.tv_sec = 0;
-               ts.tv_nsec = rand() % 20000; // 20 millisecond max delay
+               ts.tv_nsec = (rand() % 20000) * 1000; // 20 millisecond max delay
+DMSG("1 sleeping %i nanoseconds\n", ts.tv_nsec)
                nanosleep(&ts, NULL);
             }
             retries++;
 FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
             return 0; // wait again to make sure the device is ready for writing
          } else {
- DMSG("retry later: %i\n", retries)
+DMSG("retry later: %i\n", retries)
             // retry again at our next slot
             int space = mdelay - delay;
             delay = mdelay + rdelay;
@@ -180,6 +181,9 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
                addDelay(427);
             }
 
+            // count this as an attempt since we only sent some
+            retries++;
+
 FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
             return ret;
          } else {
@@ -198,15 +202,17 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
       }
    }
 
-DMSG("%i - %i < %i || (%i - %i == %i && %i > 1)\n", nows, last_time_s, sec, nows, last_time_s, sec, sec);
+//DMSG("%i - %i < %i || (%i - %i == %i && %i > 1)\n", nows, last_time_s, sec, nows, last_time_s, sec, sec);
    // the time has not yet come, we should spend most of it sleeping
    if (nows - last_time_s < sec || (nows - last_time_s == sec && sec > 1)) {
       // at least two second delay, sleep for one second and return to fight again later
+DMSG("sleeping 1 second\n")
       sleep(1);
 FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
       return 0;
    } else if (nows - last_time_s == sec && sec > 0) {
       // at least one second delay, sleep for half a second and return to fight again later
+DMSG("sleeping 1/2 a second\n")
       usleep(500);
 FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
       return 0;
@@ -216,15 +222,18 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
       ts.tv_sec = 0;
       if (rest > 35) {
          // delay is more than 35 milliseconds away, sleep half of that and return to fight again later
-         ts.tv_nsec = rest * 500; // half of 1000 nanoseconds per millisecond
+         ts.tv_nsec = rest * 500 * 1000; // half of 1000 nanoseconds per microsecond (1000 per millisecond)
+DMSG("2 sleeping %i nanoseconds\n", ts.tv_nsec)
          nanosleep(&ts, NULL);
 FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
          return 0;
       } else {
          // the time is now very soon, sleep all but 10 milliseconds and return to fight again later
          // the 10 milliseconds is so epoll has enough time to re-poll the device (the radio may stop being ready)
-         ts.tv_nsec = (rest-10) * 1000; // 1000 nanoseconds per millisecond
+         //   and because nanosleep will sleep an uncertain amount extra (up to 5 milliseconds)
+         ts.tv_nsec = (rest-10) * 1000 * 1000; // 1000 nanoseconds per microsecond (1000 per millisecond)
          if (rest > 10) {
+DMSG("3 sleeping %i nanoseconds\n", ts.tv_nsec)
             nanosleep(&ts, NULL);
          }
 FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
