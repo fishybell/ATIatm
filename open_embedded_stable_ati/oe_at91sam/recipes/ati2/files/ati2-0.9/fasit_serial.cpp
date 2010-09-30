@@ -21,6 +21,7 @@ FUNCTION_END("::~FASIT_Serial()")
 // called when either ready to read or write; returns -1 if needs to be deleted afterwards
 int FASIT_Serial::handleEvent(epoll_event *ev) {
 HERE
+return 0;
    return handleReady(ev);
 }
 
@@ -98,9 +99,9 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0)
 }
 
 // macros used in validMessage function to check just the message length field of the header and call it good
-#define END_CHECKS DMSG("%i from %i to %i\n", hdr.num, *start, *end) return hdr.num; break;
-#define CHECK_LENGTH(FASIT_NUM) case FASIT_NUM : if (hdr.length != hl + sizeof( ATI_ ## FASIT_NUM )) { DMSG("not %i\n", hdr.num) break; } ; if (hdr.length > (rsize - *start)) { DMSG("maybe %i\n", hdr.num) break; } ; END_CHECKS
-#define CHECK_CRC(CRCL) if (*end <= rsize && crc ## CRCL (rbuf, *start, *end) == 0 ) { END_CHECKS } else { DMSG("bad crc\n") }
+#define END_CHECKS DMSG("%i from %i to %i\n", hdr->num, *start, *end) return hdr->num; break;
+#define CHECK_LENGTH(FASIT_NUM) case FASIT_NUM : if (hdr->length != hl + sizeof( ATI_ ## FASIT_NUM )) { DMSG("not %i\n", hdr->num) break; } ; if (hdr->length > (rsize - *start)) { DMSG("maybe %i\n", hdr->num) break; } ; END_CHECKS
+#define CHECK_CRC(CRCL) DMSG("CHECK_CRC %i: %i <= %i && 0x%02x == 0...", CRCL, *end, rsize, crc ## CRCL (rbuf, *start, *end)) if (*end <= rsize && crc ## CRCL (rbuf, *start, *end) == 0 ) { END_CHECKS } else { DMSG("bad crc\n") }
 
 // the start and end values may be set even if no valid message is found
 int FASIT_Serial::validMessage(int *start, int *end) {
@@ -110,29 +111,28 @@ FUNCTION_START("::validMessage(int *start, int *end)")
    while (*start < rsize && rsize - *start >= sizeof(ATI_header)) { // end when not big enough to contain an entire header
 TMSG("starting at %i\n", *start)
       // unlike TCP messages, all serial messages have the same header
-      if (rbuf[*start] & 240 != 240) {
-         // first 3 bits of header not 
+      //ATI_header hdr;
+      int hl = sizeof(ATI_header); // keep for later
+      //memcpy(&hdr, rbuf + *start, hl);
+      ATI_header *hdr = (ATI_header*)(rbuf + *start);
+DMSG("trying with header: %i %i %i %i %i (%i bytes avail)...", hdr->magic, hdr->parity, hdr->length, hdr->num, hdr->source, rsize - *start);
+      if (hdr->magic != 7) { // magic number knows all, sees all, is shamed by all
 DMSG("bad magic\n")
          *start = *start + 1;
          continue;
       }
-      
-      ATI_header hdr;
-      int hl = sizeof(ATI_header); // keep for later
-      memcpy(&hdr, rbuf + *start, hl);
-DMSG("header: %i %i %i %i %i\n", hdr.magic, hdr.parity, hdr.length, hdr.num, hdr.source);
-      if (hdr.length < hl) { // invalid message length
-DMSG("too short: %i < %i\n", hdr.length, hl)
+      if (hdr->length < hl) { // invalid message length
+DMSG("too short: %i < %i\n", hdr->length, hl)
          *start = *start + 1;
          continue;
       }
-      *end = *start + hdr.length;
+      *end = *start + hdr->length;
 
       // if we're reasonably sure this message might be done, check the parity now
       if (*end < rsize) {
          char buf[15];
-         memcpy(buf, rbuf + *start, min(15, (int)hdr.length));
-         if (parity(buf, min(15, (int)hdr.length)) != 0) {
+         memcpy(buf, rbuf + *start, min(15, (int)hdr->length));
+         if (parity(buf, min(15, (int)hdr->length)) != 0) {
             // invalid parity, move on
 DMSG("bad parity\n")
             *start = *start + 1;
@@ -141,17 +141,17 @@ DMSG("bad parity\n")
       }
 
       // do checks for individual messages
-      switch (hdr.num) {
+      switch (hdr->num) {
          case 2005:
-            if (hdr.length != (sizeof(ATI_header) + sizeof(ATI_2005s)) && hdr.length != (sizeof(ATI_header) + sizeof(ATI_2005f))) { break; }
-            if (hdr.length > (rsize - *start)) { break; }
+            if (hdr->length != (sizeof(ATI_header) + sizeof(ATI_2005s)) && hdr->length != (sizeof(ATI_header) + sizeof(ATI_2005f))) { break; }
+            if (hdr->length > (rsize - *start)) { break; }
             END_CHECKS
          case 63556:
-            *end = *start + sizeof(ATI_63556);
+            *end = *start + sizeof(ATI_header) + sizeof(ATI_63556);
             CHECK_CRC (8)
             break;
          case 42966:
-            *end = *start + sizeof(ATI_42966);
+            *end = *start + sizeof(ATI_header) + sizeof(ATI_42966);
             CHECK_CRC (8)
             break;
          case 2100:
@@ -166,19 +166,19 @@ DMSG("bad parity\n")
             break;
          case 2101:
          case 43061:
-            if (hdr.length != sizeof(ATI_header)) { break; }
-            if (hdr.length > (rsize - *start)) { break; }
+            if (hdr->length != sizeof(ATI_header)) { break; }
+            if (hdr->length > (rsize - *start)) { break; }
             END_CHECKS
          case 2111:
-            if (hdr.length != (sizeof(ATI_header) + sizeof(ATI_2111s)) && hdr.length != (sizeof(ATI_header) + sizeof(ATI_2111f))) { break; }
-            if (hdr.length > (rsize - *start)) { break; }
+            if (hdr->length != (sizeof(ATI_header) + sizeof(ATI_2111s)) && hdr->length != (sizeof(ATI_header) + sizeof(ATI_2111f))) { break; }
+            if (hdr->length > (rsize - *start)) { break; }
             END_CHECKS
          case 2102:
-            if (hdr.length == (sizeof(ATI_header) + sizeof(ATI_2102))) {
-               if (hdr.length > (rsize - *start)) { break; }
+            if (hdr->length == (sizeof(ATI_header) + sizeof(ATI_2102))) {
+               if (hdr->length > (rsize - *start)) { break; }
                END_CHECKS
             }
-            *end = *start + sizeof(ATI_2102) + sizeof(ATI_2102x);
+            *end = *start + sizeof(ATI_header) + sizeof(ATI_2102) + sizeof(ATI_2102x);
             CHECK_CRC (8)
             break;
          // these ones just look at msg length
@@ -200,9 +200,9 @@ DMSG("bad parity\n")
          CHECK_LENGTH (16005)
          CHECK_LENGTH (16006)
          CHECK_LENGTH (16007)
-         default: DMSG("unknown msg %i\n", hdr.num) break;
+         default: DMSG("unknown msg %i\n", hdr->num) break;
       }
-TMSG("didn't like header: %i %i %i %i %i\n", hdr.magic, hdr.parity, hdr.length, hdr.num, hdr.source);
+TMSG("didn't like header: %i %i %i %i %i (%i bytes avail)...", hdr->magic, hdr->parity, hdr->length, hdr->num, hdr->source, rsize - *start);
 
       *start = *start + 1;
    }
