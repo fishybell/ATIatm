@@ -1,10 +1,10 @@
 #include <sys/epoll.h>
 #include <stdlib.h>
-#include <sched.h>
 #include <errno.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
+#include <sched.h>
+#include <unistd.h>
 
 using namespace std;
 
@@ -18,6 +18,7 @@ using namespace std;
 
 
 // rough idea of how many connections we'll deal with and the max we'll deal with in a single loop
+#define MAX_CONNECTIONS 2048
 #define MAX_EVENTS 16
 
 // tcp port we'll listen to for new connections
@@ -52,7 +53,6 @@ int main(int argc, char *argv[]) {
 PROG_START
    struct epoll_event ev, events[MAX_EVENTS];
    int client, listener, kdpfd; // file descriptors
-   fd_set sfds; // select file descriptors
    int n, nfds, yes=1;
    socklen_t addrlen;
    struct sockaddr_in serveraddr, local;
@@ -151,7 +151,7 @@ const char *usage = "Usage: %s [options]\n\
 
 
    /* set up polling */
-   kdpfd = epoll_create(MAX_EVENTS);
+   kdpfd = epoll_create(MAX_CONNECTIONS);
    memset(&ev, 0, sizeof(ev));
    ev.events = EPOLLIN;
    if (!base) {
@@ -185,25 +185,23 @@ DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getF
 
 
    for(;;) {
-      // prepare the select set (it's modified by select directly)
-      FD_ZERO(&sfds);
-      FD_SET(kdpfd, &sfds);
-
-      // grab the global timeout for use in select
+      // prepare timeout for epoll
       timeval timeout = Timeout::getTimeout();
-      timeval *p_timeout = timeout.tv_sec + timeout.tv_usec > 0 ? &timeout : NULL; // if the timeout is zero, pass a NULL to select
-HERE
-      if (select(kdpfd+1, &sfds, &sfds, NULL, p_timeout) == -1) {
-         perror("Server-select() error ");
-         return 1;
+      int msec_t = timeout.tv_sec + timeout.tv_usec > 0 ? (timeout.tv_sec * 1000) + (timeout.tv_usec / 1000) : -1;
+      if (msec_t > -1) {
+         msec_t = max(msec_t, 15); // minimum of 15 millisecond timeout
       }
 
-      // did we timeout?
+      // epoll_wait() blocks until we timeout (if msec != -1) or one of the file descriptors is ready
 HERE
-      switch (Timeout::timedOut() == 1) {
+      nfds = epoll_wait(kdpfd, events, MAX_EVENTS, msec_t);
+HERE
+
+      // did we timeout?
+      switch (Timeout::timedOut()) {
          case 0 :
-            if (p_timeout != NULL) {
-               if (!FD_ISSET(kdpfd, &sfds)) { continue; }
+            if (msec_t != -1) {
+               if (nfds == 0) { DMSG("didn't follow timeout: %i\n", msec_t) continue; }
             }
             break;
          case 1 :
@@ -211,8 +209,6 @@ HERE
             continue;
       }
 
-      // no timeout, handle epoll
-      nfds = epoll_wait(kdpfd, events, MAX_EVENTS, -1);
       for(n = 0; n < nfds; ++n) {
          if(events[n].data.ptr == NULL) { // NULL inidicates the listener fd
 HERE
