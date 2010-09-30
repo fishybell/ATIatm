@@ -192,12 +192,14 @@ DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getF
       // grab the global timeout for use in select
       timeval timeout = Timeout::getTimeout();
       timeval *p_timeout = timeout.tv_sec + timeout.tv_usec > 0 ? &timeout : NULL; // if the timeout is zero, pass a NULL to select
+HERE
       if (select(kdpfd+1, &sfds, &sfds, NULL, p_timeout) == -1) {
          perror("Server-select() error ");
          return 1;
       }
 
       // did we timeout?
+HERE
       switch (Timeout::timedOut() == 1) {
          case 0 :
             if (p_timeout != NULL) {
@@ -210,7 +212,6 @@ DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getF
       }
 
       // no timeout, handle epoll
-HERE
       nfds = epoll_wait(kdpfd, events, MAX_EVENTS, -1);
       for(n = 0; n < nfds; ++n) {
          if(events[n].data.ptr == NULL) { // NULL inidicates the listener fd
@@ -233,10 +234,10 @@ HERE
             IMSG("Accepted new client %i\n", client)
          } else {
 HERE
-            FASIT *fasit = (FASIT*)events[n].data.ptr;
-            int ret = fasit->handleEvent(&events[n]);
+            Connection *conn = (Connection*)events[n].data.ptr;
+            int ret = conn->handleReady(&events[n]);
             if (ret == -1) {
-               delete fasit;
+               delete conn;
             }
          }
       }
