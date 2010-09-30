@@ -28,6 +28,7 @@ FUNCTION_START("::Connection(int fd)")
    lwsize = 0;
    uuid = 0;
    tnum = 0;
+   needDelete = 0;
 FUNCTION_END("::Connection(int fd)")
 }
 
@@ -220,12 +221,33 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
    return 0;
 }
 
+void Connection::deleteLater() {
+FUNCTION_START("::deleteLater()")
+   // set the delete flag
+   needDelete = 1;
+   
+   // make this connection turn up as ready so it deletes soon
+   epoll_event ev;
+   memset(&ev, 0, sizeof(ev));
+   ev.data.ptr = (void*)this; 
+   ev.events = EPOLLIN | EPOLLOUT; // set to check for readable or writeable
+   epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
+
+FUNCTION_END("::deleteLater()")
+}
+
+
 // handles an incoming event (ready for read or ready for write or both), possibly writing the other connections write buffers in the process
 // -1 is returned if this object needs to be deleted afterwards
 int Connection::handleReady(epoll_event *ev) {
 FUNCTION_START("::handleReady(epoll_event *ev)")
    int ret = 0;
-PRINT_HEX(ev->events)
+
+   // have we been marked for deletion?
+   if (needDelete) {
+      return -1; // -1 represents a "delete me" flag
+   }
+
    // handle writing out first as it is potentially time sensitive
    if (ev->events & EPOLLOUT) {
       if (handleWrite(ev) == -1) {
