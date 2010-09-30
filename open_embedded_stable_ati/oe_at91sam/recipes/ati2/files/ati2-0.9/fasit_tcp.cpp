@@ -13,7 +13,7 @@ multimap<ATI_2100m, int, struct_comp<ATI_2100m> > FASIT_TCP::commandMap;
 
 FASIT_TCP::FASIT_TCP(int fd) : Connection(fd) {
 FUNCTION_START("::FASIT_TCP(int fd) : Connection(fd)")
-   seq = needDelete = 0;
+   seq = 0;
 
    // new connection, send new connection message over serial
    ATI_16003 msg;
@@ -29,7 +29,7 @@ FUNCTION_END("::FASIT_TCP(int fd) : Connection(fd)")
 // special case constructor where we already know the target number
 FASIT_TCP::FASIT_TCP(int fd, int tnum) : Connection(fd) {
 FUNCTION_START("::FASIT_TCP(int fd, int tnum) : Connection(fd)")
-   seq = needDelete = 0;
+   seq = 0;
 
    setTnum(tnum);
 FUNCTION_END("::FASIT_TCP(int fd, int tnum) : Connection(fd)")
@@ -38,6 +38,7 @@ FUNCTION_END("::FASIT_TCP(int fd, int tnum) : Connection(fd)")
 // called when either ready to read or write; returns -1 if needs to be deleted afterwards
 int FASIT_TCP::handleEvent(epoll_event *ev) {
 HERE
+return 0;
    return handleReady(ev);
 }
 
@@ -60,10 +61,6 @@ FUNCTION_END("::~FASIT_TCP()")
 int FASIT_TCP::parseData(int size, char *buf) {
 FUNCTION_START("::parseData(int size, char *buf)")
    IMSG("TCP %i read %i bytes of data\n", fd, size)
-
-   if (needDelete) { // have we been marked for deletion?
-      return -1; // -1 represents a "delete me" flag
-   }
 
    addToBuffer(size, buf);
 
@@ -779,6 +776,7 @@ DMSG("short 2102? %s\n", shortOnly ? "yes" : "no")
       rhdr = createHeader(2102, tnum, buf + sizeof(ATI_header), size- sizeof(ATI_header)); // recreate header for larger sized message
       memcpy(buf, &rhdr, sizeof(ATI_header)); // copy to correct place
       xmsg.crc = crc8(buf, 0, size - sizeof(xmsg.crc)); // don't crc the crc field
+      memcpy(buf + size - sizeof(xmsg.crc), &xmsg.crc, sizeof(xmsg.crc)); // copy crc in
 
       // send full message on all serial devices
       SerialConnection::queueMsgAll(buf, size);
