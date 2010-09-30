@@ -22,7 +22,7 @@
         _x > _y ? _x : _y; })
 
 // comment these out to remove the TRACE, etc. lines from entire program, redefine to 0 to make individual chunks of code turn it off
-#define TRACE 1
+//#define TRACE 1
 #define DEBUG 1
 #define INFO 1
 #define ERRORS 1
