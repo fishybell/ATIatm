@@ -41,7 +41,8 @@ class FasitPd():
         self.__direction__           = 0
         self.__move__                = fasit_packet_pd.PD_MOVE_STOP
         self.__move_speed__          = 0
-        self.__position__            = 0
+        # this is a hack for testing
+        self.__position__            = 25
         self.__device_type__         = fasit_packet_pd.PD_TYPE_NONE
         
         self.__hit_count__               = 0

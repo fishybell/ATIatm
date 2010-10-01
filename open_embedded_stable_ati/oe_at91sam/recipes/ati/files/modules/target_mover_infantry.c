@@ -18,7 +18,7 @@
 #define MOVER_TYPE  	"infantry"
 
 // TODO - replace with a table based on distance and speed?
-#define TIMEOUT_IN_SECONDS		20
+#define TIMEOUT_IN_SECONDS		60
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -49,6 +49,12 @@
 #define FAULT_WRONG_DIRECTION_DETECTED                     12
 #define FAULT_STOPPED_DUE_TO_STOP_COMMAND                  13
 
+// RC - 1 khz
+// RA - 50 duty of 1khz - cannot exceed RC
+// RB - 50 duty of 1khz - cannot exceed RC
+#define MOTOR_PWM_RC			0x4074
+#define MOTOR_PWM_RA_DEFAULT	0x203A
+#define MOTOR_PWM_RB_DEFAULT	0x203A
 
 // TODO - map pwm output pin to block/channel
 #define MOTOR_PWM_BLOCK			1		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -203,7 +209,7 @@ static int hardware_motor_on(int direction)
 
     if (direction == MOVER_DIRECTION_REVERSE)
 		{
-		at91_set_B_periph(OUTPUT_MOVER_MOTOR_REV_POS, 0);
+		at91_set_B_periph(OUTPUT_MOVER_MOTOR_REV_POS, PULLUP_OFF);
 		at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 
 	    atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_REVERSE);
@@ -211,7 +217,7 @@ static int hardware_motor_on(int direction)
 		}
     else if (direction == MOVER_DIRECTION_FORWARD)
 		{
-		at91_set_B_periph(OUTPUT_MOVER_MOTOR_FWD_POS, 0);
+		at91_set_B_periph(OUTPUT_MOVER_MOTOR_FWD_POS, PULLUP_OFF);
 		at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 
     	atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
@@ -412,25 +418,25 @@ static int hardware_motor_pwm_init(void)
 /*
     #if MOTOR_PWM_BLOCK == 0
         #if MOTOR_PWM_CHANNEL == 0
-            at91_set_A_periph(AT91_PIN_PA26, 0);	// TIOA0
-            at91_set_B_periph(AT91_PIN_PC9, 0);		// TIOB0
+            at91_set_A_periph(AT91_PIN_PA26, PULLUP_OFF);	// TIOA0
+            at91_set_B_periph(AT91_PIN_PC9, PULLUP_OFF);		// TIOB0
         #elif MOTOR_PWM_CHANNEL == 1
-            at91_set_A_periph(AT91_PIN_PA27, 0);	// TIOA1
-            at91_set_A_periph(AT91_PIN_PC7, 0);		// TIOB1
+            at91_set_A_periph(AT91_PIN_PA27, PULLUP_OFF);	// TIOA1
+            at91_set_A_periph(AT91_PIN_PC7, PULLUP_OFF);		// TIOB1
         #elif MOTOR_PWM_CHANNEL == 2
-            at91_set_A_periph(AT91_PIN_PA28, 0);	// TIOA2
-            at91_set_A_periph(AT91_PIN_PC6, 0);		// TIOB2
+            at91_set_A_periph(AT91_PIN_PA28, PULLUP_OFF);	// TIOA2
+            at91_set_A_periph(AT91_PIN_PC6, PULLUP_OFF);		// TIOB2
         #endif
     #else
         #if MOTOR_PWM_CHANNEL == 0
-            at91_set_B_periph(AT91_PIN_PB0, 0);		// TIOA3
-            at91_set_B_periph(AT91_PIN_PB1, 0);		// TIOB3
+            at91_set_B_periph(AT91_PIN_PB0, PULLUP_OFF);		// TIOA3
+            at91_set_B_periph(AT91_PIN_PB1, PULLUP_OFF);		// TIOB3
         #elif MOTOR_PWM_CHANNEL == 1
-            at91_set_B_periph(AT91_PIN_PB2, 0);		// TIOA4
-            at91_set_B_periph(AT91_PIN_PB18, 0);	// TIOB4
+            at91_set_B_periph(AT91_PIN_PB2, PULLUP_OFF);		// TIOA4
+            at91_set_B_periph(AT91_PIN_PB18, PULLUP_OFF);		// TIOB4
         #elif MOTOR_PWM_CHANNEL == 2
-//            at91_set_B_periph(AT91_PIN_PB3, 0);		// TIOA5
-            at91_set_B_periph(AT91_PIN_PB19, 0);	// TIOB5
+            at91_set_B_periph(AT91_PIN_PB3, PULLUP_OFF);		// TIOA5
+            at91_set_B_periph(AT91_PIN_PB19, PULLUP_OFF);		// TIOB5
         #endif
     #endif
 */
@@ -452,9 +458,11 @@ static int hardware_motor_pwm_init(void)
 
 	__raw_writel(ATMEL_TC_CLKEN, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));
 	__raw_writel(ATMEL_TC_SYNC, motor_pwm_tc->regs + ATMEL_TC_BCR);
-	__raw_writel(0x0800, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA)); // 0x203A 50%
-	__raw_writel(0x0800, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
-	__raw_writel(0x4074, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
+
+	// These set up the freq and duty cycle
+	__raw_writel(MOTOR_PWM_RA_DEFAULT, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA)); // 0x203A 50%
+	__raw_writel(MOTOR_PWM_RB_DEFAULT, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+	__raw_writel(MOTOR_PWM_RC, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
 
 	// disable irqs and start timer
 	__raw_writel(0xff, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, IDR));				// irq register
@@ -613,14 +621,31 @@ static int hardware_speed_get(void)
 //---------------------------------------------------------------------------
 static int hardware_speed_set(int speed)
     {
-    // check if an operation is in progress...
-    if (atomic_read(&moving_atomic))
+	unsigned long flags;
+
+	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
+    if (!atomic_read(&full_init))
+        {
+		printk(KERN_ALERT "%s - %s() error - driver not fully initialized.\n",TARGET_NAME, __func__);
+        return FALSE;
+        }
+
+    if (!motor_pwm_tc)
 		{
-		return 0;
+    	return -EINVAL;
 		}
 
-    // TODO - check for limits and set actual speed
 	atomic_set(&speed_atomic, speed);
+
+	spin_lock_irqsave(&motor_lock, flags);
+
+	// These change the duty cycle
+	__raw_writel((MOTOR_PWM_RC * speed)/100, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	__raw_writel((MOTOR_PWM_RC * speed)/100, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+
+	spin_unlock_irqrestore(&motor_lock, flags);
+
     return TRUE;
     }
 
@@ -720,15 +745,17 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr, co
 	long value;
     ssize_t status;
 
-	status = strict_strtol(buf, 0, &value);
-	if (status == 0)
+    status = size;
+
+    if ((strict_strtol(buf, 0, &value) == 0) &&
+    	(value >= 1) &&
+    	(value <= 100))
 		{
 		hardware_speed_set(value);
-		status = size;
 		}
 	else
 		{
-		status = size;
+		printk(KERN_ALERT "%s - %s() : speed out of range or malformed (%s)\n",TARGET_NAME, __func__, buf);
 		}
 
 	return status;
