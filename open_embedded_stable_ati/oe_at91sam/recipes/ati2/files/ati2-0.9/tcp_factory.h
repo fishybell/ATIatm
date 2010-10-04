@@ -12,13 +12,15 @@ public :
 
    FASIT_TCP *newConn(); // creates a new connection to the IP and port given in the constructor
 
+   static void SendResubscribe(); // tell all downrange units to resubscribe
+
 protected :
    // we don't actually have a valid file descriptor, so we'll just overwrite these to do nothing
    int handleWrite(epoll_event *ev) { return 0; };
    int handleRead(epoll_event *ev) { return 0; };
    int parseData(int rsize, char *rbuf) { return 0; };
 
-   int last_tnum;
+   int findNextTnum(); // look for the lowest available tnum
 
    struct sockaddr_in server;
 };
