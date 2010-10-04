@@ -22,7 +22,7 @@ FUNCTION_START("::SerialConnection(char *fname) : Connection(0)")
    link = NULL;
    if (flink == NULL) {
       // we're first
-DMSG("first link in chain 0x%08x\n", this);
+DMSG("first serial link in chain 0x%08x\n", this);
       flink = this;
    } else {
       // we're last (find old last and link from there)
@@ -31,7 +31,7 @@ DMSG("first link in chain 0x%08x\n", this);
          tlink = tlink->link;
       }
       tlink->link = this;
-DMSG("last link in chain 0x%08x\n", this);
+DMSG("last serial link in chain 0x%08x\n", this);
    }
 
    // initialize local variables
@@ -70,10 +70,13 @@ FUNCTION_START("::~SerialConnection()")
 
    // remove from linked list
    SerialConnection *tlink = flink;
-   while(tlink->link != this) {
-      tlink = tlink->link;
+   while (tlink != NULL) {
+      if (tlink->link == this) {
+         tlink->link = this->link; // connect to next link in chain (if last, this drops this link off chain)
+         break;
+      }
    }
-   tlink->link = this->link; // connect neighbors in list (works for end of list too)
+
 FUNCTION_END("::~SerialConnection()")
 }
 
@@ -249,6 +252,38 @@ FUNCTION_START("::setTimeNow()")
 FUNCTION_END("::setTimeNow()")
 }
 
+// sets a wait time for all serial devices for before they send their next message
+void SerialConnection::nowDelay(int msecs) {
+FUNCTION_START("::nextDelay()")
+   SerialConnection *c = flink;
+   while (c != NULL) {
+      c->addDelay(msecs);
+      c = c->link;
+   };
+FUNCTION_END("::nextDelay()")
+}
+
+// sets a wait time for all serial devices for after they send their next message
+void SerialConnection::nextDelay(int msecs) {
+FUNCTION_START("::nextDelay()")
+   SerialConnection *c = flink;
+   while (c != NULL) {
+      c->ndelay = msecs;
+      c = c->link;
+   };
+FUNCTION_END("::nextDelay()")
+}
+
+// resets timer based on the nextDelay variable
+void SerialConnection::handleNextDelay() {
+FUNCTION_START("::handleNextDelay()")
+   if (ndelay > 0) {
+      addDelay(ndelay);
+      ndelay = 0;
+   }
+FUNCTION_END("::handleNextDelay()")
+}
+
 // resets delay related variables and the last send time variables
 void SerialConnection::resetDelay() {
 FUNCTION_START("::resetDelay()")
@@ -256,6 +291,7 @@ FUNCTION_START("::resetDelay()")
    delay = (3 * getTnum() % 512) + (getTnum() > 512 ? 2 : 0);
    mdelay = rdelay = retries = 0;
    setTimeNow();
+   handleNextDelay();
 FUNCTION_END("::resetDelay()")
 }
 

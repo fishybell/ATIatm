@@ -11,6 +11,9 @@ public:
    static void queueMsgAll(char *msg, int size); // queues a message for all serial devices
    static void queueMsgAll(void *msg, int size) { queueMsgAll((char*)msg, size); }
 
+   static void nextDelay(int msecs); // sets a wait time for all serial devices for after they send their next message
+   static void nowDelay(int msecs); // sets a wait time for all serial devices for before they send their next message
+   
    void setTimeNow(); // called to set the current time as the time to start delays from
    void addDelay(int delay); // called to increase the delay required before the next time I can send data (in milliseconds)
    void minDelay(int delay); // called to set the minimum delay required before the next time I can send data (in milliseconds)
@@ -28,6 +31,7 @@ private:
    // precise specific functions
    static void timeNow(int *sec, int *msec); // sets the current time in seconds and milliseconds to the given variables
    void resetDelay(); // resets current time and delay variables
+   void handleNextDelay(); // resets timer based on the ndelay variable
 
    // precise timing specific variables
    int charMax; // maximum amount of characters allowed in the allotted timeslot
@@ -38,6 +42,8 @@ private:
    int last_time_s; // the last time we sent (seconds part)
    int last_time_m; // the last time we sent (milliseconds part)
    struct termios oldtio; // the original state of the serial device
+   int ndelay; // delay for after the next message is sent
+   int wdelay; // delay for before the next message is sent
 };
 
 #endif
