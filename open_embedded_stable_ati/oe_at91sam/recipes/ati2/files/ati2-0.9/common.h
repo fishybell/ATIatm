@@ -22,20 +22,20 @@
         _x > _y ? _x : _y; })
 
 // comment these out to remove the TRACE, etc. lines from entire program, redefine to 0 to make individual chunks of code turn it off
-//#define TRACE 1
+#define TRACE 1
 #define DEBUG 1
 #define INFO 1
 #define ERRORS 1
 
 // for run time tracing of application
 #ifdef TRACE
-#define FUNCTION_START(arg) TRACE && printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__);
-#define FUNCTION_END(arg) TRACE && printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__);
-#define FUNCTION_INT(arg, ret) TRACE && printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__);
-#define FUNCTION_HEX(arg, ret) TRACE && printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__);
-#define FUNCTION_STR(arg, ret) TRACE && printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__);
-#define HERE TRACE && printf("TRACE: Here! %s %i\n", __FILE__, __LINE__);
-#define TMSG(...) TRACE && printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); TRACE && printf(__VA_ARGS__);
+#define FUNCTION_START(arg) TRACE && printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); TRACE && fflush(stdout);
+#define FUNCTION_END(arg) TRACE && printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); TRACE && fflush(stdout);
+#define FUNCTION_INT(arg, ret) TRACE && printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); TRACE && fflush(stdout);
+#define FUNCTION_HEX(arg, ret) TRACE && printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); TRACE && fflush(stdout);
+#define FUNCTION_STR(arg, ret) TRACE && printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); TRACE && fflush(stdout);
+#define HERE TRACE && printf("TRACE: Here! %s %i\n", __FILE__, __LINE__); TRACE && fflush(stdout);
+#define TMSG(...) TRACE && printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); TRACE && printf(__VA_ARGS__); TRACE && fflush(stdout);
 #else
 #define FUNCTION_START(arg)
 #define FUNCTION_END(arg)
@@ -55,10 +55,10 @@
            printf("%02x", (__uint8_t)_data[_i]); \
         } \
         printf(" in %s at line %i\n", __FILE__, __LINE__); \
-        });
+        }); DEBUG && fflush(stdout);
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
-#define BLIP DEBUG && printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__);
-#define DMSG(...) DEBUG && printf("DEBUG: " __VA_ARGS__);
+#define BLIP DEBUG && printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); DEBUG && fflush(stdout);
+#define DMSG(...) DEBUG && printf("DEBUG: " __VA_ARGS__); DEBUG && fflush(stdout);
 #else
 #define PRINT_HEXB(data, size)
 #define PRINT_HEX(arg)
@@ -90,7 +90,8 @@ template <class T>
 class struct_comp {
 public :
    bool operator( )(T const & x, T const & y) const {
-      return memcmp(&x, &y, sizeof(T)) < 0;
+      int r = memcmp(&x, &y, sizeof(T));
+      return r < 0;
    };
 };
 
