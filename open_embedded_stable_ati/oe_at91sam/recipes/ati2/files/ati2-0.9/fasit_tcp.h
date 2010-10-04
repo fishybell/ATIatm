@@ -35,9 +35,17 @@ public :
    vector<struct FASIT_2006z> *get2006zones() {return &zones;}; // returns pointer so the caller can add to list or loop over list
    void clearZones() {zones.clear();};
 
+   static FASIT_TCP *getFirst() { return flink; }
+   FASIT_TCP *getNext() { return link; }
+
    virtual int handleEvent(epoll_event *ev); // called when either ready to read or write; returns -1 if needs to be deleted afterwards
    
 private :
+   // for linked list
+   FASIT_TCP *link; // link to next
+   static FASIT_TCP *flink; // link to first
+   void initChain(); // initialize place in linked list
+
    // individual message handlers, all return -1 if needs to be deleted afterwards
    // the message data itself is in the read buffer from start to end
    int handle_100(int start, int end);
