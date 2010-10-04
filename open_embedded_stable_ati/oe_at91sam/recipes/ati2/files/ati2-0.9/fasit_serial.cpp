@@ -56,11 +56,13 @@ FUNCTION_START("::parseData(int size, char *buf)")
    
    // read all available valid messages
    while ((mnum = validMessage(&start, &end)) != 0) {
+      IMSG("Serial Message : %i\n", mnum)
       if (ignoreAll && mnum != 16000) {
          clearBuffer(end); // clear out last message
 FUNCTION_INT("::parseData(int size, char *buf)", 0)
          return 0;
       }
+DMSG("trying this is : 0x%08x\n", this)
       switch (mnum) {
          HANDLE_FASIT (100)
          HANDLE_FASIT (2000)
@@ -88,13 +90,18 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0)
          HANDLE_FASIT (16005)
          HANDLE_FASIT (16006)
          HANDLE_FASIT (16007)
+         HANDLE_FASIT (16008)
          default:
             IMSG("message valid, but not handled: %i\n", mnum)
             break;
       }
+HERE
+DMSG("this is : 0x%08x\n", this)
       clearBuffer(end); // clear out last message
+HERE
    }
 FUNCTION_INT("::parseData(int size, char *buf)", 0)
+HERE
    return 0;
 }
 
@@ -200,6 +207,7 @@ DMSG("bad parity\n")
          CHECK_LENGTH (16005)
          CHECK_LENGTH (16006)
          CHECK_LENGTH (16007)
+         CHECK_LENGTH (16008)
          default: DMSG("unknown msg %i\n", hdr->num) break;
       }
 TMSG("didn't like header: %i %i %i %i %i (%i bytes avail)...", hdr->magic, hdr->parity, hdr->length, hdr->num, hdr->source, rsize - *start);
@@ -385,7 +393,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
    // we don't grab ATI_2100c, as it's not needed, and its crc member has already checked
 
    // compute the number of ATI_2100m structures found based on the size of the total message
-   int nmsgm = (end - (sizeof(ATI_2100c) + sizeof(ATI_2100) + sizeof(ATI_header))) / sizeof(ATI_2100m);
+   int nmsgm = (end - (sizeof(ATI_2100c) + sizeof(ATI_2100) + sizeof(ATI_header)) - start) / sizeof(ATI_2100m);
    for (int i=0; i<nmsgm; i++) {
        memcpy(msgm + i, rbuf + start + sizeof(ATI_header) + sizeof(ATI_2100) + (sizeof(ATI_2100m) * i), sizeof(ATI_2100m));
    }
@@ -422,7 +430,7 @@ DMSG("first slot: %i : last slot: %i\n", slot, tslot)
 
    // evaluate delay field (as set in the ATI_header length field)
    setTimeNow(); // delay next-send-time from right now
-   static int mults[8] = {16, 32, 64, 128, 256, 512, 1024, 2048};
+   int mults[8] = {16, 32, 64, 128, 256, 512, 1024, 2048};
    int mult = mults[0x7 & hdr->length]; // only look at 3 bits worth
    SerialConnection::minDelay(mult * slot); // wait for correct place in line
    SerialConnection::timeslot(mult / 10); // 10% overage alowed for the timeslot
@@ -431,14 +439,17 @@ DMSG("first slot: %i : last slot: %i\n", slot, tslot)
    SerialConnection::setMaxChar((cmax / 32) + 1); // fixed point math for 600 characters per second max (with 50% "clear-channel" margin, rounded up)
 
    // message not for me
-   if (tcps.empty()) { return 0; }
-HERE
+   if (tcps.empty()) { 
+FUNCTION_INT("::handle_2100(int start, int end)", 0)
+      return 0;
+   }
 
    // send each message found to each destination found, the order doesn't really matter:
    //    all the messages will be actually sent in the order the individual TCP sockets
    //    become writeable, and even then each will send all (1-4) messages in a single chunk
    list<FASIT_TCP*>::iterator l;
    while (nmsgm--) {
+DMSG("handling message %i\n", nmsgm)
       l = tcps.begin();
       while (l != tcps.end()) {
          // recombobulate to TCP message
@@ -1062,6 +1073,27 @@ FUNCTION_START("::handle_16007(int start, int end)")
    // TODO -- reset disconnect timer (and create disconnect timer)
 
 FUNCTION_INT("::handle_16007(int start, int end)", 0)
+   return 0;
+}
+
+int FASIT_Serial::handle_16008(int start, int end) {
+FUNCTION_START("::handle_16008(int start, int end)")
+   // map header and message
+   ATI_header *hdr = (ATI_header*)(rbuf + start);
+   ATI_16008 *msg = (ATI_16008*)(rbuf + start + sizeof(ATI_header));
+
+   // are we the base station?
+   FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(UNASSIGNED);
+   if (tcp != NULL) { return 0; } // the base station shouldn't get this message anyway, but best to be sure
+
+   // delete all serial connetions
+   tcp = FASIT_TCP::getFirst();
+   while (tcp != NULL) {
+      tcp->deleteLater();
+      tcp = tcp->getNext();
+   }
+
+FUNCTION_INT("::handle_16008(int start, int end)", 0)
    return 0;
 }
 
