@@ -427,4 +427,11 @@ typedef struct ATI_16007 {
    __uint8_t sequence PCKD8;
 } ATI_16007;
 
+/********************************************/
+/* 16008 - Resubscribe                      */
+/********************************************/
+typedef struct ATI_16008 {
+   __uint8_t sequence PCKD8;
+} ATI_16008;
+
 #endif

@@ -2,6 +2,7 @@ using namespace std;
 
 #include "timeout.h"
 #include "fasit_tcp.h"
+#include "tcp_factory.h"
 #include <sys/time.h>
 
 // disable tracing for now
@@ -143,6 +144,9 @@ FUNCTION_START("::handleTimeoutEvents()")
    // handle individual events
    if (ev & BAKE_2100) {
       FASIT_TCP::Bake_2100();
+   }
+   if (ev & RESUBSCRIBE) {
+      FASIT_TCP_Factory::SendResubscribe();
    }
 
 FUNCTION_END("::handleTimeoutEvents()")

@@ -28,7 +28,6 @@ private :
 
 // possible events
 #define BAKE_2100 0x1
-// #define OTHER_1 (0x1 << 1)
-// #define OTHER_2 (0x1 << 2)
+#define RESUBSCRIBE (0x1 << 1)
 
 #endif
