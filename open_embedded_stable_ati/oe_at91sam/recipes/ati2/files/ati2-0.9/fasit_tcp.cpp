@@ -6,22 +6,24 @@ using namespace std;
 #include "timeout.h"
 #include <sys/time.h>
 #include <arpa/inet.h>
+#include <stdlib.h>
 
 // initialize static members
 list<ATI_2100m> FASIT_TCP::commandList;
 multimap<ATI_2100m, int, struct_comp<ATI_2100m> > FASIT_TCP::commandMap;
+FASIT_TCP *FASIT_TCP::flink = NULL;
 
 FASIT_TCP::FASIT_TCP(int fd) : Connection(fd) {
 FUNCTION_START("::FASIT_TCP(int fd) : Connection(fd)")
    seq = 0;
+   initChain();
 
-   // new connection, send new connection message over serial
+   // send a message requesting a tnum from our rnum
    ATI_16003 msg;
    msg.rand = rnum;
    ATI_header hdr = createHeader(16003, UNASSIGNED, &msg, sizeof(ATI_16003)); // source unassigned for 16003
    SerialConnection::queueMsgAll(&hdr, sizeof(ATI_header));
    SerialConnection::queueMsgAll(&msg, sizeof(ATI_16003));
-   // TODO -- no response from server after 10 seconds? disconnect
    
 FUNCTION_END("::FASIT_TCP(int fd) : Connection(fd)")
 }
@@ -30,9 +32,30 @@ FUNCTION_END("::FASIT_TCP(int fd) : Connection(fd)")
 FASIT_TCP::FASIT_TCP(int fd, int tnum) : Connection(fd) {
 FUNCTION_START("::FASIT_TCP(int fd, int tnum) : Connection(fd)")
    seq = 0;
+   initChain();
 
    setTnum(tnum);
 FUNCTION_END("::FASIT_TCP(int fd, int tnum) : Connection(fd)")
+}
+
+// initialize place in linked list
+void FASIT_TCP::initChain() {
+FUNCTION_START("::initChain()")
+   link = NULL;
+   if (flink == NULL) {
+      // we're first
+DMSG("first tcp link in chain 0x%08x\n", this);
+      flink = this;
+   } else {
+      // we're last (find old last and link from there)
+      FASIT_TCP *tlink = flink;
+      while(tlink->link != NULL) {
+         tlink = tlink->link;
+      }
+      tlink->link = this;
+DMSG("last tcp link in chain 0x%08x\n", this);
+   }
+FUNCTION_END("::initChain()")
 }
 
 // called when either ready to read or write; returns -1 if needs to be deleted afterwards
@@ -46,11 +69,27 @@ FASIT_TCP::~FASIT_TCP() {
 FUNCTION_START("::~FASIT_TCP()")
 
    // disconnecting, tell the other side of the radio connection
-   ATI_16006 msg;
-   msg.dest = tnum; // send to myself
-   ATI_header hdr = createHeader(16006, tnum, &msg, sizeof(ATI_16006));
-   SerialConnection::queueMsgAll(&hdr, sizeof(ATI_header));
-   SerialConnection::queueMsgAll(&msg, sizeof(ATI_16006));
+   if (tnum != UNASSIGNED) {
+      ATI_16006 msg;
+      msg.dest = tnum; // send to myself
+      ATI_header hdr = createHeader(16006, tnum, &msg, sizeof(ATI_16006));
+      SerialConnection::queueMsgAll(&hdr, sizeof(ATI_header));
+      SerialConnection::queueMsgAll(&msg, sizeof(ATI_16006));
+   }
+
+   // am I the sole FASIT_TCP?
+   if (link == NULL && flink == this) {
+      flink = NULL;
+   }
+
+   // remove from linked list
+   FASIT_TCP *tlink = flink;
+   while (tlink != NULL) {
+      if (tlink->link == this) {
+         tlink->link = this->link; // connect to next link in chain (if last, this drops this link off chain)
+         break;
+      }
+   }
 
 FUNCTION_END("::~FASIT_TCP()")
 }
@@ -69,6 +108,7 @@ FUNCTION_START("::parseData(int size, char *buf)")
    // read all available valid messages
 HERE
    while ((mnum = validMessage(&start, &end)) != 0) {
+      IMSG("TCP Message : %i\n", mnum)
       switch (mnum) {
          HANDLE_FASIT (100)
          HANDLE_FASIT (2000)
@@ -209,7 +249,7 @@ FUNCTION_START("::getResponse(int mnum)")
       respMap.erase(rIt);
    }
 
-FUNCTION_INT("::getResponse(int mnum)", resp)
+FUNCTION_END("::getResponse(int mnum)")
    return resp;
 }
 
@@ -421,6 +461,7 @@ FUNCTION_START("::Bake_2100()")
 
    // add up to 4 messages to the command
    int mnum = 0;
+   int dests = 0; // count the number of destinations we're sending to
    list<ATI_2100m>::iterator cIt = commandList.begin();
    while (mnum < 4) {
       // does this command already exist in the list?
@@ -451,12 +492,15 @@ PRINT_HEX(*cIt)
          // first message, fill in main destination list
          for (multimap<ATI_2100m, int, struct_comp<ATI_2100m> >::iterator mIt = ppp.first; mIt != ppp.second; mIt++) {
             int index = 149 - ((*mIt).second/8); // inverse index in list to maintain destinations as a 1200-bit big endian bit field
+DMSG("adding bit for tnum %i at index %i bit %i: ", (*mIt).second, index, ((*mIt).second % 8))
             destinations.dest[index] |= (1 << ((*mIt).second % 8)); // set individual bit
-DMSG("adding bit for tnum %i at index %i bit %i: %02x\n", (*mIt).second, index, ((*mIt).second % 8), destinations.dest[index])
+            dests++;
+DMSG("%02x\n", destinations.dest[index])
          }
 
          // add to message list
          messages[mnum] = *cIt;
+HERE
       } else {
 DMSG("adding secondary message\n")
 PRINT_HEX(*cIt)
@@ -498,28 +542,39 @@ DMSG("adding bit for tnum %i at index %i bit %i: %02x\n", (*mIt).second, index, 
    // we're not sending any commands?
    if (mnum == 0) { return; }
 
+HERE
    // clear out all mapped message/dest pairs being actually sent
    for (int m = 0; m < mnum; m++) {
       // for each command sent...
       pair<multimap<ATI_2100m, int, struct_comp<ATI_2100m> >::iterator, multimap<ATI_2100m, int, struct_comp<ATI_2100m> >::iterator> ppp;
       ppp = commandMap.equal_range(messages[m]);
-     // ...find each destination...
-      for (multimap<ATI_2100m, int, struct_comp<ATI_2100m> >::iterator mIt = ppp.first; mIt != ppp.second; mIt++) {
+      // ...find each destination...
+      for (multimap<ATI_2100m, int, struct_comp<ATI_2100m> >::iterator mIt = ppp.first; mIt != ppp.second; ) {
          // ...and see if we actually sent to it...
-         int index = 150 - ((*mIt).second/8); // inverse index in list to maintain destinations as a 1200-bit big endian bit field
+         int index = 149 - ((*mIt).second/8); // inverse index in list to maintain destinations as a 1200-bit big endian bit field
          if (destinations.dest[index] & (1 << ((*mIt).second % 8))) {
             // ...and delete it from the map if we do
-            commandMap.erase(mIt);
+DMSG("deleting destination %i\n", (*mIt).second)
+            commandMap.erase(mIt++); // iterate the iterator before erasing
+         } else {
+            mIt++; // iterate
          }
       }
    }
+HERE
+
 
    // clear out the list of commands without destinations
-   for (cIt == commandList.begin(); cIt != commandList.end(); cIt++) {
+   for (cIt = commandList.begin(); cIt != commandList.end(); ) {
       if (commandMap.count(*cIt) == 0) {
-         commandList.erase(cIt);
+DMSG("deleting a command from the command list\n")
+         commandList.erase(cIt++); // iterate the iterator before erasing
+      } else {
+         cIt++; //iterate
       }
    }
+HERE
+
 
    // create header with the correct delay set (read the "internal fasit to radio protocol.odt" document for explanation of below)
    ATI_header hdr = createHeader(2100, BASE_STATION, &destinations, 15); // source is the base station
@@ -605,6 +660,7 @@ DMSG("adding bit for tnum %i at index %i bit %i: %02x\n", (*mIt).second, index, 
       hdr.length = 7;
    }
    hdr.length |= 0x08;
+HERE
 
    // recalculate parity for header
    hdr.parity = 0;
@@ -624,6 +680,23 @@ DMSG("adding bit for tnum %i at index %i bit %i: %02x\n", (*mIt).second, index, 
 
    // send all at once
    SerialConnection::queueMsgAll(buf, size);
+
+   // set the serial next delay to wait for replies
+   int nextDelay = (delay * dests * 2) + (size / 10); // allow time for each device to send twice plus the time to send this current message
+DMSG("next delay will be %i\n", nextDelay)
+   SerialConnection::nextDelay(nextDelay);
+   
+   if (!commandList.empty()) {
+      // check timeout timer
+      if (Timeout::timedOut() == -1) {
+         // timer not set, set to starting now
+         Timeout::setStartTimeNow();
+      }
+      // make sure that we're an event to watch
+      Timeout::setMaxWait(nextDelay); // wait until we're ready to send and send more commands then
+      Timeout::addTimeoutEvent(BAKE_2100); // when we timeout, handle the BAKE_2100 event, which will combine all found 2100 messages and send them
+   }
+   
 FUNCTION_END("::Bake_2100()")
 }
 
