@@ -189,7 +189,8 @@ DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getF
       timeval timeout = Timeout::getTimeout();
       int msec_t = timeout.tv_sec + timeout.tv_usec > 0 ? (timeout.tv_sec * 1000) + (timeout.tv_usec / 1000) : -1;
       if (msec_t > -1) {
-         msec_t = max(msec_t, 15); // minimum of 15 millisecond timeout
+DMSG("epoll with timeout: %i\n", msec_t)
+         msec_t = max(msec_t, 1); // minimum of 1 millisecond timeout
       }
 
       // epoll_wait() blocks until we timeout (if msec != -1) or one of the file descriptors is ready
