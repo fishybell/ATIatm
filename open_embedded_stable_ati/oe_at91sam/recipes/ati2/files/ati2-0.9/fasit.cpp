@@ -2,7 +2,7 @@ using namespace std;
 
 #include "fasit.h"
 #include "common.h"
-
+/*
 // disable DEBUG
 #ifdef DEBUG
 #undef DEBUG
@@ -14,7 +14,7 @@ using namespace std;
 #undef TRACE
 #define TRACE 0
 #endif
-
+*/
 int FASIT::messageSeq = 0;
 
 FASIT::FASIT() {
