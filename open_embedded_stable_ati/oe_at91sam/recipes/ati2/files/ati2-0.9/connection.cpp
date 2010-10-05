@@ -174,8 +174,7 @@ int Connection::handleWrite(epoll_event *ev) {
 FUNCTION_START("::handleWrite(epoll_event *ev)")
    if (wsize <= 0) {
       // we only send data, or listen for writability, if we have something to write
-      ev->events = EPOLLIN;
-      epoll_ctl(efd, EPOLL_CTL_MOD, fd, ev);
+      makeWritable(false);
 FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
       return 0;
    }
@@ -227,11 +226,7 @@ FUNCTION_START("::deleteLater()")
    needDelete = 1;
    
    // make this connection turn up as ready so it deletes soon
-   epoll_event ev;
-   memset(&ev, 0, sizeof(ev));
-   ev.data.ptr = (void*)this; 
-   ev.events = EPOLLIN | EPOLLOUT; // set to check for readable or writeable
-   epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
+   Connection::makeWritable(true); // bypass overwritten functions
 
 FUNCTION_END("::deleteLater()")
 }
@@ -267,6 +262,29 @@ FUNCTION_INT("::handleReady(epoll_event *ev)", ret)
    return ret;
 }
 
+// allows the global event fd to watch for writable status of this connection or not
+void Connection::makeWritable(bool writable) {
+FUNCTION_START("::makeWritable(bool writable)")
+   // change the efd and check for errors
+   epoll_event ev;
+   memset(&ev, 0, sizeof(ev));
+   ev.data.ptr = (void*)this;
+   ev.events = writable ? EPOLLIN | EPOLLOUT : EPOLLIN; // EPOLLOUT if writable set
+   int ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
+//DMSG("epoll_ctl(%i, EPOLL_CTL_MOD, %i, &ev) returned: %i\n", efd, fd, ret);
+   if (ret == -1) {
+      switch (errno) {
+         case EBADF : IERROR("EBADF\n") ; break;
+         case EEXIST : IERROR("EEXIST\n") ; break;
+         case EINVAL : IERROR("EINVAL\n") ; break;
+         case ENOENT : IERROR("ENOENT\n") ; break;
+         case ENOMEM : IERROR("ENOMEM\n") ; break;
+         case EPERM : IERROR("EPERM\n") ; break;
+      }
+   }
+FUNCTION_END("::makeWritable(bool writable)")
+}
+
 // add this message to the write buffer
 // as this function does not actually write and will not cause the caller function to be
 //   preempted, the caller may call this function multiple times to create a complete
@@ -290,23 +308,8 @@ PRINT_HEXB(msg, size)
       wsize = size;
    }
 
-   // set this connection to watch for writeability
-   epoll_event ev;
-   memset(&ev, 0, sizeof(ev));
-   ev.data.ptr = (void*)this;
-   ev.events = EPOLLIN | EPOLLOUT;
-   int ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
-//DMSG("epoll_ctl(%i, EPOLL_CTL_MOD, %i, &ev) returned: %i\n", efd, fd, ret);
-   if (ret == -1) {
-      switch (errno) {
-         case EBADF : IERROR("EBADF\n") ; break;
-         case EEXIST : IERROR("EEXIST\n") ; break;
-         case EINVAL : IERROR("EINVAL\n") ; break;
-         case ENOENT : IERROR("ENOENT\n") ; break;
-         case ENOMEM : IERROR("ENOMEM\n") ; break;
-         case EPERM : IERROR("EPERM\n") ; break;
-      }
-   }
+   // set this connection to watch for writability
+   makeWritable(true);
 FUNCTION_END("::queueMsg(char *msg, int size)")
 }
 

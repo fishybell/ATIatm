@@ -30,7 +30,8 @@ public:
    static void Init(int efd); // initialize with the global event fd
    int handleReady(epoll_event *ev); // called when either ready to read or write; returns -1 if needs to be deleted afterwards
    int getFD() { return fd; }; // retrieve the file descriptor for use in epoll or select or similar
-   void deleteLater();// cause this tcp to be deleted at a later point in time
+   void deleteLater(); // cause this tcp to be deleted at a later point in time
+   virtual void makeWritable(bool writable); // allows the global event fd to watch for writable status of this connection or not
 
 protected:
    virtual int handleWrite(epoll_event *ev); // could be overwritten
