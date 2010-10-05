@@ -10,6 +10,7 @@ public:
 
    static void queueMsgAll(char *msg, int size); // queues a message for all serial devices
    static void queueMsgAll(void *msg, int size) { queueMsgAll((char*)msg, size); }
+   virtual void makeWritable(bool writable); // checks timers and potentially queues this action for later
 
    static void nextDelay(int msecs); // sets a wait time for all serial devices for after they send their next message
    static void nowDelay(int msecs); // sets a wait time for all serial devices for before they send their next message
