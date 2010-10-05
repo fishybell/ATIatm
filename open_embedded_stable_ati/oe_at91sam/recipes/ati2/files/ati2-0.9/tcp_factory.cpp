@@ -5,7 +5,7 @@ using namespace std;
 #include <sys/epoll.h>
 #include <errno.h>
 #include "tcp_factory.h"
-#include "timeout.h"
+#include "timers.h"
 #include "serial.h"
 #include "common.h"
 
@@ -21,9 +21,8 @@ DMSG("Created addr with ip %s, (%08x) port %i\n", inet_ntoa(server.sin_addr), se
 
    setTnum(UNASSIGNED); // so unassigned tnums point to this as the source
 
-   // after 125 milliseconds, send the resubscribe messag
-   Timeout::setMaxWait(125);
-   Timeout::addTimeoutEvent(RESUBSCRIBE);
+   // schedule the resubscribe message
+   new Resubscribe(RESUBSCRIBE);
 
 FUNCTION_END("::FASIT_TCP_Factory(char *destIP, int port) : Connection(0xDEADBEEF)")
 }

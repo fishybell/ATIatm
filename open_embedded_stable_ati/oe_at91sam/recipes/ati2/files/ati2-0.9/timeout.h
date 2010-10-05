@@ -1,33 +1,26 @@
 #ifndef _TIMEOUT_H_
 #define _TIMEOUT_H_
 
-// for manipulating a single global timeout
-// TODO -- manipulate on an individual timeout basis with the global timeout being the minimum, and handleTimeoutEvents only handling ready-to-go events
+// helps in the creation of a single timeout value ready for epoll_wait
+// when timed out, calling handleTimedoutEvents will run all events that have passed their end time
+
+#include "timer.h"
+#include <set>
+
+using namespace std;
 
 class Timeout {
 public :
-   static void setStartTimeNow(); // set's the timeout's start time to now
-   static void setMaxWait(int msec); // maximum amount of milliseconds to wait since setStartTime was called
+   static void handleTimeoutEvents(); // runs all ready events
+   static void addTimeoutEvent(TimeoutTimer *timer); // add an event for handling
+   static int timedOut(); // returns 1 if there is a timer waiting to be processed, 0 if not, and -1 if there are no timers
 
-   static struct timeval getStartTime(); // get the start time
-   static struct timeval getTimeout(); // get a timeout based on the start time and maximum wait
+   static void clearTimeout(TimeoutTimer *timer); // clear a specific event from the existing list
 
-   static int timedOut(); // returns 1 if the max time has passed, 0 if not, and -1 if there is no max time
-
-   static void handleTimeoutEvents(); // runs all flagged events
-   static void addTimeoutEvent(int event); // flag an event for handling
-
-   static void clearTimeout(); // clears all existing timeouts
-   static void clearTimeout(int event); // clear a specific event from the existing timeout
+   static int timeoutVal(); // returns an epoll_wait ready timeout value (-1 if no timers exist) in milliseconds
 
 private :
-   static struct timeval g_startTime;
-   static struct timeval g_maxTime;
-   static int events;
+   static multiset<TimeoutTimer*, TimerComp> timers;
 };
-
-// possible events
-#define BAKE_2100 0x1
-#define RESUBSCRIBE (0x1 << 1)
 
 #endif
