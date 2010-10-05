@@ -114,9 +114,8 @@ FUNCTION_END("::makeWritable(bool writable)")
       return;
    }
 
-   // have we received the first heartbeat? schedule for later
+   // are we receiving an active heartbeat? if not give up
    if (!HeartBeat::haveHeartBeat()) {
-      new SerialWrite(this, SERIALWAIT);
       Connection::makeWritable(false); // double check that we're not writable
 FUNCTION_END("::makeWritable(bool writable)")
       return;
@@ -131,18 +130,9 @@ FUNCTION_END("::makeWritable(bool writable)")
    // are we needing to delay? schedule for later
    if (delay > diff) {
 DMSG("serial write delay: %i; diff: %i from (%i,%i) : (%i,%i)\n", delay, diff, nows, nowm, last_time_s, last_time_m)
-      // wait a second, if more than 1.5 seconds remain
-      if ((delay - diff) > 1500) {
-         new SerialWrite(this, 1000);
-         Connection::makeWritable(false); // double check that we're not writable
-FUNCTION_END("::makeWritable(bool writable)")
-         return;
-      }
-
-      // wait half the remaining time, leaving 5 milliseconds at the end
-      diff = (delay - diff) / 2;
-      if (diff > 5) {
-         new SerialWrite(this, diff - 5);
+      // wait the remaining time, leaving 5 milliseconds at the end
+      if ((delay - diff) > 5) {
+         new SerialWrite(this, delay - diff - 5);
          Connection::makeWritable(false); // double check that we're not writable
 FUNCTION_END("::makeWritable(bool writable)")
          return;
@@ -157,7 +147,6 @@ FUNCTION_END("::makeWritable(bool writable)")
 // the serial line needs to wait for the right time, it then sends its data uing the parent function
 int SerialConnection::handleWrite(epoll_event *ev) {
 FUNCTION_START("::handleWrite(epoll_event *ev)")
-   int sec = delay / 1000;
    int nows, nowm; // current time in seconds and milliseconds
    timeNow(&nows, &nowm);
    int diff = ((nows - last_time_s) * 1000) + (nowm - last_time_m); // time differential in milliseconds
@@ -169,7 +158,7 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
       return ret;
    }
 
-DMSG("Sec: %i, MinDelay: %i, MaxDelay: %i, Diff: %i\n", sec, delay, mdelay, diff);
+DMSG("MinDelay: %i, MaxDelay: %i, Diff: %i\n", delay, mdelay, diff);
    // have we reached our allotted time?
    if (delay <= diff) {
       // are we past our allotted time?
@@ -181,19 +170,6 @@ DMSG("retry way too many times: %i\n", retries)
             int ret = Connection::handleWrite(ev);
 FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
             return ret;
-         } else if (retries > 2) {
-DMSG("retry too many times: %i\n", retries)
-            // too many retries, delay a random amount of time one last time so as to not send at the same time as other radios
-            if (diff - mdelay > 30) {
-               timespec ts;
-               ts.tv_sec = 0;
-               ts.tv_nsec = (rand() % 20000) * 1000; // 20 millisecond max delay
-DMSG("1 sleeping %i nanoseconds\n", ts.tv_nsec)
-               nanosleep(&ts, NULL);
-            }
-            retries++;
-FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
-            return 0; // wait again to make sure the device is ready for writing
          } else {
 DMSG("retry later: %i\n", retries)
             // retry again at our next slot
