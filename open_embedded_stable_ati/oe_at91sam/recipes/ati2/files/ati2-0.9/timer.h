@@ -23,6 +23,7 @@ public :
    struct timeval getStartTime() { return startTime; } // get the start time
    struct timeval getTimeout(); // get a timeout based on the start time and maximum wait
    int timedOut(); // returns 1 if the end time has passed, 0 if not
+   timerTypes getType() { return type; } // returns this timer's type
 
    virtual void handleTimeout() = 0; // Timeout class determines if this timer has timed out and calls this appropriately
 
@@ -40,8 +41,10 @@ struct TimerComp {
   bool operator() (TimeoutTimer* const &lhs, TimeoutTimer* const &rhs) const {
      if (lhs->endTime.tv_sec < rhs->endTime.tv_sec) {
         return true;
-     } else {
+     } else if (lhs->endTime.tv_sec == rhs->endTime.tv_sec) {
         return lhs->endTime.tv_usec < rhs->endTime.tv_usec;
+     } else {
+        return false;
      }
   }
 };
