@@ -16,6 +16,7 @@ public :
    static int timedOut(); // returns 1 if there is a timer waiting to be processed, 0 if not, and -1 if there are no timers
 
    static void clearTimeout(TimeoutTimer *timer); // clear a specific event from the existing list
+   static void clearTimeout(timerTypes type); // clear a specific event from the existing list
 
    static int timeoutVal(); // returns an epoll_wait ready timeout value (-1 if no timers exist) in milliseconds
 

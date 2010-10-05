@@ -31,7 +31,7 @@ FUNCTION_START("::clearTimeout(TimeoutTimer timer)")
       // check if they match
       TimeoutTimer *tod = (*found);
       if (*tod == *timer) {
-DMSG("deleting timer...\n")
+DMSG("1 deleting timer of type %i\n", tod->getType())
          timers.erase(found);
          delete tod;
          found = timers.begin();
@@ -40,6 +40,26 @@ DMSG("deleting timer...\n")
       }
    }
 FUNCTION_END("::clearTimeout(TimeoutTimer timer)")
+}
+
+// clear a specific event from the existing list
+void Timeout::clearTimeout(timerTypes type) {
+FUNCTION_START("::clearTimeout(timerTypes type)")
+   // loop through all timers
+   multiset<TimeoutTimer*, TimerComp>::iterator found = timers.begin();
+   while (found != timers.end()) {
+      // check if they match
+      TimeoutTimer *tod = (*found);
+      if (tod->getType() == type) {
+DMSG("2 deleting timer of type %i\n", type)
+         timers.erase(found);
+         delete tod;
+         found = timers.begin();
+      } else {
+         found++;
+      }
+   }
+FUNCTION_END("::clearTimeout(timerTypes type)")
 }
 
 // add an event for handling
