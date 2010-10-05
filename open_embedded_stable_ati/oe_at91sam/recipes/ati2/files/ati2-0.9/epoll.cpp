@@ -14,6 +14,7 @@ using namespace std;
 #include "fasit_tcp.h"
 #include "tcp_factory.h"
 #include "common.h"
+#include "timers.h"
 #include "timeout.h"
 
 
@@ -109,8 +110,14 @@ const char *usage = "Usage: %s [options]\n\
       }
    }
 
-   /* clear the global timer */
-   Timeout::clearTimeout();
+   /* start or watch the heartbeat signal */
+   if (!base) {
+      // subscribers watch
+      DeadHeart::startWatching();
+   } else {
+      // base stations beat
+      new HeartBeat(FIRSTHEARTBEAT);
+   }
 
    /* start as either a base station or a "target" */
    if (!base) {
@@ -185,16 +192,10 @@ DMSG("epoll_ctl(%i, EPOLL_CTL_ADD, %i, &ev) returned: %i\n", kdpfd, (*sIt)->getF
 
 
    for(;;) {
-      // prepare timeout for epoll
-      timeval timeout = Timeout::getTimeout();
-      int msec_t = timeout.tv_sec + timeout.tv_usec > 0 ? (timeout.tv_sec * 1000) + (timeout.tv_usec / 1000) : -1;
-      if (msec_t > -1) {
-DMSG("epoll with timeout: %i\n", msec_t)
-         msec_t = max(msec_t, 1); // minimum of 1 millisecond timeout
-      }
-
-      // epoll_wait() blocks until we timeout (if msec != -1) or one of the file descriptors is ready
+      // epoll_wait() blocks until we timeout or one of the file descriptors is ready
 HERE
+      int msec_t = Timeout::timeoutVal();
+DMSG("epoll_wait with %i timeout\n", msec_t);
       nfds = epoll_wait(kdpfd, events, MAX_EVENTS, msec_t);
 HERE
 
@@ -202,7 +203,7 @@ HERE
       switch (Timeout::timedOut()) {
          case 0 :
             if (msec_t != -1) {
-               if (nfds == 0) { DMSG("didn't follow timeout: %i\n", msec_t) continue; }
+               if (nfds == 0) { DMSG("didn't timeout after %i milliseconds\n", msec_t) continue; }
             }
             break;
          case 1 :
