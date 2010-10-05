@@ -2,6 +2,7 @@ using namespace std;
 
 #include "serial.h"
 #include "common.h"
+#include "timers.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -101,6 +102,56 @@ DMSG("queueing %i bytes on link 0x%08x\n", size, tlink)
       tlink->queueMsg(msg, size);
    }
 FUNCTION_END("::queueMsgAll(char *msg, int size)")
+}
+
+// checks timers and potentially queues this action for later
+void SerialConnection::makeWritable(bool writable) {
+FUNCTION_START("::makeWritable(bool writable)")
+   // turning off writable? just do it now
+   if (!writable) {
+      Connection::makeWritable(false);
+FUNCTION_END("::makeWritable(bool writable)")
+      return;
+   }
+
+   // have we received the first heartbeat? schedule for later
+   if (!HeartBeat::haveHeartBeat()) {
+      new SerialWrite(this, SERIALWAIT);
+      Connection::makeWritable(false); // double check that we're not writable
+FUNCTION_END("::makeWritable(bool writable)")
+      return;
+   }
+
+   // determine time to wait based on last time, delay and mdelay
+   int sec = delay / 1000;
+   int nows, nowm; // current time in seconds and milliseconds
+   timeNow(&nows, &nowm);
+   int diff = ((nows - last_time_s) * 1000) + (nowm - last_time_m); // time differential in milliseconds
+
+   // are we needing to delay? schedule for later
+   if (delay > diff) {
+DMSG("serial write delay: %i; diff: %i from (%i,%i) : (%i,%i)\n", delay, diff, nows, nowm, last_time_s, last_time_m)
+      // wait a second, if more than 1.5 seconds remain
+      if ((delay - diff) > 1500) {
+         new SerialWrite(this, 1000);
+         Connection::makeWritable(false); // double check that we're not writable
+FUNCTION_END("::makeWritable(bool writable)")
+         return;
+      }
+
+      // wait half the remaining time, leaving 5 milliseconds at the end
+      diff = (delay - diff) / 2;
+      if (diff > 5) {
+         new SerialWrite(this, diff - 5);
+         Connection::makeWritable(false); // double check that we're not writable
+FUNCTION_END("::makeWritable(bool writable)")
+         return;
+      }
+   }
+
+   // no timeout required? make writable now
+   Connection::makeWritable(true);
+FUNCTION_END("::makeWritable(bool writable)")
 }
 
 // the serial line needs to wait for the right time, it then sends its data uing the parent function
@@ -205,44 +256,8 @@ FUNCTION_INT("::handleWrite(epoll_event *ev)", ret)
       }
    }
 
-//DMSG("%i - %i < %i || (%i - %i == %i && %i > 1)\n", nows, last_time_s, sec, nows, last_time_s, sec, sec);
    // the time has not yet come, we should spend most of it sleeping
-   if (nows - last_time_s < sec || (nows - last_time_s == sec && sec > 1)) {
-      // at least two second delay, sleep for one second and return to fight again later
-DMSG("sleeping 1 second\n")
-      sleep(1);
-FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
-      return 0;
-   } else if (nows - last_time_s == sec && sec > 0) {
-      // at least one second delay, sleep for half a second and return to fight again later
-DMSG("sleeping 1/2 a second\n")
-      usleep(500);
-FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
-      return 0;
-   } else {
-      int rest = delay - diff;
-      timespec ts;
-      ts.tv_sec = 0;
-      if (rest > 35) {
-         // delay is more than 35 milliseconds away, sleep half of that and return to fight again later
-         ts.tv_nsec = rest * 500 * 1000; // half of 1000 nanoseconds per microsecond (1000 per millisecond)
-DMSG("2 sleeping %i nanoseconds\n", ts.tv_nsec)
-         nanosleep(&ts, NULL);
-FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
-         return 0;
-      } else {
-         // the time is now very soon, sleep all but 10 milliseconds and return to fight again later
-         // the 10 milliseconds is so epoll has enough time to re-poll the device (the radio may stop being ready)
-         //   and because nanosleep will sleep an uncertain amount extra (up to 5 milliseconds)
-         ts.tv_nsec = (rest-10) * 1000 * 1000; // 1000 nanoseconds per microsecond (1000 per millisecond)
-         if (rest > 10) {
-DMSG("3 sleeping %i nanoseconds\n", ts.tv_nsec)
-            nanosleep(&ts, NULL);
-         }
-FUNCTION_INT("::handleWrite(epoll_event *ev)", 0)
-         return 0;
-      }
-   }
+   makeWritable(true); // this will create a timeout for the remaining time and then mark the efd to watch for reads only
 }
 
 // called to set the current time as the time to start delays from
