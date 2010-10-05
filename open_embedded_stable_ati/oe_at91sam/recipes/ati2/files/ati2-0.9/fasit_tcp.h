@@ -23,6 +23,8 @@ public :
    // for handling of the potentially multi-message 2100 message
    static void Bake_2100();
 
+   static void clearSubscribers(); // clears out all tcp connections on non-base station units
+
    // for handling of the super-compact 2102 message
    int getMoveReq() { return moveReq; }
    void setMoveReq(int moveReq) { this->moveReq = moveReq; }
@@ -78,6 +80,7 @@ private :
    // for handling of the potentially multi-message 2100 message
    static list<ATI_2100m> commandList; // for keeping the order of messages
    static multimap<ATI_2100m, int, struct_comp<struct ATI_2100m> > commandMap; // for keeping track of all destinations
+   static struct timeval start2100;
 };
 
 #endif

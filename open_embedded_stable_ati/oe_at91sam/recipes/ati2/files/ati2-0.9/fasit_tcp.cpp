@@ -3,7 +3,7 @@ using namespace std;
 #include "fasit_tcp.h"
 #include "serial.h"
 #include "common.h"
-#include "timeout.h"
+#include "timers.h"
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
@@ -11,6 +11,7 @@ using namespace std;
 // initialize static members
 list<ATI_2100m> FASIT_TCP::commandList;
 multimap<ATI_2100m, int, struct_comp<ATI_2100m> > FASIT_TCP::commandMap;
+timeval FASIT_TCP::start2100 = {0, 0};
 FASIT_TCP *FASIT_TCP::flink = NULL;
 
 FASIT_TCP::FASIT_TCP(int fd) : Connection(fd) {
@@ -259,6 +260,24 @@ FUNCTION_START("::seqForResp(int mnum, int seq)")
 FUNCTION_END("::seqForResp(int mnum, int seq)")
 }
 
+// clears out all tcp connections on non-base station units
+void FASIT_TCP::clearSubscribers() {
+FUNCTION_START("::clearSubscribers()")
+   // the base station shouldn't get this message anyway, but best to be sure
+   FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(UNASSIGNED);
+   if (tcp != NULL) {
+      return;
+   }
+
+   // delete all serial connetions
+   tcp = FASIT_TCP::getFirst();
+   while (tcp != NULL) {
+      tcp->deleteLater();
+      tcp = tcp->getNext();
+   }
+FUNCTION_END("::clearSubscribers()")
+}
+
 /***********************************************************
 *                     Message Handlers                     *
 ***********************************************************/
@@ -427,23 +446,20 @@ FUNCTION_START("::handle_2100(int start, int end)")
    commandMap.insert(pair<ATI_2100m,int>(cmd,this->tnum - 1)); // destination is this connection (convert tnum to zero based)
 DMSG("sending hit configuration: %i %i %i %i %i\n", cmd.embed.on, cmd.embed.react, cmd.embed.sens, cmd.embed.mode, cmd.embed.burst)
 
-   // check timeout timer
-   if (Timeout::timedOut() == -1) {
-      // timer not set, set to starting now
-      Timeout::setStartTimeNow();
-   }
    // make sure that we're an event to watch
-   Timeout::setMaxWait(125); // wait up to 125 milliseconds between 2100 commands
-   Timeout::addTimeoutEvent(BAKE_2100); // when we timeout, handle the BAKE_2100 event, which will combine all found 2100 messages and send them
+   Bake2100 *baker = new Bake2100(125); // wait up to 125 milliseconds between 2100 commands
 
    // check if we've waited for a total of 250 milliseconds already
-   timeval sTime = Timeout::getStartTime(), eTime;
+   timeval sTime = baker->getStartTime(), eTime;
    gettimeofday(&eTime, NULL);
-   if (eTime.tv_sec > sTime.tv_sec) {
-      // move second difference to tv_usec field
-      eTime.tv_usec += (eTime.tv_sec - sTime.tv_sec) * 1000000;
+   if (start2100.tv_sec == 0 && start2100.tv_usec == 0) {
+      start2100 = sTime;
    }
-   if (eTime.tv_usec - sTime.tv_usec > 250000) {
+   if (eTime.tv_sec > start2100.tv_sec) {
+      // move second difference to tv_usec field
+      eTime.tv_usec += (eTime.tv_sec - start2100.tv_sec) * 1000000;
+   }
+   if (eTime.tv_usec - start2100.tv_usec > 250000) {
       // 250 milliseconds has passed since the first message arrived, bake now
       Bake_2100();
    }
@@ -687,14 +703,15 @@ DMSG("next delay will be %i\n", nextDelay)
    SerialConnection::nextDelay(nextDelay);
    
    if (!commandList.empty()) {
-      // check timeout timer
-      if (Timeout::timedOut() == -1) {
-         // timer not set, set to starting now
-         Timeout::setStartTimeNow();
-      }
       // make sure that we're an event to watch
-      Timeout::setMaxWait(nextDelay); // wait until we're ready to send and send more commands then
-      Timeout::addTimeoutEvent(BAKE_2100); // when we timeout, handle the BAKE_2100 event, which will combine all found 2100 messages and send them
+      Bake2100 *baker = new Bake2100(125); // wait up to 125 milliseconds between 2100 commands
+
+      // reset the timer to now
+      start2100 = baker->getStartTime();
+   } else {
+      // reset start time
+      start2100.tv_sec = 0;
+      start2100.tv_usec = 0;
    }
    
 FUNCTION_END("::Bake_2100()")
