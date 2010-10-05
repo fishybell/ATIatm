@@ -6,7 +6,9 @@ using namespace std;
 #include "common.h"
 #include "radio.h"
 #include "timers.h"
+#include "timeout.h"
 #include <list>
+#include <stdlib.h>
 
 FASIT_Serial::FASIT_Serial(char *fname) : SerialConnection(fname) {
 FUNCTION_START("::FASIT_Serial(char *fname) : SerialConnection(fname)")
@@ -1071,7 +1073,17 @@ FUNCTION_START("::handle_16007(int start, int end)")
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_16007 *msg = (ATI_16007*)(rbuf + start + sizeof(ATI_header));
 
-   // received heartbeat signal
+   // did we already have the heartbeat?
+   if (!HeartBeat::haveHeartBeat()) {
+      // didn't have heartbeat, couldn't send serial, create random offset so every subscriber doesn't try to start at the same time
+      int rtime = rand() % 30000; // 30 second grouping
+DMSG("waiting initial random time of %i\n", rtime)
+      makeWritable(false); // disable writing (just in case it was writable)
+      Timeout::clearTimeout(serialWrite); // clear existing timers
+      new SerialWrite(this, rtime); // create new random timer to renable writing
+   }
+
+   // signal heartbeat received
    HeartBeat::heartBeatReceived(true);
 
 FUNCTION_INT("::handle_16007(int start, int end)", 0)
