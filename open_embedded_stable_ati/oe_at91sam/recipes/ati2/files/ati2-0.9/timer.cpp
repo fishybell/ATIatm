@@ -35,7 +35,7 @@ FUNCTION_START("::getTimeout()")
    // subtract current time from end time to acquire the timeout value
    timeval timeout;
    gettimeofday(&timeout, NULL);
-DMSG("finding timeout for (%i,%i) from (%i,%i)\n", endTime.tv_sec, endTime.tv_usec, timeout.tv_sec, timeout.tv_usec)
+DMSG("finding timeout of type %i for (%i,%i) from (%i,%i)\n", type, endTime.tv_sec, endTime.tv_usec, timeout.tv_sec, timeout.tv_usec)
 
    // subtract seconds straight out
    timeout.tv_sec = endTime.tv_sec - timeout.tv_sec;
