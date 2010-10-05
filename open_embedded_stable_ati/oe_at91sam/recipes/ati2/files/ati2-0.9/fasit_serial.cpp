@@ -5,6 +5,7 @@ using namespace std;
 #include "tcp_factory.h"
 #include "common.h"
 #include "radio.h"
+#include "timers.h"
 #include <list>
 
 FASIT_Serial::FASIT_Serial(char *fname) : SerialConnection(fname) {
@@ -446,7 +447,7 @@ FUNCTION_INT("::handle_2100(int start, int end)", 0)
 
    // send each message found to each destination found, the order doesn't really matter:
    //    all the messages will be actually sent in the order the individual TCP sockets
-   //    become writeable, and even then each will send all (1-4) messages in a single chunk
+   //    become writable, and even then each will send all (1-4) messages in a single chunk
    list<FASIT_TCP*>::iterator l;
    while (nmsgm--) {
 DMSG("handling message %i\n", nmsgm)
@@ -1070,7 +1071,8 @@ FUNCTION_START("::handle_16007(int start, int end)")
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_16007 *msg = (ATI_16007*)(rbuf + start + sizeof(ATI_header));
 
-   // TODO -- reset disconnect timer (and create disconnect timer)
+   // received heartbeat signal
+   HeartBeat::heartBeatReceived(true);
 
 FUNCTION_INT("::handle_16007(int start, int end)", 0)
    return 0;
@@ -1082,16 +1084,8 @@ FUNCTION_START("::handle_16008(int start, int end)")
    ATI_header *hdr = (ATI_header*)(rbuf + start);
    ATI_16008 *msg = (ATI_16008*)(rbuf + start + sizeof(ATI_header));
 
-   // are we the base station?
-   FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(UNASSIGNED);
-   if (tcp != NULL) { return 0; } // the base station shouldn't get this message anyway, but best to be sure
-
-   // delete all serial connetions
-   tcp = FASIT_TCP::getFirst();
-   while (tcp != NULL) {
-      tcp->deleteLater();
-      tcp = tcp->getNext();
-   }
+   // clear out subscriber's tcp connections
+   FASIT_TCP::clearSubscribers();
 
 FUNCTION_INT("::handle_16008(int start, int end)", 0)
    return 0;
