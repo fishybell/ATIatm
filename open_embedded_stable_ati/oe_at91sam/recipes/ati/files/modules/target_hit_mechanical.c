@@ -192,7 +192,7 @@ irqreturn_t hit_int(int irq, void *dev_id, struct pt_regs *regs)
 	// We get an interrupt on both edges, so we have to check to which edge we should respond.
     if (at91_get_gpio_value(INPUT_HIT_SENSOR) == INPUT_HIT_SENSOR_ACTIVE_STATE)
         {
-//    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
     	// Disable the interrupt (ourselves)
     	disable_irq_nosync(INPUT_HIT_SENSOR);
