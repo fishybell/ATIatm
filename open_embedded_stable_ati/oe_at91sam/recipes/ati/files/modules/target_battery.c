@@ -34,16 +34,15 @@
 	#undef INPUT_CHARGING_BAT_DEGLITCH_STATE
 	#undef INPUT_CHARGING_BAT
 
-//	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC0
-	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC3
+	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC1//PC0
 
 	#define OUTPUT_LED_LOW_BAT_ACTIVE_STATE			ACTIVE_LOW
-	#define	OUTPUT_LED_LOW_BAT 						AT91_PIN_PA6 // LED on dev. board
+	#define	OUTPUT_LED_LOW_BAT 						AT91_PIN_PC15 //PA6 LED on dev. board
 
 	#define INPUT_CHARGING_BAT_ACTIVE_STATE			ACTIVE_LOW
 	#define INPUT_CHARGING_BAT_PULLUP_STATE			PULLUP_OFF
 	#define INPUT_CHARGING_BAT_DEGLITCH_STATE		DEGLITCH_ON
-	#define	INPUT_CHARGING_BAT					AT91_PIN_PA30 // BP3 on dev. board
+	#define	INPUT_CHARGING_BAT					AT91_PIN_PB8 // PB3 on dev. board
 #endif // TESTING_ON_EVAL
 
 #if 	(INPUT_ADC_LOW_BAT == AT91_PIN_PC0)
@@ -86,6 +85,7 @@ struct clk *	adc_clk;
 #define ADC_CDR        	(0x30+(4*ADC_CHAN))   	// Channel Data Register
 #define CH_EN           (0x01<<ADC_CHAN)	 	// Channel to enable
 #define CH_DIS          (!CH_EN)				// Channels to disable
+#define ADC_START	0x02			// bit in the control register to start the ADC
 
 #define TRGEN           0x00    // 	Hardware triggers are disabled. Starting a conversion is only possible by software.
 #define TRGSEL          0x00    // 	Trigger Select - disregarded, see above
@@ -125,8 +125,8 @@ static const char * battery_charging_state[] =
 //---------------------------------------------------------------------------
 static unsigned char hardware_adc_read(void)
 	{
-	__raw_writel(0x02, adc_base + ADC_CR); // Start the ADC
-	while(!(__raw_readl(adc_base + ADC_SR) & CH_EN /*0x01*/))
+	__raw_writel(ADC_START, adc_base + ADC_CR); // Start the ADC
+	while(!(__raw_readl(adc_base + ADC_SR) & CH_EN))
 		{
 		cpu_relax();
 		}
@@ -189,7 +189,7 @@ static int hardware_adc_init(void)
 	at91_set_A_periph(INPUT_ADC_LOW_BAT, 0); 			// Set the pin to ADC
 
 	adc_base = ioremap(AT91SAM9260_BASE_ADC,SZ_16K); 	// Map the ADC memory region
-
+printk("adc_base: %08x\n",(int)adc_base);
 	__raw_writel(0x01, adc_base + ADC_CR); 				// Reset the ADC
 
 	__raw_writel(ADC_MODE, adc_base + ADC_MR); 			// Mode setup
