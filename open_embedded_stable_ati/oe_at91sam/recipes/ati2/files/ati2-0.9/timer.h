@@ -9,7 +9,9 @@ enum timerTypes {
    heartBeat,
    deadHeart,
    resubscribe,
-   serialWrite
+   serialWrite,
+   changeChannel,
+   sendChangeChannel
 };
 
 // for manipulating an individual timeout

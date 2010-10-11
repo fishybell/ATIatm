@@ -134,13 +134,13 @@ FUNCTION_END("::handleTimeout()")
  * SerialWrite timer                        *
  *******************************************/
 SerialWrite::SerialWrite(SerialConnection *serial, int msec) : TimeoutTimer(msec) {
-FUNCTION_START("::SerialWrite(int msec)")
+FUNCTION_START("::SerialWrite(SerialConnection *serial, int msec)")
    this->serial = serial;
 
    // set the type and push to the main timer class
    type = serialWrite;
    push();
-FUNCTION_END("::SerialWrite(int msec)")
+FUNCTION_END("::SerialWrite(SerialConnection *serial, int msec)")
 }
 
 void SerialWrite::handleTimeout() {
@@ -149,5 +149,54 @@ FUNCTION_START("::handleTimeout()")
 FUNCTION_END("::handleTimeout()")
 }
 
+/********************************************
+ * ChangeChannel timer                      *
+ *******************************************/
+ChangeChannel::ChangeChannel(int channel, int msec) : TimeoutTimer(msec) {
+FUNCTION_START("::ChangeChannel(int channel, int msec)")
+   this->channel = channel;
 
+   // set the type and push to the main timer class
+   type = changeChannel;
+   push();
+FUNCTION_END("::ChangeChannel(int channel, int msec)")
+}
+
+void ChangeChannel::handleTimeout() {
+FUNCTION_START("::handleTimeout()")
+   // change all radios to the new channel
+   SerialConnection::changeAllChannels(channel);
+FUNCTION_END("::handleTimeout()")
+}
+
+/********************************************
+ * SendChangeChannel timer                  *
+ *******************************************/
+SendChangeChannel::SendChangeChannel(int source, ATI_16005 msg, int count, int msec) : TimeoutTimer(msec) {
+FUNCTION_START("::SendChangeChannel(int source, ATI_16005 msg, int count, int msec)")
+   this->source = source;
+   this->msg = msg;
+   this->count = count;
+
+   // set the type and push to the main timer class
+   type = changeChannel;
+   push();
+FUNCTION_END("::SendChangeChannel(int source, ATI_16005 msg, int count, int msec)")
+}
+
+void SendChangeChannel::handleTimeout() {
+FUNCTION_START("::handleTimeout()")
+   // create header
+   ATI_header hdr = FASIT::createHeader(16005, source, &msg, sizeof(ATI_16005));
+
+   // send message on all serial devices
+   SerialConnection::queueMsgAll(&hdr, sizeof(ATI_header));
+   SerialConnection::queueMsgAll(&msg, sizeof(ATI_16005));
+   
+   // send again?
+   if (--count) {
+      new SendChangeChannel(source, msg, count, SENDCHANGECHANNEL);
+   }
+FUNCTION_END("::handleTimeout()")
+}
 

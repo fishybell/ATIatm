@@ -2,6 +2,7 @@
 #define _TIMERS_H_
 
 #include "timer.h"
+#include "fasit.h"
 
 // various timout timer definitions
 
@@ -11,6 +12,8 @@
 #define RESUBSCRIBE 50
 #define DEADHEART 50000
 #define SERIALWAIT 10000
+#define CHANGECHANNEL 10000
+#define SENDCHANGECHANNEL 2000
 
 // calls FASIT_TCP::Bake_2100
 class Bake2100 : public TimeoutTimer {
@@ -60,6 +63,28 @@ public :
 
 private :
    SerialConnection *serial;
+};
+
+// changes all radios to a different channel
+class ChangeChannel : public TimeoutTimer {
+public :
+   ChangeChannel(int channel, int msec); // starts the timeout timer and installs with the global timer
+   virtual void handleTimeout(); // Timeout class determines if this timer has timed out and calls this appropriately
+
+private :
+   int channel;
+};
+
+// resend a "change radio channel" message later several times
+class SendChangeChannel : public TimeoutTimer {
+public :
+   SendChangeChannel(int source, struct ATI_16005 msg, int count, int msec); // starts the timeout timer and installs with the global timer
+   virtual void handleTimeout(); // Timeout class determines if this timer has timed out and calls this appropriately
+
+private :
+   int source;
+   struct ATI_16005 msg;
+   int count;
 };
 
 #endif
