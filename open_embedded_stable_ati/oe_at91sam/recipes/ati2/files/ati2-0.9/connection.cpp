@@ -154,7 +154,7 @@ FUNCTION_START("::handleRead(epoll_event *ev)")
 DMSG("%i read %i bytes:\n", fd, rsize)
 PRINT_HEXB(buf, rsize)
    if (rsize == -1) {
-      DMSG("Read error: %s\n", strerror(errno))
+      IERROR("Read error: %s\n", strerror(errno))
    }
    if (rsize > 0) {
       int ret = parseData(rsize, buf);
