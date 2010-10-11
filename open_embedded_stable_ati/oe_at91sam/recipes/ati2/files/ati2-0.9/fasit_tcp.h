@@ -64,6 +64,9 @@ private :
    int handle_2110(int start, int end);
    int handle_2112(int start, int end);
    int handle_2113(int start, int end);
+   int handle_16000(int start, int end);
+   int handle_16001(int start, int end);
+   int handle_16005(int start, int end);
 
    int seq; // incrimenting sequence to send with each message
    void seqForResp(int mnum, int seq);

@@ -332,4 +332,24 @@ FUNCTION_START("::setMaxChar(int max)")
 FUNCTION_END("::setMaxChar(int max)")
 }
 
+// change each serial radio's channel
+void SerialConnection::changeAllChannels(int channel) {
+FUNCTION_START("::changeAllChannels(int channel)")
+   // loop through linked list and change all available channels
+   SerialConnection *tlink = flink;
+   while (tlink != NULL) {
+      tlink->changeChannel(channel); // TODO -- all change to the same channel?
+      tlink = tlink->link;
+   }
+FUNCTION_END("::changeAllChannels(int channel)")
+}
+
+// change this serial radio's channel
+void SerialConnection::changeChannel(int channel) {
+FUNCTION_START("::changeChannel(int channel)")
+   // change channel (will block for several seconds)
+   Radio radio(fd);
+   radio.changeChannel(msg->channel);
+FUNCTION_END("::changeChannel(int channel)")
+}
 

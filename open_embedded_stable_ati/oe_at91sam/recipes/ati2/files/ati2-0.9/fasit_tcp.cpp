@@ -7,6 +7,7 @@ using namespace std;
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
+#include <errno.h>
 
 // initialize static members
 list<ATI_2100m> FASIT_TCP::commandList;
@@ -125,6 +126,9 @@ HERE
          HANDLE_FASIT (2110)
          HANDLE_FASIT (2112)
          HANDLE_FASIT (2113)
+         HANDLE_FASIT (16000)
+         HANDLE_FASIT (16001)
+         HANDLE_FASIT (16005)
          default:
             IMSG("message valid, but not handled: %i\n", mnum)
             break;
@@ -161,21 +165,33 @@ FUNCTION_START("::validMessage(int *start, int *end)")
             return 16001;
          }
          if (strncmp("@Channel", rbuf + *start, 8) == 0) {
-            *end = *start + 9;
+            *end = *start + 8;
             // look for end character
             while (*end < rsize) {
                if (rbuf[*end] == '~') {
                   return 16005;
                }
+               *end = *end + 1;
             }
          }
-          if (strncmp("@AllChannel", rbuf + *start, 11) == 0) {
+          if (strncmp("@BaseChannel", rbuf + *start, 12) == 0) {
             *end = *start + 12;
             // look for end character
             while (*end < rsize) {
                if (rbuf[*end] == '~') {
                   return 16005;
                }
+               *end = *end + 1;
+            }
+         }
+         if (strncmp("@AllChannel", rbuf + *start, 11) == 0) {
+            *end = *start + 11;
+            // look for end character
+            while (*end < rsize) {
+               if (rbuf[*end] == '~') {
+                  return 16005;
+               }
+               *end = *end + 1;
             }
          }
       }
@@ -1005,6 +1021,88 @@ FUNCTION_START("::handle_2113(int start, int end)")
    SerialConnection::queueMsgAll(&rmsg, sizeof(ATI_2113));
 
 FUNCTION_INT("::handle_2113(int start, int end)", 0)
+   return 0;
+}
+
+int FASIT_TCP::handle_16000(int start, int end) {
+FUNCTION_START("::handle_16000(int start, int end)")
+   ATI_16000 msg;
+   msg.dest = tnum; // send to myself
+   msg.enable = end - start == 9 ? 0 : 1; // message length of 8 for enable, 9 for disable
+   ATI_header hdr = createHeader(16000, tnum, &msg, sizeof(ATI_16000)); // source is this connection
+   
+   // send message on all serial devices
+   SerialConnection::queueMsgAll(&hdr, sizeof(ATI_header));
+   SerialConnection::queueMsgAll(&msg, sizeof(ATI_16000));
+   
+FUNCTION_INT("::handle_16000(int start, int end)", 0)
+   return 0;
+}
+
+int FASIT_TCP::handle_16001(int start, int end) {
+FUNCTION_START("::handle_16001(int start, int end)")
+   ATI_16001 msg;
+   msg.dest = tnum; // send to myself
+   ATI_header hdr = createHeader(16001, tnum, &msg, sizeof(ATI_16001)); // source is this connection
+   
+   // send message on all serial devices
+   SerialConnection::queueMsgAll(&hdr, sizeof(ATI_header));
+   SerialConnection::queueMsgAll(&msg, sizeof(ATI_16001));
+   
+FUNCTION_INT("::handle_16001(int start, int end)", 0)
+   return 0;
+}
+
+int FASIT_TCP::handle_16005(int start, int end) {
+FUNCTION_START("::handle_16005(int start, int end)")
+   ATI_16005 msg;
+
+   // check for broadcast, single, or local
+   char *endptr, *startptr;
+   bool local = false;
+   if (strncmp("@AllChannel", rbuf + start, 11) == 0) {
+      // broadcast
+      msg.dest = BASE_STATION;
+      msg.broadcast = 1;
+      startptr = rbuf + start + 11;
+   } else if (strncmp("@Channel", rbuf + start, 8) == 0) {
+      // single
+      msg.dest = tnum; // send to myself
+      msg.broadcast = 0;
+      startptr = rbuf + start + 8;
+   } else {
+      // local
+      local = true;
+      startptr = rbuf + start + 12;
+FUNCTION_INT("::handle_16005(int start, int end)", 0)
+      return 0;
+   }
+
+   // parse the argument
+   rbuf[end] = '\0'; // change '~' into null character to terminate as a standard string
+   errno = 0;
+   msg.channel = strtoq(startptr, &endptr, 10); // look for a base 10 integer
+   if (errno == ERANGE || errno == EINVAL) {
+      IERROR("Error parsing 16005 channel data: %s\n", strerror(errno))
+FUNCTION_INT("::handle_16005(int start, int end)", 0)
+      return 0;
+   }
+DMSG("sending 16005 to 0x%04x%s for channel %i\n", msg.dest, msg.broadcast ? ", as broadcast," : "", msg.channel)
+
+   // schedule another action for later
+   if (local) {
+      new ChangeChannel(msg.channel, CHANGECHANNEL); // actually change the channel later
+   } else {
+      new SendChangeChannel(tnum, msg, 3, SENDCHANGECHANNEL); // resend thrice
+   }
+
+   ATI_header hdr = createHeader(16005, tnum, &msg, sizeof(ATI_16005)); // source is this connection
+   
+   // send message on all serial devices
+   SerialConnection::queueMsgAll(&hdr, sizeof(ATI_header));
+   SerialConnection::queueMsgAll(&msg, sizeof(ATI_16005));
+   
+FUNCTION_INT("::handle_16005(int start, int end)", 0)
    return 0;
 }
 

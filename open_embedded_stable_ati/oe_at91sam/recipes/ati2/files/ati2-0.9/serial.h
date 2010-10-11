@@ -14,6 +14,9 @@ public:
 
    static void nextDelay(int msecs); // sets a wait time for all serial devices for after they send their next message
    static void nowDelay(int msecs); // sets a wait time for all serial devices for before they send their next message
+
+   static void changeAllChannels(int channel); // change each serial radio's channel
+   void changeChannel(int channel); // change this serial radio's channel
    
    void setTimeNow(); // called to set the current time as the time to start delays from
    void addDelay(int delay); // called to increase the delay required before the next time I can send data (in milliseconds)
