@@ -12,12 +12,13 @@ ctl.wm8731 {
 
 pcm.swmix {
 	type dmix
-	ipc_key 249
+	ipc_key 1024
 	slave {
 		pcm wm8731
 		period_time 0
-		period_size 1024
-		buffer_size 8192
+		period_size 2048
+		buffer_size 32768
 		rate 44100
 	}
 }
+
