@@ -5,6 +5,7 @@ RDEPENDS = "kernel (${KERNEL_VERSION})"
 DEPENDS = "virtual/kernel"
 
 #        file://ati-1.0.tar.gz  \
+#        file://start_target_modules.sh \
 SRC_URI = " \
 		file://asoundrc \
 		file://modules/Makefile \
@@ -31,9 +32,10 @@ SRC_URI = " \
 		file://modules/target_muzzle_flash.h \
 		file://modules/target_thermal.c \
 		file://modules/target_thermal.h \
+		file://modules/target_ses_interface.c \
+		file://modules/target_ses_interface.h \
 		file://modules/target_user_interface.c \
 		file://modules/target_user_interface.h \
-        file://start_target_modules.sh \
           "
 SRCNAME = "${PN}"
 #S = "${WORKDIR}/${SRCNAME}-${PV}/modules"
@@ -59,24 +61,16 @@ ROOT_USER_INSTALL_DIR = "/home/root"
 
 do_install(){
     install -d ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_battery.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_hit_mechanical.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_hit_miles.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_lifter_armor.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_lifter_infantry.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_miles_transmitter.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_mover_infantry.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_muzzle_flash.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_thermal.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0644 ${S}/target_user_interface.ko ${D}${TARGET_MODULES_INSTALL_DIR}
-    install -m 0755 ${WORKDIR}/start_target_modules.sh ${D}${ROOT_USER_INSTALL_DIR}/start_target_modules.sh
-    install -m 0755 ${WORKDIR}/asoundrc ${D}${ROOT_USER_INSTALL_DIR}/.asoundrc
+    install -d ${D}/etc
+    install -m 0644 ${S}/*.ko ${D}${TARGET_MODULES_INSTALL_DIR}
+#    install -m 0755 ${WORKDIR}/start_target_modules.sh ${D}${ROOT_USER_INSTALL_DIR}/start_target_modules.sh
+    install -m 0644 ${WORKDIR}/asoundrc ${D}/etc/asound.conf
 }
 
 PACKAGE_ARCH = "at91sam9g20ek_2mmc"
 PACKAGES = "${PN}"
 FILES_${PN} = "${TARGET_MODULES_INSTALL_DIR}"
+FILES_${PN} += "/etc/asound.conf"
 
 
 
