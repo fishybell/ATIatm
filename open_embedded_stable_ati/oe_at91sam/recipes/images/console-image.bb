@@ -12,6 +12,9 @@ ANGSTROM_EXTRA_INSTALL += " \
 	iperf \
 	dosfstools \
 	mtd-utils \
+	gdb \
+	tcl \
+	tcludp \
 #	nbench-byte \
 	"
 
@@ -21,6 +24,8 @@ DEPENDS = "task-base-extended \
            python \
 	   ati ati2\
            compat-wireless \
+	   tcl \
+	   tcludp \
            ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
 
@@ -30,6 +35,7 @@ IMAGE_INSTALL = "task-base-extended \
            kernel-modules \
 	   ati ati2\
            compat-wireless \
+           lame \
 	   ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
 
