@@ -58,7 +58,7 @@
 
 // TODO - map pwm output pin to block/channel
 #define MOTOR_PWM_BLOCK			1		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
-#define MOTOR_PWM_CHANNEL		2		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+#define MOTOR_PWM_CHANNEL		1		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 
 static struct atmel_tc * motor_pwm_tc = NULL;
 
@@ -199,38 +199,35 @@ static int hardware_motor_on(int direction)
 
     spin_lock_irqsave(&motor_lock, flags);
 
-    // de-assert the neg inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-
-    // ensure the pos (pwm) inputs to the h-bridge are set to gpio and de-assert
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-
+    // turn on directional lines
     if (direction == MOVER_DIRECTION_REVERSE)
 		{
-		at91_set_B_periph(OUTPUT_MOVER_MOTOR_REV_POS, PULLUP_OFF);
-		at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+		// reverse on, forward off
+		at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+		at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
 
 	    atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_REVERSE);
 	    printk(KERN_ALERT "%s - %s() - reverse\n",TARGET_NAME, __func__);
 		}
     else if (direction == MOVER_DIRECTION_FORWARD)
 		{
-		at91_set_B_periph(OUTPUT_MOVER_MOTOR_FWD_POS, PULLUP_OFF);
-		at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+		// reverse off, forward on
+		at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+		at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
 
     	atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
     	printk(KERN_ALERT "%s - %s() - forward\n",TARGET_NAME, __func__);
 		}
     else
     	{
-		// TODO - error
-		at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-		at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-
 		printk(KERN_ALERT "%s - %s() - error\n",TARGET_NAME, __func__);
     	}
+
+    // assert pwm line
+    at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+
+    // turn off brake
+    at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, !OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
 
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
@@ -247,17 +244,15 @@ static int hardware_motor_off(void)
 
 	spin_lock_irqsave(&motor_lock, flags);
 
-    // de-assert the neg inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+	// de-assert the pwm line
+	at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 
-    // de-assert the pos (pwm) inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+	// turn on brake
+	at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
 
-    // now assert the neg inputs to the h-bridge - this state acts as the brake
-	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+	// turn off both directional lines
+	at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+	at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
 
 	atomic_set(&movement_atomic, MOVER_MOVEMENT_STOPPED);
 	
@@ -510,18 +505,11 @@ static int hardware_init(void)
     {
     int status = 0;
 
-    // de-assert the neg inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    // turn on brake
+    at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
 
-    // de-assert the pos (pwm) inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-
-    // now assert the neg inputs to the h-bridge - this state acts as the brake
-	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-
+    // de-assert the pwm line
+    at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 
     // TODO - add speed sensors
     if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_SENSOR_FRONT, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE, movement_sensor_front_int, "movement_sensor_front_int") == FALSE) 	||
@@ -535,6 +523,11 @@ static int hardware_init(void)
     // setup motor PWM output
     status = hardware_motor_pwm_init();
 
+    // turn on motor controller (via h-bridge, so de-assert negatives first, then assert power line)
+    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+
     return status;
     }
 
@@ -544,15 +537,18 @@ static int hardware_init(void)
 static int hardware_exit(void)
     {
 
-    // de-assert the neg inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+	// de-assert the pwm line
+	at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 
-    // de-assert the pos (pwm) inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+	// turn on brake
+	at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
 
-    // now assert the neg inputs to the h-bridge - this state acts as the brake
+	// turn off both directional lines
+	at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+	at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+
+	// turn on motor controller (via h-bridge, so de-assert power first, then assert negatives)
+	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 
@@ -641,8 +637,8 @@ static int hardware_speed_set(int speed)
 	spin_lock_irqsave(&motor_lock, flags);
 
 	// These change the duty cycle
-	__raw_writel((MOTOR_PWM_RC * speed)/100, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	__raw_writel((MOTOR_PWM_RC * speed)/100, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+	__raw_writel((MOTOR_PWM_RC * speed)/20, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	__raw_writel((MOTOR_PWM_RC * speed)/20, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
 
 	spin_unlock_irqrestore(&motor_lock, flags);
 
