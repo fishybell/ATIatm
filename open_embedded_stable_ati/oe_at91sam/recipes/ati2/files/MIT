@@ -1,11 +1,10 @@
-PWD=`pwd`
-cd
+cd /home/root
 
 rmmod *.ko 2>/dev/null
 rmmod *.ko 2>/dev/null
 
 insmod target.ko
-#insmod target_user_interface.ko
+insmod target_user_interface.ko
 insmod target_mover_infantry.ko
 insmod target_hit_mechanical.ko
 
@@ -13,5 +12,3 @@ if cd fasit 2>/dev/null ; then
     python fasit_client_main.py -t MIT
 fi
 
-cd
-cd $PWD
