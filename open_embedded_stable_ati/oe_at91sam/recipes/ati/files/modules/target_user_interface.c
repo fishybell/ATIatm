@@ -11,6 +11,10 @@
 
 #define TARGET_NAME		"user interface"
 
+#define BIT_DOUBLE_IN_MSECONDS		2000
+#define BIT_READ_IN_MSECONDS		50
+#define BIT_CANCEL_IN_MSECONDS		5000
+
 #define BLINK_ON_IN_MSECONDS		1000
 #define BLINK_OFF_IN_MSECONDS		500
 
@@ -19,9 +23,12 @@
 #define BIT_STATUS_BLINK   	2
 #define BIT_STATUS_ERROR   	3
 
+// moves from clear, to unclear, to reclear, to press as we need a double click
 #define BUTTON_STATUS_CLEAR   	0
-#define BUTTON_STATUS_PRESSED  	1
-#define BUTTON_STATUS_ERROR   	2
+#define BUTTON_STATUS_UNCLEAR  	1
+#define BUTTON_STATUS_RECLEAR  	2
+#define BUTTON_STATUS_PRESSED  	3
+#define BUTTON_STATUS_ERROR   	4
 
 
 //#define TESTING_ON_EVAL
@@ -34,23 +41,14 @@
 	#undef OUTPUT_TEST_INDICATOR_ACTIVE_STATE
 	#undef OUTPUT_TEST_INDICATOR
 
-	#undef INPUT_WAKEUP_BUTTON_ACTIVE_STATE
-	#undef INPUT_WAKEUP_BUTTON_PULLUP_STATE
-	#undef INPUT_WAKEUP_BUTTON_DEGLITCH_STATE
-	#undef INPUT_WAKEUP_BUTTON
-
-	#define	INPUT_TEST_BUTTON_ACTIVE_STATE		ACTIVE_LOW
+	#define	INPUT_TEST_BUTTON_ACTIVE_STATE		ACTIVE_HIGH
 	#define INPUT_TEST_BUTTON_PULLUP_STATE		PULLUP_ON
 	#define INPUT_TEST_BUTTON_DEGLITCH_STATE	DEGLITCH_ON
 	#define	INPUT_TEST_BUTTON 					AT91_PIN_PA31   // BP4 on dev. board
 
 	#define	OUTPUT_TEST_INDICATOR_ACTIVE_STATE	ACTIVE_LOW
-	#define	OUTPUT_TEST_INDICATOR 				AT91_PIN_PA6	// LED on dev. board
+	#define	OUTPUT_TEST_INDICATOR 				AT91_PIN_PB8	// LED on dev. board
 
-	#define	INPUT_WAKEUP_BUTTON_ACTIVE_STATE	ACTIVE_LOW
-	#define INPUT_WAKEUP_BUTTON_PULLUP_STATE	PULLUP_ON
-	#define INPUT_WAKEUP_BUTTON_DEGLITCH_STATE	DEGLITCH_ON
-	#define	INPUT_WAKEUP_BUTTON 				AT91_PIN_PA30   // BP3 on dev. board
 #endif // TESTING_ON_EVAL
 
 //---------------------------------------------------------------------------
@@ -65,15 +63,19 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 atomic_t bit_button_atomic = ATOMIC_INIT(BUTTON_STATUS_CLEAR);
 
 //---------------------------------------------------------------------------
-// This atomic variable is use to indicate that an the wake-up button has
-// been pressed. It gets cleared when user-space reads
-//---------------------------------------------------------------------------
-atomic_t wakeup_button_atomic = ATOMIC_INIT(BUTTON_STATUS_CLEAR);
-
-//---------------------------------------------------------------------------
 // This atomic variable is use to store the bit indicator setting.
 //---------------------------------------------------------------------------
 atomic_t bit_indicator_atomic = ATOMIC_INIT(BIT_STATUS_OFF);
+
+//---------------------------------------------------------------------------
+// Declaration of the function that gets called when the press timeout fires.
+//---------------------------------------------------------------------------
+static void press_timeout_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
+// Kernel timer for the blink timeout.
+//---------------------------------------------------------------------------
+static struct timer_list press_timeout_timer_list = TIMER_INITIALIZER(press_timeout_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Declaration of the function that gets called when the blink timeout fires.
@@ -86,16 +88,30 @@ static void blink_timeout_fire(unsigned long data);
 static struct timer_list blink_timeout_timer_list = TIMER_INITIALIZER(blink_timeout_fire, 0, 0);
 
 //---------------------------------------------------------------------------
+// Declaration of the function that gets called when the bit read timeout fires.
+//---------------------------------------------------------------------------
+static void bit_read_timeout_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
+// Kernel timer for the bit read timeout.
+//---------------------------------------------------------------------------
+static struct timer_list bit_read_timeout_timer_list = TIMER_INITIALIZER(bit_read_timeout_fire, 0, 0);
+
+//---------------------------------------------------------------------------
+// Declaration of the function that gets called when the bit timeout fires.
+//---------------------------------------------------------------------------
+static void bit_timeout_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
+// Kernel timer for the bit timeout.
+//---------------------------------------------------------------------------
+static struct timer_list bit_timeout_timer_list = TIMER_INITIALIZER(bit_timeout_fire, 0, 0);
+
+//---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space that the bit
 // button has been pressed.
 //---------------------------------------------------------------------------
 static struct work_struct bit_button_work;
-
-//---------------------------------------------------------------------------
-// This delayed work queue item is used to notify user-space that the wake-up
-// button has been pressed.
-//---------------------------------------------------------------------------
-static struct work_struct wakeup_button_work;
 
 //---------------------------------------------------------------------------
 // Maps the bit indicator status to status name.
@@ -113,6 +129,8 @@ static const char * bit_led_status[] =
 //---------------------------------------------------------------------------
 static const char * button_status[] =
     {
+    "clear",
+    "clear",
     "clear",
     "pressed",
     "error"
@@ -137,6 +155,30 @@ static int hardware_bit_status_off(void)
 	}
 
 //---------------------------------------------------------------------------
+// The function that gets called when the bit timeout fires.
+//---------------------------------------------------------------------------
+static void bit_timeout_fire(unsigned long data)
+    {
+    printk(KERN_ALERT "%s - %s\n",TARGET_NAME, __func__);
+    if (atomic_read(&bit_button_atomic) != BUTTON_STATUS_PRESSED)
+        {
+        atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
+        }
+    }
+
+//---------------------------------------------------------------------------
+// The function that gets called when the press timeout fires.
+//---------------------------------------------------------------------------
+static void press_timeout_fire(unsigned long data)
+    {
+    printk(KERN_ALERT "%s - %s\n",TARGET_NAME, __func__);
+    atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
+
+    // notify user-space only when fully double-clicked
+    schedule_work(&bit_button_work);
+    }
+
+//---------------------------------------------------------------------------
 // The function that gets called when the blink timeout fires.
 //---------------------------------------------------------------------------
 static void blink_timeout_fire(unsigned long data)
@@ -154,67 +196,80 @@ static void blink_timeout_fire(unsigned long data)
 	}
 
 //---------------------------------------------------------------------------
-//
+// double press required to trip
 //---------------------------------------------------------------------------
-irqreturn_t wakeup_button_int(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t bit_button_int(int irq, void *dev_id, struct pt_regs *regs)
     {
+    int value;
     if (!atomic_read(&full_init))
         {
         return IRQ_HANDLED;
         }
 
     // check if the button has been pressed but not read by user-space
-    if (atomic_read(&wakeup_button_atomic))
-		{
-		return IRQ_HANDLED;
-		}
+    value = atomic_read(&bit_button_atomic);
+    if (value == BUTTON_STATUS_PRESSED)
+	{
+	return IRQ_HANDLED;
+	}
 
-	// We get an interrupt on both edges, so we have to check to which edge
-	// we are responding.
-    if (at91_get_gpio_value(INPUT_WAKEUP_BUTTON) == INPUT_WAKEUP_BUTTON_ACTIVE_STATE)
-        {
-    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
-
-        // signal that the wake-up button has been pressed
-        atomic_set(&wakeup_button_atomic, BUTTON_STATUS_PRESSED);
-
-        // notify user-space
-        schedule_work(&bit_button_work);
-        }
+    // handle the actual read after a short timeout to let the button settle
+    del_timer(&bit_read_timeout_timer_list);
+    mod_timer(&bit_read_timeout_timer_list, jiffies+(BIT_READ_IN_MSECONDS*HZ/1000));
 
     return IRQ_HANDLED;
     }
 
 //---------------------------------------------------------------------------
-//
+// The function that gets called when the bit read timeout fires.
 //---------------------------------------------------------------------------
-irqreturn_t bit_button_int(int irq, void *dev_id, struct pt_regs *regs)
+static void bit_read_timeout_fire(unsigned long data)
     {
-    if (!atomic_read(&full_init))
-        {
-        return IRQ_HANDLED;
-        }
+    int value;
+    // read in value of bit button
+    value = atomic_read(&bit_button_atomic);
 
-    // check if the button has been pressed but not read by user-space
-    if (atomic_read(&bit_button_atomic))
-		{
-		return IRQ_HANDLED;
-		}
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
-	// We get an interrupt on both edges, so we have to check to which edge
-	// we are responding.
+    // We get an interrupt on both edges, so we have to check to which edge
+    //  we are responding.
     if (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE)
         {
-    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+        printk(KERN_ALERT "%s - ACTIVE\n",TARGET_NAME);
+        if (value == BUTTON_STATUS_CLEAR || BUTTON_STATUS_RECLEAR)
+            {
+            // signal that the wake-up button has been pressed
+            atomic_set(&bit_button_atomic, ++value);
 
-        // signal that the bit button has been pressed
-        atomic_set(&bit_button_atomic, BUTTON_STATUS_PRESSED);
+            // schedule a timeout in case we don't double-click
+            if (value != BUTTON_STATUS_PRESSED)
+                {
+                mod_timer(&bit_timeout_timer_list, jiffies+(BIT_DOUBLE_IN_MSECONDS*HZ/1000));
+                }
+            else
+                {
+                // notify user-space only when fully double-clicked
+                schedule_work(&bit_button_work);
 
-        // notify user-space
-        schedule_work(&bit_button_work);
+                // at some point clear out the press
+                mod_timer(&press_timeout_timer_list, jiffies+(BIT_CANCEL_IN_MSECONDS*HZ/1000));
+                }
+            }
+        }
+    else
+        {
+        printk(KERN_ALERT "%s - INACTIVE\n",TARGET_NAME);
+        if (value == BUTTON_STATUS_UNCLEAR)
+            {
+            // signal that the wake-up button has been pressed
+            atomic_set(&bit_button_atomic, ++value);
+
+            // schedule a timeout in case we don't double-click
+            mod_timer(&bit_timeout_timer_list, jiffies+(BIT_DOUBLE_IN_MSECONDS*HZ/1000));
+            }
         }
 
-    return IRQ_HANDLED;
+    printk(KERN_ALERT "%s - %i\n",TARGET_NAME, value);
     }
 
 //---------------------------------------------------------------------------
@@ -228,25 +283,8 @@ static int hardware_init(void)
     at91_set_gpio_output(OUTPUT_TEST_INDICATOR, !OUTPUT_TEST_INDICATOR_ACTIVE_STATE);
 
     // Configure button gpios for input and deglitch for interrupts
-    at91_set_gpio_input(INPUT_WAKEUP_BUTTON, INPUT_WAKEUP_BUTTON_PULLUP_STATE);
-    at91_set_deglitch(INPUT_WAKEUP_BUTTON, INPUT_WAKEUP_BUTTON_DEGLITCH_STATE);
-
     at91_set_gpio_input(INPUT_TEST_BUTTON, INPUT_TEST_BUTTON_PULLUP_STATE);
     at91_set_deglitch(INPUT_TEST_BUTTON, INPUT_TEST_BUTTON_DEGLITCH_STATE);
-
-    status = request_irq(INPUT_WAKEUP_BUTTON, (void*)wakeup_button_int, 0, "user_interface_wakeup_button", NULL);
-    if (status != 0)
-        {
-        if (status == -EINVAL)
-            {
-            printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_WAKEUP_BUTTON);
-            }
-        else if (status == -EBUSY)
-            {
-            printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_WAKEUP_BUTTON);
-            }
-        return status;
-        }
 
     status = request_irq(INPUT_TEST_BUTTON, (void*)bit_button_int, 0, "user_interface_bit_button", NULL);
     if (status != 0)
@@ -271,9 +309,12 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
-	free_irq(INPUT_WAKEUP_BUTTON, NULL);
-	free_irq(INPUT_TEST_BUTTON, NULL);
-	return 0;
+    del_timer(&press_timeout_timer_list);
+    del_timer(&bit_timeout_timer_list);
+    del_timer(&bit_read_timeout_timer_list);
+    del_timer(&blink_timeout_timer_list);
+    free_irq(INPUT_TEST_BUTTON, NULL);
+    return 0;
     }
 
 //---------------------------------------------------------------------------
@@ -287,24 +328,22 @@ static int hardware_bit_status_get(void)
     }
 
 //---------------------------------------------------------------------------
-// Handles reads to the wakeup_button attribute through sysfs
-//---------------------------------------------------------------------------
-static ssize_t wakeup_button_show(struct device *dev, struct device_attribute *attr, char *buf)
-    {
-	int status;
-	status = atomic_read(&wakeup_button_atomic);
-	atomic_set(&wakeup_button_atomic, BUTTON_STATUS_CLEAR);
-    return sprintf(buf, "%s\n", button_status[status]);
-    }
-
-//---------------------------------------------------------------------------
 // Handles reads to the bit_button attribute through sysfs
 //---------------------------------------------------------------------------
 static ssize_t bit_button_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
-	int status;
-	status = atomic_read(&bit_button_atomic);
-	atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
+    int status;
+    status = atomic_read(&bit_button_atomic);
+    // clear if we were pressed
+    if (status == BUTTON_STATUS_PRESSED)
+        {
+        // cancel the bit timer
+        del_timer(&bit_timeout_timer_list);
+        atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
+
+        // cancel the press clear timer
+        del_timer(&press_timeout_timer_list);
+        }
     return sprintf(buf, "%s\n", button_status[status]);
     }
 
@@ -352,7 +391,6 @@ static ssize_t bit_status_store(struct device *dev, struct device_attribute *att
 //---------------------------------------------------------------------------
 // maps attributes, r/w permissions, and handler functions
 //---------------------------------------------------------------------------
-static DEVICE_ATTR(wakeup_button, 0444, wakeup_button_show, NULL);
 static DEVICE_ATTR(bit_button, 0444, bit_button_show, NULL);
 static DEVICE_ATTR(bit_status, 0644, bit_status_show, bit_status_store);
 
@@ -361,7 +399,6 @@ static DEVICE_ATTR(bit_status, 0644, bit_status_show, bit_status_store);
 //---------------------------------------------------------------------------
 static const struct attribute * user_interface_attrs[] =
     {
-    &dev_attr_wakeup_button.attr,
     &dev_attr_bit_button.attr,
     &dev_attr_bit_status.attr,
     NULL,
@@ -403,14 +440,6 @@ static void bit_pressed(struct work_struct * work)
 	}
 
 //---------------------------------------------------------------------------
-// Work item to notify the user-space about a wake-up button press
-//---------------------------------------------------------------------------
-static void wakeup_button_pressed(struct work_struct * work)
-	{
-	target_sysfs_notify(&target_device_user_interface, "wakeup_button");
-	}
-
-//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init target_user_interface_init(void)
@@ -421,7 +450,6 @@ static int __init target_user_interface_init(void)
 	hardware_init();
 
 	INIT_WORK(&bit_button_work, bit_pressed);
-	INIT_WORK(&wakeup_button_work, wakeup_button_pressed);
 
     retval=target_sysfs_add(&target_device_user_interface);
 
