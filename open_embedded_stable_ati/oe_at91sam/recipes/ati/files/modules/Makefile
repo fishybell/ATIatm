@@ -7,6 +7,7 @@ obj-m := 	target.o \
 			target_battery.o \
 			target_hit_mechanical.o \
 			target_hit_miles.o \
+			target_ses_interface.o \
 			target_user_interface.o \
 			target_mover_armor.o \
 			target_lifter_armor.o \

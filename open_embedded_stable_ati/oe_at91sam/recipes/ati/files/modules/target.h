@@ -18,6 +18,7 @@
 #define TARGET_TYPE_THERMAL				7
 #define TARGET_TYPE_BATTERY				8
 #define TARGET_TYPE_USER_INTERFACE		9
+#define TARGET_TYPE_SES_INTERFACE		10
 
 struct target_device
 	{

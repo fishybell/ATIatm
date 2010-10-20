@@ -31,7 +31,8 @@ static const char * target_type[] =
     "sound",
     "thermal",
     "battery",
-    "user_interface"
+    "user_interface",
+    "ses_interface"
     };
 
 //---------------------------------------------------------------------------
