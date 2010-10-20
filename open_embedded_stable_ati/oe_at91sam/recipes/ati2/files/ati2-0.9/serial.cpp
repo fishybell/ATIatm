@@ -3,6 +3,7 @@ using namespace std;
 #include "serial.h"
 #include "common.h"
 #include "timers.h"
+#include "radio.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -349,7 +350,7 @@ void SerialConnection::changeChannel(int channel) {
 FUNCTION_START("::changeChannel(int channel)")
    // change channel (will block for several seconds)
    Radio radio(fd);
-   radio.changeChannel(msg->channel);
+   radio.changeChannel(channel);
 FUNCTION_END("::changeChannel(int channel)")
 }
 
