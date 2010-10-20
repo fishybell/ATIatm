@@ -1,0 +1,12 @@
+C:\Documents and Settings\ATI\Local Settings\Application Data\Temporary Projects\BaseStation\obj\Debug\ResolveAssemblyReference.cache
+C:\Documents and Settings\ATI\Local Settings\Application Data\Temporary Projects\BaseStation\bin\Debug\BaseStation.exe
+C:\Documents and Settings\ATI\Local Settings\Application Data\Temporary Projects\BaseStation\bin\Debug\BaseStation.pdb
+C:\Documents and Settings\ATI\Local Settings\Application Data\Temporary Projects\BaseStation\obj\Debug\BaseStation.exe
+C:\Documents and Settings\ATI\Local Settings\Application Data\Temporary Projects\BaseStation\obj\Debug\BaseStation.pdb
+C:\Documents and Settings\ATI\Desktop\BaseStation\BaseStation\BaseStation\obj\Debug\BaseStation.exe
+C:\Documents and Settings\ATI\Desktop\BaseStation\BaseStation\BaseStation\obj\Debug\BaseStation.pdb
+N:\devel\atm\windows\BaseStation\BaseStation\obj\Debug\BaseStation.exe
+N:\devel\atm\windows\BaseStation\BaseStation\obj\Debug\BaseStation.pdb
+N:\devel\atm\windows\BaseStation\BaseStation\bin\Debug\BaseStation.exe
+N:\devel\atm\windows\BaseStation\BaseStation\bin\Debug\BaseStation.pdb
+N:\devel\atm\windows\BaseStation\BaseStation\obj\Debug\ResolveAssemblyReference.cache

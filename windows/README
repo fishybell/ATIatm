@@ -1,0 +1,17 @@
+- Step 1.
+--- Install Visual Studio C# 2008 Express Edition
+- Step 2.
+--- Copy BaseStation Directory to windows computer
+- Step 3.
+--- Open solution file BaseStation.sln
+- Step 4.
+--- Build/Test/Etc.
+- Step 5.
+--- Copy directory back to network share
+- Step 6.
+--- Copy BaseStation/bin/Release/BaseStation.exe to main directory
+- Step 7.
+--- Add files to cvs as necessary
+--- Checkin to cvs as necessary
+- Step 8.
+--- Copy exe file to correct directory in Research & Development Folder
