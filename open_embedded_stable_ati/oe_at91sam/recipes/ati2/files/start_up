@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# manage startup of drivers and python code
+
+if ! [ -f /home/root/is_board ] ; then
+    exit 0
+fi
+
+case "$1" in
+    start)
+        radio_conv -s /dev/ttyS1 &
+        sh /usr/bin/$(cat /home/root/is_board) &
+        ;;
+    stop)
+        killall radio_conv
+        killall python
+        ;;
+    force-reload|restart)
+        killall radio_conv
+        killall python
+        radio_conv -s /dev/ttyS1 &
+        sh /usr/bin/$(cat /home/root/is_board) &
+        ;;
+    *)
+        echo "Usage: /etc/init.d/networking {start|stop|restart|force-reload}"
+        exit 1
+        ;;
+esac
+
