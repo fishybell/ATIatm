@@ -14,6 +14,7 @@ from remote_target import *
 
 LIFTER_PATH         = "/sys/class/target/lifter/"
 MOVER_PATH          = "/sys/class/target/mover/"
+MOVER_POSITION_PATH = "/sys/class/target/mover_position/"
 HIT_SENSOR_PATH     = "/sys/class/target/hit_sensor/"
 MILES_TX_PATH       = "/sys/class/target/miles_transmitter/"
 MUZZLE_FLASH_PATH   = "/sys/class/target/muzzle_flash/"
@@ -42,8 +43,7 @@ class FasitPd():
         self.__direction__           = 0
         self.__move__                = fasit_packet_pd.PD_MOVE_STOP
         self.__move_speed__          = 0
-        # this is a hack for testing
-        self.__position__            = 25
+        self.__position__            = 0
         self.__device_type__         = fasit_packet_pd.PD_TYPE_NONE
         
         self.__hit_count__               = 0
@@ -476,7 +476,7 @@ class lifter_thread(QThread):
         
         if (type != self.lifter_type+"\n"):
             self.logger.debug("Wrong lifter type: %s", type)
-            raise ValueError('Wrong lifter type.')
+            #raise ValueError('Wrong lifter type.')
         
         self.logger.debug('correct type...')
 
@@ -955,9 +955,9 @@ class FasitPdSit(FasitPd):
        
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_SIT
-        
-#        self.__ui_thread__= user_interface_thread()
-#        self.__ui_thread__.check_driver()
+       
+        self.__ui_thread__= user_interface_thread()
+        self.__ui_thread__.check_driver()
 #        self.__ui_thread__.set_setting("bit_status", "on")
 
         # Check if we have MILES TX
@@ -1009,7 +1009,7 @@ class FasitPdSit(FasitPd):
         
         self.__lifter_thread__.start()
         self.__hit_thread__.start()
-#        self.__ui_thread__.start()
+        self.__ui_thread__.start()
 #        self.__ui_thread__.set_setting("bit_status", "on")
         
     def get_setting_string(self, path):
@@ -1033,7 +1033,7 @@ class FasitPdSit(FasitPd):
         self.logger.info('stop_threads()')
         self.__lifter_thread__.write("stop")
         self.__hit_thread__.write("stop")
-#        self.__ui_thread__.write("stop")
+        self.__ui_thread__.write("stop")
         
         if (self.__lifter_thread__.isAlive()):
             self.__lifter_thread__.join()
@@ -1041,8 +1041,8 @@ class FasitPdSit(FasitPd):
         if (self.__hit_thread__.isAlive()):
             self.__hit_thread__.join()
             
-#        if (self.__ui_thread__.isAlive()):
-#            self.__ui_thread__.join()
+        if (self.__ui_thread__.isAlive()):
+            self.__ui_thread__.join()
         
         
     def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
@@ -1094,13 +1094,15 @@ class FasitPdSit(FasitPd):
         check_for_updates_status = False
         
         # check the ui thread
-#        bit_status = self.__ui_thread__.read()
-#        if (bit_status == "pressed"):
-#            current_position = self.__lifter_thread__.get_current_position() 
-#            if (current_position == fasit_packet_pd.PD_EXPOSURE_CONCEALED):
-#                self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED) 
-#            elif (current_position == fasit_packet_pd.PD_EXPOSURE_EXPOSED):
-#                    self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
+        bit_status = self.__ui_thread__.read()
+        if (bit_status == "pressed"):
+            current_position = self.__lifter_thread__.get_current_position() 
+            if (current_position == fasit_packet_pd.PD_EXPOSURE_CONCEALED):
+                self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED) 
+            elif (current_position == fasit_packet_pd.PD_EXPOSURE_EXPOSED):
+                self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
+            else:
+                self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED) 
         
         # check the hit thread
         new_hits = self.__hit_thread__.read()
@@ -1175,10 +1177,17 @@ class mover_thread(QThread):
         self.logger = logging.getLogger('mover_thread')
         self.keep_going = True
         self.mover_type = mover_type
+        self.mover_pos_mult = 1/50.0
+        self.mover_speed_mult = 1/3750.0
+        if (mover_type == "infantry"):
+            self.mover_pos_mult = 1/25.0
+            self.mover_speed_mult = 1/2000.0
         self.driver_path = MOVER_PATH
+        self.driver_pos_path = MOVER_POSITION_PATH
         self.movement_path = self.driver_path + "movement"
-        self.position_path = self.driver_path + "position"
-        self.speed_path = self.driver_path + "speed"
+        self.position_path = self.driver_pos_path + "position"
+        self.speed_write_path = self.driver_path + "speed"
+        self.speed_read_path = self.driver_pos_path + "velocity"
         self.fd = None
         
     def check_driver(self):
@@ -1200,17 +1209,16 @@ class mover_thread(QThread):
     # not to be called from within the thread context
     def get_setting_speed(self):
         fd = None 
-        fd = os.open(self.speed_path, os.O_RDONLY)
-        speed = os.read(fd, 32)
+        fd = os.open(self.speed_read_path, os.O_RDONLY)
+        speed = int(abs(int(os.read(fd, 32)) * self.mover_speed_mult))
         os.close(fd)
-        speed = speed.rstrip()
-        self.logger.debug("Current speed: %s", speed)
-        return int(speed)
+        self.logger.debug("Current speed: %i", speed)
+        return speed
     
     def set_setting_speed(self, speed):
         speed = int(speed)
         fd = None
-        fd = os.open(self.speed_path, os.O_RDWR)
+        fd = os.open(self.speed_write_path, os.O_RDWR)
         os.write(fd, str(speed) + "\n")
         os.close(fd)
 
@@ -1387,10 +1395,10 @@ class mover_thread(QThread):
         
         # get the current movement and report
         pos_fd = os.open(self.position_path, os.O_RDONLY)
-        position = os.read(pos_fd, 32)
+        position = int(os.read(pos_fd, 32)) * self.mover_pos_mult
         os.close(pos_fd)
         
-        self.logger.debug("Current position: %s", position.rstrip())
+        self.logger.debug("Current position: %i", position)
         
         self.write_out("position")
         self.write_out(int(position))
