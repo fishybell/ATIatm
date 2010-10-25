@@ -32,7 +32,8 @@ static const char * target_type[] =
     "thermal",
     "battery",
     "user_interface",
-    "ses_interface"
+    "ses_interface",
+    "mover_position"
     };
 
 //---------------------------------------------------------------------------
