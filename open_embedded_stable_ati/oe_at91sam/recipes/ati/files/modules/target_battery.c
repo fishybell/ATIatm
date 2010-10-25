@@ -15,12 +15,21 @@
 // TODO - the ADC code could be broken into its own file to allows configuration
 // and use of more than one ADC channel at a time.
 
-// TODO - make this timeout longer, we don't need to check the battery every 5 seconds
-#define TIMEOUT_IN_SECONDS	5
+// various timer timeouts
+#define TIMEOUT_IN_SECONDS		30
+#define ADC_READ_DELAY_IN_MSECONDS	20
+#define LED_BLINK_ON_IN_MSECONDS	100
+#define LED_BLINK_COUNT			3
+#define LED_BLINK_OFF_IN_MSECONDS	1500
+#define LED_CHARGING_ON_IN_MSECONDS	500
+#define LED_CHARGING_OFF_IN_MSECONDS	500
 
 #define BATTERY_CHARGING_NO   		0
 #define BATTERY_CHARGING_YES    	1
 #define BATTERY_CHARGING_ERROR  	2
+
+// TODO -- empirically test for a true value
+#define ADC_LOW_BATTERY_VALUE		100
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -34,15 +43,21 @@
 	#undef INPUT_CHARGING_BAT_DEGLITCH_STATE
 	#undef INPUT_CHARGING_BAT
 
-	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC1//PC0
+	#undef USB_ENABLE
+
+	#undef TIMEOUT_IN_SECONDS
+	#define TIMEOUT_IN_SECONDS		5
+	#define	INPUT_ADC_LOW_BAT 						AT91_PIN_PC0
 
 	#define OUTPUT_LED_LOW_BAT_ACTIVE_STATE			ACTIVE_LOW
-	#define	OUTPUT_LED_LOW_BAT 						AT91_PIN_PC15 //PA6 LED on dev. board
+	#define	OUTPUT_LED_LOW_BAT 						AT91_PIN_PB8 //PA6 LED on dev. board
 
 	#define INPUT_CHARGING_BAT_ACTIVE_STATE			ACTIVE_LOW
-	#define INPUT_CHARGING_BAT_PULLUP_STATE			PULLUP_OFF
+	#define INPUT_CHARGING_BAT_PULLUP_STATE			PULLUP_ON
 	#define INPUT_CHARGING_BAT_DEGLITCH_STATE		DEGLITCH_ON
-	#define	INPUT_CHARGING_BAT					AT91_PIN_PB8 // PB3 on dev. board
+	#define	INPUT_CHARGING_BAT					AT91_PIN_PA31 // PB3 on dev. board
+
+	#define USB_ENABLE					AT91_PIN_PC5
 #endif // TESTING_ON_EVAL
 
 #if 	(INPUT_ADC_LOW_BAT == AT91_PIN_PC0)
@@ -100,14 +115,20 @@ struct clk *	adc_clk;
 // TODO - automate ADC settings via #define or otherwise
 
 //---------------------------------------------------------------------------
-// Declaration of the function that gets called when the timeout fires.
+// Declaration of the functions that gets called when the timers fire.
 //---------------------------------------------------------------------------
 static void timeout_fire(unsigned long data);
+static void adc_read_fire(unsigned long data);
+static void led_blink_fire(unsigned long data);
+static void charging_fire(unsigned long data);
 
 //---------------------------------------------------------------------------
-// Kernel timer for the timeout.
+// Kernel timers for the timeout, adc read delay, and various led blinks
 //---------------------------------------------------------------------------
 static struct timer_list timeout_timer_list = TIMER_INITIALIZER(timeout_fire, 0, 0);
+static struct timer_list adc_read_timer_list = TIMER_INITIALIZER(adc_read_fire, 0, 0);
+static struct timer_list led_blink_timer_list = TIMER_INITIALIZER(led_blink_fire, 0, 0);
+static struct timer_list charging_timer_list = TIMER_INITIALIZER(charging_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Maps the battery charging state to state name.
@@ -119,35 +140,72 @@ static const char * battery_charging_state[] =
     "error"
     };
 
+//---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we are fully initialized
+//---------------------------------------------------------------------------
+atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
-//
+// This atomic variable used for storing the last adc value read
 //---------------------------------------------------------------------------
-static unsigned char hardware_adc_read(void)
+atomic_t adc_atomic = ATOMIC_INIT(0);
+
+//---------------------------------------------------------------------------
+// This atomic variable used for storing the amount of times we've blinked
+// in one blinking set.
+//---------------------------------------------------------------------------
+atomic_t blink_count = ATOMIC_INIT(0);
+
+//---------------------------------------------------------------------------
+// This delayed work queue item is used to notify user-space that the adc
+// level has changed
+//---------------------------------------------------------------------------
+static struct work_struct level_work;
+
+//---------------------------------------------------------------------------
+// Start the ADC reading
+//---------------------------------------------------------------------------
+static void hardware_adc_read_start(void)
 	{
 	__raw_writel(ADC_START, adc_base + ADC_CR); // Start the ADC
-	while(!(__raw_readl(adc_base + ADC_SR) & CH_EN))
+        mod_timer(&adc_read_timer_list, jiffies+((ADC_READ_DELAY_IN_MSECONDS*HZ)/1000));
+	}
+
+//---------------------------------------------------------------------------
+// The ADC Read Delay timer fired
+//---------------------------------------------------------------------------
+static void adc_read_fire(unsigned long data)
+	{
+	unsigned char adc_val;
+	unsigned char old_adc_val;
+	// check if the register adc register is ready
+	if(!(__raw_readl(adc_base + ADC_SR) & CH_EN))
 		{
-		cpu_relax();
+		// try again later
+        	mod_timer(&adc_read_timer_list, jiffies+((ADC_READ_DELAY_IN_MSECONDS*HZ)/1000));
 		}
-	//return __raw_readl(adc_base + ADC_CDR0); // Read & Return the conversion
-	return __raw_readl(adc_base + ADC_CDR); // Read & Return the conversion
-	}
+	else
+		{
+		// Read the conversion
+		adc_val = __raw_readl(adc_base + ADC_CDR);
+		printk(KERN_ALERT "ADC = %i\n", adc_val);
 
-//---------------------------------------------------------------------------
-// Starts the timeout timer.
-//---------------------------------------------------------------------------
-static void timeout_timer_start(void)
-	{
-	mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS*HZ));
-	}
+		// has the value changed?
+		old_adc_val = atomic_read(&adc_atomic);
+		if (adc_val != old_adc_val)
+			{
+			atomic_set(&adc_atomic, adc_val);
 
-//---------------------------------------------------------------------------
-// Stops the timeout timer.
-//---------------------------------------------------------------------------
-static void timeout_timer_stop(void)
-	{
-	del_timer(&timeout_timer_list);
+			// notify user-space
+			schedule_work(&level_work);
+
+			// start blinking if we're too low
+			if (adc_val < ADC_LOW_BATTERY_VALUE)
+				{
+        			mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
+				}
+			}
+		}
 	}
 
 //---------------------------------------------------------------------------
@@ -155,28 +213,106 @@ static void timeout_timer_stop(void)
 //---------------------------------------------------------------------------
 static void timeout_fire(unsigned long data)
 	{
-	char battery_test;
+	// start the adc reading
+	hardware_adc_read_start();
 
-	battery_test = hardware_adc_read();
-
-	printk(KERN_ALERT "ADC = %i\n", battery_test);
-
-	// TODO  determine if battery is low, based on ADC value
-	// now we just toggle the LED
-	if(at91_get_gpio_value(OUTPUT_LED_LOW_BAT) == OUTPUT_LED_LOW_BAT_ACTIVE_STATE)
-		{
-		at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
-		}
-	else
-		{
-		at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
-		}
-
-
-
-	// Restart the timer
+	// Restart the timeout timer
 	mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS*HZ));
 	}
+
+//---------------------------------------------------------------------------
+// connected or disconnected the charging harness
+//---------------------------------------------------------------------------
+irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
+    {
+    if (!atomic_read(&full_init))
+        {
+        return IRQ_HANDLED;
+        }
+
+    // We get an interrupt on both edges, so we have to check to which edge
+    //  we are responding.
+    if (at91_get_gpio_value(INPUT_CHARGING_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE)
+        {
+        printk(KERN_ALERT "%s - %s - ACTIVE\n",TARGET_NAME, __func__);
+        // we're connected, start the timer and turn off the led
+        at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+        mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_OFF_IN_MSECONDS*HZ)/1000));
+        }
+    else
+        {
+        printk(KERN_ALERT "%s - %s - INACTIVE\n",TARGET_NAME, __func__);
+        // we're disconnected, delete the timer and turn on the led
+	del_timer(&charging_timer_list);
+        at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+        }
+    return IRQ_HANDLED;
+    }
+
+//---------------------------------------------------------------------------
+// the charging led timer fired
+//---------------------------------------------------------------------------
+static void charging_fire(unsigned long data)
+    {
+    // blink on or off?
+    if (at91_get_gpio_value(OUTPUT_LED_LOW_BAT) == OUTPUT_LED_LOW_BAT_ACTIVE_STATE)
+        {
+        // turn off
+        at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+        mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_OFF_IN_MSECONDS*HZ)/1000));
+        }
+    else
+        {
+        // turn back on, decriment counter
+        at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+        mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_ON_IN_MSECONDS*HZ)/1000));
+        }
+     }
+
+//---------------------------------------------------------------------------
+// the low battery blink timer fired
+//---------------------------------------------------------------------------
+static void led_blink_fire(unsigned long data)
+    {
+    int count, value;
+
+    // are we still low?
+    value = atomic_read(&adc_atomic);
+    if (value >= ADC_LOW_BATTERY_VALUE)
+        {
+        // we're high, turn led on and return
+        at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+        return;
+        }
+
+    // how many times have we blinked?
+    count = atomic_read(&blink_count);
+
+    // blink more?
+    if (count > 0)
+        {
+        // keep blinking...blink on or off?
+        if (at91_get_gpio_value(OUTPUT_LED_LOW_BAT) == OUTPUT_LED_LOW_BAT_ACTIVE_STATE)
+            {
+            // turn off
+            at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+            }
+        else
+            {
+            // turn back on, decriment counter
+            at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+            atomic_set(&blink_count, --count);
+            }
+        mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
+        }
+    else
+        {
+        // stop blinking...for now
+        atomic_set(&blink_count, LED_BLINK_COUNT);
+        at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+        mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_OFF_IN_MSECONDS*HZ)/1000));
+        }
+    }
 
 //---------------------------------------------------------------------------
 // Set up the ADC to check the battery level
@@ -217,17 +353,41 @@ static int hardware_adc_exit(void)
 static int hardware_init(void)
     {
     int status = 0;
+    // Enable USB 5V
+    at91_set_gpio_input(USB_ENABLE, USB_ENABLE_PULLUP_STATE);
 
     // Configure charging gpio for input / deglitch
-    at91_set_gpio_input(INPUT_CHARGING_BAT, 1);
-    at91_set_deglitch(INPUT_CHARGING_BAT, 1);
+    at91_set_gpio_input(INPUT_CHARGING_BAT, INPUT_CHARGING_BAT_PULLUP_STATE);
+    at91_set_deglitch(INPUT_CHARGING_BAT, INPUT_CHARGING_BAT_DEGLITCH_STATE);
 
     // configure low battery indicator gpio for output and set initial output
-    at91_set_gpio_output(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
+
+    // blink a couple of times to show we're on (this is the "power on" led after all)
+    atomic_set(&blink_count, LED_BLINK_COUNT);
+    mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
+
+    // check the value for the first time after 1 second
+    mod_timer(&timeout_timer_list, jiffies+(1*HZ));
+
+    // configure interrupt
+    status = request_irq(INPUT_CHARGING_BAT, (void*)charging_bat_int, 0, "battery_charging_bat", NULL);
+    if (status != 0)
+        {
+        if (status == -EINVAL)
+            {
+                printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_CHARGING_BAT);
+            }
+        else if (status == -EBUSY)
+            {
+                printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_CHARGING_BAT);
+            }
+
+        return status;
+        }
+
 
     hardware_adc_init();
-
-    timeout_timer_start();
 
     return status;
     }
@@ -237,7 +397,11 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
-	timeout_timer_stop();
+	del_timer(&timeout_timer_list);
+	del_timer(&adc_read_timer_list);
+	del_timer(&led_blink_timer_list);
+	del_timer(&charging_timer_list);
+	free_irq(INPUT_CHARGING_BAT, NULL);
 	hardware_adc_exit();
 	return 0;
     }
@@ -271,8 +435,8 @@ static ssize_t charging_show(struct device *dev, struct device_attribute *attr, 
 static ssize_t level_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
 	// TODO - return value as percentage?
-	char battery_test;
-	battery_test = hardware_adc_read();
+	unsigned char battery_test;
+	battery_test = atomic_read(&adc_atomic); // show last value read
 	return sprintf(buf, "%i\n", battery_test);
     }
 
@@ -320,13 +484,28 @@ struct target_device target_device_battery =
     };
 
 //---------------------------------------------------------------------------
+// Work item to notify the user-space about an adc level change
+//---------------------------------------------------------------------------
+static void level_changed(struct work_struct * work)
+	{
+	target_sysfs_notify(&target_device_battery, "level");
+	}
+
+//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init target_battery_init(void)
     {
+	int retval;
 	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 	hardware_init();
-    return target_sysfs_add(&target_device_battery);
+	retval = target_sysfs_add(&target_device_battery);
+
+        INIT_WORK(&level_work, level_changed);
+
+	// signal that we are fully initialized
+	atomic_set(&full_init, TRUE);
+	return retval;
     }
 
 //---------------------------------------------------------------------------
