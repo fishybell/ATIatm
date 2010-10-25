@@ -74,10 +74,6 @@ module_param(reverse, bool, S_IRUGO);
 #define OUTPUT_MOVER_FORWARD_NEG	(reverse ? OUTPUT_MOVER_MOTOR_REV_NEG : OUTPUT_MOVER_MOTOR_FWD_NEG)
 #define OUTPUT_MOVER_REVERSE_NEG	(reverse ? OUTPUT_MOVER_MOTOR_FWD_NEG : OUTPUT_MOVER_MOTOR_REV_NEG)
 
-// map mover track sensor signals based on the 'reverse' parameter
-#define INPUT_MOVER_TRACK_SENSOR_FRONT 	(reverse ? INPUT_MOVER_TRACK_SENSOR_2 : INPUT_MOVER_TRACK_SENSOR_1)
-#define INPUT_MOVER_TRACK_SENSOR_REAR 	(reverse ? INPUT_MOVER_TRACK_SENSOR_1 : INPUT_MOVER_TRACK_SENSOR_2)
-
 //---------------------------------------------------------------------------
 // This lock protects against motor control from simultaneously access from
 // IRQs, timeout timer and user-space.
@@ -113,11 +109,6 @@ atomic_t fault_atomic = ATOMIC_INIT(FAULT_NORMAL);
 atomic_t speed_atomic = ATOMIC_INIT(0);
 
 //---------------------------------------------------------------------------
-// This atomic variable is the mover's position in feet.
-//---------------------------------------------------------------------------
-atomic_t position_atomic = ATOMIC_INIT(0);
-
-//---------------------------------------------------------------------------
 // This atomic variable is used to store which track sensor (front or rear)
 // was last triggered. It is used to determine the actual direction of the
 // mover. Note: Should be initialized in hardware_init() or at least after
@@ -130,12 +121,6 @@ atomic_t last_track_sensor_atomic = ATOMIC_INIT(0);
 // change or error.
 //---------------------------------------------------------------------------
 static struct work_struct movement_work;
-
-//---------------------------------------------------------------------------
-// This delayed work queue item is used to notify user-space of a position
-// change.
-//---------------------------------------------------------------------------
-static struct work_struct position_work;
 
 //---------------------------------------------------------------------------
 // Declaration of the function that gets called when the timeout fires.
@@ -290,66 +275,6 @@ static void timeout_fire(unsigned long data)
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
-irqreturn_t movement_sensor_front_int(int irq, void *dev_id, struct pt_regs *regs)
-    {
-    if (!atomic_read(&full_init))
-        {
-        return IRQ_HANDLED;
-        }
-
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
-
-    if (at91_get_gpio_value(INPUT_MOVER_TRACK_SENSOR_FRONT) != INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE)
-        {
-		return IRQ_HANDLED;
-        }
-
-/*
-	if (atomic_read(&last_track_sensor_atomic) == INPUT_MOVER_TRACK_SENSOR_REAR)
-		{
-		atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
-
-		// TODO - Take timestamp, compute speed?
-		}
-
-	atomic_set(&last_track_sensor_atomic, INPUT_MOVER_TRACK_SENSOR_FRONT);
-*/
-	return IRQ_HANDLED;
-    }
-
-//---------------------------------------------------------------------------
-//
-//---------------------------------------------------------------------------
-irqreturn_t movement_sensor_rear_int(int irq, void *dev_id, struct pt_regs *regs)
-    {
-    if (!atomic_read(&full_init))
-        {
-        return IRQ_HANDLED;
-        }
-
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
-
-    if (at91_get_gpio_value(INPUT_MOVER_TRACK_SENSOR_REAR) != INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE)
-        {
-		return IRQ_HANDLED;
-        }
-
-/*
-	if (atomic_read(&last_track_sensor_atomic) == INPUT_MOVER_TRACK_SENSOR_REAR)
-		{
-		atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
-
-		// TODO - Take timestamp, compute speed?
-		}
-
-	atomic_set(&last_track_sensor_atomic, INPUT_MOVER_TRACK_SENSOR_FRONT);
-*/
-	return IRQ_HANDLED;
-    }
-
-//---------------------------------------------------------------------------
-//
-//---------------------------------------------------------------------------
 irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
     {
     if (!atomic_read(&full_init))
@@ -500,9 +425,7 @@ static int hardware_init(void)
     at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 
     // TODO - add speed sensors
-    if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_SENSOR_FRONT, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE, movement_sensor_front_int, "movement_sensor_front_int") == FALSE) 	||
-    	(hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_SENSOR_REAR, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE, movement_sensor_rear_int, "movement_sensor_rear_int") == FALSE) 		||
-    	(hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_HOME, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_home_int, "track_sensor_home_int") == FALSE) 					||
+    if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_HOME, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_home_int, "track_sensor_home_int") == FALSE) 					||
     	(hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_END, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_end_int, "track_sensor_end_int") == FALSE))
     	{
 		return FALSE;
@@ -530,8 +453,6 @@ static int hardware_exit(void)
     // change pwm back to gpio
     at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 
-	free_irq(INPUT_MOVER_TRACK_SENSOR_FRONT, NULL);
-	free_irq(INPUT_MOVER_TRACK_SENSOR_REAR, NULL);
 	free_irq(INPUT_MOVER_TRACK_HOME, NULL);
 	free_irq(INPUT_MOVER_TRACK_END, NULL);
 
@@ -679,14 +600,6 @@ static ssize_t fault_show(struct device *dev, struct device_attribute *attr, cha
     }
 
 //---------------------------------------------------------------------------
-// Handles reads to the position attribute through sysfs
-//---------------------------------------------------------------------------
-static ssize_t position_show(struct device *dev, struct device_attribute *attr, char *buf)
-    {
-	return sprintf(buf, "%d\n", atomic_read(&position_atomic));
-    }
-
-//---------------------------------------------------------------------------
 // Handles reads to the speed attribute through sysfs
 //---------------------------------------------------------------------------
 static ssize_t speed_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -722,7 +635,6 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr, co
 static DEVICE_ATTR(type, 0444, type_show, NULL);
 static DEVICE_ATTR(movement, 0644, movement_show, movement_store);
 static DEVICE_ATTR(fault, 0444, fault_show, NULL);
-static DEVICE_ATTR(position, 0444, position_show, NULL);
 static DEVICE_ATTR(speed, 0644, speed_show, speed_store);
 
 //---------------------------------------------------------------------------
@@ -733,7 +645,6 @@ static const struct attribute * armor_mover_attrs[] =
     &dev_attr_type.attr,
     &dev_attr_movement.attr,
     &dev_attr_fault.attr,
-    &dev_attr_position.attr,
     &dev_attr_speed.attr,
     NULL,
     };
@@ -774,14 +685,6 @@ static void movement_change(struct work_struct * work)
 	}
 
 //---------------------------------------------------------------------------
-// Work item to notify the user-space about a position change
-//---------------------------------------------------------------------------
-static void position_change(struct work_struct * work)
-	{
-	target_sysfs_notify(&target_device_mover_armor, "position");
-	}
-
-//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init target_mover_armor_init(void)
@@ -791,7 +694,6 @@ static int __init target_mover_armor_init(void)
 	hardware_init();
 
 	INIT_WORK(&movement_work, movement_change);
-	INIT_WORK(&position_work, position_change);
     // signal that we are fully initialized
     atomic_set(&full_init, TRUE);
     return target_sysfs_add(&target_device_mover_armor);
