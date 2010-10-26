@@ -18,7 +18,7 @@
 #define MOVER_TYPE  	"infantry"
 
 // TODO - replace with a table based on distance and speed?
-#define TIMEOUT_IN_SECONDS		60
+#define TIMEOUT_IN_SECONDS		120
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -32,6 +32,9 @@
 #define MOVER_MOVEMENT_MOVING_FORWARD	1
 #define MOVER_MOVEMENT_MOVING_REVERSE	2
 #define MOVER_MOVEMENT_STOPPED_FAULT	3
+
+// the maximum allowed speed ticks 
+#define NUMBER_OF_SPEEDS	10
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -57,8 +60,17 @@
 #define MOTOR_PWM_RB_DEFAULT	0x203A
 
 // TODO - map pwm output pin to block/channel
-#define MOTOR_PWM_BLOCK			1		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
-#define MOTOR_PWM_CHANNEL		1		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+#define MOTOR_PWM_BLOCK			0		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
+#define MOTOR_PWM_CHANNEL		2		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+
+// The external motor control for the infantry is the opposite of the armor
+#if OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE == ACTIVE_LOW
+#undef OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE
+#define OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE ACTIVE_HIGH
+#else
+#undef OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE
+#define OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE ACTIVE_LOW
+#endif
 
 static struct atmel_tc * motor_pwm_tc = NULL;
 
@@ -209,7 +221,11 @@ static int hardware_motor_on(int direction)
     	}
 
     // assert pwm line
-    at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+    #if MOTOR_PWM_BLOCK == 0
+        at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+    #else
+        at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+    #endif
 
     // turn off brake
     at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, !OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
@@ -367,10 +383,10 @@ static int hardware_motor_pwm_init(void)
 	// initialize clock
 	__raw_writel(ATMEL_TC_TIMER_CLOCK2				// Master clock/4 = 132MHz/4 = 33MHz ?
 					| ATMEL_TC_WAVE					// output mode
-					| ATMEL_TC_ACPA_SET				// set TIOA high when counter reaches "A"
-					| ATMEL_TC_ACPC_CLEAR			// set TIOA low when counter reaches "C"
-					| ATMEL_TC_BCPB_SET				// set TIOB high when counter reaches "B"
-					| ATMEL_TC_BCPC_CLEAR			// set TIOB low when counter reaches "C"
+					| ATMEL_TC_ACPA_CLEAR				// set TIOA low when counter reaches "A"
+					| ATMEL_TC_ACPC_SET			// set TIOA high when counter reaches "C"
+					| ATMEL_TC_BCPB_CLEAR				// set TIOB low when counter reaches "B"
+					| ATMEL_TC_BCPC_SET			// set TIOB high when counter reaches "C"
 					| ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
 					| ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
 					motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CMR));	// CMR register for timer 0
@@ -435,7 +451,6 @@ static int hardware_init(void)
     // de-assert the pwm line
     at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 
-    // TODO - add speed sensors
     if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_HOME, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_home_int, "track_sensor_home_int") == FALSE) 					||
     	(hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_END, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_end_int, "track_sensor_end_int") == FALSE))
     	{
@@ -538,6 +553,7 @@ static int hardware_speed_get(void)
 static int hardware_speed_set(int speed)
     {
 	unsigned long flags;
+        int new_speed;
 
 	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
@@ -557,8 +573,9 @@ static int hardware_speed_set(int speed)
 	spin_lock_irqsave(&motor_lock, flags);
 
 	// These change the duty cycle
-	__raw_writel((MOTOR_PWM_RC * speed)/20, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	__raw_writel((MOTOR_PWM_RC * speed)/20, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+        new_speed = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_RC - MOTOR_PWM_RB_DEFAULT) * speed) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_RC
+	__raw_writel(new_speed, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	__raw_writel(new_speed, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
 
 	spin_unlock_irqrestore(&motor_lock, flags);
 
@@ -656,8 +673,8 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr, co
     status = size;
 
     if ((strict_strtol(buf, 0, &value) == 0) &&
-    	(value >= 1) &&
-    	(value <= 100))
+    	(value >= 0) &&
+    	(value <= NUMBER_OF_SPEEDS))
 		{
 		hardware_speed_set(value);
 		}
