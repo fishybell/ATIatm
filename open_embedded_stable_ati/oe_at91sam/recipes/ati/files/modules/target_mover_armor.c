@@ -16,7 +16,8 @@
 #define MOVER_TYPE  	"armor"
 
 // TODO - replace with a table based on distance and speed?
-#define TIMEOUT_IN_SECONDS		5
+// currently needs to go at least 1 mph to maintain this
+#define TIMEOUT_IN_SECONDS		10
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -30,6 +31,13 @@
 #define MOVER_MOVEMENT_MOVING_FORWARD	1
 #define MOVER_MOVEMENT_MOVING_REVERSE	2
 #define MOVER_MOVEMENT_STOPPED_FAULT	3
+
+// the maximum allowed speed ticks 
+#define NUMBER_OF_SPEEDS        20
+
+// the paremeters of the velocity ramp up
+#define RAMP_TIME_IN_MSECONDS	750
+#define RAMP_STEPS		100
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -47,10 +55,16 @@
 #define FAULT_WRONG_DIRECTION_DETECTED                     12
 #define FAULT_STOPPED_DUE_TO_STOP_COMMAND                  13
 
+// RC - max time
+// RA - 0 percent of RC - cannot exceed RC
+// RB - 0 percent of RC - cannot exceed RC
+#define MOTOR_PWM_RC		0x0064
+#define MOTOR_PWM_RA_DEFAULT	0x0000
+#define MOTOR_PWM_RB_DEFAULT	0x0000
 
 // TODO - map pwm output pin to block/channel
-#define MOTOR_PWM_BLOCK			1		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
-#define MOTOR_PWM_CHANNEL		1		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+#define MOTOR_PWM_BLOCK			0		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
+#define MOTOR_PWM_CHANNEL		2		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 
 static struct atmel_tc * motor_pwm_tc = NULL;
 
@@ -93,6 +107,13 @@ atomic_t moving_atomic = ATOMIC_INIT(FALSE);
 atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to indicate the goal speed
+//---------------------------------------------------------------------------
+atomic_t goal_atomic = ATOMIC_INIT(0); // final speed desired
+atomic_t goal_start_atomic = ATOMIC_INIT(0); // start of ramp
+atomic_t goal_step_atomic = ATOMIC_INIT(0); // last step taken
+
+//---------------------------------------------------------------------------
 // This atomic variable is to store the current movement,
 // It is used to synchronize user-space commands with the actual hardware.
 //---------------------------------------------------------------------------
@@ -128,9 +149,19 @@ static struct work_struct movement_work;
 static void timeout_fire(unsigned long data);
 
 //---------------------------------------------------------------------------
+// Declaration of the function that gets called when the ramp timer fires.
+//---------------------------------------------------------------------------
+static void ramp_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
 // Kernel timer for the timeout.
 //---------------------------------------------------------------------------
 static struct timer_list timeout_timer_list = TIMER_INITIALIZER(timeout_fire, 0, 0);
+
+//---------------------------------------------------------------------------
+// Kernel timer for the speed ramping
+//---------------------------------------------------------------------------
+static struct timer_list ramp_timer_list = TIMER_INITIALIZER(ramp_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Maps the movement to movement name.
@@ -189,6 +220,16 @@ static int hardware_motor_on(int direction)
     at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 
+    // assert pwm line
+    #if MOTOR_PWM_BLOCK == 0
+        at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+    #else
+        at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+    #endif
+
+    // start the ramp up/down of the mover
+    mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS*HZ)/1000)/RAMP_STEPS));
+
     if (direction == MOVER_DIRECTION_REVERSE)
 		{
 		at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
@@ -223,6 +264,9 @@ static int hardware_motor_off(void)
 
 	spin_lock_irqsave(&motor_lock, flags);
 
+        // de-assert the pwm line
+        at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
+
     // de-assert the all inputs to the h-bridge
     at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -237,20 +281,83 @@ static int hardware_motor_off(void)
 	}
 
 //---------------------------------------------------------------------------
-//
+// sets up a ramping change in speed
+//---------------------------------------------------------------------------
+static int hardware_speed_set(int new_speed)
+    {
+    int old_speed;
+
+        printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
+    if (!atomic_read(&full_init))
+        {
+                printk(KERN_ALERT "%s - %s() error - driver not fully initialized.\n",TARGET_NAME, __func__);
+        return FALSE;
+        }
+
+    if (!motor_pwm_tc)
+                {
+        return -EINVAL;
+                }
+
+        // reset timer
+        if (atomic_read(&moving_atomic))
+            {
+            timeout_timer_stop();
+            timeout_timer_start();
+            }
+
+        // start ramp up
+        old_speed = atomic_read(&speed_atomic);
+        if (new_speed != old_speed)
+            {
+            atomic_set(&goal_atomic, new_speed); // reset goal speed
+            atomic_set(&goal_start_atomic, old_speed); // reset ramp start
+            del_timer(&ramp_timer_list); // start ramp over
+            if (new_speed < old_speed)
+                {
+                atomic_set(&goal_step_atomic, -1); // stepping backwards
+                }
+            else
+                {
+                atomic_set(&goal_step_atomic, 1); // stepping forwards
+                }
+
+            // are we already moving?
+            if (atomic_read(&moving_atomic))
+                {
+                // start the ramp up/down of the mover immediately
+                mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS*HZ)/1000)/RAMP_STEPS));
+                }
+            }
+
+    return TRUE;
+    }
+
+//---------------------------------------------------------------------------
+// stops all motion as quickly as possible
 //---------------------------------------------------------------------------
 static int hardware_movement_stop(int stop_timer)
     {
+        int speed;
 	if (stop_timer == TRUE)
 		{
 		timeout_timer_stop();
 		}
+
+        // stop ramping, remember goal speed, and reset to 0 (new speed)
+        del_timer(&ramp_timer_list); // start ramp over
+        speed = atomic_read(&goal_atomic);
+        atomic_set(&speed_atomic, 0);
 
 	// turn off the motor
 	hardware_motor_off();
 
 	// signal that an operation is done
 	atomic_set(&moving_atomic, FALSE);
+
+        // set speed to ramp back up again
+        hardware_speed_set(speed);
 
 	// notify user-space
 	schedule_work(&movement_work);
@@ -324,7 +431,7 @@ static int hardware_motor_pwm_init(void)
 		{
     	return -EINVAL;
 		}
-
+/*
     #if MOTOR_PWM_BLOCK == 0
         #if MOTOR_PWM_CHANNEL == 0
             at91_set_A_periph(AT91_PIN_PA26, 0);	// TIOA0
@@ -348,6 +455,7 @@ static int hardware_motor_pwm_init(void)
             at91_set_B_periph(AT91_PIN_PB19, 0);	// TIOB5
         #endif
     #endif
+*/
 
 	clk_enable(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
 
@@ -366,9 +474,9 @@ static int hardware_motor_pwm_init(void)
 
 	__raw_writel(ATMEL_TC_CLKEN, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));
 	__raw_writel(ATMEL_TC_SYNC, motor_pwm_tc->regs + ATMEL_TC_BCR);
-	__raw_writel(0x0042, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	__raw_writel(0x0042, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
-	__raw_writel(0x0064, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
+	__raw_writel(MOTOR_PWM_RA_DEFAULT, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	__raw_writel(MOTOR_PWM_RB_DEFAULT, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+	__raw_writel(MOTOR_PWM_RC, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
 
 	// disable irqs and start timer
 	__raw_writel(0xff, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, IDR));				// irq register
@@ -512,19 +620,61 @@ static int hardware_speed_get(void)
     }
 
 //---------------------------------------------------------------------------
-//
+// The function that gets called when the ramp timer fires.
 //---------------------------------------------------------------------------
-static int hardware_speed_set(int speed)
+static void ramp_fire(unsigned long data)
     {
-    // check if an operation is in progress...
-    if (atomic_read(&moving_atomic))
-		{
-		return 0;
-		}
+//    unsigned long flags;
+    int goal_start, goal_step, new_speed, ticks_change, ramp, start_speed;
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
 
-    // TODO - check for limits and set actual speed
-	atomic_set(&speed_atomic, speed);
-    return TRUE;
+//    spin_lock_irqsave(&motor_lock, flags);
+
+    goal_start = atomic_read(&goal_start_atomic);
+    goal_step = atomic_read(&goal_step_atomic);
+
+    // calculate speed based on percent of full difference
+    ticks_change = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_RC - MOTOR_PWM_RB_DEFAULT) * abs(atomic_read(&goal_atomic) - goal_start)) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_RC
+
+    // calculate start speed
+    start_speed = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_RC - MOTOR_PWM_RB_DEFAULT) * goal_start) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_RC
+
+    // calculate change for this step in the ramp (ramp based on simple y=x^2 curve)
+    ramp = ((goal_step * goal_step) * (ticks_change)) / (RAMP_STEPS * RAMP_STEPS);
+
+    // add to original start of ramp
+    if (goal_step < 0)
+        {
+        // stepping backwards
+        new_speed = start_speed - ramp;
+        atomic_set(&goal_step_atomic, goal_step - 1);
+        }
+    else
+        {
+        // stepping forwards
+        new_speed = start_speed + ramp;
+        atomic_set(&goal_step_atomic, goal_step + 1);
+        }
+
+    printk(KERN_ALERT "%s - %s : %i, %i, %i %i\n",TARGET_NAME, __func__, ticks_change, start_speed, ramp, new_speed);
+
+    // take another step?
+    if (abs(goal_step) < RAMP_STEPS)
+        {
+        mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS*HZ)/1000)/RAMP_STEPS));
+        }
+
+    // These change the pwm duty cycle
+    __raw_writel(new_speed, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+    __raw_writel(new_speed, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+
+    // save the changed speed back as value of 0 to NUMBER_OF_SPEEDS
+    atomic_set(&speed_atomic, (NUMBER_OF_SPEEDS * new_speed) / MOTOR_PWM_RC);
+
+//    spin_unlock_irqrestore(&motor_lock, flags);
     }
 
 //---------------------------------------------------------------------------
@@ -616,7 +766,9 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr, co
     ssize_t status;
 
 	status = strict_strtol(buf, 0, &value);
-	if (status == 0)
+	if ((status == 0) &&
+           (value >= 0) &&
+           (value <= NUMBER_OF_SPEEDS))
 		{
 		hardware_speed_set(value);
 		status = size;
