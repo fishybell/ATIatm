@@ -9,6 +9,7 @@
 
 
 #include "target.h"
+#include "target_hardware.h"
 #include "target_mover_position.h"
 //---------------------------------------------------------------------------
 
@@ -21,6 +22,23 @@
 #define MAX_TIME	0x10000
 #define MAX_OVER	0x10000
 #define VELO_K		0x1000000
+
+#define TICKS_PER_LEG 100
+
+//#define TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL
+
+#undef INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE
+#undef INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE
+#undef INPUT_MOVER_TRACK_SENSOR_1
+#undef INPUT_MOVER_TRACK_SENSOR_2
+
+#define INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE           ACTIVE_LOW
+#define INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE           PULLUP_ON
+#define INPUT_MOVER_TRACK_SENSOR_1                                      AT91_PIN_PA30
+#define INPUT_MOVER_TRACK_SENSOR_2                                      AT91_PIN_PA31
+
+#endif
 
 struct atmel_tc *tc;
 
@@ -37,6 +55,7 @@ atomic_t last_t = ATOMIC_INIT(0);
 atomic_t o_count = ATOMIC_INIT(0);
 atomic_t delta_t = ATOMIC_INIT(0);
 atomic_t position = ATOMIC_INIT(0);
+atomic_t legs = ATOMIC_INIT(0);
 atomic_t direction = ATOMIC_INIT(0);
 
 
@@ -49,11 +68,42 @@ static struct work_struct velocity_work;
 static struct work_struct delta_work;
 
 //---------------------------------------------------------------------------
+// passed a track sensor
+//---------------------------------------------------------------------------
+irqreturn_t track_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
+    {
+    int dir;
+    if (!atomic_read(&full_init))
+        {
+        return IRQ_HANDLED;
+        }
+    // only handle the interrupt when sensor 1 is active
+    if (at91_get_gpio_value(INPUT_MOVER_TRACK_SENSOR_1) == INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE)
+        {
+        // is the sensor 2 active or not?
+        if (at91_get_gpio_value(INPUT_MOVER_TRACK_SENSOR_2) == INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE)
+            {
+            // both active, going forward
+            dir = 1;
+            }
+        else
+            {
+            // only sensor 1 is active, going backward
+            dir = -1;
+            }
+        // calculate position based on number of times we've passed a track leg
+        atomic_set(&legs, atomic_read(&legs) + dir); // gain a leg or lose a leg
+        atomic_set(&position, atomic_read(&legs) * TICKS_PER_LEG); // this overwrites the value received from the quad encoder
+        schedule_work(&position_work); // notify the system
+        }
+    }
+
+//---------------------------------------------------------------------------
 // the timer triggered
 //---------------------------------------------------------------------------
 irqreturn_t target_mover_position_int(int irq, void *dev_id, struct pt_regs *regs)
     {
-    u32 status, ra, rb, cv, this_t;
+    u32 status, rb, cv, this_t;
     if (!atomic_read(&full_init))
         {
         return IRQ_HANDLED;
@@ -213,6 +263,26 @@ printk(KERN_ALERT "moving on\n");
 
     /* start timer */
     __raw_writel(ATMEL_TC_SWTRG, tc->regs + ATMEL_TC_REG(PWM_CHANNEL, CCR));	/* control register */
+
+    // Configure track sensor gpios for input and deglitch for interrupts
+    at91_set_gpio_input(INPUT_MOVER_TRACK_SENSOR_1, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE);
+    at91_set_gpio_input(INPUT_MOVER_TRACK_SENSOR_2, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE);
+    at91_set_deglitch(INPUT_MOVER_TRACK_SENSOR_1, INPUT_MOVER_TRACK_SENSOR_DEGLITCH_STATE);
+
+    status = request_irq(INPUT_MOVER_TRACK_SENSOR_1, (void*)track_sensor_int, 0, "user_interface_bit_button", NULL);
+    if (status != 0)
+        {
+        if (status == -EINVAL)
+            {
+                printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TRACK_SENSOR_1);
+            }
+        else if (status == -EBUSY)
+            {
+                printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TRACK_SENSOR_1);
+            }
+
+        return status;
+        }
 
 printk(KERN_ALERT "done\n");
     return status;
