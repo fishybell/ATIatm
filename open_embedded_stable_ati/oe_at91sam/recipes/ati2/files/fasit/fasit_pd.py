@@ -883,7 +883,10 @@ class user_interface_thread(QThread):
         self.keep_going = True
         self.driver_path = USER_INTERFACE_PATH
         self.bit_button_path = self.driver_path + "bit_button"
+        self.move_button_path = self.driver_path + "move_button"
         self.bit_button_fd = None
+        self.move_button_fd = None
+        self.is_moving = False
         
     def check_driver(self):
         if (os.path.exists(self.driver_path) == False):
@@ -907,6 +910,7 @@ class user_interface_thread(QThread):
         
         # clear any previous button presses on startup
         self.get_setting("bit_button")
+        self.get_setting("move_button")
         
         # process incoming commands            
         while self.keep_going:
@@ -914,17 +918,37 @@ class user_interface_thread(QThread):
             
             if(data is None):
                 self.bit_button_fd = os.open(self.bit_button_path,os.O_RDONLY)
+                self.move_button_fd = os.open(self.move_button_path,os.O_RDONLY)
                 bit_button_status = os.read(self.bit_button_fd, 32)
+                move_button_status = os.read(self.move_button_fd, 32)
                 
                 if (bit_button_status == "pressed\n"):
                     self.logger.debug('bit button pressed 1')
                     self.write_out("pressed")
                     os.close(self.bit_button_fd)
+                elif (move_button_status == "forward\n"):
+                    self.logger.debug('move button forward 1')
+                    self.write_out("forward")
+                    os.close(self.move_button_fd)
+                    self.is_moving = True
+                elif (move_button_status == "reverse\n"):
+                    self.logger.debug('move button reverse 1')
+                    self.write_out("reverse")
+                    os.close(self.move_button_fd)
+                    self.is_moving = True
+                elif (move_button_status == "stop\n"):
+                    if (self.is_moving):
+                        self.logger.debug('move button stop 1')
+                        self.write_out("stop")
+                    os.close(self.move_button_fd)
+                    self.is_moving = False
                 else:
                     p = select.poll()
                     p.register(self.bit_button_fd, select.POLLERR|select.POLLPRI)
+                    p.register(self.move_button_fd, select.POLLERR|select.POLLPRI)
                     s = p.poll(self.UI_POLL_TIMEOUT_MS)
                     os.close(self.bit_button_fd)
+                    os.close(self.move_button_fd)
                     
                     while (len(s) > 0):
                         fd, event = s.pop()
@@ -935,6 +959,22 @@ class user_interface_thread(QThread):
                             if (bit_button_status == "pressed\n"):
                                 self.logger.debug('bit button pressed 2')
                                 self.write_out("pressed")
+                        elif (fd == self.move_button_fd):
+                            self.logger.debug("Change in move button status...")
+                            move_button_status = self.get_setting("move_button")
+                            if (move_button_status == "forward\n"):
+                                self.logger.debug('move button forward 2')
+                                self.write_out("forward")
+                                self.is_moving = True
+                            elif (move_button_status == "reverse\n"):
+                                self.logger.debug('move button reverse 2')
+                                self.write_out("reverse")
+                                self.is_moving = True
+                            elif (move_button_status == "stop\n"):
+                                if (self.is_moving):
+                                    self.logger.debug('move button stop 2')
+                                    self.write_out("stop")
+                                self.is_moving = False
                                                      
                         else:
                             # TODO - report error
@@ -1415,6 +1455,9 @@ class FasitPdMit(FasitPd):
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_MIT
         
+        self.__ui_thread__= user_interface_thread()
+        self.__ui_thread__.check_driver()
+
         self.__mover_thread__= mover_thread("infantry")
         self.__mover_thread__.check_driver()
             
@@ -1428,12 +1471,17 @@ class FasitPdMit(FasitPd):
         self.__speed__ = self.__mover_thread__.get_setting_speed() 
        
         self.__mover_thread__.start()
+        self.__ui_thread__.start()
         
     def stop_threads(self):
         self.__mover_thread__.write("stop")
+        self.__ui_thread__.write("stop")
         
         if (self.__mover_thread__.isAlive()):
             self.__mover_thread__.join()
+
+        if (self.__ui_thread__.isAlive()):
+            self.__ui_thread__.join()
         
     def move(self, direction = 0, movement = fasit_packet_pd.PD_MOVE_STOP, speed = 0):
         FasitPd.move(self, direction, movement, speed)
@@ -1442,7 +1490,16 @@ class FasitPdMit(FasitPd):
         
     def check_for_updates(self):
         check_for_updates_status = False
-                   
+
+        # check the ui thread
+        bit_status = self.__ui_thread__.read()
+        if (bit_status == "forward"):
+            self.move(0, fasit_packet_pd.PD_MOVE_FORWARD, 1)
+        elif (bit_status == "reverse"):
+            self.move(0, fasit_packet_pd.PD_MOVE_REVERSE, 1)
+        elif (bit_status == "stop"):
+            self.move(0, fasit_packet_pd.PD_MOVE_STOP, 0)
+
         # check the mover thread
         mover_status = 0
         mover_status = self.__mover_thread__.read()
@@ -1482,6 +1539,9 @@ class FasitPdMat(FasitPd):
        
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_MIT
+       
+        self.__ui_thread__= user_interface_thread()
+        self.__ui_thread__.check_driver()
         
         self.__mover_thread__= mover_thread("armor")
         self.__mover_thread__.check_driver()
@@ -1496,12 +1556,17 @@ class FasitPdMat(FasitPd):
         self.__speed__ = self.__mover_thread__.get_setting_speed() 
        
         self.__mover_thread__.start()
+        self.__ui_thread__.start()
         
     def stop_threads(self):
         self.__mover_thread__.write("stop")
+        self.__ui_thread__.write("stop")
         
         if (self.__mover_thread__.isAlive()):
             self.__mover_thread__.join()
+
+        if (self.__ui_thread__.isAlive()):
+            self.__ui_thread__.join()
         
     def move(self, direction = 0, movement = fasit_packet_pd.PD_MOVE_STOP, speed = 0):
         FasitPd.move(self, direction, movement, speed)
@@ -1511,6 +1576,15 @@ class FasitPdMat(FasitPd):
     def check_for_updates(self):
         check_for_updates_status = False
                    
+        # check the ui thread
+        bit_status = self.__ui_thread__.read()
+        if (bit_status == "forward"):
+            self.move(0, fasit_packet_pd.PD_MOVE_FORWARD, 1)
+        elif (bit_status == "reverse"):
+            self.move(0, fasit_packet_pd.PD_MOVE_REVERSE, 1)
+        elif (bit_status == "stop"):
+            self.move(0, fasit_packet_pd.PD_MOVE_STOP, 0)
+
         # check the mover thread
         mover_status = 0
         mover_status = self.__mover_thread__.read()
