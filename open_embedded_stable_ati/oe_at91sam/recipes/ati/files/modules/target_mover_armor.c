@@ -220,6 +220,8 @@ static int hardware_motor_on(int direction)
     at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 
+    spin_unlock_irqrestore(&motor_lock, flags);
+
     // assert pwm line
     #if MOTOR_PWM_BLOCK == 0
         at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
@@ -249,7 +251,6 @@ static int hardware_motor_on(int direction)
 		printk(KERN_ALERT "%s - %s() - error\n",TARGET_NAME, __func__);
     	}
 
-	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
 
@@ -262,10 +263,12 @@ static int hardware_motor_off(void)
 
 	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
-	spin_lock_irqsave(&motor_lock, flags);
-
         // de-assert the pwm line
         at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
+
+	atomic_set(&movement_atomic, MOVER_MOVEMENT_STOPPED);
+
+	spin_lock_irqsave(&motor_lock, flags);
 
     // de-assert the all inputs to the h-bridge
     at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -274,9 +277,8 @@ static int hardware_motor_off(void)
     at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 	
-	atomic_set(&movement_atomic, MOVER_MOVEMENT_STOPPED);
-
 	spin_unlock_irqrestore(&motor_lock, flags);
+
 	return 0;
 	}
 
@@ -305,6 +307,13 @@ static int hardware_speed_set(int new_speed)
             {
             timeout_timer_stop();
             timeout_timer_start();
+
+            // don't ramp if we're already going there
+            old_speed = atomic_read(&goal_atomic);
+            if (old_speed == new_speed)
+                {
+                return TRUE;
+                }
             }
 
         // start ramp up
