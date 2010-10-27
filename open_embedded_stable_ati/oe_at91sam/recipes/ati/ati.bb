@@ -28,6 +28,8 @@ SRC_URI = " \
 		file://modules/target_mover_armor.h \
 		file://modules/target_mover_infantry.c \
 		file://modules/target_mover_infantry.h \
+		file://modules/target_mover_position.c \
+		file://modules/target_mover_position.h \
 		file://modules/target_muzzle_flash.c \
 		file://modules/target_muzzle_flash.h \
 		file://modules/target_thermal.c \
