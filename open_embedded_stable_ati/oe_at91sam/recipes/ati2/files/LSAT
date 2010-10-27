@@ -4,11 +4,29 @@ rmmod *.ko 2>/dev/null
 rmmod *.ko 2>/dev/null
 
 insmod target.ko
+insmod target_battery.ko
 insmod target_user_interface.ko
 insmod target_lifter_armor.ko
 insmod target_hit_mechanical.ko
 
-if cd fasit 2>/dev/null ; then
-    python fasit_client_main.py -t LSAT
+if [ -n "$1" ] ; then
+    case "$1" in
+    start)
+        radio_conv -s /dev/ttyS1 &
+        python fasit_client_main.py -t LSAT &
+        ;;
+    stop)
+        killall radio_conv
+        killall python
+    force-reload|restart)
+        killall radio_conv
+        killall python
+        radio_conv -s /dev/ttyS1 &
+        python fasit_client_main.py -t LSAT &
+        ;;
+    *)
+        echo "bad command"
+        ;;
+    esac
 fi
 

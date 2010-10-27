@@ -8,18 +8,13 @@ fi
 
 case "$1" in
     start)
-        radio_conv -s /dev/ttyS1 &
-        sh /usr/bin/$(cat /home/root/is_board) &
+        /usr/bin/$(cat /home/root/is_board) start &
         ;;
     stop)
-        killall radio_conv
-        killall python
+        /usr/bin/$(cat /home/root/is_board) stop &
         ;;
     force-reload|restart)
-        killall radio_conv
-        killall python
-        radio_conv -s /dev/ttyS1 &
-        sh /usr/bin/$(cat /home/root/is_board) &
+        /usr/bin/$(cat /home/root/is_board) restart &
         ;;
     *)
         echo "Usage: /etc/init.d/networking {start|stop|restart|force-reload}"

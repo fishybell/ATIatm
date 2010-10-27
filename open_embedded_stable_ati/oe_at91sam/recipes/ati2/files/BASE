@@ -5,24 +5,19 @@ rmmod *.ko 2>/dev/null
 
 insmod target.ko
 insmod target_battery.ko
-insmod target_user_interface.ko
-insmod target_mover_infantry.ko
-insmod target_hit_mechanical.ko
 
 if [ -n "$1" ] ; then
     case "$1" in
     start)
-        radio_conv -s /dev/ttyS1 &
-        python fasit_client_main.py -t MIT &
+        /etc/init.d/networking restart
+        radio_conv -s /dev/ttyS1 -b `findbase.tcl` &
         ;;
     stop)
         killall radio_conv
-        killall python
     force-reload|restart)
         killall radio_conv
-        killall python
-        radio_conv -s /dev/ttyS1 &
-        python fasit_client_main.py -t MIT &
+        /etc/init.d/networking restart
+        radio_conv -s /dev/ttyS1 -b `findbase.tcl` &
         ;;
     *)
         echo "bad command"
