@@ -14,6 +14,7 @@ if [ -n "$1" ] ; then
         ;;
     stop)
         killall radio_conv
+        ;;
     force-reload|restart)
         killall radio_conv
         /etc/init.d/networking restart
