@@ -36,7 +36,7 @@
 #define NUMBER_OF_SPEEDS        20
 
 // the paremeters of the velocity ramp up
-#define RAMP_TIME_IN_MSECONDS	750
+#define RAMP_TIME_IN_MSECONDS	1000
 #define RAMP_STEPS		100
 
 // These map directly to the FASIT faults for movers
