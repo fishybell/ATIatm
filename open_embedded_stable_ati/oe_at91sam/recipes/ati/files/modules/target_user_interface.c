@@ -14,6 +14,7 @@
 #define BIT_DOUBLE_IN_MSECONDS		2000
 #define BIT_READ_IN_MSECONDS		50
 #define BIT_CANCEL_IN_MSECONDS		5000
+#define MOVE_WAIT_IN_MSECONDS		2000
 
 #define BLINK_ON_IN_MSECONDS		1000
 #define BLINK_OFF_IN_MSECONDS		500
@@ -30,6 +31,13 @@
 #define BUTTON_STATUS_PRESSED  	3
 #define BUTTON_STATUS_ERROR   	4
 
+// for moving a mover
+#define FORWARD_BUTTON	0
+#define REVERSE_BUTTON	1
+#define TEST_BUTTON	2
+#define MOVING_FWD	0
+#define MOVING_REV	1
+#define MOVING_STOP	2
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -38,13 +46,25 @@
 	#undef INPUT_TEST_BUTTON_DEGLITCH_STATE
 	#undef INPUT_TEST_BUTTON
 
+        #undef INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE
+        #undef INPUT_MOVER_TEST_BUTTON_PULLUP_STATE
+        #undef INPUT_MOVER_TEST_BUTTON_DEGLITCH_STATE
+        #undef INPUT_MOVER_TEST_BUTTON_FWD
+        #undef INPUT_MOVER_TEST_BUTTON_REV
+
 	#undef OUTPUT_TEST_INDICATOR_ACTIVE_STATE
 	#undef OUTPUT_TEST_INDICATOR
 
-	#define	INPUT_TEST_BUTTON_ACTIVE_STATE		ACTIVE_HIGH
+	#define	INPUT_TEST_BUTTON_ACTIVE_STATE		ACTIVE_LOW
 	#define INPUT_TEST_BUTTON_PULLUP_STATE		PULLUP_ON
 	#define INPUT_TEST_BUTTON_DEGLITCH_STATE	DEGLITCH_ON
-	#define	INPUT_TEST_BUTTON 					AT91_PIN_PA31   // BP4 on dev. board
+	#define	INPUT_TEST_BUTTON 					AT91_PIN_PB30 //A31 is BP4 on dev. board
+
+        #define INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE            ACTIVE_LOW
+        #define INPUT_MOVER_TEST_BUTTON_PULLUP_STATE            PULLUP_ON
+        #define INPUT_MOVER_TEST_BUTTON_DEGLITCH_STATE          DEGLITCH_ON
+        #define INPUT_MOVER_TEST_BUTTON_FWD                     AT91_PIN_PA30
+        #define INPUT_MOVER_TEST_BUTTON_REV                     AT91_PIN_PA31
 
 	#define	OUTPUT_TEST_INDICATOR_ACTIVE_STATE	ACTIVE_LOW
 	#define	OUTPUT_TEST_INDICATOR 				AT91_PIN_PB8	// LED on dev. board
@@ -61,6 +81,12 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 // pressed. It gets cleared when user-space reads
 //---------------------------------------------------------------------------
 atomic_t bit_button_atomic = ATOMIC_INIT(BUTTON_STATUS_CLEAR);
+
+//---------------------------------------------------------------------------
+// This atomic variable is use to indicate that an the bit button has been
+// pressed. It gets cleared when user-space reads
+//---------------------------------------------------------------------------
+atomic_t move_button_atomic = ATOMIC_INIT(MOVING_STOP);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to store the bit indicator setting.
@@ -103,15 +129,22 @@ static struct timer_list bit_read_timeout_timer_list = TIMER_INITIALIZER(bit_rea
 static void bit_timeout_fire(unsigned long data);
 
 //---------------------------------------------------------------------------
+// Declaration of the function that gets called when the move timeout fires.
+//---------------------------------------------------------------------------
+static void move_timeout_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
 // Kernel timer for the bit timeout.
 //---------------------------------------------------------------------------
 static struct timer_list bit_timeout_timer_list = TIMER_INITIALIZER(bit_timeout_fire, 0, 0);
+static struct timer_list move_timeout_timer_list = TIMER_INITIALIZER(move_timeout_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space that the bit
 // button has been pressed.
 //---------------------------------------------------------------------------
 static struct work_struct bit_button_work;
+static struct work_struct move_button_work;
 
 //---------------------------------------------------------------------------
 // Maps the bit indicator status to status name.
@@ -127,6 +160,13 @@ static const char * bit_led_status[] =
 //---------------------------------------------------------------------------
 // Maps a button status to status name.
 //---------------------------------------------------------------------------
+static const char * move_status[] =
+    {
+    "forward",
+    "reverse",
+    "stop"
+    };
+
 static const char * button_status[] =
     {
     "clear",
@@ -154,6 +194,99 @@ static int hardware_bit_status_off(void)
 	return 0;
 	}
 
+//---------------------------------------------------------------------------
+// handles movement button interrupts
+//---------------------------------------------------------------------------
+static void move_button_int(int button)
+    {
+    int bit_value, fwd_value, rev_value;
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+
+    // look at all three values
+    bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
+    fwd_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_FWD) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
+    rev_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_REV) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
+
+    // cancel timer
+    del_timer(&move_timeout_timer_list);
+
+    // check failure values (a button went from on to off)
+    if ((!bit_value) ||
+        (button == FORWARD_BUTTON && !fwd_value) ||
+        (button == REVERSE_BUTTON && !rev_value))
+        {
+
+        // stop
+        atomic_set(&move_button_atomic, MOVING_STOP);
+
+        // notify user-space
+        schedule_work(&move_button_work);
+        return;
+        }
+
+    // if a move button was pressed, check again later to see if it's still pressed
+    if (button != TEST_BUTTON)
+        {
+        // start timer
+        mod_timer(&move_timeout_timer_list, jiffies+(MOVE_WAIT_IN_MSECONDS*HZ/1000));
+        }
+
+    }
+irqreturn_t fwd_button_int(int irq, void *dev_id, struct pt_regs *regs)
+    {
+    move_button_int(FORWARD_BUTTON);
+    return IRQ_HANDLED;
+    }
+irqreturn_t rev_button_int(int irq, void *dev_id, struct pt_regs *regs)
+    {
+    move_button_int(REVERSE_BUTTON);
+    return IRQ_HANDLED;
+    }
+
+//---------------------------------------------------------------------------
+// The function that gets called when the move timeout fires.
+//---------------------------------------------------------------------------
+static void move_timeout_fire(unsigned long data)
+    {
+    int bit_value, fwd_value, rev_value;
+    printk(KERN_ALERT "%s - %s\n",TARGET_NAME, __func__);
+
+    // we've waited several seconds, and we havne't been canceled, check which way we're moving
+    bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
+    fwd_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_FWD) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
+    rev_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_REV) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
+
+    // check for an error state
+    if (!bit_value)
+        {
+        move_button_int(TEST_BUTTON);
+        return;
+        }
+
+    // check which way we're going
+    if (fwd_value && !rev_value)
+        {
+        // forward
+        atomic_set(&move_button_atomic, MOVING_FWD);
+        }
+    else if (!fwd_value && rev_value)
+        {
+        // reverse
+        atomic_set(&move_button_atomic, MOVING_REV);
+        }
+    else
+        {
+        // error
+        move_button_int(TEST_BUTTON);
+        return;
+        }
+
+    // notify user-space
+    schedule_work(&move_button_work);
+    }
 //---------------------------------------------------------------------------
 // The function that gets called when the bit timeout fires.
 //---------------------------------------------------------------------------
@@ -205,6 +338,9 @@ irqreturn_t bit_button_int(int irq, void *dev_id, struct pt_regs *regs)
         {
         return IRQ_HANDLED;
         }
+
+    // tell the movement code that the test button has changed
+    move_button_int(TEST_BUTTON);
 
     // check if the button has been pressed but not read by user-space
     value = atomic_read(&bit_button_atomic);
@@ -285,6 +421,10 @@ static int hardware_init(void)
     // Configure button gpios for input and deglitch for interrupts
     at91_set_gpio_input(INPUT_TEST_BUTTON, INPUT_TEST_BUTTON_PULLUP_STATE);
     at91_set_deglitch(INPUT_TEST_BUTTON, INPUT_TEST_BUTTON_DEGLITCH_STATE);
+    at91_set_gpio_input(INPUT_MOVER_TEST_BUTTON_FWD, INPUT_MOVER_TEST_BUTTON_PULLUP_STATE);
+    at91_set_deglitch(INPUT_MOVER_TEST_BUTTON_FWD, INPUT_MOVER_TEST_BUTTON_DEGLITCH_STATE);
+    at91_set_gpio_input(INPUT_MOVER_TEST_BUTTON_REV, INPUT_MOVER_TEST_BUTTON_PULLUP_STATE);
+    at91_set_deglitch(INPUT_MOVER_TEST_BUTTON_REV, INPUT_MOVER_TEST_BUTTON_DEGLITCH_STATE);
 
     status = request_irq(INPUT_TEST_BUTTON, (void*)bit_button_int, 0, "user_interface_bit_button", NULL);
     if (status != 0)
@@ -301,6 +441,36 @@ static int hardware_init(void)
         return status;
         }
 
+    status = request_irq(INPUT_MOVER_TEST_BUTTON_FWD, (void*)fwd_button_int, 0, "user_interface_bit_button", NULL);
+    if (status != 0)
+        {
+        if (status == -EINVAL)
+            {
+        	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_FWD);
+            }
+        else if (status == -EBUSY)
+            {
+        	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_FWD);
+            }
+
+        return status;
+        }
+
+    status = request_irq(INPUT_MOVER_TEST_BUTTON_REV, (void*)rev_button_int, 0, "user_interface_bit_button", NULL);
+    if (status != 0)
+        {
+        if (status == -EINVAL)
+            {
+        	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_REV);
+            }
+        else if (status == -EBUSY)
+            {
+        	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_REV);
+            }
+
+        return status;
+        }
+
     return status;
     }
 
@@ -311,9 +481,12 @@ static int hardware_exit(void)
     {
     del_timer(&press_timeout_timer_list);
     del_timer(&bit_timeout_timer_list);
+    del_timer(&move_timeout_timer_list);
     del_timer(&bit_read_timeout_timer_list);
     del_timer(&blink_timeout_timer_list);
     free_irq(INPUT_TEST_BUTTON, NULL);
+    free_irq(INPUT_MOVER_TEST_BUTTON_FWD, NULL);
+    free_irq(INPUT_MOVER_TEST_BUTTON_REV, NULL);
     return 0;
     }
 
@@ -325,6 +498,16 @@ static int hardware_bit_status_get(void)
 	int status;
 	status = at91_get_gpio_value(OUTPUT_TEST_INDICATOR);
     return (status == OUTPUT_TEST_INDICATOR_ACTIVE_STATE);
+    }
+
+//---------------------------------------------------------------------------
+// Handles reads to the move_button attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t move_button_show(struct device *dev, struct device_attribute *attr, char *buf)
+    {
+    int status;
+    status = atomic_read(&move_button_atomic);
+    return sprintf(buf, "%s\n", move_status[status]);
     }
 
 //---------------------------------------------------------------------------
@@ -392,6 +575,7 @@ static ssize_t bit_status_store(struct device *dev, struct device_attribute *att
 // maps attributes, r/w permissions, and handler functions
 //---------------------------------------------------------------------------
 static DEVICE_ATTR(bit_button, 0444, bit_button_show, NULL);
+static DEVICE_ATTR(move_button, 0444, move_button_show, NULL);
 static DEVICE_ATTR(bit_status, 0644, bit_status_show, bit_status_store);
 
 //---------------------------------------------------------------------------
@@ -400,6 +584,7 @@ static DEVICE_ATTR(bit_status, 0644, bit_status_show, bit_status_store);
 static const struct attribute * user_interface_attrs[] =
     {
     &dev_attr_bit_button.attr,
+    &dev_attr_move_button.attr,
     &dev_attr_bit_status.attr,
     NULL,
     };
@@ -440,6 +625,14 @@ static void bit_pressed(struct work_struct * work)
 	}
 
 //---------------------------------------------------------------------------
+// Work item to notify the user-space about a move button press
+//---------------------------------------------------------------------------
+static void move_pressed(struct work_struct * work)
+	{
+	target_sysfs_notify(&target_device_user_interface, "move_button");
+	}
+
+//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init target_user_interface_init(void)
@@ -450,6 +643,7 @@ static int __init target_user_interface_init(void)
 	hardware_init();
 
 	INIT_WORK(&bit_button_work, bit_pressed);
+	INIT_WORK(&move_button_work, move_pressed);
 
     retval=target_sysfs_add(&target_device_user_interface);
 
