@@ -55,6 +55,7 @@ atomic_t last_t = ATOMIC_INIT(0);
 atomic_t o_count = ATOMIC_INIT(0);
 atomic_t delta_t = ATOMIC_INIT(0);
 atomic_t position = ATOMIC_INIT(0);
+atomic_t position_old = ATOMIC_INIT(0);
 atomic_t legs = ATOMIC_INIT(0);
 atomic_t direction = ATOMIC_INIT(0);
 
@@ -370,7 +371,11 @@ struct target_device target_device_mover_position =
 //---------------------------------------------------------------------------
 static void do_position(struct work_struct * work)
         {
-        target_sysfs_notify(&target_device_mover_position, "position");
+        if (abs(atomic_read(&position_old) - atomic_read(&position)) > (TICKS_PER_LEG/2))
+            {
+            atomic_set(&position_old, atomic_read(&position)); 
+            target_sysfs_notify(&target_device_mover_position, "position");
+            }
         }
 
 static void do_velocity(struct work_struct * work)
