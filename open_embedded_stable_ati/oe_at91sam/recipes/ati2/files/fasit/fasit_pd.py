@@ -1572,6 +1572,7 @@ class FasitPdMat(FasitPd):
         FasitPd.move(self, direction, movement, speed)
         self.__mover_thread__.set_setting_speed(speed)  
         self.__mover_thread__.write(movement)
+        self.__speed__ = speed
         
     def check_for_updates(self):
         check_for_updates_status = False
@@ -1600,6 +1601,7 @@ class FasitPdMat(FasitPd):
                 new_position = self.__mover_thread__.read()
                 self.logger.debug("position update %d", new_position)
                 if (new_position != self.__position__):
+                    self.__mover_thread__.set_setting_speed(self.__speed__) ;# passed a leg, keep it going
                     self.__position__ = new_position
                     check_for_updates_status = True
                     self.__move_needs_update__ = True
