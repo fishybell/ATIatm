@@ -1,6 +1,7 @@
 DESCRIPTION = "at91bootstrap"
 SRC_URI = "ftp://www.at91.com/pub/buildroot/${PN}-${PV}.tar.bz2 \
-           file://0006-ati.patch;patch=1"
+           file://0006-ati.patch;patch=1 \
+           file://0007-ati.patch;patch=1"
 
 PR = "r1"
 SECTION = "bootloaders"
