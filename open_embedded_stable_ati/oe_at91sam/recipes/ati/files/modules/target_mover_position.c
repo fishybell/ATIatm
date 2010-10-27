@@ -97,6 +97,7 @@ irqreturn_t track_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
         atomic_set(&position, atomic_read(&legs) * TICKS_PER_LEG); // this overwrites the value received from the quad encoder
         schedule_work(&position_work); // notify the system
         }
+    return IRQ_HANDLED;
     }
 
 //---------------------------------------------------------------------------
@@ -161,7 +162,7 @@ printk(KERN_ALERT "O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, 
 //---------------------------------------------------------------------------
 // set PINs to be used by peripheral A and/or B
 //---------------------------------------------------------------------------
-static void init_pins()
+static void init_pins(void)
     {
     #if PWM_BLOCK == 0
         #if PWM_CHANNEL == 0

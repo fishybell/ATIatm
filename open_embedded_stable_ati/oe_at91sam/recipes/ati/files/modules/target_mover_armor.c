@@ -35,6 +35,10 @@
 // the maximum allowed speed ticks 
 #define NUMBER_OF_SPEEDS        20
 
+// horn on and off times (off is time to wait after mover starts moving before going off)
+#define HORN_ON_IN_MSECONDS	2000
+#define HORN_OFF_IN_MSECONDS	8000
+
 // the paremeters of the velocity ramp up
 #define RAMP_TIME_IN_MSECONDS	1000
 #define RAMP_STEPS		100
@@ -154,6 +158,12 @@ static void timeout_fire(unsigned long data);
 static void ramp_fire(unsigned long data);
 
 //---------------------------------------------------------------------------
+// Declaration of the function that gets called when the horn timers fire.
+//---------------------------------------------------------------------------
+static void horn_on_fire(unsigned long data);
+static void horn_off_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
 // Kernel timer for the timeout.
 //---------------------------------------------------------------------------
 static struct timer_list timeout_timer_list = TIMER_INITIALIZER(timeout_fire, 0, 0);
@@ -162,6 +172,12 @@ static struct timer_list timeout_timer_list = TIMER_INITIALIZER(timeout_fire, 0,
 // Kernel timer for the speed ramping
 //---------------------------------------------------------------------------
 static struct timer_list ramp_timer_list = TIMER_INITIALIZER(ramp_fire, 0, 0);
+
+//---------------------------------------------------------------------------
+// Kernel timers for the horn blaring
+//---------------------------------------------------------------------------
+static struct timer_list horn_on_timer_list = TIMER_INITIALIZER(horn_on_fire, 0, 0);
+static struct timer_list horn_off_timer_list = TIMER_INITIALIZER(horn_off_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Maps the movement to movement name.
@@ -229,8 +245,10 @@ static int hardware_motor_on(int direction)
         at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
     #endif
 
-    // start the ramp up/down of the mover
-    mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS*HZ)/1000)/RAMP_STEPS));
+    // turn on horn and wait to do actual move
+    at91_set_gpio_output(OUTPUT_MOVER_HORN, OUTPUT_MOVER_HORN_ACTIVE_STATE);
+    del_timer(&horn_on_timer_list); // start horn over
+    mod_timer(&horn_on_timer_list, jiffies+((HORN_ON_IN_MSECONDS*HZ)/1000));
 
     if (direction == MOVER_DIRECTION_REVERSE)
 		{
@@ -541,6 +559,9 @@ static int hardware_init(void)
     at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 
+    // configure horn for output and set initial state
+    at91_set_gpio_output(OUTPUT_MOVER_HORN, !OUTPUT_MOVER_HORN_ACTIVE_STATE);
+
     // TODO - add speed sensors
     if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_HOME, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_home_int, "track_sensor_home_int") == FALSE) 					||
     	(hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_END, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_end_int, "track_sensor_end_int") == FALSE))
@@ -569,6 +590,11 @@ static int hardware_exit(void)
 
     // change pwm back to gpio
     at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
+
+    del_timer(&timeout_timer_list);
+    del_timer(&horn_on_timer_list);
+    del_timer(&horn_off_timer_list);
+    del_timer(&ramp_timer_list);
 
 	free_irq(INPUT_MOVER_TRACK_HOME, NULL);
 	free_irq(INPUT_MOVER_TRACK_END, NULL);
@@ -629,6 +655,39 @@ static int hardware_speed_get(void)
     }
 
 //---------------------------------------------------------------------------
+// The function that gets called when the horn on timer fires.
+//---------------------------------------------------------------------------
+static void horn_on_fire(unsigned long data)
+    {
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
+    // start the ramp up/down of the mover
+    mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS*HZ)/1000)/RAMP_STEPS));
+
+    // turn off the horn later
+    mod_timer(&horn_off_timer_list, jiffies+((HORN_OFF_IN_MSECONDS*HZ)/1000));
+    }
+
+//---------------------------------------------------------------------------
+// The function that gets called when the horn on timer fires.
+//---------------------------------------------------------------------------
+static void horn_off_fire(unsigned long data)
+    {
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+
+    // turn off horn
+    at91_set_gpio_output(OUTPUT_MOVER_HORN, !OUTPUT_MOVER_HORN_ACTIVE_STATE);
+    }
+
+//---------------------------------------------------------------------------
 // The function that gets called when the ramp timer fires.
 //---------------------------------------------------------------------------
 static void ramp_fire(unsigned long data)
@@ -668,7 +727,7 @@ static void ramp_fire(unsigned long data)
         atomic_set(&goal_step_atomic, goal_step + 1);
         }
 
-    printk(KERN_ALERT "%s - %s : %i, %i, %i %i\n",TARGET_NAME, __func__, ticks_change, start_speed, ramp, new_speed);
+    //printk(KERN_ALERT "%s - %s : %i, %i, %i %i\n",TARGET_NAME, __func__, ticks_change, start_speed, ramp, new_speed);
 
     // take another step?
     if (abs(goal_step) < RAMP_STEPS)

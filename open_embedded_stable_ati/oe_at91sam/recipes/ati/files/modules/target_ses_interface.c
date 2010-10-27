@@ -148,7 +148,7 @@ static const int knob_map[16] = {0,1,3,2,7,6,4,5,15,14,12,13,8,9,11,10};
 //---------------------------------------------------------------------------
 // reads the value of all 4 knob pins at once, returning the computed value
 //---------------------------------------------------------------------------
-static void do_mode()
+static void do_mode(void)
     {
     int mode = atomic_read(&mode_value_atomic);
     printk(KERN_ALERT "%s - %s() : %i\n",TARGET_NAME, __func__, mode);
@@ -183,7 +183,7 @@ static void do_mode()
 // reads the value of all 4 knob pins at once, returning the computed value
 //---------------------------------------------------------------------------
 static DEFINE_SPINLOCK(knob_lock);
-static int knob_read()
+static int knob_read(void)
     {
     int pin1, pin2, pin4, pin8;
     unsigned long flags;
@@ -194,9 +194,9 @@ static int knob_read()
     pin4 = (at91_get_gpio_value(INPUT_SELECTOR_KNOB_PIN_4) == INPUT_SELECTOR_KNOB_ACTIVE_STATE);
     pin8 = (at91_get_gpio_value(INPUT_SELECTOR_KNOB_PIN_8) == INPUT_SELECTOR_KNOB_ACTIVE_STATE);
 
-    printk(KERN_ALERT "%s - pins : %i %i %i %i\n",TARGET_NAME, pin1, pin2, pin4, pin8);
-
     spin_unlock_irqrestore(&knob_lock, flags);
+
+    printk(KERN_ALERT "%s - pins : %i %i %i %i\n",TARGET_NAME, pin1, pin2, pin4, pin8);
 
     return (pin1 * 1) + (pin2 * 2) + (pin4 * 4) + (pin8 * 8);
     }
@@ -359,6 +359,9 @@ static int hardware_init(void)
     at91_set_gpio_output(OUTPUT_SES_MODE_TESTING_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_SES_MODE_RECORD_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
+
+    // turn amp up to 11
+    at91_set_gpio_output(OUTPUT_SES_MODE_AMPLIFIER_ON, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
 
     // set initial value of knob/mode
     value = knob_read();
