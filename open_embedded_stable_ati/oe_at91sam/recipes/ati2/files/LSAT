@@ -4,32 +4,44 @@ rmmod *.ko 2>/dev/null
 rmmod *.ko 2>/dev/null
 
 insmod target.ko
-insmod target_battery.ko
-insmod target_user_interface.ko
+insmod target_battery.ko minvoltval=12 charge=0
+insmod target_user_interface.ko mover=0
 insmod target_lifter_armor.ko
 insmod target_hit_mechanical.ko
+
+SERVER_START="radio_conv -s /dev/ttyS1"
+FASIT_START="python fasit_client_main.py -t SIT"
+SERVER_STOP="killall radio_conv"
+FASIT_STOP="killall python"
+if [ -f network ] ; then
+    SERVER_START="echo -n"
+    FASIT_START="python fasit_client_main.py -t SIT -s `findbase.tcl`"
+fi
 
 if [ -n "$1" ] ; then
     case "$1" in
     start)
-        radio_conv -s /dev/ttyS1 &
+        $SERVER_START &
         cd /home/root/fasit
-        python fasit_client_main.py -t LSAT &
+        $FASIT_START &
         ;;
     stop)
-        killall radio_conv
-        killall python
+        $SERVER_STOP
+        $FASIT_STOP
         ;;
     force-reload|restart)
-        killall radio_conv
-        killall python
-        radio_conv -s /dev/ttyS1 &
+        $SERVER_STOP
+        $FASIT_STOP
+        $SERVER_START &
         cd /home/root/fasit
-        python fasit_client_main.py -t LSAT &
+        $FASIT_START &
         ;;
     *)
         echo "bad command"
         ;;
     esac
+else
+    $SERVER_STOP
+    $FASIT_STOP
 fi
 

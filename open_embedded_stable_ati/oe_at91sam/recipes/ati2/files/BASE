@@ -4,25 +4,31 @@ rmmod *.ko 2>/dev/null
 rmmod *.ko 2>/dev/null
 
 insmod target.ko
-insmod target_battery.ko
+insmod target_battery.ko minvoltval=12 charge=0
+
+SERVER_START="radio_conv -s /dev/ttyS1 -b `findbase.tcl`"
+SERVER_STOP="killall radio_conv"
 
 if [ -n "$1" ] ; then
     case "$1" in
     start)
         /etc/init.d/networking restart
-        radio_conv -s /dev/ttyS1 -b `findbase.tcl` &
+        $SERVER_START &
         ;;
     stop)
-        killall radio_conv
+        $SERVER_STOP
+        $FASIT_STOP
         ;;
     force-reload|restart)
-        killall radio_conv
+        $SERVER_STOP
         /etc/init.d/networking restart
-        radio_conv -s /dev/ttyS1 -b `findbase.tcl` &
+        $SERVER_START &
         ;;
     *)
         echo "bad command"
         ;;
     esac
+else
+    $SERVER_STOP
 fi
 
