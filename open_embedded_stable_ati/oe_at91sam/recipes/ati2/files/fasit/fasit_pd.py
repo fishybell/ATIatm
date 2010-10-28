@@ -877,7 +877,7 @@ class ses_interface_thread(QThread):
 #------------------------------------------------------------------------------     
 class user_interface_thread(QThread):    
     UI_POLL_TIMEOUT_MS = 500
-    def __init__(self):
+    def __init__(self, mover):
         QThread.__init__(self)
         self.logger = logging.getLogger('user_interface_thread')
         self.keep_going = True
@@ -887,6 +887,7 @@ class user_interface_thread(QThread):
         self.bit_button_fd = None
         self.move_button_fd = None
         self.is_moving = False
+        self.is_mover = mover
         
     def check_driver(self):
         if (os.path.exists(self.driver_path) == False):
@@ -910,7 +911,8 @@ class user_interface_thread(QThread):
         
         # clear any previous button presses on startup
         self.get_setting("bit_button")
-        self.get_setting("move_button")
+        if (self.is_mover):
+            self.get_setting("move_button")
         
         # process incoming commands            
         while self.keep_going:
@@ -918,9 +920,13 @@ class user_interface_thread(QThread):
             
             if(data is None):
                 self.bit_button_fd = os.open(self.bit_button_path,os.O_RDONLY)
-                self.move_button_fd = os.open(self.move_button_path,os.O_RDONLY)
+                if (self.is_mover):
+                    self.move_button_fd = os.open(self.move_button_path,os.O_RDONLY)
                 bit_button_status = os.read(self.bit_button_fd, 32)
-                move_button_status = os.read(self.move_button_fd, 32)
+                if (self.is_mover):
+                    move_button_status = os.read(self.move_button_fd, 32)
+                else:
+                    move_button_status = "other"
                 
                 if (bit_button_status == "pressed\n"):
                     self.logger.debug('bit button pressed 1')
@@ -945,10 +951,12 @@ class user_interface_thread(QThread):
                 else:
                     p = select.poll()
                     p.register(self.bit_button_fd, select.POLLERR|select.POLLPRI)
-                    p.register(self.move_button_fd, select.POLLERR|select.POLLPRI)
+                    if (self.is_mover):
+                        p.register(self.move_button_fd, select.POLLERR|select.POLLPRI)
                     s = p.poll(self.UI_POLL_TIMEOUT_MS)
                     os.close(self.bit_button_fd)
-                    os.close(self.move_button_fd)
+                    if (self.is_mover):
+                        os.close(self.move_button_fd)
                     
                     while (len(s) > 0):
                         fd, event = s.pop()
@@ -959,7 +967,7 @@ class user_interface_thread(QThread):
                             if (bit_button_status == "pressed\n"):
                                 self.logger.debug('bit button pressed 2')
                                 self.write_out("pressed")
-                        elif (fd == self.move_button_fd):
+                        elif (self.is_mover and fd == self.move_button_fd):
                             self.logger.debug("Change in move button status...")
                             move_button_status = self.get_setting("move_button")
                             if (move_button_status == "forward\n"):
@@ -996,7 +1004,7 @@ class FasitPdSit(FasitPd):
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_SIT
        
-        self.__ui_thread__= user_interface_thread()
+        self.__ui_thread__= user_interface_thread(False)
         self.__ui_thread__.check_driver()
 #        self.__ui_thread__.set_setting("bit_status", "on")
 
@@ -1455,7 +1463,7 @@ class FasitPdMit(FasitPd):
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_MIT
         
-        self.__ui_thread__= user_interface_thread()
+        self.__ui_thread__= user_interface_thread(True)
         self.__ui_thread__.check_driver()
 
         self.__mover_thread__= mover_thread("infantry")
@@ -1540,7 +1548,7 @@ class FasitPdMat(FasitPd):
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_MIT
        
-        self.__ui_thread__= user_interface_thread()
+        self.__ui_thread__= user_interface_thread(True)
         self.__ui_thread__.check_driver()
         
         self.__mover_thread__= mover_thread("armor")
@@ -1675,7 +1683,7 @@ class FasitPdSes(FasitPd):
         self.__sound_thread_1__ = play_sound_thread(1)
         self.__sound_thread_2__ = play_sound_thread(2)
       
-        self.__ui_thread__= user_interface_thread()
+        self.__ui_thread__= user_interface_thread(False)
         self.__ui_thread__.check_driver()
         self.__ui_thread__.start()
 
