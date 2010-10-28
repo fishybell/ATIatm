@@ -72,6 +72,12 @@
 #endif // TESTING_ON_EVAL
 
 //---------------------------------------------------------------------------
+// This variable is a parameter that can be set to enable/disable move_button
+//---------------------------------------------------------------------------
+static int mover = FALSE;
+module_param(mover, bool, S_IRUGO);
+
+//---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are fully initialized
 //---------------------------------------------------------------------------
 atomic_t full_init = ATOMIC_INIT(FALSE);
@@ -205,6 +211,12 @@ static void move_button_int(int button)
         return;
         }
 
+    // if we're not a mover, don't bother
+    if (!mover)
+        {
+        return;
+        }
+
     // look at all three values
     bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
     fwd_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_FWD) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
@@ -252,6 +264,11 @@ irqreturn_t rev_button_int(int irq, void *dev_id, struct pt_regs *regs)
 static void move_timeout_fire(unsigned long data)
     {
     int bit_value, fwd_value, rev_value;
+    // if we're not a mover, don't bother
+    if (!mover)
+        {
+        return;
+        }
     printk(KERN_ALERT "%s - %s\n",TARGET_NAME, __func__);
 
     // we've waited several seconds, and we havne't been canceled, check which way we're moving
@@ -414,6 +431,7 @@ static void bit_read_timeout_fire(unsigned long data)
 static int hardware_init(void)
     {
     int status = 0;
+    printk(KERN_ALERT "%s mover: %i\n",__func__, mover);
 
     // configure bit status gpio for output and set initial output
     at91_set_gpio_output(OUTPUT_TEST_INDICATOR, !OUTPUT_TEST_INDICATOR_ACTIVE_STATE);
@@ -421,10 +439,15 @@ static int hardware_init(void)
     // Configure button gpios for input and deglitch for interrupts
     at91_set_gpio_input(INPUT_TEST_BUTTON, INPUT_TEST_BUTTON_PULLUP_STATE);
     at91_set_deglitch(INPUT_TEST_BUTTON, INPUT_TEST_BUTTON_DEGLITCH_STATE);
-    at91_set_gpio_input(INPUT_MOVER_TEST_BUTTON_FWD, INPUT_MOVER_TEST_BUTTON_PULLUP_STATE);
-    at91_set_deglitch(INPUT_MOVER_TEST_BUTTON_FWD, INPUT_MOVER_TEST_BUTTON_DEGLITCH_STATE);
-    at91_set_gpio_input(INPUT_MOVER_TEST_BUTTON_REV, INPUT_MOVER_TEST_BUTTON_PULLUP_STATE);
-    at91_set_deglitch(INPUT_MOVER_TEST_BUTTON_REV, INPUT_MOVER_TEST_BUTTON_DEGLITCH_STATE);
+
+    // if we're not a mover, don't bother
+    if (mover)
+        {
+        at91_set_gpio_input(INPUT_MOVER_TEST_BUTTON_FWD, INPUT_MOVER_TEST_BUTTON_PULLUP_STATE);
+        at91_set_deglitch(INPUT_MOVER_TEST_BUTTON_FWD, INPUT_MOVER_TEST_BUTTON_DEGLITCH_STATE);
+        at91_set_gpio_input(INPUT_MOVER_TEST_BUTTON_REV, INPUT_MOVER_TEST_BUTTON_PULLUP_STATE);
+        at91_set_deglitch(INPUT_MOVER_TEST_BUTTON_REV, INPUT_MOVER_TEST_BUTTON_DEGLITCH_STATE);
+        }
 
     status = request_irq(INPUT_TEST_BUTTON, (void*)bit_button_int, 0, "user_interface_bit_button", NULL);
     if (status != 0)
@@ -441,35 +464,39 @@ static int hardware_init(void)
         return status;
         }
 
-    status = request_irq(INPUT_MOVER_TEST_BUTTON_FWD, (void*)fwd_button_int, 0, "user_interface_bit_button", NULL);
-    if (status != 0)
+    // if we're not a mover, don't bother
+    if (mover)
         {
-        if (status == -EINVAL)
+        status = request_irq(INPUT_MOVER_TEST_BUTTON_FWD, (void*)fwd_button_int, 0, "user_interface_bit_button", NULL);
+        if (status != 0)
             {
-        	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_FWD);
-            }
-        else if (status == -EBUSY)
-            {
-        	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_FWD);
-            }
+            if (status == -EINVAL)
+                {
+                printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_FWD);
+                }
+            else if (status == -EBUSY)
+                {
+            	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_FWD);
+                }
 
-        return status;
+            return status;
+            }
+        status = request_irq(INPUT_MOVER_TEST_BUTTON_REV, (void*)rev_button_int, 0, "user_interface_bit_button", NULL);
+        if (status != 0)
+            {
+            if (status == -EINVAL)
+                {
+            	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_REV);
+                }
+            else if (status == -EBUSY)
+                {
+            	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_REV);
+                }
+
+            return status;
+            }
         }
 
-    status = request_irq(INPUT_MOVER_TEST_BUTTON_REV, (void*)rev_button_int, 0, "user_interface_bit_button", NULL);
-    if (status != 0)
-        {
-        if (status == -EINVAL)
-            {
-        	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_REV);
-            }
-        else if (status == -EBUSY)
-            {
-        	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_REV);
-            }
-
-        return status;
-        }
 
     return status;
     }
@@ -481,12 +508,16 @@ static int hardware_exit(void)
     {
     del_timer(&press_timeout_timer_list);
     del_timer(&bit_timeout_timer_list);
-    del_timer(&move_timeout_timer_list);
     del_timer(&bit_read_timeout_timer_list);
     del_timer(&blink_timeout_timer_list);
     free_irq(INPUT_TEST_BUTTON, NULL);
-    free_irq(INPUT_MOVER_TEST_BUTTON_FWD, NULL);
-    free_irq(INPUT_MOVER_TEST_BUTTON_REV, NULL);
+    // if we're not a mover, don't bother
+    if (mover)
+        {
+        del_timer(&move_timeout_timer_list);
+        free_irq(INPUT_MOVER_TEST_BUTTON_FWD, NULL);
+        free_irq(INPUT_MOVER_TEST_BUTTON_REV, NULL);
+        }
     return 0;
     }
 

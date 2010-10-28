@@ -28,8 +28,6 @@
 #define BATTERY_CHARGING_YES    	1
 #define BATTERY_CHARGING_ERROR  	2
 
-// TODO -- empirically test for a true value
-#define ADC_LOW_BATTERY_VALUE		100
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -115,6 +113,14 @@ struct clk *	adc_clk;
 // TODO - automate ADC settings via #define or otherwise
 
 //---------------------------------------------------------------------------
+// These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
+//---------------------------------------------------------------------------
+static int charge = FALSE;
+module_param(charge, bool, S_IRUGO);
+static int minvoltval = 12;
+module_param(minvoltval, int, S_IRUGO);
+
+//---------------------------------------------------------------------------
 // Declaration of the functions that gets called when the timers fire.
 //---------------------------------------------------------------------------
 static void timeout_fire(unsigned long data);
@@ -188,7 +194,7 @@ static void adc_read_fire(unsigned long data)
 		{
 		// Read the conversion
 		adc_val = __raw_readl(adc_base + ADC_CDR);
-		printk(KERN_ALERT "ADC = %i\n", adc_val);
+		printk(KERN_ALERT "ADC = %i (%s)\n", adc_val, adc_val < minvoltval ? "low" : "normal");
 
 		// has the value changed?
 		old_adc_val = atomic_read(&adc_atomic);
@@ -200,7 +206,7 @@ static void adc_read_fire(unsigned long data)
 			schedule_work(&level_work);
 
 			// start blinking if we're too low
-			if (adc_val < ADC_LOW_BATTERY_VALUE)
+			if (adc_val < minvoltval)
 				{
         			mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
 				}
@@ -230,6 +236,12 @@ irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
+    // if we disabled the charging pin, don't handle
+    if (!charge)
+        {
+        return IRQ_HANDLED;
+        }
+
     // We get an interrupt on both edges, so we have to check to which edge
     //  we are responding.
     if (at91_get_gpio_value(INPUT_CHARGING_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE)
@@ -254,6 +266,12 @@ irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
 //---------------------------------------------------------------------------
 static void charging_fire(unsigned long data)
     {
+    // if we disabled the charging pin, don't handle
+    if (!charge)
+        {
+        return;
+        }
+
     // blink on or off?
     if (at91_get_gpio_value(OUTPUT_LED_LOW_BAT) == OUTPUT_LED_LOW_BAT_ACTIVE_STATE)
         {
@@ -278,7 +296,7 @@ static void led_blink_fire(unsigned long data)
 
     // are we still low?
     value = atomic_read(&adc_atomic);
-    if (value >= ADC_LOW_BATTERY_VALUE)
+    if (value >= minvoltval)
         {
         // we're high, turn led on and return
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
@@ -353,12 +371,26 @@ static int hardware_adc_exit(void)
 static int hardware_init(void)
     {
     int status = 0;
+    // correct voltage variable to minimum adc value
+    switch (abs(minvoltval))
+        {
+        case 12: minvoltval = 52;  break;
+        case 24: minvoltval = 104; break;
+        case 48: minvoltval = 208; break;
+        default: minvoltval = 255; break;
+        }
+    printk(KERN_ALERT "%s charge: %i, minvoltval: %i\n",__func__,  charge, minvoltval);
+
     // Enable USB 5V
     at91_set_gpio_input(USB_ENABLE, USB_ENABLE_PULLUP_STATE);
 
     // Configure charging gpio for input / deglitch
-    at91_set_gpio_input(INPUT_CHARGING_BAT, INPUT_CHARGING_BAT_PULLUP_STATE);
-    at91_set_deglitch(INPUT_CHARGING_BAT, INPUT_CHARGING_BAT_DEGLITCH_STATE);
+    // if we disabled the charging pin, don't handle
+    if (charge)
+       {
+       at91_set_gpio_input(INPUT_CHARGING_BAT, INPUT_CHARGING_BAT_PULLUP_STATE);
+       at91_set_deglitch(INPUT_CHARGING_BAT, INPUT_CHARGING_BAT_DEGLITCH_STATE);
+       }
 
     // configure low battery indicator gpio for output and set initial output
     at91_set_gpio_output(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
@@ -371,19 +403,23 @@ static int hardware_init(void)
     mod_timer(&timeout_timer_list, jiffies+(1*HZ));
 
     // configure interrupt
-    status = request_irq(INPUT_CHARGING_BAT, (void*)charging_bat_int, 0, "battery_charging_bat", NULL);
-    if (status != 0)
+    // if we disabled the charging pin, don't handle
+    if (charge)
         {
-        if (status == -EINVAL)
+        status = request_irq(INPUT_CHARGING_BAT, (void*)charging_bat_int, 0, "battery_charging_bat", NULL);
+        if (status != 0)
             {
-                printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_CHARGING_BAT);
-            }
-        else if (status == -EBUSY)
-            {
-                printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_CHARGING_BAT);
-            }
+            if (status == -EINVAL)
+                {
+                    printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_CHARGING_BAT);
+                }
+            else if (status == -EBUSY)
+                {
+                    printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_CHARGING_BAT);
+                }
 
-        return status;
+            return status;
+            }
         }
 
 
@@ -401,7 +437,11 @@ static int hardware_exit(void)
 	del_timer(&adc_read_timer_list);
 	del_timer(&led_blink_timer_list);
 	del_timer(&charging_timer_list);
-	free_irq(INPUT_CHARGING_BAT, NULL);
+        // if we disabled the charging pin, don't handle
+        if (charge)
+            {
+            free_irq(INPUT_CHARGING_BAT, NULL);
+            }
 	hardware_adc_exit();
 	return 0;
     }
@@ -411,6 +451,12 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 static int hardware_charging_get(void)
     {
+    // if we disabled the charging pin, don't handle
+    if (!charge)
+        {
+        return BATTERY_CHARGING_NO;
+        }
+
 	if (at91_get_gpio_value(INPUT_CHARGING_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE)
 	    {
 		return BATTERY_CHARGING_YES;

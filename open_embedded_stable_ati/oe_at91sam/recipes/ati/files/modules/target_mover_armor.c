@@ -550,6 +550,7 @@ static int hardware_set_gpio_input_irq(	int pin_number,
 static int hardware_init(void)
     {
     int status = 0;
+    printk(KERN_ALERT "%s reverse: %i\n",__func__,  reverse);
 
     // de-assert the neg inputs to the h-bridge
     at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
