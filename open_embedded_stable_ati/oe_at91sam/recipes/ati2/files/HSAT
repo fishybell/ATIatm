@@ -13,6 +13,7 @@ if [ -n "$1" ] ; then
     case "$1" in
     start)
         radio_conv -s /dev/ttyS1 &
+        cd /home/root/fasit
         python fasit_client_main.py -t HSAT &
         ;;
     stop)
@@ -23,6 +24,7 @@ if [ -n "$1" ] ; then
         killall radio_conv
         killall python
         radio_conv -s /dev/ttyS1 &
+        cd /home/root/fasit
         python fasit_client_main.py -t HSAT &
         ;;
     *)
