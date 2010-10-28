@@ -5,8 +5,8 @@ diff -ruN at91bootstrap-2.11.orig/board/at91sam9g20ek/at91sam9g20ek.c at91bootst
  		{"RXD", AT91C_PIN_PB(14), 0, PIO_DEFAULT, PIO_PERIPH_A},
  		{"TXD", AT91C_PIN_PB(15), 0, PIO_DEFAULT, PIO_PERIPH_A},
  #endif
-+		{"USBEN",  AT91C_PIN_PA(22), 1, PIO_DEFAULT, PIO_INPUT},
-+		{"PLED",  AT91C_PIN_PC(8), 1, PIO_DEFAULT, PIO_OUTPUT},
++		{"USBEN",  AT91C_PIN_PA(22), 0, PIO_DEFAULT, PIO_INPUT},
++		{"PLED",  AT91C_PIN_PC(15), 0, PIO_DEFAULT, PIO_OUTPUT},
  		{(char *) 0, 0, 0, PIO_DEFAULT, PIO_PERIPH_A},
  	};
  
