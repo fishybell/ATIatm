@@ -62,7 +62,7 @@
 // RC - max time
 // RA - 0 percent of RC - cannot exceed RC
 // RB - 0 percent of RC - cannot exceed RC
-#define MOTOR_PWM_RC		0x0064
+#define MOTOR_PWM_RC		0x3074
 #define MOTOR_PWM_RA_DEFAULT	0x0000
 #define MOTOR_PWM_RB_DEFAULT	0x0000
 
@@ -489,7 +489,7 @@ static int hardware_motor_pwm_init(void)
 	// approx 1.8MHz with 50% duty-cycle
 
 	// initialize clock
-	__raw_writel(ATMEL_TC_TIMER_CLOCK1				// Master clock/2 = 132MHz/2 = 66MHz
+	__raw_writel(ATMEL_TC_TIMER_CLOCK2				// Master clock/2 = 132MHz/2 = 66MHz
 					| ATMEL_TC_WAVE					// output mode
 					| ATMEL_TC_ACPA_SET				// set TIOA high when counter reaches "A"
 					| ATMEL_TC_ACPC_CLEAR			// set TIOA low when counter reaches "C"
