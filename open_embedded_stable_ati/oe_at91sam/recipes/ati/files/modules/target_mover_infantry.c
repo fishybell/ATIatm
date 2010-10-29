@@ -52,12 +52,12 @@
 #define FAULT_WRONG_DIRECTION_DETECTED                     12
 #define FAULT_STOPPED_DUE_TO_STOP_COMMAND                  13
 
-// RC - 1 khz
-// RA - 50 duty of 1khz - cannot exceed RC
-// RB - 50 duty of 1khz - cannot exceed RC
-#define MOTOR_PWM_RC			0x4074
-#define MOTOR_PWM_RA_DEFAULT	0x203A
-#define MOTOR_PWM_RB_DEFAULT	0x203A
+// RC - 600 khz
+// RA - 50 duty of 600khz - cannot exceed RC
+// RB - 50 duty of 600khz - cannot exceed RC
+#define MOTOR_PWM_RC			0x001C
+#define MOTOR_PWM_RA_DEFAULT	0x000E
+#define MOTOR_PWM_RB_DEFAULT	0x000E
 
 // TODO - map pwm output pin to block/channel
 #define MOTOR_PWM_BLOCK			0		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
