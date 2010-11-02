@@ -33,14 +33,14 @@
 #define MOVER_MOVEMENT_STOPPED_FAULT	3
 
 // the maximum allowed speed ticks 
-#define NUMBER_OF_SPEEDS        20
+#define NUMBER_OF_SPEEDS        40
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
 #define HORN_ON_IN_MSECONDS	2000
 #define HORN_OFF_IN_MSECONDS	8000
 
 // the paremeters of the velocity ramp up
-#define RAMP_TIME_IN_MSECONDS	1000
+#define RAMP_TIME_IN_MSECONDS	5000
 #define RAMP_STEPS		100
 
 // These map directly to the FASIT faults for movers
