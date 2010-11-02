@@ -34,7 +34,7 @@
 #define MOVER_MOVEMENT_STOPPED_FAULT	3
 
 // the maximum allowed speed ticks 
-#define NUMBER_OF_SPEEDS	10
+#define NUMBER_OF_SPEEDS	20
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
