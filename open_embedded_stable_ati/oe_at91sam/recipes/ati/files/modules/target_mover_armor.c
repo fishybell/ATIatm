@@ -36,7 +36,7 @@
 #define NUMBER_OF_SPEEDS        40
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
-#define HORN_ON_IN_MSECONDS	2000
+#define HORN_ON_IN_MSECONDS	3500
 #define HORN_OFF_IN_MSECONDS	8000
 
 // the paremeters of the velocity ramp up
@@ -281,6 +281,13 @@ static int hardware_motor_off(void)
 
 	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
+    // turn off irrelevant timers
+    del_timer(&timeout_timer_list);
+    del_timer(&horn_on_timer_list);
+    del_timer(&horn_off_timer_list);
+    del_timer(&ramp_timer_list);
+    mod_timer(&horn_off_timer_list, jiffies+((10*HZ)/1000));
+
         // de-assert the pwm line
         at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 
@@ -451,13 +458,14 @@ static int hardware_motor_pwm_init(void)
     motor_pwm_tc = target_timer_alloc(MOTOR_PWM_BLOCK, "gen_tc");
     printk(KERN_ALERT "timer_alloc(): %08x\n", (unsigned int) motor_pwm_tc);
 
-    mck_freq = clk_get_rate(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
-    printk(KERN_ALERT "mck_freq: %i\n", (unsigned int) mck_freq);
-
     if (!motor_pwm_tc)
 		{
     	return -EINVAL;
 		}
+
+    mck_freq = clk_get_rate(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
+    printk(KERN_ALERT "mck_freq: %i\n", (unsigned int) mck_freq);
+
 /*
     #if MOTOR_PWM_BLOCK == 0
         #if MOTOR_PWM_CHANNEL == 0
@@ -484,7 +492,11 @@ static int hardware_motor_pwm_init(void)
     #endif
 */
 
-	clk_enable(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
+	if (clk_enable(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]) != 0)
+            {
+            printk(KERN_ERR "clk_enable() failed\n");
+            return 0;
+            }
 
 	// approx 1.8MHz with 50% duty-cycle
 
