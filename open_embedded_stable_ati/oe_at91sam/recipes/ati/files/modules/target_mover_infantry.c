@@ -115,6 +115,11 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 atomic_t movement_atomic = ATOMIC_INIT(MOVER_MOVEMENT_STOPPED);
 
 //---------------------------------------------------------------------------
+// This atomic variable is to store the last end limit hit
+//---------------------------------------------------------------------------
+atomic_t last_limit_atomic = ATOMIC_INIT(MOVER_MOVEMENT_STOPPED);
+
+//---------------------------------------------------------------------------
 // This atomic variable is to store the fault code.
 //---------------------------------------------------------------------------
 atomic_t fault_atomic = ATOMIC_INIT(FAULT_NORMAL);
@@ -309,6 +314,15 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
 
     printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
+    // check to see if this one needs to be ignored
+    if (atomic_read(&last_limit_atomic) == MOVER_DIRECTION_REVERSE &&
+        atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)
+        {
+        // ignore
+        return IRQ_HANDLED;
+        }
+
+    atomic_set(&last_limit_atomic, MOVER_DIRECTION_REVERSE);
     hardware_movement_stop(TRUE);
 
 	return IRQ_HANDLED;
@@ -326,6 +340,15 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
 
     printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
+    // check to see if this one needs to be ignored
+    if (atomic_read(&last_limit_atomic) == MOVER_DIRECTION_FORWARD &&
+        atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)
+        {
+        // ignore
+        return IRQ_HANDLED;
+        }
+
+    atomic_set(&last_limit_atomic, MOVER_DIRECTION_FORWARD);
     hardware_movement_stop(TRUE);
 
 	return IRQ_HANDLED;
