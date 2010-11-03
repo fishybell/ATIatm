@@ -23,6 +23,10 @@
 #define MAX_OVER	0x10000
 #define VELO_K		0x1000000
 
+// to keep updates to the file system in check somewhat
+#define POSITION_DELAY_IN_MSECONDS	1000
+#define VELOCITY_DELAY_IN_MSECONDS	1000
+
 #define TICKS_PER_LEG 100
 
 //#define TESTING_ON_EVAL
@@ -58,7 +62,20 @@ atomic_t position = ATOMIC_INIT(0);
 atomic_t position_old = ATOMIC_INIT(0);
 atomic_t legs = ATOMIC_INIT(0);
 atomic_t direction = ATOMIC_INIT(0);
+atomic_t doing_pos = ATOMIC_INIT(FALSE);
+atomic_t doing_vel = ATOMIC_INIT(FALSE);
 
+//---------------------------------------------------------------------------
+// Declaration of the function that gets called when the timers fire.
+//---------------------------------------------------------------------------
+static void position_fire(unsigned long data);
+static void velocity_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
+// Kernel timer for the delayed update for position and velocity
+//---------------------------------------------------------------------------
+static struct timer_list position_timer_list = TIMER_INITIALIZER(position_fire, 0, 0);
+static struct timer_list velocity_timer_list = TIMER_INITIALIZER(velocity_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space that the bit
@@ -67,6 +84,33 @@ atomic_t direction = ATOMIC_INIT(0);
 static struct work_struct position_work;
 static struct work_struct velocity_work;
 static struct work_struct delta_work;
+
+//---------------------------------------------------------------------------
+// The function that gets called when the position timer fires.
+//---------------------------------------------------------------------------
+static void position_fire(unsigned long data)
+    {
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+    atomic_set(&doing_pos, FALSE);
+    schedule_work(&position_work); // notify the system
+    }
+
+//---------------------------------------------------------------------------
+// The function that gets called when the velocity timer fires.
+//---------------------------------------------------------------------------
+static void velocity_fire(unsigned long data)
+    {
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+    atomic_set(&doing_vel, FALSE);
+    schedule_work(&velocity_work); // notify the system
+    }
+
 
 //---------------------------------------------------------------------------
 // passed a track sensor
@@ -95,7 +139,11 @@ irqreturn_t track_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
         // calculate position based on number of times we've passed a track leg
         atomic_set(&legs, atomic_read(&legs) + dir); // gain a leg or lose a leg
         atomic_set(&position, atomic_read(&legs) * TICKS_PER_LEG); // this overwrites the value received from the quad encoder
-        schedule_work(&position_work); // notify the system
+        if (atomic_read(&doing_pos) == FALSE)
+            {
+            atomic_set(&doing_pos, TRUE);
+            mod_timer(&position_timer_list, jiffies+((POSITION_DELAY_IN_MSECONDS*HZ)/1000));
+            }
         }
     return IRQ_HANDLED;
     }
@@ -105,7 +153,7 @@ irqreturn_t track_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
 //---------------------------------------------------------------------------
 irqreturn_t target_mover_position_int(int irq, void *dev_id, struct pt_regs *regs)
     {
-    u32 status, rb, cv, this_t;
+    u32 status, rb, cv, this_t, dn1, dn2;
     if (!atomic_read(&full_init))
         {
         return IRQ_HANDLED;
@@ -116,7 +164,7 @@ irqreturn_t target_mover_position_int(int irq, void *dev_id, struct pt_regs *reg
     rb = __raw_readl(tc->regs + ATMEL_TC_REG(PWM_CHANNEL, RB));
     cv = __raw_readl(tc->regs + ATMEL_TC_REG(PWM_CHANNEL, CV));
 
-printk(KERN_ALERT "O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, status & ATMEL_TC_LDRAS, atomic_read(&last_t), this_t, cv, atomic_read(&o_count) );
+//printk(KERN_ALERT "O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, status & ATMEL_TC_LDRAS, atomic_read(&last_t), this_t, cv, atomic_read(&o_count) );
 
     /* Overlflow caused IRQ? */
     if ( status & ATMEL_TC_COVFS )
@@ -140,11 +188,24 @@ printk(KERN_ALERT "O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, 
             }
         atomic_set(&delta_t, this_t + atomic_read(&o_count));
         atomic_set(&o_count, 0);
-        atomic_set(&velocity, VELO_K / atomic_read(&delta_t) * atomic_read(&direction));
+        dn1 = atomic_read(&delta_t);
+        dn2 = atomic_read(&direction);
+        if (dn1 * dn2 == 0)
+            {
+            return IRQ_HANDLED;
+            }
+        atomic_set(&velocity, VELO_K / dn1 * dn2);
         atomic_set(&last_t, this_t);
-        schedule_work(&position_work);
-        schedule_work(&delta_work);
-        schedule_work(&velocity_work);
+        if (atomic_read(&doing_pos) == FALSE)
+            {
+            atomic_set(&doing_pos, TRUE);
+            mod_timer(&position_timer_list, jiffies+((POSITION_DELAY_IN_MSECONDS*HZ)/1000));
+            }
+        if (atomic_read(&doing_vel) == FALSE)
+            {
+            atomic_set(&doing_vel, TRUE);
+            mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
+            }
         }
     else
         {
@@ -152,7 +213,11 @@ printk(KERN_ALERT "O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, 
         if ( atomic_read(&o_count) > MAX_OVER )
             {
             atomic_set(&velocity, 0);
-            schedule_work(&velocity_work);
+            if (atomic_read(&doing_vel) == FALSE)
+                {
+                atomic_set(&doing_vel, TRUE);
+                mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
+                }
             }
         }
 
@@ -240,6 +305,7 @@ printk(KERN_ALERT "clock enabled\n");
 printk(KERN_ALERT "bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(PWM_CHANNEL, IMR)));
 
     /* setup system irq */
+printk(KERN_ALERT "going to request irq: %i\n", tc->irq[PWM_CHANNEL]);
     status = request_irq(tc->irq[PWM_CHANNEL], (void*)target_mover_position_int, 0, "target_mover_position_int", NULL);
 printk(KERN_ALERT "requested irq: %i\n", status);
     if (status != 0)
@@ -295,6 +361,8 @@ printk(KERN_ALERT "done\n");
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
+    del_timer(&position_timer_list);
+    del_timer(&velocity_timer_list);
 	free_irq(tc->irq[PWM_CHANNEL], NULL);
         target_timer_free(tc);
 	return 0;
