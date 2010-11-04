@@ -78,7 +78,7 @@ static struct atmel_tc * motor_pwm_tc = NULL;
 // the meanings of the 'end of track' sensors and 'forward' and 'reverse'
 //---------------------------------------------------------------------------
 static int reverse = FALSE;
-module_param(reverse, bool, S_IRUGO);
+module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only by user, group, other
 
 // map home and 'end of track' sensors based on the 'reverse' parameter
 #define INPUT_MOVER_TRACK_HOME	(reverse ? INPUT_MOVER_END_OF_TRACK_2 : INPUT_MOVER_END_OF_TRACK_1)
@@ -122,6 +122,11 @@ atomic_t goal_step_atomic = ATOMIC_INIT(0); // last step taken
 // It is used to synchronize user-space commands with the actual hardware.
 //---------------------------------------------------------------------------
 atomic_t movement_atomic = ATOMIC_INIT(MOVER_MOVEMENT_STOPPED);
+
+//---------------------------------------------------------------------------
+// This atomic variable is to store the last end limit hit
+//---------------------------------------------------------------------------
+atomic_t ignore_next_direction = ATOMIC_INIT(MOVER_DIRECTION_STOP);
 
 //---------------------------------------------------------------------------
 // This atomic variable is to store the fault code.
@@ -425,6 +430,17 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
 
     printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
+    // check to see if this one needs to be ignored
+    if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)
+        {
+        // unset direction ignore...
+        atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
+
+        // ...then ignore switch
+        return IRQ_HANDLED;
+        }
+
+    atomic_set(&ignore_next_direction, MOVER_DIRECTION_REVERSE); // ignore same direction
     hardware_movement_stop(TRUE);
 
 	return IRQ_HANDLED;
@@ -442,6 +458,17 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
 
     printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
+    // check to see if this one needs to be ignored
+    if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)
+        {
+        // unset direction ignore...
+        atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
+
+        // ...then ignore switch
+        return IRQ_HANDLED;
+        }
+
+    atomic_set(&ignore_next_direction, MOVER_DIRECTION_FORWARD); // ignore same direction
     hardware_movement_stop(TRUE);
 
 	return IRQ_HANDLED;
@@ -622,16 +649,23 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 static int hardware_movement_set(int movement)
     {
-	if ((movement == MOVER_DIRECTION_REVERSE) || (movement == MOVER_DIRECTION_FORWARD))
+ 	if ((movement == MOVER_DIRECTION_REVERSE) || (movement == MOVER_DIRECTION_FORWARD))
 		{
-		// TODO - check our sensors (and possibly the last command) to ensure that we can move in the requested direction
-/*
-		if (((movement == MOVER_DIRECTION_REVERSE) && ()) ||
-				((movement == MOVER_DIRECTION_FORWARD) && ()))
-			{
-			return FALSE;
-			}
-*/
+		// check our next ignore direction to ensure that we can move in the requested direction
+                if (movement == atomic_read(&ignore_next_direction))
+                    {
+                    // unset direction ignore...
+                    atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
+
+                    // send the stop command in 150 milliseconds
+                    mod_timer(&timeout_timer_list, jiffies+((150*HZ)/1000));
+                    return FALSE;
+                    }
+                else
+                    {
+                    // clear out ignore variable (this could lead to problems, but it's the most robust in case of false end-stop reads)
+                    atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
+                    }
 
 		// signal that an operation is in progress
 		atomic_set(&moving_atomic, TRUE);
@@ -787,6 +821,8 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
     if (sysfs_streq(buf, "stop"))
 		{
 		printk(KERN_ALERT "%s - %s() : user command stop\n",TARGET_NAME, __func__);
+                // unset direction ignore...
+                atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
 
 		hardware_movement_stop(TRUE);
 		}
