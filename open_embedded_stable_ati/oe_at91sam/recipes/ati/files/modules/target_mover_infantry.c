@@ -34,7 +34,7 @@
 #define MOVER_MOVEMENT_STOPPED_FAULT	3
 
 // the maximum allowed speed ticks 
-#define NUMBER_OF_SPEEDS	20
+#define NUMBER_OF_SPEEDS	10
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -55,9 +55,12 @@
 // RC - 600 khz
 // RA - 50 duty of 600khz - cannot exceed RC
 // RB - 50 duty of 600khz - cannot exceed RC
-#define MOTOR_PWM_RC			0x001C
-#define MOTOR_PWM_RA_DEFAULT	0x000E
-#define MOTOR_PWM_RB_DEFAULT	0x000E
+#define MOTOR_PWM_RC			0x0070
+#define MOTOR_PWM_RA_DEFAULT	0x001C
+#define MOTOR_PWM_RB_DEFAULT	0x001C
+//#define MOTOR_PWM_RC			0x1C
+//#define MOTOR_PWM_RA_DEFAULT	0x000E
+//#define MOTOR_PWM_RB_DEFAULT	0x000E
 
 // TODO - map pwm output pin to block/channel
 #define MOTOR_PWM_BLOCK			0		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -117,7 +120,7 @@ atomic_t movement_atomic = ATOMIC_INIT(MOVER_MOVEMENT_STOPPED);
 //---------------------------------------------------------------------------
 // This atomic variable is to store the last end limit hit
 //---------------------------------------------------------------------------
-atomic_t last_limit_atomic = ATOMIC_INIT(MOVER_MOVEMENT_STOPPED);
+atomic_t ignore_next_direction = ATOMIC_INIT(MOVER_DIRECTION_STOP);
 
 //---------------------------------------------------------------------------
 // This atomic variable is to store the fault code.
@@ -197,9 +200,6 @@ static void timeout_timer_stop(void)
 //---------------------------------------------------------------------------
 static int hardware_motor_on(int direction)
 	{
-	unsigned long flags;
-
-    spin_lock_irqsave(&motor_lock, flags);
 
     // turn on directional lines
     if (direction == MOVER_DIRECTION_REVERSE)
@@ -225,6 +225,8 @@ static int hardware_motor_on(int direction)
 		printk(KERN_ALERT "%s - %s() - error\n",TARGET_NAME, __func__);
     	}
 
+//    spin_lock_irqsave(&motor_lock, flags);
+
     // assert pwm line
     #if MOTOR_PWM_BLOCK == 0
         at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
@@ -232,10 +234,10 @@ static int hardware_motor_on(int direction)
         at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
     #endif
 
+//	spin_unlock_irqrestore(&motor_lock, flags);
+
     // turn off brake
     at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, !OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
-
-	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
 
@@ -244,14 +246,15 @@ static int hardware_motor_on(int direction)
 //---------------------------------------------------------------------------
 static int hardware_motor_off(void)
 	{
-	unsigned long flags;
 
 	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
-	spin_lock_irqsave(&motor_lock, flags);
+//	spin_lock_irqsave(&motor_lock, flags);
 
 	// de-assert the pwm line
 	at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
+	
+//	spin_unlock_irqrestore(&motor_lock, flags);
 
 	// turn on brake
 	at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
@@ -261,8 +264,6 @@ static int hardware_motor_off(void)
 	at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
 
 	atomic_set(&movement_atomic, MOVER_MOVEMENT_STOPPED);
-	
-	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
 
@@ -315,14 +316,16 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
     printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
     // check to see if this one needs to be ignored
-    if (atomic_read(&last_limit_atomic) == MOVER_DIRECTION_REVERSE &&
-        atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)
+    if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)
         {
-        // ignore
+        // unset direction ignore...
+        atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
+        
+        // ...then ignore switch
         return IRQ_HANDLED;
         }
 
-    atomic_set(&last_limit_atomic, MOVER_DIRECTION_REVERSE);
+    atomic_set(&ignore_next_direction, MOVER_DIRECTION_REVERSE); // ignore same direction
     hardware_movement_stop(TRUE);
 
 	return IRQ_HANDLED;
@@ -341,14 +344,16 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
 
     // check to see if this one needs to be ignored
-    if (atomic_read(&last_limit_atomic) == MOVER_DIRECTION_FORWARD &&
-        atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)
+    if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)
         {
-        // ignore
+        // unset direction ignore...
+        atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
+        
+        // ...then ignore switch
         return IRQ_HANDLED;
         }
 
-    atomic_set(&last_limit_atomic, MOVER_DIRECTION_FORWARD);
+    atomic_set(&ignore_next_direction, MOVER_DIRECTION_FORWARD); // ignore same direction
     hardware_movement_stop(TRUE);
 
 	return IRQ_HANDLED;
@@ -404,7 +409,7 @@ static int hardware_motor_pwm_init(void)
 	// ~ 1 khz 50% duty
 
 	// initialize clock
-	__raw_writel(ATMEL_TC_TIMER_CLOCK2				// Master clock/4 = 132MHz/4 = 33MHz ?
+	__raw_writel(ATMEL_TC_TIMER_CLOCK1				// Master clock/4 = 132MHz/4 = 33MHz ?
 					| ATMEL_TC_WAVE					// output mode
 					| ATMEL_TC_ACPA_CLEAR				// set TIOA low when counter reaches "A"
 					| ATMEL_TC_ACPC_SET			// set TIOA high when counter reaches "C"
@@ -466,6 +471,7 @@ static int hardware_set_gpio_input_irq(	int pin_number,
 //---------------------------------------------------------------------------
 static int hardware_init(void)
     {
+	unsigned long flags;
     int status = 0;
 
     // turn on brake
@@ -484,9 +490,11 @@ static int hardware_init(void)
     status = hardware_motor_pwm_init();
 
     // turn on motor controller (via h-bridge, so de-assert negatives first, then assert power line)
+    spin_lock_irqsave(&motor_lock, flags);
     at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    spin_unlock_irqrestore(&motor_lock, flags);
 
     return status;
     }
@@ -496,6 +504,7 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
+	unsigned long flags;
 
 	// de-assert the pwm line
 	at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
@@ -507,10 +516,12 @@ static int hardware_exit(void)
 	at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
 	at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
 
-	// turn on motor controller (via h-bridge, so de-assert power first, then assert negatives)
+	// turn off motor controller (via h-bridge, so de-assert power first, then assert negatives)
+        spin_lock_irqsave(&motor_lock, flags);
 	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 	at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+	spin_unlock_irqrestore(&motor_lock, flags);
 
 	free_irq(INPUT_MOVER_TRACK_HOME, NULL);
 	free_irq(INPUT_MOVER_TRACK_END, NULL);
@@ -527,14 +538,21 @@ static int hardware_movement_set(int movement)
     {
 	if ((movement == MOVER_DIRECTION_REVERSE) || (movement == MOVER_DIRECTION_FORWARD))
 		{
-		// TODO - check our sensors (and possibly the last command) to ensure that we can move in the requested direction
-/*
-		if (((movement == MOVER_DIRECTION_REVERSE) && ()) ||
-				((movement == MOVER_DIRECTION_FORWARD) && ()))
-			{
-			return FALSE;
-			}
-*/
+		// check our next ignore direction to ensure that we can move in the requested direction
+                if (movement == atomic_read(&ignore_next_direction))
+                    {
+                    // unset direction ignore...
+                    atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
+
+                    // send the stop command in 150 milliseconds
+                    mod_timer(&timeout_timer_list, jiffies+((150*HZ)/1000));
+                    return FALSE;
+                    }
+                else
+                    {
+                    // clear out ignore variable (this could lead to problems, but it's the most robust in case of false end-stop reads)
+                    atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
+                    }
 
 		// signal that an operation is in progress
 		atomic_set(&moving_atomic, TRUE);
@@ -575,7 +593,6 @@ static int hardware_speed_get(void)
 //---------------------------------------------------------------------------
 static int hardware_speed_set(int speed)
     {
-	unsigned long flags;
         int new_speed;
 
 	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
@@ -593,14 +610,14 @@ static int hardware_speed_set(int speed)
 
 	atomic_set(&speed_atomic, speed);
 
-	spin_lock_irqsave(&motor_lock, flags);
+//	spin_lock_irqsave(&motor_lock, flags);
 
 	// These change the duty cycle
         new_speed = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_RC - MOTOR_PWM_RB_DEFAULT) * speed) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_RC
 	__raw_writel(new_speed, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
 	__raw_writel(new_speed, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
 
-	spin_unlock_irqrestore(&motor_lock, flags);
+//	spin_unlock_irqrestore(&motor_lock, flags);
 
     return TRUE;
     }
@@ -634,6 +651,9 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
     if (sysfs_streq(buf, "stop"))
 		{
 		printk(KERN_ALERT "%s - %s() : user command stop\n",TARGET_NAME, __func__);
+                // unset direction ignore...
+                atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
+
 
 		hardware_movement_stop(TRUE);
 		}
