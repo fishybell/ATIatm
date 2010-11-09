@@ -230,7 +230,7 @@ const struct attribute_group * scott_test_get_attr_group(void)
 //---------------------------------------------------------------------------
 struct target_device target_device_scott_test =
     {
-    .type     		= TARGET_TYPE_USER_INTERFACE,
+    .type     		= TARGET_TYPE_SCOTT_TEST,
     .name     		= TARGET_NAME,
     .dev     		= NULL,
     .get_attr_group	= scott_test_get_attr_group,

@@ -33,7 +33,8 @@ static const char * target_type[] =
     "battery",
     "user_interface",
     "ses_interface",
-    "mover_position"
+    "mover_position",
+    "scott_test"
     };
 
 //---------------------------------------------------------------------------
