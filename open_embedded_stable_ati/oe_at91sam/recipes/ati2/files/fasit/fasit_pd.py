@@ -605,7 +605,7 @@ class lifter_thread(QThread):
 #
 #------------------------------------------------------------------------------     
 class hit_thread(QThread):    
-    HIT_POLL_TIMEOUT_MS = 200
+    HIT_POLL_TIMEOUT_MS = 2000
     def __init__(self, sensor_type):
         QThread.__init__(self)
         self.logger = logging.getLogger('hit_thread')
@@ -805,7 +805,7 @@ class hit_thread(QThread):
 #
 #------------------------------------------------------------------------------     
 class ses_interface_thread(QThread):    
-    UI_POLL_TIMEOUT_MS = 500
+    UI_POLL_TIMEOUT_MS = 5000
     def __init__(self):
         QThread.__init__(self)
         self.logger = logging.getLogger('ses_interface_thread')
@@ -876,7 +876,7 @@ class ses_interface_thread(QThread):
 #
 #------------------------------------------------------------------------------     
 class user_interface_thread(QThread):    
-    UI_POLL_TIMEOUT_MS = 500
+    UI_POLL_TIMEOUT_MS = 5000
     def __init__(self, mover):
         QThread.__init__(self)
         self.logger = logging.getLogger('user_interface_thread')
@@ -928,26 +928,30 @@ class user_interface_thread(QThread):
                 else:
                     move_button_status = "other"
                 
+                # these don't reset when read, so only do something if we need to change movement
+                if (move_button_status == "stop\n"):
+                    if (self.is_moving):
+                        self.logger.debug('move button stop 1')
+                        self.write_out("stop")
+                        os.close(self.move_button_fd)
+                        self.is_moving = False
+                elif (move_button_status == "forward\n"):
+                    if (!self.is_moving):
+                        self.logger.debug('move button forward 1')
+                        self.write_out("forward")
+                        os.close(self.move_button_fd)
+                        self.is_moving = True
+                elif (move_button_status == "reverse\n"):
+                    if (!self.is_moving):
+                        self.logger.debug('move button reverse 1')
+                        self.write_out("reverse")
+                        os.close(self.move_button_fd)
+                        self.is_moving = True
+
                 if (bit_button_status == "pressed\n"):
                     self.logger.debug('bit button pressed 1')
                     self.write_out("pressed")
                     os.close(self.bit_button_fd)
-                elif (move_button_status == "forward\n"):
-                    self.logger.debug('move button forward 1')
-                    self.write_out("forward")
-                    os.close(self.move_button_fd)
-                    self.is_moving = True
-                elif (move_button_status == "reverse\n"):
-                    self.logger.debug('move button reverse 1')
-                    self.write_out("reverse")
-                    os.close(self.move_button_fd)
-                    self.is_moving = True
-                elif (move_button_status == "stop\n"):
-                    if (self.is_moving):
-                        self.logger.debug('move button stop 1')
-                        self.write_out("stop")
-                    os.close(self.move_button_fd)
-                    self.is_moving = False
                 else:
                     p = select.poll()
                     p.register(self.bit_button_fd, select.POLLERR|select.POLLPRI)
