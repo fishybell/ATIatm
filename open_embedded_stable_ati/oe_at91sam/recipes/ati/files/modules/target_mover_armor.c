@@ -32,8 +32,11 @@
 #define MOVER_MOVEMENT_MOVING_REVERSE	2
 #define MOVER_MOVEMENT_STOPPED_FAULT	3
 
-// the maximum allowed speed ticks 
-#define NUMBER_OF_SPEEDS        40
+// the maximum allowed speed ticks
+#define NUMBER_OF_SPEEDS        20
+// speed map based on measured values (speed of 0 needs special case)
+//static int speed_map[] = {1,112,640,1250,1800,2325,2900,3500,4025,4600,5200,5750,6300,6900,7600,8200,8800,9400,10000,10600,11200};
+static int speed_map[] = {1,112,640,1250,1800,2325,2900,3500,4025,4600,5200,5750,6300,6900,7600,8200,8800,9400,10000,10600,11200};
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
 #define HORN_ON_IN_MSECONDS	3500
@@ -41,7 +44,7 @@
 
 // the paremeters of the velocity ramp up
 #define RAMP_TIME_IN_MSECONDS	5000
-#define RAMP_STEPS		100
+#define RAMP_STEPS		50
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -59,12 +62,16 @@
 #define FAULT_WRONG_DIRECTION_DETECTED                     12
 #define FAULT_STOPPED_DUE_TO_STOP_COMMAND                  13
 
-// RC - max time
+// RC - max time (allowed by PWM code)
+// END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
 // RA - 0 percent of RC - cannot exceed RC
 // RB - 0 percent of RC - cannot exceed RC
 #define MOTOR_PWM_RC		0x3074
-#define MOTOR_PWM_RA_DEFAULT	0x0000
-#define MOTOR_PWM_RB_DEFAULT	0x0000
+#define MOTOR_PWM_END		0x3074
+//#define MOTOR_PWM_RC		0x183a
+//#define MOTOR_PWM_END		0x183a
+#define MOTOR_PWM_RA_DEFAULT	0x0001
+#define MOTOR_PWM_RB_DEFAULT	0x0001
 
 // TODO - map pwm output pin to block/channel
 #define MOTOR_PWM_BLOCK			0		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -295,6 +302,8 @@ static int hardware_motor_off(void)
 
         // de-assert the pwm line
         at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
+	__raw_writel(1, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA)); // change to smallest value
+	__raw_writel(1, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB)); // change to smallest value
 
 	atomic_set(&movement_atomic, MOVER_MOVEMENT_STOPPED);
 
@@ -319,7 +328,7 @@ static int hardware_speed_set(int new_speed)
     {
     int old_speed;
 
-        printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+        printk(KERN_ALERT "%s - %s(%i)\n",TARGET_NAME, __func__, new_speed);
 
     if (!atomic_read(&full_init))
         {
@@ -352,6 +361,7 @@ static int hardware_speed_set(int new_speed)
             {
             atomic_set(&goal_atomic, new_speed); // reset goal speed
             atomic_set(&goal_start_atomic, old_speed); // reset ramp start
+            printk(KERN_ALERT "%s - %s : old (%i), new (%i)\n",TARGET_NAME, __func__, old_speed, new_speed);
             del_timer(&ramp_timer_list); // start ramp over
             if (new_speed < old_speed)
                 {
@@ -740,7 +750,7 @@ static void horn_off_fire(unsigned long data)
 static void ramp_fire(unsigned long data)
     {
 //    unsigned long flags;
-    int goal_start, goal_step, new_speed, ticks_change, ramp, start_speed;
+    int goal_start, goal_step, new_speed, ticks_change, ramp, start_speed, i;
     if (!atomic_read(&full_init))
         {
         return;
@@ -751,11 +761,17 @@ static void ramp_fire(unsigned long data)
     goal_start = atomic_read(&goal_start_atomic);
     goal_step = atomic_read(&goal_step_atomic);
 
-    // calculate speed based on percent of full difference
-    ticks_change = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_RC - MOTOR_PWM_RB_DEFAULT) * abs(atomic_read(&goal_atomic) - goal_start)) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_RC
+/*    // calculate speed based on percent of full difference
+    ticks_change = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_END - MOTOR_PWM_RB_DEFAULT) * abs(atomic_read(&goal_atomic) - goal_start)) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_END
 
     // calculate start speed
-    start_speed = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_RC - MOTOR_PWM_RB_DEFAULT) * goal_start) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_RC
+    start_speed = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_END - MOTOR_PWM_RB_DEFAULT) * goal_start) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_END
+*/
+    // look up start speed
+    start_speed = speed_map[goal_start];
+
+    // look up speed change
+    ticks_change = speed_map[atomic_read(&goal_atomic) - goal_start];
 
     // calculate change for this step in the ramp (ramp based on simple y=x^2 curve)
     ramp = ((goal_step * goal_step) * (ticks_change)) / (RAMP_STEPS * RAMP_STEPS);
@@ -783,11 +799,29 @@ static void ramp_fire(unsigned long data)
         }
 
     // These change the pwm duty cycle
-    __raw_writel(new_speed, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-    __raw_writel(new_speed, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+    __raw_writel(max(new_speed,1), motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+    __raw_writel(max(new_speed,1), motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
 
-    // save the changed speed back as value of 0 to NUMBER_OF_SPEEDS
-    atomic_set(&speed_atomic, (NUMBER_OF_SPEEDS * new_speed) / MOTOR_PWM_RC);
+/*    // save the changed speed back as value of 0 to NUMBER_OF_SPEEDS (subtract X from denominator to fix rounding issue)
+    atomic_set(&speed_atomic, (NUMBER_OF_SPEEDS * new_speed) / (MOTOR_PWM_END - NUMBER_OF_SPEEDS));
+*/
+    // find what speed we are based on the map
+    for (i=0;i<NUMBER_OF_SPEEDS;i++)
+        {
+        // are we smaller than the current index in the map?
+        if (new_speed < speed_map[i])
+            {
+            // ...then the previous index is our speed
+            i--;
+            break;
+            }
+        }
+    // save our speed if we've changed
+    if (atomic_read(&speed_atomic) != i)
+        {
+        printk(KERN_ALERT "%s - %s : reached speed : %i\n",TARGET_NAME, __func__, i);
+        atomic_set(&speed_atomic, i);
+        }
 
 //    spin_unlock_irqrestore(&motor_lock, flags);
     }
@@ -875,6 +909,40 @@ static ssize_t speed_show(struct device *dev, struct device_attribute *attr, cha
     }
 
 //---------------------------------------------------------------------------
+// Handles reads to the ra attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t ra_show(struct device *dev, struct device_attribute *attr, char *buf)
+    {
+        int ra;
+	ra = __raw_readl(motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	return sprintf(buf, "%d\n", ra);
+    }
+
+//---------------------------------------------------------------------------
+// Handles writes to the ra attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+    {
+    long value;
+    ssize_t status;
+
+    status = strict_strtol(buf, 0, &value);
+    if (status == 0)
+        { 
+	__raw_writel(value, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	__raw_writel(value, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+        // assert pwm line
+        #if MOTOR_PWM_BLOCK == 0
+            at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+        #else
+            at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+        #endif
+        }
+
+    return status;
+    }
+
+//---------------------------------------------------------------------------
 // Handles writes to the speed attribute through sysfs
 //---------------------------------------------------------------------------
 static ssize_t speed_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
@@ -905,6 +973,7 @@ static DEVICE_ATTR(type, 0444, type_show, NULL);
 static DEVICE_ATTR(movement, 0644, movement_show, movement_store);
 static DEVICE_ATTR(fault, 0444, fault_show, NULL);
 static DEVICE_ATTR(speed, 0644, speed_show, speed_store);
+static DEVICE_ATTR(ra, 0644, ra_show, ra_store);
 
 //---------------------------------------------------------------------------
 // Defines the attributes of the armor target mover for sysfs
@@ -915,6 +984,7 @@ static const struct attribute * armor_mover_attrs[] =
     &dev_attr_movement.attr,
     &dev_attr_fault.attr,
     &dev_attr_speed.attr,
+    &dev_attr_ra.attr,
     NULL,
     };
 
