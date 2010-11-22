@@ -81,7 +81,7 @@
 //---------------------------------------------------------------------------
 // USER INTERFACE
 //---------------------------------------------------------------------------
-#define	INPUT_TEST_BUTTON_ACTIVE_STATE		ACTIVE_HIGH
+#define	INPUT_TEST_BUTTON_ACTIVE_STATE		ACTIVE_LOW
 #define INPUT_TEST_BUTTON_PULLUP_STATE		PULLUP_ON
 #define INPUT_TEST_BUTTON_DEGLITCH_STATE	DEGLITCH_ON
 #define	INPUT_TEST_BUTTON 					AT91_PIN_PC12
