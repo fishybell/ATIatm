@@ -1,0 +1,83 @@
+diff -ruN u-boot-1.3.4.orig/tools/env/fw_env.config u-boot-1.3.4/tools/env/fw_env.config
+--- u-boot-1.3.4.orig/tools/env/fw_env.config	2008-08-12 08:08:38.000000000 -0600
++++ u-boot-1.3.4/tools/env/fw_env.config	2010-12-07 13:06:47.553665412 -0700
+@@ -3,5 +3,4 @@
+ # environment sector is assumed present.
+ 
+ # MTD device name	Device offset	Env. size	Flash sector size
+-/dev/mtd1		0x0000		0x4000		0x4000
+-/dev/mtd2		0x0000		0x4000		0x4000
++/dev/mtd0		0x60000		0x20000		0x20000
+diff -ruN u-boot-1.3.4.orig/tools/env/fw_env.h u-boot-1.3.4/tools/env/fw_env.h
+--- u-boot-1.3.4.orig/tools/env/fw_env.h	2008-08-12 08:08:38.000000000 -0600
++++ u-boot-1.3.4/tools/env/fw_env.h	2010-12-07 13:06:47.556665281 -0700
+@@ -29,15 +29,15 @@
+  */
+ #define CONFIG_FILE     "/etc/fw_env.config"
+ 
+-#define HAVE_REDUND /* For systems with 2 env sectors */
+-#define DEVICE1_NAME      "/dev/mtd1"
+-#define DEVICE2_NAME      "/dev/mtd2"
+-#define DEVICE1_OFFSET    0x0000
+-#define ENV1_SIZE         0x4000
+-#define DEVICE1_ESIZE     0x4000
+-#define DEVICE2_OFFSET    0x0000
+-#define ENV2_SIZE         0x4000
+-#define DEVICE2_ESIZE     0x4000
++//#define HAVE_REDUND /* For systems with 2 env sectors */
++#define DEVICE1_NAME      "/dev/mtd0"
++//#define DEVICE2_NAME      "/dev/mtd2"
++#define DEVICE1_OFFSET    0x60000
++#define ENV1_SIZE         0x20000
++#define DEVICE1_ESIZE     0x20000
++//#define DEVICE2_OFFSET    0x0000
++//#define ENV2_SIZE         0x4000
++//#define DEVICE2_ESIZE     0x4000
+ 
+ #define CONFIG_BAUDRATE		115200
+ #define CONFIG_BOOTDELAY	5	/* autoboot after 5 seconds	*/
+diff -ruN u-boot-1.3.4.orig/tools/Makefile u-boot-1.3.4/tools/Makefile
+--- u-boot-1.3.4.orig/tools/Makefile	2008-08-12 08:08:38.000000000 -0600
++++ u-boot-1.3.4/tools/Makefile	2010-12-07 13:06:13.603665493 -0700
+@@ -63,7 +63,7 @@
+ HOSTOS := $(shell uname -s | tr A-Z a-z | \
+ 	sed -e 's/\(cygwin\).*/cygwin/')
+ 
+-TOOLSUBDIRS =
++TOOLSUBDIRS = env
+ 
+ #
+ # Mac OS X / Darwin's C preprocessor is Apple specific.  It
+diff -ruN u-boot-1.3.4.orig/tools/env/fw_env.c u-boot-1.3.4/tools/env/fw_env.c
+--- u-boot-1.3.4.orig/tools/env/fw_env.c	2008-08-12 08:08:38.000000000 -0600
++++ u-boot-1.3.4/tools/env/fw_env.c	2010-12-07 14:27:07.935790879 -0700
+@@ -171,7 +171,7 @@
+ {
+ 	ulong rc = CFG_ENV_SIZE - sizeof (long);
+ 
+-	if (HaveRedundEnv)
++//	if (HaveRedundEnv)
+ 		rc -= sizeof (char);
+ 	return rc;
+ }
+@@ -408,9 +408,9 @@
+ 	}
+ 
+ 	len = sizeof (environment.crc);
+-	if (HaveRedundEnv) {
++	//if (HaveRedundEnv) {
+ 		len += sizeof (environment.flags);
+-	}
++	//}
+ 
+ 	if (mode == O_RDWR) {
+ 		if (HaveRedundEnv) {
+@@ -623,7 +623,7 @@
+ 	if (!HaveRedundEnv) {
+ 		if (!crc1_ok) {
+ 			fprintf (stderr,
+-				"Warning: Bad CRC, using default environment\n");
++				"Warning: Bad CRC (0x%08x:0x%08x,0x%08x@0x%08x), using default environment\n", crc1, environment.crc, ENV_SIZE, addr1);
+ 			memcpy(environment.data, default_environment, sizeof default_environment);
+ 		}
+ 	} else {

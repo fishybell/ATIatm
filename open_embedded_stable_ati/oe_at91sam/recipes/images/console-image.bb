@@ -26,6 +26,7 @@ DEPENDS = "task-base-extended \
            compat-wireless \
 	   tcl \
 	   tcludp \
+           u-boot-utils \
            ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
 
@@ -36,6 +37,7 @@ IMAGE_INSTALL = "task-base-extended \
 	   ati ati2\
            compat-wireless \
            lame \
+           u-boot-utils \
 	   ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
 
