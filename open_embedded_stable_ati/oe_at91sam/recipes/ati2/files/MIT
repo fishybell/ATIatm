@@ -7,6 +7,7 @@ insmod target.ko
 insmod target_battery.ko minvoltval=24 charge=1
 insmod target_user_interface.ko mover=1
 insmod target_mover_infantry.ko
+insmod target_mover_position.ko
 insmod target_hit_mechanical.ko
 
 SERVER_START="radio_conv -s /dev/ttyS1"
