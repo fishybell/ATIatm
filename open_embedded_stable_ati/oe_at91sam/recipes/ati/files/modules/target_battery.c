@@ -374,9 +374,9 @@ static int hardware_init(void)
     // correct voltage variable to minimum adc value
     switch (abs(minvoltval))
         {
-        case 12: minvoltval = 52;  break;
-        case 24: minvoltval = 104; break;
-        case 48: minvoltval = 208; break;
+        case 12: minvoltval = 50;  break;
+        case 24: minvoltval = 101; break;
+        case 48: minvoltval = 204; break;
         default: minvoltval = 255; break;
         }
     printk(KERN_ALERT "%s charge: %i, minvoltval: %i\n",__func__,  charge, minvoltval);
