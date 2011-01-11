@@ -33,8 +33,13 @@ class FasitClient(FasitHandler):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.logger.debug('connecting to %s', (host, port))
         
-        self.sock.connect((host, port))
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1) ;# keepalive will try to ensure a connection is valid and disconnect if it is not
+        #self.sock.setsockopt(socket.SOL_SOCKET, socket.TCP_KEEPALIVE_INTVL, 10) -- these values set globally via sysctl
+        #self.sock.setsockopt(socket.SOL_SOCKET, socket.TCP_KEEPALIVE_PROBES, 5)
+        #self.sock.setsockopt(socket.SOL_SOCKET, socket.TCP_KEEPALIVE_TIME, 30)
  
+        self.sock.connect((host, port))
+
         if (type == fasit_packet_pd.PD_TYPE_NONE):
             self.__device__ = fasit_pd.FasitPd()
         elif (type == fasit_packet_pd.PD_TYPE_SIT):
