@@ -58,6 +58,7 @@ class RemoteTargetServer(asyncore.dispatcher):
         self.handler = None
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         self.bind(address)
         self.address = self.socket.getsockname()
         self.listen(1)
