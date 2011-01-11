@@ -6,6 +6,12 @@ if ! [ -f /home/root/is_board ] ; then
     exit 0
 fi
 
+# set keepalive timeouts
+sysctl -w \
+ net.ipv4.tcp_keepalive_time=20 \
+ net.ipv4.tcp_keepalive_intvl=10 \
+ net.ipv4.tcp_keepalive_probes=3
+
 case "$1" in
     start)
         /usr/bin/$(cat /home/root/is_board) start &
@@ -17,7 +23,7 @@ case "$1" in
         /usr/bin/$(cat /home/root/is_board) restart &
         ;;
     *)
-        echo "Usage: /etc/init.d/networking {start|stop|restart|force-reload}"
+        echo "Usage: /etc/init.d/start_up {start|stop|restart|force-reload}"
         exit 1
         ;;
 esac
