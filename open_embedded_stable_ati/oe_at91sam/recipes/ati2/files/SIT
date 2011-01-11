@@ -15,7 +15,13 @@ SERVER_STOP="killall radio_conv"
 FASIT_STOP="killall python"
 if [ -f network ] ; then
     SERVER_START="echo -n"
-    FASIT_START="python fasit_client_main.py -t SIT -s `findbase.tcl`"
+    if [ -f wimax ] ; then
+        FASIT_START="python fasit_client_main.py -t SIT -s `cat wimax`"
+        killall ping
+        ping -q `cat wimax` &
+    else
+        FASIT_START="python fasit_client_main.py -t SIT -s `findbase.tcl`"
+    fi
 fi
 
 if [ -n "$1" ] ; then

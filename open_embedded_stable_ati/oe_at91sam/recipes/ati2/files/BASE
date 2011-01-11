@@ -6,13 +6,18 @@ rmmod *.ko 2>/dev/null
 insmod target.ko
 insmod target_battery.ko minvoltval=12 charge=0
 
-SERVER_START="radio_conv -s /dev/ttyS1 -b `findbase.tcl`"
 SERVER_STOP="killall radio_conv"
+if [ -f wimax ] ; then
+    SERVER_START="radio_conv -s /dev/ttyS1 -b `cat wimax`"
+    killall ping
+    ping -q `cat wimax` &
+else
+    SERVER_START="radio_conv -s /dev/ttyS1 -b `findbase.tcl`"
+fi
 
 if [ -n "$1" ] ; then
     case "$1" in
     start)
-        /etc/init.d/networking restart
         $SERVER_START &
         ;;
     stop)
@@ -21,7 +26,6 @@ if [ -n "$1" ] ; then
         ;;
     force-reload|restart)
         $SERVER_STOP
-        /etc/init.d/networking restart
         $SERVER_START &
         ;;
     *)
