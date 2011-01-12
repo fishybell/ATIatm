@@ -929,29 +929,27 @@ class user_interface_thread(QThread):
                     move_button_status = "other"
                 
                 # these don't reset when read, so only do something if we need to change movement
-                if (move_button_status == "stop\n"):
-                    if (self.is_moving):
-                        self.logger.debug('move button stop 1')
-                        self.write_out("stop")
-                        os.close(self.move_button_fd)
-                        self.is_moving = False
-                elif (move_button_status == "forward\n"):
-                    if (!self.is_moving):
-                        self.logger.debug('move button forward 1')
-                        self.write_out("forward")
-                        os.close(self.move_button_fd)
-                        self.is_moving = True
-                elif (move_button_status == "reverse\n"):
-                    if (!self.is_moving):
-                        self.logger.debug('move button reverse 1')
-                        self.write_out("reverse")
-                        os.close(self.move_button_fd)
-                        self.is_moving = True
-
-                if (bit_button_status == "pressed\n"):
+                if (move_button_status == "stop\n" and self.is_moving == True):
+                    self.logger.debug('move button stop 1')
+                    self.write_out("stop")
+                    os.close(self.move_button_fd)
+                    self.is_moving = False
+                elif (move_button_status == "forward\n" and self.is_moving == False):
+                    self.logger.debug('move button forward 1')
+                    self.write_out("forward")
+                    os.close(self.move_button_fd)
+                    self.is_moving = True
+                elif (move_button_status == "reverse\n" and self.is_moving == False):
+                    self.logger.debug('move button reverse 1')
+                    self.write_out("reverse")
+                    os.close(self.move_button_fd)
+                    self.is_moving = True
+                # this is reset when read
+                elif (bit_button_status == "pressed\n"):
                     self.logger.debug('bit button pressed 1')
                     self.write_out("pressed")
                     os.close(self.bit_button_fd)
+                # poll to wait for change
                 else:
                     p = select.poll()
                     p.register(self.bit_button_fd, select.POLLERR|select.POLLPRI)
@@ -1361,7 +1359,7 @@ class mover_thread(QThread):
                 movement = os.read(movement_fd, 32)
                 os.read(position_fd, 32)
                 
-                self.logger.debug("RACE?: movement = %s", movement)
+                #self.logger.debug("RACE?: movement = %s", movement)
                 if (wait_for_stop == True):
                     if((movement == "stopped\n") or (movement == "fault\n")):
                         keep_going = False
