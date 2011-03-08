@@ -1,0 +1,159 @@
+Readme author: Nathan Bell
+Python code authors: John Yates, Nathan Bell
+
+This file will try to document class heirarchy, thread start/stop points, and communication flow. It is not meant to be complete documentation, just a good jumping off point.
+
+-----------------------------------------------------------------------------------------------
+| Class Heirarchy:
+-----------------------------------------------------------------------------------------------
+
+asyncore.dispatcher
+|-asyncore.file_dispatcher
+|-asyncore.dispatcher_with_send
+|-asynchat.async_chat
+| |-FasitHandler
+|   |-FasitClient
+|   |-RemoteTargetServerHandler
+|-RemoteTargetServer
+
+FasitAudio
+
+Exception
+|-Error
+  |-PackError
+  |-UnpackError
+    |-NeedData
+
+Packet
+|-fasit_packet.FasitPacket
+| |-fasit_packet_pd.FasitPacketPd
+| |-fasit_packet_pyro.FasitPacketPyro
+|-fasit_packet_pd.EventCommand
+|-fasit_packet_pd.EventCommandAck
+|-fasit_packet_pd.DeviceIdAndCapabilities
+|-fasit_packet_pd.DeviceStatus
+|-fasit_packet_pd.ConfigureMilesShootback
+|-fasit_packet_pd.MilesShootbackStatus
+|-fasit_packet_pd.ConfigureMuzzleFlash
+|-fasit_packet_pd.GpsLocation
+|-fasit_packet_pd.AudioCommand
+|-fasit_packet_pyro.Command
+|-fasit_packet_pyro.CommandAck
+|-fasit_packet_pyro.DeviceIdAndCapabilities
+|-fasit_packet_pyro.DeviceStatus
+
+FasitPd
+|-FasitPdMat
+|-FasitPdMit
+|-FasitPdMitRemote
+|-FasitPdSes
+|-FasitPdSit
+|-FasitPdTestSitXXX
+
+Thread
+|-QThread
+  |-FasitPdTestSitXXX.hit_thread
+  |-FasitPdTestSitXXX.exposure_thread
+  |-hit_thread
+  |-lifter_thread
+  |-mover_thread
+  |-play_sound_thread
+  |-ses_interface_thread
+  |-user_interface_thread
+
+-----------------------------------------------------------------------------------------------
+| Thread Start/Stop Points:
+-----------------------------------------------------------------------------------------------
+calling run: (starts thread)
+FasitPdMat() -> mover_thread.start(), user_interface_thread.start() -> ...
+FasitPdMit() -> mover_thread.start(), user_interface_thread.start() -> ...
+FasitPdSes() -> user_interface_thread.start(), ses_interface_thread.start() -> ...
+FasitPdSit() -> user_interface_thread.start(), lifter_thread.start(), hit_thread.start() -> ...
+FasitPdTestSitXXX() -> FasitPdTestSitXXX.hit_thread.start(), FasitPdTestSitXXX.exposure_thread.start() -> ...
+play_sound_thread() -> play_sound_thread.start() -> ...
+Thread.start() -> [sub-class].run()
+
+calling join: (stops thread)
+asyn_chat.initiate_send() -> handle_close() -> ... (on error)
+asyn_chat.initiate_send() -> handle_error() -> ... (on error)
+asyn_chat.handle_read() -> handle_error() -> ... (on error)
+asyncore.readwrite() -> handle_close() -> ... (on error)
+asyncore.readwrite() -> handle_error() -> ... (on error)
+asyncore.read() -> handle_error() -> ... (on error)
+asyncore.write() -> handle_error() -> ... (on error)
+asyncore._exception() -> handle_error() -> ... (on error)
+dispatcher.send() -> handle_close() -> ... (on error)
+dispatcher.recv() -> handle_close() -> ... (on error)
+main() -> stop_threads() -> ... (on Ctrl+C)
+dispatcher.handle_error() -> handle_close() -> ...
+FasitClient.handle_close() -> FasitClient.stop_threads() -> ... 
+FasitClient.__del__() -> FasitClient.stop_threads() -> ...
+FasitClient.stop_threads() -> [FasitPd, FasitPdMat, FasitPdMitRemote, FasitPdMit, FasitPdSes, FasitPdSit, FasitPdTestSitXXX].stop_threads()
+
+calling read_in_blocking: (pauses thread)
+hit_thread.run()
+lifter_thread.run()
+mover_thread.run()
+
+calling select(): (pauses thread)
+hit_thread.run() -> enable_and_wait()
+lifter_thread.run() -> send_command_and_wait()
+mover_thread.run() -> send_command_and_wait()
+ses_interface_thread.run() (commented out?)
+user_interface_thread.run()
+
+-----------------------------------------------------------------------------------------------
+| Communication Flow (startup):
+-----------------------------------------------------------------------------------------------
+Normal target:
+1) connect to TCP socket:
+  main() -> connect_to_server() -> FasitClient() -> socket.connect() ...
+
+Target acting as MIT and SIT:
+SIT 1) connect to TCP socket (TRACR) :
+  main() -> connect_to_server() -> FasitClient() -> socket.connect() ...
+SIT 2) listen on TCP socket:
+  FasitClient() ... -> FasitPdMitRemote() -> RemoteTargetServer() -> dispatcher.bind(), dispatcher.listen() -> socket.bind(), socket.listen()
+MIT 1) connect to TCP socket (SIT)
+  main() -> connect_to_server() -> FasitClient() -> socket.connect()
+
+
+-----------------------------------------------------------------------------------------------
+| Communication Flow (incoming packet):
+-----------------------------------------------------------------------------------------------
+Normal target:
+1a) asynchat/asyncore handle actual data calling ...
+1b) FasitHandler.collect_incoming_data() to buffer the data and eventually calling ...
+1c) FasitHandler.found_terminator() based on packet length and calling ...
+1d) FasitHandler.process_data() which, depending on how much of a valid packet has been received, is actually _process_header or _process_packet
+2) FasitHandler.process_data() instantiates FasitPacket() with the received data
+3a) unpack method called in various places
+3b) Using _msg_num_to_type, map (one for each message) class to fasit_dpkt.Packet derived class
+4a) FasitHandler._process_packet is finally called and redoes step 3 for final parsing and unpacking of data
+4b) Using _msg_num_to_handler, map (one for each message) function to FasitHandler function
+4c) on error, call FasitHandler.default_handler() and silenty discard the data
+5 FASIT_DEV_DEF_REQUEST) FasitHandler.dev_def_request_handler() : Calls FasitPd derived class's get_device_capabilities() function and sends the data back
+5 PD_EVENT_CMD) FasitHandler.event_command_handler() : Using _event_cmd_to_handler, map (one for each event type) function to FasitHandler function
+5 PD_EVENT_CMD EVENT_CMD_NONE) FasitHandler.event_cmd_none_handler() : Calls FasitHandler.send_cmd_ack() with status 'S'
+5 PD_EVENT_CMD EVENT_CMD_RESERVED) FasitHandler.event_cmd_reserved_handler() : Calls FasitHandler.send_cmd_ack() with status 'F'
+5 PD_EVENT_CMD EVENT_CMD_REQ_STATUS) FasitHandler.event_cmd_req_status_handler() : Calls send_device_status() and then send_miles_shootback_status() and/or send_muzzle_flash_status()
+5 PD_EVENT_CMD EVENT_CMD_REQ_EXPOSE) FasitHandler.event_cmd_req_expose_handler() : Calls FasitPd derived class's expose() function, and then FasitHandler.send_cmd_ack() with status 'S'
+5 PD_EVENT_CMD EVENT_CMD_REQ_DEV_RESET) FasitHandler.event_cmd_req_dev_reset() : Silently ignores data
+5 PD_EVENT_CMD EVENT_CMD_REQ_MOVE) FasitHandler.event_cmd_req_move() : Calls FasitPd derived class's move() function, and then FasitHandler.send_cmd_ack() with status 'S'
+5 PD_EVENT_CMD EVENT_CMD_CONFIG_HIT_SENSOR) FasitHandler.event_cmd_config_hit_sensor_handler() : Calls FasitPd derived class's configure_hit_sensor() function, and then FasitHandler.send_cmd_ack() with status 'S'
+5 PD_EVENT_CMD EVENT_CMD_REQ_GPS_LOCATION) FasitHandler.event_cmd_req_gps_location_handler() : Calls FasitHandler.send_cmd_ack() with status 'F'
+5 PD_EVENT_CMD unknown event number) asitHandler.event_cmd_default_handler() : Calls FasitHandler.send_cmd_ack() with status 'F'
+5 PD_CONFIG_MILES_SHOOTBACK) FasitHandler.config_miles_shootback_handler() : Calls FasitHandler.send_cmd_ack() with status 'F' or, when devices is configured with MILES, Calls FasitPd derived class's configure_miles() function, and then FasitHandler.send_cmd_ack() with status 'S'
+5 PD_CONFIG_MUZZLE_FLASH) FasitHandler.config_muzzle_flash_handler() : Calls FasitHandler.send_cmd_ack() with status 'F' or, when devices is configured with muzzle flash, Calls FasitPd derived class's configure_muzzle_flash() function, and then FasitHandler.send_cmd_ack() with status 'S'
+5 PD_AUDIO_CMD) FasitHandler.audio_command_handler() : Calls FasitHandler.send_cmd_ack() with status 'F' or, when devices is an SES, Calls FasitPd derived class's audio_command() function, and then FasitHandler.send_cmd_ack() with status 'S' on success and 'F' on failure
+
+Target acting as MIT and SIT:
+Steps 1-5 as normal, but FasitPdMitRemote is the FasitPd derived class and the move() function is overwritten to push the command to the MIT and all other commands are done by FasitPdSit
+
+
+-----------------------------------------------------------------------------------------------
+| Communication Flow (outgoing packet):
+-----------------------------------------------------------------------------------------------
+Most commands, upon receipt of message (in step 5 above) send back an immediate success or failure ack message. Inside the move(), expose(), etc. commands, the actual action may take some time to respond, and then later create a packet and call the push() function to send the data back to TRACR
+
+

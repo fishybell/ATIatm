@@ -2,12 +2,17 @@ import asynchat
 import logging
 import socket
 
-import random
-import time
-
 import fasit_packet
 import fasit_packet_pd
-import fasit_pd
+
+# various PD classes
+import FasitPd
+import FasitPdSit
+import FasitPdMit
+import FasitPdMat
+import FasitPdMitRemote
+import FasitPdSes
+import FasitPdTestSitXXX
 
 from asynchat_fasit_handler import FasitHandler
 
@@ -24,6 +29,8 @@ class FasitClient(FasitHandler):
         # check the type here, but don't assign __device__
         # until after the socket has been successfully opened
         if ((type != fasit_packet_pd.PD_TYPE_NONE) and 
+            (type != fasit_packet_pd.PD_TYPE_SAT_LIGHT) and
+            (type != fasit_packet_pd.PD_TYPE_SAT_HEAVY) and
             (type != fasit_packet_pd.PD_TYPE_SIT) and
             (type != fasit_packet_pd.PD_TYPE_MIT) and
             (type != fasit_packet_pd.PD_TYPE_MAT) and
@@ -41,20 +48,24 @@ class FasitClient(FasitHandler):
         self.sock.connect((host, port))
 
         if (type == fasit_packet_pd.PD_TYPE_NONE):
-            self.__device__ = fasit_pd.FasitPd()
+            self.__device__ = FasitPd.FasitPd()
+        elif (type == fasit_packet_pd.PD_TYPE_SAT_LIGHT):
+            self.__device__ = FasitPdSit.FasitPdSit(type)
+        elif (type == fasit_packet_pd.PD_TYPE_SAT_HEAVY):
+            self.__device__ = FasitPdSit.FasitPdSit(type)
         elif (type == fasit_packet_pd.PD_TYPE_SIT):
-            self.__device__ = fasit_pd.FasitPdSit()
+            self.__device__ = FasitPdSit.FasitPdSit(type)
         elif (type == fasit_packet_pd.PD_TYPE_MIT):
             if (remote == True):
                 self.logger.debug('Remote connection specified')
-                self.__device__ = fasit_pd.FasitPdMitRemote(local_ip, local_port)
+                self.__device__ = FasitPdMitRemote.FasitPdMitRemote(local_ip, local_port)
             else:
                 self.logger.debug('Local connection specified')
-                self.__device__ = fasit_pd.FasitPdMit()
+                self.__device__ = FasitPdMit.FasitPdMit()
         elif (type == fasit_packet_pd.PD_TYPE_MAT):
-            self.__device__ = fasit_pd.FasitPdMat()
+            self.__device__ = FasitPdMat.FasitPdMat()
         elif (type == fasit_packet_pd.PD_TYPE_SES):
-            self.__device__ = fasit_pd.FasitPdSes()
+            self.__device__ = FasitPdSes.FasitPdSes()
         else:
             raise ValueError('NONE, SIT, MIT, MAT and SES are only currently supported target types')
             
