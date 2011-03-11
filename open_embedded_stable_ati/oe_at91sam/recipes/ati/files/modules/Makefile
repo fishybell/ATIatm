@@ -12,7 +12,7 @@ obj-m := 	target.o \
 			target_mover_armor.o \
 			target_lifter_armor.o \
 			target_mover_position.o \
-			scott_test.o \
+			target_mover_generic.o \
 
 PWD := $(shell pwd)
 #EXTRA_CFLAGS += -mfloat-abi=softfp -mfpu=vfp
