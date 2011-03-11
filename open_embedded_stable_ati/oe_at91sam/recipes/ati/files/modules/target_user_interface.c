@@ -205,7 +205,8 @@ static int hardware_bit_status_off(void)
 //---------------------------------------------------------------------------
 static void move_button_int(int button)
     {
-    int bit_value, fwd_value, rev_value;
+    //int bit_value, fwd_value, rev_value;
+    int fwd_value, rev_value;
     if (!atomic_read(&full_init))
         {
         return;
@@ -217,8 +218,10 @@ static void move_button_int(int button)
         return;
         }
 
+    printk(KERN_ALERT "%s - %s(%i)\n",TARGET_NAME, __func__, button);
+
     // look at all three values
-    bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
+    //bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
     fwd_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_FWD) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
     rev_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_REV) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
 
@@ -226,16 +229,22 @@ static void move_button_int(int button)
     del_timer(&move_timeout_timer_list);
 
     // check failure values (a button went from on to off)
-    if ((!bit_value) ||
-        (button == FORWARD_BUTTON && !fwd_value) ||
+    //if ((!bit_value) ||
+    if ((button == FORWARD_BUTTON && !fwd_value) ||
         (button == REVERSE_BUTTON && !rev_value))
         {
 
-        // stop
-        atomic_set(&move_button_atomic, MOVING_STOP);
+    //printk(KERN_ALERT "%s - %s fail: (!%i) || (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, bit_value,button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
+    printk(KERN_ALERT "%s - %s fail: (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
+        // were we moving?
+        if (atomic_read(&move_button_atomic) != MOVING_STOP)
+            {
+            // stop
+            atomic_set(&move_button_atomic, MOVING_STOP);
 
-        // notify user-space
-        schedule_work(&move_button_work);
+            // notify user-space
+            schedule_work(&move_button_work);
+            }
         return;
         }
 
@@ -265,38 +274,42 @@ static void move_timeout_fire(unsigned long data)
     {
     int bit_value, fwd_value, rev_value;
     // if we're not a mover, don't bother
+    printk(KERN_ALERT "%s - %s\n",TARGET_NAME, __func__);
     if (!mover)
         {
         return;
         }
-    printk(KERN_ALERT "%s - %s\n",TARGET_NAME, __func__);
 
     // we've waited several seconds, and we havne't been canceled, check which way we're moving
-    bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
+    //bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
     fwd_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_FWD) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
     rev_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_REV) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
 
     // check for an error state
-    if (!bit_value)
+    /*if (!bit_value)
         {
+        printk(KERN_ALERT "%s - %s - NONE\n",TARGET_NAME, __func__);
         move_button_int(TEST_BUTTON);
         return;
-        }
+        }*/
 
     // check which way we're going
     if (fwd_value && !rev_value)
         {
         // forward
+        printk(KERN_ALERT "%s - %s - FORWARD\n",TARGET_NAME, __func__);
         atomic_set(&move_button_atomic, MOVING_FWD);
         }
     else if (!fwd_value && rev_value)
         {
         // reverse
+        printk(KERN_ALERT "%s - %s - REVERSE\n",TARGET_NAME, __func__);
         atomic_set(&move_button_atomic, MOVING_REV);
         }
     else
         {
         // error
+        printk(KERN_ALERT "%s - %s - STOP\n",TARGET_NAME, __func__);
         move_button_int(TEST_BUTTON);
         return;
         }
@@ -357,7 +370,7 @@ irqreturn_t bit_button_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
     // tell the movement code that the test button has changed
-    move_button_int(TEST_BUTTON);
+    //move_button_int(TEST_BUTTON);
 
     // check if the button has been pressed but not read by user-space
     value = atomic_read(&bit_button_atomic);
