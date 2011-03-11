@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------
-// target_mover_armor.c
+// target_mover_generic.c
 //---------------------------------------------------------------------------
 #include <linux/device.h>
 #include <linux/moduleparam.h>
@@ -10,14 +10,18 @@
 #include <linux/atmel_pwm.h>
 
 #include "target.h"
-#include "target_mover_armor.h"
+#include "target_mover_generic.h"
 //---------------------------------------------------------------------------
-#define TARGET_NAME		"armor mover"
-#define MOVER_TYPE  	"armor"
+// These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
+//---------------------------------------------------------------------------
+static int mover_type = 1; // 0 = infantry, 1 = armor, 2 = error
+module_param(mover_type, int, S_IRUGO);
+
+static char* TARGET_NAME[] = {"infantry mover","armor mover","error"};
+static char* MOVER_TYPE[] = {"infantry","armor","error"};
 
 // TODO - replace with a table based on distance and speed?
-// currently needs to go at least 1 mph to maintain this
-#define TIMEOUT_IN_SECONDS		15
+static int TIMEOUT_IN_SECONDS[] = {120,15,0};
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -33,17 +37,15 @@
 #define MOVER_MOVEMENT_STOPPED_FAULT	3
 
 // the maximum allowed speed ticks
-#define NUMBER_OF_SPEEDS        20
-// speed map based on measured values (speed of 0 needs special case)
-//static int speed_map[] = {1,112,640,1250,1800,2325,2900,3500,4025,4600,5200,5750,6300,6900,7600,8200,8800,9400,10000,10600,11200};
+static int NUMBER_OF_SPEEDS[] = {10,20,0};
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
-#define HORN_ON_IN_MSECONDS	3500
-#define HORN_OFF_IN_MSECONDS	8000
+static int HORN_ON_IN_MSECONDS[] = {0,3500,0};
+static int HORN_OFF_IN_MSECONDS[] = {0,8000,0};
 
 // the paremeters of the velocity ramp up
-#define RAMP_TIME_IN_MSECONDS	5000
-#define RAMP_STEPS		50
+static int RAMP_TIME_IN_MSECONDS[] = {1000,5000,0};
+static int RAMP_STEPS[] = {50,50,0};
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -63,23 +65,21 @@
 
 // RC - max time (allowed by PWM code)
 // END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
-// RA - 0 percent of RC - cannot exceed RC
-// RB - 0 percent of RC - cannot exceed RC
-#define MOTOR_PWM_RC		0x3074
-#define MOTOR_PWM_END		0x3074
-//#define MOTOR_PWM_RC		0x183a
-//#define MOTOR_PWM_END		0x183a
-//#define MOTOR_PWM_RA_DEFAULT	0x0001
-//#define MOTOR_PWM_RB_DEFAULT	0x0001
-#define MOTOR_PWM_RA_DEFAULT	0x04d8
-#define MOTOR_PWM_RB_DEFAULT	0x04d8
+// RA - low time setting - cannot exceed RC
+// RB - low time setting - cannot exceed RC
+static int MOTOR_PWM_RC[] = {0x0070,0x3074,0};
+static int MOTOR_PWM_END[] = {0x0070,0x3074,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x001C,0x04D8,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x001C,0x04D8,0};
 
 // TODO - map pwm output pin to block/channel
-#define MOTOR_PWM_BLOCK			0		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
-#define MOTOR_PWM_CHANNEL		2		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+#define MOTOR_PWM_BLOCK			1		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
+#define MOTOR_PWM_CHANNEL		1		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+
+// external motor controller polarity
+static int OUTPUT_MOVER_PWM_SPEED_ACTIVE[] = {ACTIVE_HIGH,ACTIVE_LOW,0};
 
 static struct atmel_tc * motor_pwm_tc = NULL;
-
 
 //---------------------------------------------------------------------------
 // This variable is a parameter that can be set at module loading to reverse
@@ -92,11 +92,16 @@ module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only 
 #define INPUT_MOVER_TRACK_HOME	(reverse ? INPUT_MOVER_END_OF_TRACK_2 : INPUT_MOVER_END_OF_TRACK_1)
 #define INPUT_MOVER_TRACK_END	(reverse ? INPUT_MOVER_END_OF_TRACK_1 : INPUT_MOVER_END_OF_TRACK_2)
 
-// map motor controller reverse and forward signals based on the 'reverse' parameter
+static bool OUTPUT_H_BRIDGE[] = {false,true,false};
+static bool USE_BRAKE[] = {true,false,false};
+
+// Non-H-Bridge : map motor controller reverse and forward signals based on the 'reverse' parameter
+#define OUTPUT_MOVER_FORWARD	(reverse ? OUTPUT_MOVER_DIRECTION_REVERSE : OUTPUT_MOVER_DIRECTION_FORWARD)
+#define OUTPUT_MOVER_REVERSE	(reverse ? OUTPUT_MOVER_DIRECTION_FORWARD : OUTPUT_MOVER_DIRECTION_REVERSE)
+
+// H-Bridge : map motor controller reverse and forward signals based on the 'reverse' parameter
 #define OUTPUT_MOVER_FORWARD_POS	(reverse ? OUTPUT_MOVER_MOTOR_REV_POS : OUTPUT_MOVER_MOTOR_FWD_POS)
 #define OUTPUT_MOVER_REVERSE_POS	(reverse ? OUTPUT_MOVER_MOTOR_FWD_POS : OUTPUT_MOVER_MOTOR_REV_POS)
-
-// map motor controller reverse and forward signals based on the 'reverse' parameter
 #define OUTPUT_MOVER_FORWARD_NEG	(reverse ? OUTPUT_MOVER_MOTOR_REV_NEG : OUTPUT_MOVER_MOTOR_FWD_NEG)
 #define OUTPUT_MOVER_REVERSE_NEG	(reverse ? OUTPUT_MOVER_MOTOR_FWD_NEG : OUTPUT_MOVER_MOTOR_REV_NEG)
 
@@ -195,18 +200,6 @@ static struct timer_list horn_off_timer_list = TIMER_INITIALIZER(horn_off_fire, 
 //---------------------------------------------------------------------------
 // Maps the movement to movement name.
 //---------------------------------------------------------------------------
-/*
-static const char * mover_movement[] =
-    {
-    "home",
-    "end",
-    "forward",
-    "reverse",
-    "stopped",
-    "emergency",
-    "timeout"
-    };
-*/
 static const char * mover_movement[] =
     {
     "stopped",
@@ -219,80 +212,112 @@ static const char * mover_movement[] =
 // Starts the timeout timer.
 //---------------------------------------------------------------------------
 static void timeout_timer_start(void)
-	{
-	mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS*HZ));
-	}
+    {
+    mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS[mover_type]*HZ));
+    }
 
 //---------------------------------------------------------------------------
 // Stops the timeout timer.
 //---------------------------------------------------------------------------
 static void timeout_timer_stop(void)
-	{
-	del_timer(&timeout_timer_list);
-	}
+    {
+    del_timer(&timeout_timer_list);
+    }
 
 //---------------------------------------------------------------------------
-//
+// a request to turn the motor on
 //---------------------------------------------------------------------------
 static int hardware_motor_on(int direction)
-	{
-	unsigned long flags;
+    {
+    unsigned long flags;
 
-    spin_lock_irqsave(&motor_lock, flags);
+    // turn on directional lines
+    if (OUTPUT_H_BRIDGE[mover_type])
+        {
+        // H-bridge handling
+        spin_lock_irqsave(&motor_lock, flags);
 
-    // de-assert the neg inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        // de-assert the neg inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 
-    // we always turn both signals off first to ensure that both don't ever get turned
-    // on at the same time
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        // we always turn both signals off first to ensure that both don't ever get turned
+        // on at the same time
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
 
-    spin_unlock_irqrestore(&motor_lock, flags);
+        spin_unlock_irqrestore(&motor_lock, flags);
+        }
+    else
+        {
+        // non-H-bridge handling
+        if (direction == MOVER_DIRECTION_REVERSE)
+            {
+            // reverse on, forward off
+            at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+            at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+            }
+        else if (direction == MOVER_DIRECTION_FORWARD)
+            {
+            // reverse off, forward on
+            at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+            at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+            }
+        }
 
     // assert pwm line
     #if MOTOR_PWM_BLOCK == 0
-        at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, PULLUP_OFF);
+        at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
     #else
-        at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, PULLUP_OFF);
+        at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
     #endif
 
     // turn on horn and wait to do actual move
-    at91_set_gpio_output(OUTPUT_MOVER_HORN, OUTPUT_MOVER_HORN_ACTIVE_STATE);
-    del_timer(&horn_on_timer_list); // start horn over
-    mod_timer(&horn_on_timer_list, jiffies+((HORN_ON_IN_MSECONDS*HZ)/1000));
-
-    if (direction == MOVER_DIRECTION_REVERSE)
-		{
-		at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-
-	    atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_REVERSE);
-	    printk(KERN_ALERT "%s - %s() - reverse\n",TARGET_NAME, __func__);
-		}
-    else if (direction == MOVER_DIRECTION_FORWARD)
-		{
-		at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-
-    	atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
-    	printk(KERN_ALERT "%s - %s() - forward\n",TARGET_NAME, __func__);
-		}
+    del_timer(&horn_on_timer_list); // start horn timer over
+    if (HORN_ON_IN_MSECONDS[mover_type] > 0)
+        {
+        at91_set_gpio_output(OUTPUT_MOVER_HORN, OUTPUT_MOVER_HORN_ACTIVE_STATE);
+        mod_timer(&horn_on_timer_list, jiffies+((HORN_ON_IN_MSECONDS[mover_type]*HZ)/1000));
+        }
     else
-    	{
-		printk(KERN_ALERT "%s - %s() - error\n",TARGET_NAME, __func__);
-    	}
+        {
+        mod_timer(&horn_on_timer_list, jiffies+((10*HZ)/1000));
+        }
 
-	return 0;
-	}
+
+    // log and set direction
+    if (direction == MOVER_DIRECTION_REVERSE)
+        {
+        atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_REVERSE);
+        printk(KERN_ALERT "%s - %s() - reverse\n",TARGET_NAME[mover_type], __func__);
+        }
+    else if (direction == MOVER_DIRECTION_FORWARD)
+        {
+        atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
+        printk(KERN_ALERT "%s - %s() - forward\n",TARGET_NAME[mover_type], __func__);
+        }
+    else
+        {
+        printk(KERN_ALERT "%s - %s() - error\n",TARGET_NAME[mover_type], __func__);
+        }
+
+    // turn off brake?
+    if (USE_BRAKE[mover_type])
+        {
+        at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, !OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
+        }
+
+    return 0;
+    }
 
 //---------------------------------------------------------------------------
-//
+// immediately stop the motor, and try to stop the mover
 //---------------------------------------------------------------------------
 static int hardware_motor_off(void)
-	{
-	unsigned long flags;
+    {
+    unsigned long flags;
 
-	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // turn off irrelevant timers
     del_timer(&timeout_timer_list);
@@ -301,26 +326,41 @@ static int hardware_motor_off(void)
     del_timer(&ramp_timer_list);
     mod_timer(&horn_off_timer_list, jiffies+((10*HZ)/1000));
 
-        // de-assert the pwm line
-        at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
-	__raw_writel(1, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA)); // change to smallest value
-	__raw_writel(1, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB)); // change to smallest value
+    // de-assert the pwm line
+    at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE[mover_type]);
+    __raw_writel(1, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA)); // change to smallest value
+    __raw_writel(1, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB)); // change to smallest value
 
-	atomic_set(&movement_atomic, MOVER_MOVEMENT_STOPPED);
+    // turn on brake?
+    if (USE_BRAKE[mover_type])
+        {
+        at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
+        }
 
-	spin_lock_irqsave(&motor_lock, flags);
+    atomic_set(&movement_atomic, MOVER_MOVEMENT_STOPPED);
 
-    // de-assert the all inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    // turn off directional lines
+    if (OUTPUT_H_BRIDGE[mover_type])
+        {
+        spin_lock_irqsave(&motor_lock, flags);
 
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-	
-	spin_unlock_irqrestore(&motor_lock, flags);
+        // de-assert the all inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 
-	return 0;
-	}
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    
+        spin_unlock_irqrestore(&motor_lock, flags);
+        }
+    else
+        {
+        at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+        }
+
+    return 0;
+    }
 
 //---------------------------------------------------------------------------
 // sets up a ramping change in speed
@@ -329,57 +369,57 @@ static int hardware_speed_set(int new_speed)
     {
     int old_speed;
 
-        printk(KERN_ALERT "%s - %s(%i)\n",TARGET_NAME, __func__, new_speed);
+    printk(KERN_ALERT "%s - %s(%i)\n",TARGET_NAME[mover_type], __func__, new_speed);
 
+    // check for full initialization
     if (!atomic_read(&full_init))
         {
-                printk(KERN_ALERT "%s - %s() error - driver not fully initialized.\n",TARGET_NAME, __func__);
+                printk(KERN_ALERT "%s - %s() error - driver not fully initialized.\n",TARGET_NAME[mover_type], __func__);
         return FALSE;
         }
-
     if (!motor_pwm_tc)
-                {
+        {
         return -EINVAL;
-                }
+        }
 
-        // reset timer
+    // reset timer if we're being told to move
+    if (atomic_read(&moving_atomic))
+        {
+        timeout_timer_stop();
+        timeout_timer_start();
+
+        // don't ramp if we're already going there
+        old_speed = atomic_read(&goal_atomic);
+        if (old_speed == new_speed)
+            {
+            return TRUE;
+            }
+        }
+
+    // start ramp up
+    old_speed = atomic_read(&speed_atomic);
+    if (new_speed != old_speed)
+        {
+        atomic_set(&goal_atomic, new_speed); // reset goal speed
+        atomic_set(&goal_start_atomic, old_speed); // reset ramp start
+        printk(KERN_ALERT "%s - %s : old (%i), new (%i)\n",TARGET_NAME[mover_type], __func__, old_speed, new_speed);
+        del_timer(&ramp_timer_list); // start ramp over
+        if (new_speed < old_speed)
+            {
+            atomic_set(&goal_step_atomic, -1); // stepping backwards
+            }
+        else
+            {
+            atomic_set(&goal_step_atomic, 1); // stepping forwards
+            }
+
+        // are we being told to move?
         if (atomic_read(&moving_atomic))
             {
-            timeout_timer_stop();
-            timeout_timer_start();
-
-            // don't ramp if we're already going there
-            old_speed = atomic_read(&goal_atomic);
-            if (old_speed == new_speed)
-                {
-                return TRUE;
-                }
+            // start the ramp up/down of the mover immediately
+            mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS[mover_type]*HZ)/1000)/RAMP_STEPS[mover_type]));
             }
-
-        // start ramp up
-        old_speed = atomic_read(&speed_atomic);
-        if (new_speed != old_speed)
-            {
-            atomic_set(&goal_atomic, new_speed); // reset goal speed
-            atomic_set(&goal_start_atomic, old_speed); // reset ramp start
-            printk(KERN_ALERT "%s - %s : old (%i), new (%i)\n",TARGET_NAME, __func__, old_speed, new_speed);
-            del_timer(&ramp_timer_list); // start ramp over
-            if (new_speed < old_speed)
-                {
-                atomic_set(&goal_step_atomic, -1); // stepping backwards
-                }
-            else
-                {
-                atomic_set(&goal_step_atomic, 1); // stepping forwards
-                }
-
-            // are we already moving?
-            if (atomic_read(&moving_atomic))
-                {
-                // start the ramp up/down of the mover immediately
-                mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS*HZ)/1000)/RAMP_STEPS));
-                }
-            }
+        }
 
     return TRUE;
     }
@@ -389,50 +429,48 @@ static int hardware_speed_set(int new_speed)
 //---------------------------------------------------------------------------
 static int hardware_movement_stop(int stop_timer)
     {
-        int speed;
-	if (stop_timer == TRUE)
-		{
-		timeout_timer_stop();
-		}
+    int speed;
+    if (stop_timer == TRUE)
+        {
+        timeout_timer_stop();
+        }
 
-        // stop ramping, remember goal speed, and reset to 0 (new speed)
-        del_timer(&ramp_timer_list); // start ramp over
-        speed = atomic_read(&goal_atomic);
-        atomic_set(&speed_atomic, 0);
+    // stop ramping, remember goal speed, and reset to 0 (new speed)
+    del_timer(&ramp_timer_list); // start ramp over
+    speed = atomic_read(&goal_atomic);
+    atomic_set(&speed_atomic, 0);
 
-	// turn off the motor
-	hardware_motor_off();
+    // turn off the motor
+    hardware_motor_off();
 
-	// signal that an operation is done
-	atomic_set(&moving_atomic, FALSE);
+    // signal that an operation is done
+    atomic_set(&moving_atomic, FALSE);
 
-        // set speed to ramp back up again
-        hardware_speed_set(speed);
+    // reset speed ramping
+    hardware_speed_set(speed);
 
-	// notify user-space
-	schedule_work(&movement_work);
+    // notify user-space
+    schedule_work(&movement_work);
 
-	return 0;
-	}
+    return 0;
+    }
 
 //---------------------------------------------------------------------------
 // The function that gets called when the timeout fires.
 //---------------------------------------------------------------------------
 static void timeout_fire(unsigned long data)
-	{
+    {
     if (!atomic_read(&full_init))
         {
         return;
         }
 
-return;
-
-	printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME, __func__);
-	hardware_movement_stop(FALSE);
-	}
+    printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME[mover_type], __func__);
+    hardware_movement_stop(FALSE);
+    }
 
 //---------------------------------------------------------------------------
-//
+// track sensor "home"
 //---------------------------------------------------------------------------
 irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
     {
@@ -441,7 +479,7 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // check to see if this one needs to be ignored
     if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)
@@ -456,11 +494,11 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
     atomic_set(&ignore_next_direction, MOVER_DIRECTION_REVERSE); // ignore same direction
     hardware_movement_stop(TRUE);
 
-	return IRQ_HANDLED;
+    return IRQ_HANDLED;
     }
 
 //---------------------------------------------------------------------------
-//
+// track sensor "end"
 //---------------------------------------------------------------------------
 irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     {
@@ -469,7 +507,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // check to see if this one needs to be ignored
     if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)
@@ -484,7 +522,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     atomic_set(&ignore_next_direction, MOVER_DIRECTION_FORWARD); // ignore same direction
     hardware_movement_stop(TRUE);
 
-	return IRQ_HANDLED;
+    return IRQ_HANDLED;
     }
 
 //---------------------------------------------------------------------------
@@ -492,16 +530,16 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
 //---------------------------------------------------------------------------
 static int hardware_motor_pwm_init(void)
     {
-	unsigned int mck_freq;
+    unsigned int mck_freq;
 
     // initialize timer counter
     motor_pwm_tc = target_timer_alloc(MOTOR_PWM_BLOCK, "gen_tc");
     printk(KERN_ALERT "timer_alloc(): %08x\n", (unsigned int) motor_pwm_tc);
 
     if (!motor_pwm_tc)
-		{
-    	return -EINVAL;
-		}
+        {
+        return -EINVAL;
+        }
 
     mck_freq = clk_get_rate(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
     printk(KERN_ALERT "mck_freq: %i\n", (unsigned int) mck_freq);
@@ -532,47 +570,67 @@ static int hardware_motor_pwm_init(void)
     #endif
 */
 
-	if (clk_enable(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]) != 0)
+    if (clk_enable(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]) != 0)
             {
             printk(KERN_ERR "clk_enable() failed\n");
             return 0;
             }
 
-	// approx 1.8MHz with 50% duty-cycle
+    switch (mover_type)
+        {
+        case 0:
+        // initialize infantry clock
+        __raw_writel(ATMEL_TC_TIMER_CLOCK1			// Master clock/4 = 132MHz/4 = 33MHz ?
+                    | ATMEL_TC_WAVE					// output mode
+                    | ATMEL_TC_ACPA_CLEAR			// set TIOA low when counter reaches "A"
+                    | ATMEL_TC_ACPC_SET				// set TIOA high when counter reaches "C"
+                    | ATMEL_TC_BCPB_CLEAR			// set TIOB low when counter reaches "B"
+                    | ATMEL_TC_BCPC_SET				// set TIOB high when counter reaches "C"
+                    | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
+                    | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
+                    motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CMR));	// CMR register for timer
+        break;
 
-	// initialize clock
-	__raw_writel(ATMEL_TC_TIMER_CLOCK2				// Master clock/2 = 132MHz/2 = 66MHz
-					| ATMEL_TC_WAVE					// output mode
-					| ATMEL_TC_ACPA_SET				// set TIOA high when counter reaches "A"
-					| ATMEL_TC_ACPC_CLEAR			// set TIOA low when counter reaches "C"
-					| ATMEL_TC_BCPB_SET				// set TIOB high when counter reaches "B"
-					| ATMEL_TC_BCPC_CLEAR			// set TIOB low when counter reaches "C"
-					| ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
-					| ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
-					motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CMR));	// CMR register for timer 0
+        case 1:
+        // initialize armor clock
+        __raw_writel(ATMEL_TC_TIMER_CLOCK2			// Master clock/2 = 132MHz/2 = 66MHz
+                    | ATMEL_TC_WAVE					// output mode
+                    | ATMEL_TC_ACPA_SET				// set TIOA high when counter reaches "A"
+                    | ATMEL_TC_ACPC_CLEAR			// set TIOA low when counter reaches "C"
+                    | ATMEL_TC_BCPB_SET				// set TIOB high when counter reaches "B"
+                    | ATMEL_TC_BCPC_CLEAR			// set TIOB low when counter reaches "C"
+                    | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
+                    | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
+                    motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CMR));	// CMR register for timer
+        break;
+        default: return 1; break;
+        }
 
-	__raw_writel(ATMEL_TC_CLKEN, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));
-	__raw_writel(ATMEL_TC_SYNC, motor_pwm_tc->regs + ATMEL_TC_BCR);
-	__raw_writel(MOTOR_PWM_RA_DEFAULT, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	__raw_writel(MOTOR_PWM_RB_DEFAULT, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
-	__raw_writel(MOTOR_PWM_RC, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
+    // initialize clock timer
+    __raw_writel(ATMEL_TC_CLKEN, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));
+    __raw_writel(ATMEL_TC_SYNC, motor_pwm_tc->regs + ATMEL_TC_BCR);
 
-	// disable irqs and start timer
-	__raw_writel(0xff, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, IDR));				// irq register
-	__raw_writel(ATMEL_TC_SWTRG, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));	// control register
+    // These set up the freq and duty cycle
+    __raw_writel(MOTOR_PWM_RA_DEFAULT[mover_type], motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+    __raw_writel(MOTOR_PWM_RB_DEFAULT[mover_type], motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+    __raw_writel(MOTOR_PWM_RC[mover_type], motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
 
-	return 0;
+    // disable irqs and start timer
+    __raw_writel(0xff, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, IDR));				// irq register
+    __raw_writel(ATMEL_TC_SWTRG, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));	// control register
+
+    return 0;
     }
 
 //---------------------------------------------------------------------------
-//
+// set an IRQ for a GPIO pin to call a handler function
 //---------------------------------------------------------------------------
-static int hardware_set_gpio_input_irq(	int pin_number,
-										int pullup_state,
-										irqreturn_t (*handler)(int, void *, struct pt_regs *),
-										const char * dev_name)
-	{
-	int status = 0;
+static int hardware_set_gpio_input_irq(int pin_number,
+                                       int pullup_state,
+                                       irqreturn_t (*handler)(int, void *, struct pt_regs *),
+                                       const char * dev_name)
+    {
+    int status = 0;
 
     // Configure position gpios for input and deglitch for interrupts
     at91_set_gpio_input(pin_number, pullup_state);
@@ -594,33 +652,57 @@ static int hardware_set_gpio_input_irq(	int pin_number,
         }
 
     return TRUE;
-	}
+    }
 
 //---------------------------------------------------------------------------
-//
+// called to initialize driver
 //---------------------------------------------------------------------------
 static int hardware_init(void)
     {
     int status = 0;
     printk(KERN_ALERT "%s reverse: %i\n",__func__,  reverse);
 
-    // de-assert the neg inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    // turn on brake?
+    if (USE_BRAKE[mover_type])
+        {
+        at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
+        }
 
-    // configure motor gpio for output and set initial output
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    // de-assert the pwm line
+    at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE[mover_type]);
 
-    // configure horn for output and set initial state
-    at91_set_gpio_output(OUTPUT_MOVER_HORN, !OUTPUT_MOVER_HORN_ACTIVE_STATE);
+    // always put the H-bridge circuitry in the right state from the beginning
+    if (OUTPUT_H_BRIDGE[mover_type])
+        {
+        // de-assert the neg inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+
+        // configure motor gpio for output and set initial output
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        }
+    else
+        {
+        // if we don't use the H-bridge for direction, turn on motor controller
+        //  (via h-bridge, so de-assert negatives first, then assert power line)
+        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // motor controller on
+        }
+
+    if (HORN_ON_IN_MSECONDS[mover_type] > 0)
+        {
+        // configure horn for output and set initial state
+        at91_set_gpio_output(OUTPUT_MOVER_HORN, !OUTPUT_MOVER_HORN_ACTIVE_STATE);
+        }
 
     // TODO - add speed sensors
-    if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_HOME, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_home_int, "track_sensor_home_int") == FALSE) 					||
-    	(hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_END, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_end_int, "track_sensor_end_int") == FALSE))
-    	{
-		return FALSE;
-    	}
+    if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_HOME, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_home_int, "track_sensor_home_int") == FALSE) ||
+        (hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_END, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_end_int, "track_sensor_end_int") == FALSE))
+        {
+        return FALSE;
+        }
 
     // setup motor PWM output
     status = hardware_motor_pwm_init();
@@ -629,42 +711,60 @@ static int hardware_init(void)
     }
 
 //---------------------------------------------------------------------------
-//
+// called on driver shutdown
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
-	// de-assert the neg inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    // turn on brake?
+    if (USE_BRAKE[mover_type])
+        {
+        at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
+        }
 
-	// de-assert the forward/reverse signals (pos signals to h-bridge)
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    // always put the H-bridge circuitry in the right state on shutdown
+    if (OUTPUT_H_BRIDGE[mover_type])
+        {
+        // de-assert the neg inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+
+        // configure motor gpio for output and set initial output
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        }
+    else
+        {
+        // if we don't use the H-bridge for direction, turn off motor controller
+        //  (via h-bridge, so de-assert negatives first, then de-assert power line)
+        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // motor controller off
+        }
 
     // change pwm back to gpio
-    at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE[mover_type]);
 
     del_timer(&timeout_timer_list);
     del_timer(&horn_on_timer_list);
     del_timer(&horn_off_timer_list);
     del_timer(&ramp_timer_list);
 
-	free_irq(INPUT_MOVER_TRACK_HOME, NULL);
-	free_irq(INPUT_MOVER_TRACK_END, NULL);
+    free_irq(INPUT_MOVER_TRACK_HOME, NULL);
+    free_irq(INPUT_MOVER_TRACK_END, NULL);
 
-	target_timer_free(motor_pwm_tc);
+    target_timer_free(motor_pwm_tc);
 
-	return 0;
+    return 0;
     }
 
 //---------------------------------------------------------------------------
-//
+// set moving forward or reverse
 //---------------------------------------------------------------------------
 static int hardware_movement_set(int movement)
     {
- 	if ((movement == MOVER_DIRECTION_REVERSE) || (movement == MOVER_DIRECTION_FORWARD))
-		{
-		// check our next ignore direction to ensure that we can move in the requested direction
+    if ((movement == MOVER_DIRECTION_REVERSE) || (movement == MOVER_DIRECTION_FORWARD))
+        {
+        // check our next ignore direction to ensure that we can move in the requested direction
                 if (movement == atomic_read(&ignore_next_direction))
                     {
                     // unset direction ignore...
@@ -680,38 +780,38 @@ static int hardware_movement_set(int movement)
                     atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
                     }
 
-		// signal that an operation is in progress
-		atomic_set(&moving_atomic, TRUE);
+        // signal that an operation is in progress
+        atomic_set(&moving_atomic, TRUE);
 
-		hardware_motor_on(movement);
+        hardware_motor_on(movement);
 
-		// notify user-space
-		schedule_work(&movement_work);
+        // notify user-space
+        schedule_work(&movement_work);
 
-		timeout_timer_start();
+        timeout_timer_start();
 
-		return TRUE;
-		}
-	else
-		{
-		return FALSE;
-		}
+        return TRUE;
+        }
+    else
+        {
+        return FALSE;
+        }
     }
 
 //---------------------------------------------------------------------------
-//
+// get current direction
 //---------------------------------------------------------------------------
 static int hardware_movement_get(void)
     {
-	return atomic_read(&movement_atomic);
+    return atomic_read(&movement_atomic);
     }
 
 //---------------------------------------------------------------------------
-//
+// get current speed
 //---------------------------------------------------------------------------
 static int hardware_speed_get(void)
     {
-	return atomic_read(&speed_atomic);
+    return atomic_read(&speed_atomic);
     }
 
 //---------------------------------------------------------------------------
@@ -723,13 +823,16 @@ static void horn_on_fire(unsigned long data)
         {
         return;
         }
-	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // start the ramp up/down of the mover
-    mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS*HZ)/1000)/RAMP_STEPS));
+    mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS[mover_type]*HZ)/1000)/RAMP_STEPS[mover_type]));
 
-    // turn off the horn later
-    mod_timer(&horn_off_timer_list, jiffies+((HORN_OFF_IN_MSECONDS*HZ)/1000));
+    // turn off the horn later?
+    if (HORN_ON_IN_MSECONDS[mover_type] > 0)
+        {
+        mod_timer(&horn_off_timer_list, jiffies+((HORN_OFF_IN_MSECONDS[mover_type]*HZ)/1000));
+        }
     }
 
 //---------------------------------------------------------------------------
@@ -741,10 +844,13 @@ static void horn_off_fire(unsigned long data)
         {
         return;
         }
-	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
-    // turn off horn
-    at91_set_gpio_output(OUTPUT_MOVER_HORN, !OUTPUT_MOVER_HORN_ACTIVE_STATE);
+    // turn off horn?
+    if (HORN_ON_IN_MSECONDS[mover_type] > 0)
+        {
+        at91_set_gpio_output(OUTPUT_MOVER_HORN, !OUTPUT_MOVER_HORN_ACTIVE_STATE);
+        }
     }
 
 //---------------------------------------------------------------------------
@@ -765,10 +871,10 @@ static void ramp_fire(unsigned long data)
     goal_step = atomic_read(&goal_step_atomic);
 
     // calculate speed based on percent of full difference
-    ticks_change = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_END - MOTOR_PWM_RB_DEFAULT) * abs(atomic_read(&goal_atomic) - goal_start)) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_END
+    ticks_change = MOTOR_PWM_RB_DEFAULT[mover_type] + (((MOTOR_PWM_END[mover_type] - MOTOR_PWM_RB_DEFAULT[mover_type]) * abs(atomic_read(&goal_atomic) - goal_start)) / NUMBER_OF_SPEEDS[mover_type]); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_END
 
     // calculate start speed
-    start_speed = MOTOR_PWM_RB_DEFAULT + (((MOTOR_PWM_END - MOTOR_PWM_RB_DEFAULT) * goal_start) / NUMBER_OF_SPEEDS); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_END
+    start_speed = MOTOR_PWM_RB_DEFAULT[mover_type] + (((MOTOR_PWM_END[mover_type] - MOTOR_PWM_RB_DEFAULT[mover_type]) * goal_start) / NUMBER_OF_SPEEDS[mover_type]); // minimum is MOTOR_PWM_RB_DEFAULT, max is MOTOR_PWM_END
 
 /*    // look up start speed
     start_speed = speed_map[goal_start];
@@ -778,7 +884,7 @@ static void ramp_fire(unsigned long data)
 */
 
     // calculate change for this step in the ramp (ramp based on simple y=x^2 curve)
-    ramp = ((goal_step * goal_step) * (ticks_change)) / (RAMP_STEPS * RAMP_STEPS);
+    ramp = ((goal_step * goal_step) * (ticks_change)) / (RAMP_STEPS[mover_type] * RAMP_STEPS[mover_type]);
 
     // add to original start of ramp
     if (goal_step < 0)
@@ -794,12 +900,12 @@ static void ramp_fire(unsigned long data)
         atomic_set(&goal_step_atomic, goal_step + 1);
         }
 
-    //printk(KERN_ALERT "%s - %s : %i, %i, %i %i\n",TARGET_NAME, __func__, ticks_change, start_speed, ramp, new_speed);
+    //printk(KERN_ALERT "%s - %s : %i, %i, %i %i\n",TARGET_NAME[mover_type], __func__, ticks_change, start_speed, ramp, new_speed);
 
     // take another step?
-    if (abs(goal_step) < RAMP_STEPS)
+    if (abs(goal_step) < RAMP_STEPS[mover_type])
         {
-        mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS*HZ)/1000)/RAMP_STEPS));
+        mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS[mover_type]*HZ)/1000)/RAMP_STEPS[mover_type]));
         }
 
     // These change the pwm duty cycle
@@ -807,26 +913,7 @@ static void ramp_fire(unsigned long data)
     __raw_writel(max(new_speed,1), motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
 
     // save the changed speed back as value of 0 to NUMBER_OF_SPEEDS (subtract X from denominator to fix rounding issue)
-    atomic_set(&speed_atomic, (NUMBER_OF_SPEEDS * new_speed) / (MOTOR_PWM_END - NUMBER_OF_SPEEDS));
-
-/*    // find what speed we are based on the map
-    for (i=0;i<NUMBER_OF_SPEEDS;i++)
-        {
-        // are we smaller than the current index in the map?
-        if (new_speed < speed_map[i])
-            {
-            // ...then the previous index is our speed
-            i--;
-            break;
-            }
-        }
-    // save our speed if we've changed
-    if (atomic_read(&speed_atomic) != i)
-        {
-        printk(KERN_ALERT "%s - %s : reached speed : %i\n",TARGET_NAME, __func__, i);
-        atomic_set(&speed_atomic, i);
-        }
-*/
+    atomic_set(&speed_atomic, (NUMBER_OF_SPEEDS[mover_type] * new_speed) / (MOTOR_PWM_END[mover_type] - NUMBER_OF_SPEEDS[mover_type]));
 
 //    spin_unlock_irqrestore(&motor_lock, flags);
     }
@@ -836,7 +923,7 @@ static void ramp_fire(unsigned long data)
 //---------------------------------------------------------------------------
 static ssize_t type_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
-    return sprintf(buf, "%s\n", MOVER_TYPE);
+    return sprintf(buf, "%s\n", MOVER_TYPE[mover_type]);
     }
 
 //---------------------------------------------------------------------------
@@ -859,7 +946,7 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
     // We always react to the stop command
     if (sysfs_streq(buf, "stop"))
 		{
-		printk(KERN_ALERT "%s - %s() : user command stop\n",TARGET_NAME, __func__);
+		printk(KERN_ALERT "%s - %s() : user command stop\n",TARGET_NAME[mover_type], __func__);
                 // unset direction ignore...
                 atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
 
@@ -869,26 +956,26 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
     // check if an operation is in progress, if so ignore any command other than 'stop' above
     else if (atomic_read(&moving_atomic))
 		{
-    	printk(KERN_ALERT "%s - %s() : operation in progress, ignoring command.\n",TARGET_NAME, __func__);
+    	printk(KERN_ALERT "%s - %s() : operation in progress, ignoring command.\n",TARGET_NAME[mover_type], __func__);
 		}
 
     else if (sysfs_streq(buf, "forward"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command forward\n",TARGET_NAME, __func__);
+    	printk(KERN_ALERT "%s - %s() : user command forward\n",TARGET_NAME[mover_type], __func__);
 
     	hardware_movement_set(MOVER_DIRECTION_FORWARD);
         }
 
     else if (sysfs_streq(buf, "reverse"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command reverse\n",TARGET_NAME, __func__);
+    	printk(KERN_ALERT "%s - %s() : user command reverse\n",TARGET_NAME[mover_type], __func__);
     	status = size;
 
         hardware_movement_set(MOVER_DIRECTION_REVERSE);
         }
     else
 		{
-    	printk(KERN_ALERT "%s - %s() : unknown user command %s\n",TARGET_NAME, __func__, buf);
+    	printk(KERN_ALERT "%s - %s() : unknown user command %s\n",TARGET_NAME[mover_type], __func__, buf);
 		}
 
     return status;
@@ -901,7 +988,7 @@ static ssize_t fault_show(struct device *dev, struct device_attribute *attr, cha
     {
 	int fault;
 	fault = atomic_read(&fault_atomic);
-	atomic_set(&fault_atomic, FAULT_NORMAL);
+	atomic_set(&fault_atomic, FAULT_NORMAL); // reset fault on receipt by user-space
 	return sprintf(buf, "%d\n", fault);
     }
 
@@ -914,7 +1001,7 @@ static ssize_t speed_show(struct device *dev, struct device_attribute *attr, cha
     }
 
 //---------------------------------------------------------------------------
-// Handles reads to the ra attribute through sysfs
+// Handles reads to the ra attribute through sysfs (for debugging only)
 //---------------------------------------------------------------------------
 static ssize_t ra_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
@@ -924,7 +1011,7 @@ static ssize_t ra_show(struct device *dev, struct device_attribute *attr, char *
     }
 
 //---------------------------------------------------------------------------
-// Handles writes to the ra attribute through sysfs
+// Handles writes to the ra attribute through sysfs (for debugging only)
 //---------------------------------------------------------------------------
 static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
     {
@@ -938,9 +1025,9 @@ static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const
 	__raw_writel(value, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
         // assert pwm line
         #if MOTOR_PWM_BLOCK == 0
-            at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, PULLUP_OFF);
+            at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
         #else
-            at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, PULLUP_OFF);
+            at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
         #endif
         }
     // de-assert the neg inputs to the h-bridge
@@ -969,7 +1056,7 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr, co
 	status = strict_strtol(buf, 0, &value);
 	if ((status == 0) &&
            (value >= 0) &&
-           (value <= NUMBER_OF_SPEEDS))
+           (value <= NUMBER_OF_SPEEDS[mover_type]))
 		{
 		hardware_speed_set(value);
 		status = size;
@@ -992,9 +1079,9 @@ static DEVICE_ATTR(speed, 0644, speed_show, speed_store);
 static DEVICE_ATTR(ra, 0644, ra_show, ra_store);
 
 //---------------------------------------------------------------------------
-// Defines the attributes of the armor target mover for sysfs
+// Defines the attributes of the generic target mover for sysfs
 //---------------------------------------------------------------------------
-static const struct attribute * armor_mover_attrs[] =
+static const struct attribute * generic_mover_attrs[] =
     {
     &dev_attr_type.attr,
     &dev_attr_movement.attr,
@@ -1005,30 +1092,30 @@ static const struct attribute * armor_mover_attrs[] =
     };
 
 //---------------------------------------------------------------------------
-// Defines the attribute group of the armor target mover for sysfs
+// Defines the attribute group of the generic target mover for sysfs
 //---------------------------------------------------------------------------
-const struct attribute_group armor_mover_attr_group =
+const struct attribute_group generic_mover_attr_group =
     {
-    .attrs = (struct attribute **) armor_mover_attrs,
+    .attrs = (struct attribute **) generic_mover_attrs,
     };
 
 //---------------------------------------------------------------------------
-// Returns the attribute group of the armor target mover
+// Returns the attribute group of the generic target mover
 //---------------------------------------------------------------------------
-const struct attribute_group * armor_mover_get_attr_group(void)
+const struct attribute_group * generic_mover_get_attr_group(void)
     {
-    return &armor_mover_attr_group;
+    return &generic_mover_attr_group;
     }
 
 //---------------------------------------------------------------------------
 // declares the target_device that is added/removed through target.ko
 //---------------------------------------------------------------------------
-struct target_device target_device_mover_armor =
+struct target_device target_device_mover_generic =
     {
     .type     		= TARGET_TYPE_MOVER,
-    .name     		= TARGET_NAME,
+    .name     		= NULL,
     .dev     		= NULL,
-    .get_attr_group	= armor_mover_get_attr_group,
+    .get_attr_group	= generic_mover_get_attr_group,
     };
 
 //---------------------------------------------------------------------------
@@ -1036,13 +1123,13 @@ struct target_device target_device_mover_armor =
 //---------------------------------------------------------------------------
 static void movement_change(struct work_struct * work)
 	{
-	target_sysfs_notify(&target_device_mover_armor, "movement");
+	target_sysfs_notify(&target_device_mover_generic, "movement");
 	}
 
 //---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
-static int __init target_mover_armor_init(void)
+static int __init target_mover_generic_init(void)
     {
 	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
@@ -1051,25 +1138,26 @@ static int __init target_mover_armor_init(void)
 	INIT_WORK(&movement_work, movement_change);
     // signal that we are fully initialized
     atomic_set(&full_init, TRUE);
-    return target_sysfs_add(&target_device_mover_armor);
+    target_device_mover_generic.name = TARGET_NAME[mover_type]; // set name in structure here as we can't initialize on a non-constant
+    return target_sysfs_add(&target_device_mover_generic);
     }
 
 //---------------------------------------------------------------------------
 // exit handler for the module
 //---------------------------------------------------------------------------
-static void __exit target_mover_armor_exit(void)
+static void __exit target_mover_generic_exit(void)
     {
 	hardware_exit();
-    target_sysfs_remove(&target_device_mover_armor);
+    target_sysfs_remove(&target_device_mover_generic);
     }
 
 
 //---------------------------------------------------------------------------
 // module declarations
 //---------------------------------------------------------------------------
-module_init(target_mover_armor_init);
-module_exit(target_mover_armor_exit);
+module_init(target_mover_generic_init);
+module_exit(target_mover_generic_exit);
 MODULE_LICENSE("proprietary");
-MODULE_DESCRIPTION("ATI target mover armor module");
-MODULE_AUTHOR("jpy");
+MODULE_DESCRIPTION("ATI target mover generic module");
+MODULE_AUTHOR("ndb");
 

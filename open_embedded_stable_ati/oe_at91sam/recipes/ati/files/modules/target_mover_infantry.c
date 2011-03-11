@@ -229,9 +229,9 @@ static int hardware_motor_on(int direction)
 
     // assert pwm line
     #if MOTOR_PWM_BLOCK == 0
-        at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+        at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, PULLUP_OFF);
     #else
-        at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
+        at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, PULLUP_OFF);
     #endif
 
 //	spin_unlock_irqrestore(&motor_lock, flags);
@@ -252,7 +252,7 @@ static int hardware_motor_off(void)
 //	spin_lock_irqsave(&motor_lock, flags);
 
 	// de-assert the pwm line
-	at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
+	at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 	
 //	spin_unlock_irqrestore(&motor_lock, flags);
 
@@ -478,7 +478,7 @@ static int hardware_init(void)
     at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
 
     // de-assert the pwm line
-    at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 
     if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_HOME, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_home_int, "track_sensor_home_int") == FALSE) 					||
     	(hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_END, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_end_int, "track_sensor_end_int") == FALSE))
@@ -507,7 +507,7 @@ static int hardware_exit(void)
 	unsigned long flags;
 
 	// de-assert the pwm line
-	at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
+	at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE_OLD, !OUTPUT_MOVER_PWM_SPEED_ACTIVE_STATE);
 
 	// turn on brake
 	at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
@@ -653,7 +653,6 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
 		printk(KERN_ALERT "%s - %s() : user command stop\n",TARGET_NAME, __func__);
                 // unset direction ignore...
                 atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
-
 
 		hardware_movement_stop(TRUE);
 		}
