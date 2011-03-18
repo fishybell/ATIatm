@@ -73,13 +73,26 @@ static int MOTOR_PWM_RA_DEFAULT[] = {0x001C,0x04D8,0};
 static int MOTOR_PWM_RB_DEFAULT[] = {0x001C,0x04D8,0};
 
 // TODO - map pwm output pin to block/channel
-#define MOTOR_PWM_BLOCK			1		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
+#define PWM_BLOCK				1		// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
 #define MOTOR_PWM_CHANNEL		1		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+#define ENCODER_PWM_CHANNEL		0		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+
+#define MAX_TIME	0x10000
+#define MAX_OVER	0x10000
+#define VELO_K		0x1000000
+
+// to keep updates to the file system in check somewhat
+#define POSITION_DELAY_IN_MSECONDS	1000
+#define VELOCITY_DELAY_IN_MSECONDS	1000
+
+#define TICKS_PER_LEG 100
+
 
 // external motor controller polarity
 static int OUTPUT_MOVER_PWM_SPEED_ACTIVE[] = {ACTIVE_HIGH,ACTIVE_LOW,0};
 
-static struct atmel_tc * motor_pwm_tc = NULL;
+// structure to access the timer counter registers
+static struct atmel_tc * tc = NULL;
 
 //---------------------------------------------------------------------------
 // This variable is a parameter that can be set at module loading to reverse
@@ -110,6 +123,20 @@ static bool USE_BRAKE[] = {true,false,false};
 // IRQs, timeout timer and user-space.
 //---------------------------------------------------------------------------
 static DEFINE_SPINLOCK(motor_lock);
+
+//---------------------------------------------------------------------------
+// These atomic variables is use to indicate global position changes
+//---------------------------------------------------------------------------
+atomic_t velocity = ATOMIC_INIT(0);
+atomic_t last_t = ATOMIC_INIT(0);
+atomic_t o_count = ATOMIC_INIT(0);
+atomic_t delta_t = ATOMIC_INIT(0);
+atomic_t position = ATOMIC_INIT(0);
+atomic_t position_old = ATOMIC_INIT(0);
+atomic_t legs = ATOMIC_INIT(0);
+atomic_t quad_direction = ATOMIC_INIT(0);
+atomic_t doing_pos = ATOMIC_INIT(FALSE);
+atomic_t doing_vel = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that an operation is in progress,
@@ -160,10 +187,20 @@ atomic_t speed_atomic = ATOMIC_INIT(0);
 atomic_t last_track_sensor_atomic = ATOMIC_INIT(0);
 
 //---------------------------------------------------------------------------
-// This delayed work queue item is used to notify user-space of a movement
-// change or error.
+// This delayed work queue item is used to notify user-space of a
+// change or error in movement, position, velocity, or position delta
 //---------------------------------------------------------------------------
 static struct work_struct movement_work;
+static struct work_struct position_work;
+static struct work_struct velocity_work;
+static struct work_struct delta_work;
+
+
+//---------------------------------------------------------------------------
+// Declaration of the function that gets called when the position timers fire
+//---------------------------------------------------------------------------
+static void position_fire(unsigned long data);
+static void velocity_fire(unsigned long data);
 
 //---------------------------------------------------------------------------
 // Declaration of the function that gets called when the timeout fires.
@@ -180,6 +217,12 @@ static void ramp_fire(unsigned long data);
 //---------------------------------------------------------------------------
 static void horn_on_fire(unsigned long data);
 static void horn_off_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
+// Kernel timer for the delayed update for position and velocity
+//---------------------------------------------------------------------------
+static struct timer_list position_timer_list = TIMER_INITIALIZER(position_fire, 0, 0);
+static struct timer_list velocity_timer_list = TIMER_INITIALIZER(velocity_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Kernel timer for the timeout.
@@ -266,7 +309,7 @@ static int hardware_motor_on(int direction)
         }
 
     // assert pwm line
-    #if MOTOR_PWM_BLOCK == 0
+    #if PWM_BLOCK == 0
         at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
     #else
         at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
@@ -328,8 +371,8 @@ static int hardware_motor_off(void)
 
     // de-assert the pwm line
     at91_set_gpio_output(OUTPUT_MOVER_PWM_SPEED_THROTTLE, !OUTPUT_MOVER_PWM_SPEED_ACTIVE[mover_type]);
-    __raw_writel(1, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA)); // change to smallest value
-    __raw_writel(1, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB)); // change to smallest value
+    __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA)); // change to smallest value
+    __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB)); // change to smallest value
 
     // turn on brake?
     if (USE_BRAKE[mover_type])
@@ -377,7 +420,7 @@ static int hardware_speed_set(int new_speed)
                 printk(KERN_ALERT "%s - %s() error - driver not fully initialized.\n",TARGET_NAME[mover_type], __func__);
         return FALSE;
         }
-    if (!motor_pwm_tc)
+    if (!tc)
         {
         return -EINVAL;
         }
@@ -456,6 +499,32 @@ static int hardware_movement_stop(int stop_timer)
     }
 
 //---------------------------------------------------------------------------
+// The function that gets called when the position timer fires.
+//---------------------------------------------------------------------------
+static void position_fire(unsigned long data)
+    {
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+    atomic_set(&doing_pos, FALSE);
+    schedule_work(&position_work); // notify the system
+    }
+
+//---------------------------------------------------------------------------
+// The function that gets called when the velocity timer fires.
+//---------------------------------------------------------------------------
+static void velocity_fire(unsigned long data)
+    {
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+    atomic_set(&doing_vel, FALSE);
+    schedule_work(&velocity_work); // notify the system
+    }
+
+//---------------------------------------------------------------------------
 // The function that gets called when the timeout fires.
 //---------------------------------------------------------------------------
 static void timeout_fire(unsigned long data)
@@ -467,6 +536,118 @@ static void timeout_fire(unsigned long data)
 
     printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME[mover_type], __func__);
     hardware_movement_stop(FALSE);
+    }
+
+//---------------------------------------------------------------------------
+// passed a leg sensor
+//---------------------------------------------------------------------------
+irqreturn_t leg_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
+    {
+    int dir;
+    if (!atomic_read(&full_init))
+        {
+        return IRQ_HANDLED;
+        }
+    // only handle the interrupt when sensor 1 is active
+    if (at91_get_gpio_value(INPUT_MOVER_TRACK_SENSOR_1) == INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE)
+        {
+        // is the sensor 2 active or not?
+        if (at91_get_gpio_value(INPUT_MOVER_TRACK_SENSOR_2) == INPUT_MOVER_TRACK_SENSOR_ACTIVE_STATE)
+            {
+            // both active, going forward
+            dir = 1;
+            }
+        else
+            {
+            // only sensor 1 is active, going backward
+            dir = -1;
+            }
+        // calculate position based on number of times we've passed a track leg
+        atomic_set(&legs, atomic_read(&legs) + dir); // gain a leg or lose a leg
+        atomic_set(&position, atomic_read(&legs) * TICKS_PER_LEG); // this overwrites the value received from the quad encoder
+        if (atomic_read(&doing_pos) == FALSE)
+            {
+            atomic_set(&doing_pos, TRUE);
+            mod_timer(&position_timer_list, jiffies+((POSITION_DELAY_IN_MSECONDS*HZ)/1000));
+            }
+        }
+    return IRQ_HANDLED;
+    }
+
+//---------------------------------------------------------------------------
+// the quad encoder pin tripped
+//---------------------------------------------------------------------------
+irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
+    {
+    u32 status, rb, cv, this_t, dn1, dn2;
+    if (!atomic_read(&full_init))
+        {
+        return IRQ_HANDLED;
+        }
+    if (!tc) return IRQ_HANDLED;
+    status = __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, SR)); // status register
+    this_t = __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, RA));
+    rb = __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, RB));
+    cv = __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, CV));
+
+//printk(KERN_ALERT "O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, status & ATMEL_TC_LDRAS, atomic_read(&last_t), this_t, cv, atomic_read(&o_count) );
+
+    // Overlflow caused IRQ?
+    if ( status & ATMEL_TC_COVFS )
+        {
+        atomic_set(&o_count, atomic_read(&o_count) + MAX_TIME);
+        }
+
+    // Pin A going high caused IRQ?
+    if ( status & ATMEL_TC_LDRAS )
+        {
+        // change position
+        if ( status & ATMEL_TC_MTIOB )
+            {
+            atomic_set(&position, atomic_read(&position) - 1);
+            atomic_set(&quad_direction, -1);
+            }
+        else
+            {
+            atomic_set(&position, atomic_read(&position) + 1);
+            atomic_set(&quad_direction, 1);
+            }
+        atomic_set(&delta_t, this_t + atomic_read(&o_count));
+        atomic_set(&o_count, 0);
+        dn1 = atomic_read(&delta_t);
+        dn2 = atomic_read(&quad_direction);
+        if (dn1 * dn2 == 0)
+            {
+            return IRQ_HANDLED;
+            }
+        atomic_set(&velocity, VELO_K / dn1 * dn2);
+        atomic_set(&last_t, this_t);
+        if (atomic_read(&doing_pos) == FALSE)
+            {
+            atomic_set(&doing_pos, TRUE);
+            mod_timer(&position_timer_list, jiffies+((POSITION_DELAY_IN_MSECONDS*HZ)/1000));
+            }
+        if (atomic_read(&doing_vel) == FALSE)
+            {
+            atomic_set(&doing_vel, TRUE);
+            mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
+            }
+        }
+    else
+        {
+        // Pin A did not go high
+        if ( atomic_read(&o_count) > MAX_OVER )
+            {
+            atomic_set(&velocity, 0);
+            if (atomic_read(&doing_vel) == FALSE)
+                {
+                atomic_set(&doing_vel, TRUE);
+                mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
+                }
+            }
+        }
+
+    return IRQ_HANDLED;
     }
 
 //---------------------------------------------------------------------------
@@ -526,26 +707,72 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     }
 
 //---------------------------------------------------------------------------
+// set PINs to be used by peripheral A and/or B
+//---------------------------------------------------------------------------
+static void init_quad_pins(void)
+    {
+    #if PWM_BLOCK == 0
+        #if ENCODER_PWM_CHANNEL == 0
+            at91_set_A_periph(AT91_PIN_PA26, 0);	// TIOA0
+            at91_set_gpio_input(AT91_PIN_PA26, 1);	// TIOA0
+            at91_set_B_periph(AT91_PIN_PC9, 0);		// TIOB0
+            at91_set_gpio_input(AT91_PIN_PC9, 1);	// TIOB0
+        #elif ENCODER_PWM_CHANNEL == 1
+            at91_set_A_periph(AT91_PIN_PA27, 0);	// TIOA1
+            at91_set_gpio_input(AT91_PIN_PA27, 1);	// TIOA1
+            at91_set_A_periph(AT91_PIN_PC7, 0);		// TIOB1
+            at91_set_gpio_input(AT91_PIN_PC7, 1);	// TIOB1
+        #elif ENCODER_PWM_CHANNEL == 2
+            at91_set_A_periph(AT91_PIN_PA28, 0);	// TIOA2
+            at91_set_gpio_input(AT91_PIN_PA28, 1);	// TIOA2
+            at91_set_A_periph(AT91_PIN_PC6, 0);		// TIOB2
+            at91_set_gpio_input(AT91_PIN_PC6, 1);	// TIOB2
+        #endif
+    #else
+        #if ENCODER_PWM_CHANNEL == 0
+            at91_set_B_periph(AT91_PIN_PB0, 0);		// TIOA3
+            at91_set_gpio_input(AT91_PIN_PB0, 1);	// TIOA3
+            at91_set_B_periph(AT91_PIN_PB1, 0);		// TIOB3
+            at91_set_gpio_input(AT91_PIN_PB1, 1);	// TIOB3
+        #elif ENCODER_PWM_CHANNEL == 1
+            at91_set_B_periph(AT91_PIN_PB2, 0);		// TIOA4
+            at91_set_gpio_input(AT91_PIN_PB2, 1);	// TIOA4
+            at91_set_B_periph(AT91_PIN_PB18, 0);	// TIOB4
+            at91_set_gpio_input(AT91_PIN_PB18, 1);	// TIOB4
+        #elif ENCODER_PWM_CHANNEL == 2
+            at91_set_B_periph(AT91_PIN_PB3, 0);		// TIOA5
+            at91_set_gpio_input(AT91_PIN_PB3, 1);	// TIOA5
+            at91_set_B_periph(AT91_PIN_PB19, 0);	// TIOB5
+            at91_set_gpio_input(AT91_PIN_PB19, 1);	// TIOB5
+        #endif
+    #endif
+    }
+
+//---------------------------------------------------------------------------
 // Initialize the timer counter as PWM output for motor control
 //---------------------------------------------------------------------------
-static int hardware_motor_pwm_init(void)
+static int hardware_pwm_init(void)
     {
     unsigned int mck_freq;
+    int status = 0;
 
     // initialize timer counter
-    motor_pwm_tc = target_timer_alloc(MOTOR_PWM_BLOCK, "gen_tc");
-    printk(KERN_ALERT "timer_alloc(): %08x\n", (unsigned int) motor_pwm_tc);
+    tc = target_timer_alloc(PWM_BLOCK, "gen_tc");
+    printk(KERN_ALERT "timer_alloc(): %08x\n", (unsigned int) tc);
 
-    if (!motor_pwm_tc)
+    if (!tc)
         {
         return -EINVAL;
         }
 
-    mck_freq = clk_get_rate(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
+    mck_freq = clk_get_rate(tc->clk[MOTOR_PWM_CHANNEL]);
     printk(KERN_ALERT "mck_freq: %i\n", (unsigned int) mck_freq);
 
+    // initialize quad encoder pins
+    init_quad_pins();
+
 /*
-    #if MOTOR_PWM_BLOCK == 0
+    #if PWM_BLOCK == 0
         #if MOTOR_PWM_CHANNEL == 0
             at91_set_A_periph(AT91_PIN_PA26, 0);	// TIOA0
             at91_set_B_periph(AT91_PIN_PC9, 0);		// TIOB0
@@ -570,13 +797,39 @@ static int hardware_motor_pwm_init(void)
     #endif
 */
 
-    if (clk_enable(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]) != 0)
+    if (clk_enable(tc->clk[ENCODER_PWM_CHANNEL]) != 0)
             {
-            printk(KERN_ERR "clk_enable() failed\n");
-            return 0;
+            printk(KERN_ERR "ENCODER clk_enable() failed\n");
+            return -EINVAL;
             }
 
-    switch (mover_type)
+    if (clk_enable(tc->clk[MOTOR_PWM_CHANNEL]) != 0)
+            {
+            printk(KERN_ERR "MOTOR clk_enable() failed\n");
+            return -EINVAL;
+            }
+
+    // initialize quad timer
+    __raw_writel(ATMEL_TC_TIMER_CLOCK5				// Master clock / 128 : 66 mhz
+                    | ATMEL_TC_ETRGEDG_RISING		// Trigger on the rising and falling edges
+                    | ATMEL_TC_ABETRG				// Trigger on TIOA
+                    | ATMEL_TC_LDRA_RISING,			// Load RA on rising edge
+                    tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, CMR));	// channel module register
+
+    // enable specific interrupts for the encoder
+    __raw_writel(ATMEL_TC_COVFS						// interrupt on counter overflow
+                    | ATMEL_TC_LDRAS,				// interrupt on loading RA
+                    tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, IER)); // interrupt enable register
+    __raw_writel(ATMEL_TC_TC0XC0S_NONE				// no signal on XC0
+                    | ATMEL_TC_TC1XC1S_NONE			// no signal on XC1
+                    | ATMEL_TC_TC2XC2S_NONE,		// no signal on XC2
+                    tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, BMR)); // block mode register
+    __raw_writel(0xffff, tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, RC));
+
+printk(KERN_ALERT "bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, IMR)));
+
+     // initialize pwm output timer
+     switch (mover_type)
         {
         case 0:
         // initialize infantry clock
@@ -588,7 +841,7 @@ static int hardware_motor_pwm_init(void)
                     | ATMEL_TC_BCPC_SET				// set TIOB high when counter reaches "C"
                     | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
                     | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
-                    motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CMR));	// CMR register for timer
+                    tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CMR));	// CMR register for timer
         break;
 
         case 1:
@@ -601,25 +854,47 @@ static int hardware_motor_pwm_init(void)
                     | ATMEL_TC_BCPC_CLEAR			// set TIOB low when counter reaches "C"
                     | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
                     | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
-                    motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CMR));	// CMR register for timer
+                    tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CMR));	// CMR register for timer
         break;
-        default: return 1; break;
+        default: return -EINVAL; break;
         }
 
-    // initialize clock timer
-    __raw_writel(ATMEL_TC_CLKEN, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));
-    __raw_writel(ATMEL_TC_SYNC, motor_pwm_tc->regs + ATMEL_TC_BCR);
+    // setup encoder irq
+printk(KERN_ALERT "going to request irq: %i\n", tc->irq[ENCODER_PWM_CHANNEL]);
+    status = request_irq(tc->irq[ENCODER_PWM_CHANNEL], (void*)quad_encoder_int, 0, "quad_encoder_int", NULL);
+printk(KERN_ALERT "requested irq: %i\n", status);
+    if (status != 0)
+        {
+        if (status == -EINVAL)
+            {
+            printk(KERN_ERR "request_irq(): Bad irq number or handler\n");
+            }
+        else if (status == -EBUSY)
+            {
+            printk(KERN_ERR "request_irq(): IRQ is busy, change your config\n");
+            }
+        target_timer_free(tc);
+        return status;
+        }
+
+     // initialize clock timer
+    __raw_writel(ATMEL_TC_CLKEN, tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, CCR));
+    __raw_writel(ATMEL_TC_CLKEN, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));
+    __raw_writel(ATMEL_TC_SYNC, tc->regs + ATMEL_TC_BCR);
 
     // These set up the freq and duty cycle
-    __raw_writel(MOTOR_PWM_RA_DEFAULT[mover_type], motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-    __raw_writel(MOTOR_PWM_RB_DEFAULT[mover_type], motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
-    __raw_writel(MOTOR_PWM_RC[mover_type], motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
+    __raw_writel(MOTOR_PWM_RA_DEFAULT[mover_type], tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+    __raw_writel(MOTOR_PWM_RB_DEFAULT[mover_type], tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+    __raw_writel(MOTOR_PWM_RC[mover_type], tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RC));
 
-    // disable irqs and start timer
-    __raw_writel(0xff, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, IDR));				// irq register
-    __raw_writel(ATMEL_TC_SWTRG, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));	// control register
+    // disable irqs and start output timer
+    __raw_writel(0xff, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, IDR));				// irq register
+    __raw_writel(ATMEL_TC_SWTRG, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, CCR));		// control register
 
-    return 0;
+    // stat input timer
+    __raw_writel(ATMEL_TC_SWTRG, tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, CCR));	// control register
+
+    return status;
     }
 
 //---------------------------------------------------------------------------
@@ -697,15 +972,20 @@ static int hardware_init(void)
         at91_set_gpio_output(OUTPUT_MOVER_HORN, !OUTPUT_MOVER_HORN_ACTIVE_STATE);
         }
 
-    // TODO - add speed sensors
+    // setup PWM input/output
+    status = hardware_pwm_init();
+
+    // install track sensor interrupts
     if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_HOME, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_home_int, "track_sensor_home_int") == FALSE) ||
-        (hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_END, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_end_int, "track_sensor_end_int") == FALSE))
+        (hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_END, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_end_int, "track_sensor_end_int") == FALSE) ||
+        (hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_SENSOR_1, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE, quad_encoder_int, "quad_encoder_int") == FALSE))
         {
         return FALSE;
         }
 
-    // setup motor PWM output
-    status = hardware_motor_pwm_init();
+    // Configure leg sensor gpios for input and deglitch for interrupts
+    at91_set_gpio_input(INPUT_MOVER_TRACK_SENSOR_2, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE); // other leg sensor is also an input, just no irq
+    at91_set_deglitch(INPUT_MOVER_TRACK_SENSOR_1, INPUT_MOVER_TRACK_SENSOR_DEGLITCH_STATE); // reset deglitch state of sensor 1
 
     return status;
     }
@@ -748,11 +1028,15 @@ static int hardware_exit(void)
     del_timer(&horn_on_timer_list);
     del_timer(&horn_off_timer_list);
     del_timer(&ramp_timer_list);
+    del_timer(&position_timer_list);
+    del_timer(&velocity_timer_list);
 
+	free_irq(tc->irq[ENCODER_PWM_CHANNEL], NULL);
     free_irq(INPUT_MOVER_TRACK_HOME, NULL);
     free_irq(INPUT_MOVER_TRACK_END, NULL);
+    free_irq(INPUT_MOVER_TRACK_SENSOR_1, NULL);
 
-    target_timer_free(motor_pwm_tc);
+    target_timer_free(tc);
 
     return 0;
     }
@@ -859,7 +1143,7 @@ static void horn_off_fire(unsigned long data)
 static void ramp_fire(unsigned long data)
     {
 //    unsigned long flags;
-    int goal_start, goal_step, new_speed, ticks_change, ramp, start_speed, i;
+    int goal_start, goal_step, new_speed, ticks_change, ramp, start_speed;
     if (!atomic_read(&full_init))
         {
         return;
@@ -909,13 +1193,35 @@ static void ramp_fire(unsigned long data)
         }
 
     // These change the pwm duty cycle
-    __raw_writel(max(new_speed,1), motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-    __raw_writel(max(new_speed,1), motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
 
     // save the changed speed back as value of 0 to NUMBER_OF_SPEEDS (subtract X from denominator to fix rounding issue)
     atomic_set(&speed_atomic, (NUMBER_OF_SPEEDS[mover_type] * new_speed) / (MOTOR_PWM_END[mover_type] - NUMBER_OF_SPEEDS[mover_type]));
 
 //    spin_unlock_irqrestore(&motor_lock, flags);
+    }
+
+//---------------------------------------------------------------------------
+// Handles reads to the position attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t position_show(struct device *dev, struct device_attribute *attr, char *buf)
+    {
+    return sprintf(buf, "%i\n", atomic_read(&position));
+    }
+
+// Handles reads to the velocity attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t velocity_show(struct device *dev, struct device_attribute *attr, char *buf)
+    {
+    return sprintf(buf, "%i\n", atomic_read(&velocity));
+    }
+
+// Handles reads to the delta attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t delta_show(struct device *dev, struct device_attribute *attr, char *buf)
+    {
+    return sprintf(buf, "%i\n", atomic_read(&delta_t));
     }
 
 //---------------------------------------------------------------------------
@@ -1006,7 +1312,7 @@ static ssize_t speed_show(struct device *dev, struct device_attribute *attr, cha
 static ssize_t ra_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
         int ra;
-	ra = __raw_readl(motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	ra = __raw_readl(tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
 	return sprintf(buf, "%d\n", ra);
     }
 
@@ -1021,10 +1327,10 @@ static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const
     status = strict_strtol(buf, 0, &value);
     if (status == 0)
         { 
-	__raw_writel(value, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
-	__raw_writel(value, motor_pwm_tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
+	__raw_writel(value, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RA));
+	__raw_writel(value, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL, RB));
         // assert pwm line
-        #if MOTOR_PWM_BLOCK == 0
+        #if PWM_BLOCK == 0
             at91_set_A_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
         #else
             at91_set_B_periph(OUTPUT_MOVER_PWM_SPEED_THROTTLE, PULLUP_OFF);
@@ -1077,6 +1383,10 @@ static DEVICE_ATTR(movement, 0644, movement_show, movement_store);
 static DEVICE_ATTR(fault, 0444, fault_show, NULL);
 static DEVICE_ATTR(speed, 0644, speed_show, speed_store);
 static DEVICE_ATTR(ra, 0644, ra_show, ra_store);
+static DEVICE_ATTR(position, 0444, position_show, NULL);
+static DEVICE_ATTR(velocity, 0444, velocity_show, NULL);
+static DEVICE_ATTR(delta, 0444, delta_show, NULL);
+
 
 //---------------------------------------------------------------------------
 // Defines the attributes of the generic target mover for sysfs
@@ -1088,7 +1398,10 @@ static const struct attribute * generic_mover_attrs[] =
     &dev_attr_fault.attr,
     &dev_attr_speed.attr,
     &dev_attr_ra.attr,
-    NULL,
+    &dev_attr_position.attr,
+    &dev_attr_velocity.attr,
+    &dev_attr_delta.attr,
+     NULL,
     };
 
 //---------------------------------------------------------------------------
@@ -1119,8 +1432,27 @@ struct target_device target_device_mover_generic =
     };
 
 //---------------------------------------------------------------------------
-// Work item to notify the user-space about a movement change or error
+// Work item to notify the user-space about positoin, velocity, delta, and movement
 //---------------------------------------------------------------------------
+static void do_position(struct work_struct * work)
+        {
+        if (abs(atomic_read(&position_old) - atomic_read(&position)) > (TICKS_PER_LEG/2))
+            {
+            atomic_set(&position_old, atomic_read(&position)); 
+            target_sysfs_notify(&target_device_mover_generic, "position");
+            }
+        }
+
+static void do_velocity(struct work_struct * work)
+        {
+        target_sysfs_notify(&target_device_mover_generic, "velocity");
+        }
+
+static void do_delta(struct work_struct * work)
+        {
+        target_sysfs_notify(&target_device_mover_generic, "delta");
+        }
+
 static void movement_change(struct work_struct * work)
 	{
 	target_sysfs_notify(&target_device_mover_generic, "movement");
@@ -1131,15 +1463,25 @@ static void movement_change(struct work_struct * work)
 //---------------------------------------------------------------------------
 static int __init target_mover_generic_init(void)
     {
+    int retval;
 	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
+    // initialize hardware registers
 	hardware_init();
 
+    // initialize delayed work items
+    INIT_WORK(&position_work, do_position);
+    INIT_WORK(&velocity_work, do_velocity);
+    INIT_WORK(&delta_work, do_delta);
 	INIT_WORK(&movement_work, movement_change);
+
+    // initialize sysfs structure
+    target_device_mover_generic.name = TARGET_NAME[mover_type]; // set name in structure here as we can't initialize on a non-constant
+    retval = target_sysfs_add(&target_device_mover_generic);
+
     // signal that we are fully initialized
     atomic_set(&full_init, TRUE);
-    target_device_mover_generic.name = TARGET_NAME[mover_type]; // set name in structure here as we can't initialize on a non-constant
-    return target_sysfs_add(&target_device_mover_generic);
+    return retval;
     }
 
 //---------------------------------------------------------------------------
