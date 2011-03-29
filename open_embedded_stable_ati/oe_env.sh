@@ -4,7 +4,7 @@ if [ `id -g` != 206 ] ; then
     echo "Group restored"
 fi
 export OE_DIR=${PWD}
-export PATH=/usr/local/bin/bitbake/bin:$PATH
+export PATH=/usr/local/bin/bitbake/bin:/usr/local/TclPro1.5/linux-ix86/bin:~/qtcreator-1.3.1/bin:/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin:/usr/NX/bin:/usr/java/j2sdk1.4.2_01/bin:/usr/local/pgsql/bin:.
 export BBPATH=${OE_DIR}/oe_at91sam:${OE_DIR}/openembedded
 
 if [ -z ${ORG_PATH} ] ; then
@@ -26,13 +26,13 @@ if [ ! -f .cvsignore ] ; then
     echo ".cvsignore" > .cvsignore
 fi
 
-for i in tmp oe_sources openembedded ; do
-    if [ ! -h $i ] ; then
-        echo "creating $i link"
-        ln -s /usr/local/var/oe/$i $i
-        echo "$i" >> .cvsignore
-    fi
-done
+#for i in tmp oe_sources openembedded ; do
+#    if [ ! -h $i ] ; then
+#        echo "creating $i link"
+#        ln -s /usr/local/var/oe/$i $i
+#        echo "$i" >> .cvsignore
+#    fi
+#done
 
 if [ ! -d flash ] ; then
     mkdir flash
