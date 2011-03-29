@@ -1,0 +1,9 @@
+diff -ruN busybox-1.13.2.orig/libbb/Kbuild busybox-1.13.2/libbb/Kbuild
+--- busybox-1.13.2.orig/libbb/Kbuild	2011-02-14 13:24:19.053404926 -0700
++++ busybox-1.13.2/libbb/Kbuild	2011-02-17 15:11:27.765205436 -0700
+@@ -151,4 +151,4 @@
+ libbb/appletlib.o: include/usage_compressed.h include/applet_tables.h
+ 
+ include/usage_compressed.h include/applet_tables.h:
+-        $(Q)$(MAKE) $(build)=applets $@
++	$(Q)$(MAKE) $(build)=applets $@

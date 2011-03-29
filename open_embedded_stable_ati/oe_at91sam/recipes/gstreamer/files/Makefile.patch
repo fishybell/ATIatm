@@ -1,0 +1,12 @@
+diff -ruN gst-plugins-base-0.10.22.orig/docs/libs/Makefile gst-plugins-base-0.10.22/docs/libs/Makefile
+--- gst-plugins-base-0.10.22.orig/docs/libs/Makefile	2011-02-15 16:25:28.178150187 -0700
++++ gst-plugins-base-0.10.22/docs/libs/Makefile	2011-02-17 15:25:45.500802406 -0700
+@@ -829,7 +829,7 @@
+ 	-cp $(srcdir)/$(DOC_MODULE).types $(distdir)/
+ 	-cp $(srcdir)/$(DOC_MODULE)-sections.txt $(distdir)/
+ 	cd $(distdir) && rm -f $(DISTCLEANFILES)
+-        -gtkdoc-rebase --online --relative --html-dir=$(distdir)/html
++	-gtkdoc-rebase --online --relative --html-dir=$(distdir)/html
+ 
+ .PHONY : dist-hook-local docs
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.

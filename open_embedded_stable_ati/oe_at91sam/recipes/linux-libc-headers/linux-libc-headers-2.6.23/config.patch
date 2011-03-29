@@ -1,0 +1,24 @@
+diff -ruN linux-2.6.23.orig/Makefile linux-2.6.23/Makefile
+--- linux-2.6.23.orig/Makefile	2007-10-09 14:31:38.000000000 -0600
++++ linux-2.6.23/Makefile	2011-02-11 15:06:54.209755852 -0700
+@@ -413,7 +413,7 @@
+ include $(srctree)/arch/$(ARCH)/Makefile
+ export KBUILD_DEFCONFIG
+ 
+-config %config: scripts_basic outputmakefile FORCE
++%config: scripts_basic outputmakefile FORCE
+ 	$(Q)mkdir -p include/linux include/config
+ 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
+ 
+diff -ruN linux-2.6.23.orig/Makefile linux-2.6.23/Makefile
+--- linux-2.6.23.orig/Makefile	2011-02-11 15:08:56.673516005 -0700
++++ linux-2.6.23/Makefile	2011-02-11 15:10:24.794465932 -0700
+@@ -1463,7 +1463,7 @@
+ 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
+ 
+ # Modules
+-/ %/: prepare scripts FORCE
++%/: prepare scripts FORCE
+ 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) \
+ 	$(build)=$(build-dir)
+ %.ko: prepare scripts FORCE

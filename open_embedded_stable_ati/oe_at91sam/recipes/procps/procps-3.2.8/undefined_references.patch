@@ -1,0 +1,16 @@
+diff -ruN procps-3.2.8.orig/Makefile procps-3.2.8/Makefile
+--- procps-3.2.8.orig/Makefile	2011-02-17 17:01:29.658738699 -0700
++++ procps-3.2.8/Makefile	2011-02-17 17:04:09.955482262 -0700
+@@ -50,9 +50,9 @@
+ 
+ BINFILES := $(usr/bin)uptime $(usr/bin)tload $(usr/bin)free $(usr/bin)w \
+             $(usr/bin)top $(usr/bin)vmstat $(usr/bin)watch $(usr/bin)skill \
+-            $(usr/bin)snice $(bin)kill $(sbin)sysctl $(usr/bin)pmap \
+-            $(usr/proc/bin)pgrep $(usr/proc/bin)pkill $(usr/bin)slabtop \
+-            $(usr/proc/bin)pwdx
++            $(usr/bin)snice $(bin)kill $(sbin)sysctl $(usr/proc/bin)pgrep \
++            $(usr/proc/bin)pkill $(usr/bin)slabtop $(usr/proc/bin)pwdx \
++            $(usr/bin)pmap
+ 
+ MANFILES := $(man1)uptime.1 $(man1)tload.1 $(man1)free.1 $(man1)w.1 \
+             $(man1)top.1 $(man1)watch.1 $(man1)skill.1 $(man1)kill.1 \

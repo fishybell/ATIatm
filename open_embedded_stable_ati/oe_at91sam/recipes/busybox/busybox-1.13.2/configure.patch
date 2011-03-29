@@ -1,0 +1,24 @@
+diff -ruN busybox-1.13.2.orig/Makefile busybox-1.13.2/Makefile
+--- busybox-1.13.2.orig/Makefile	2008-12-30 20:32:54.000000000 -0700
++++ busybox-1.13.2/Makefile	2011-02-14 12:25:57.505668069 -0700
+@@ -418,7 +418,7 @@
+ -include $(srctree)/arch/$(ARCH)/Makefile
+ export KBUILD_DEFCONFIG
+ 
+-config %config: scripts_basic outputmakefile FORCE
++%config: scripts_basic outputmakefile FORCE
+ 	$(Q)mkdir -p include
+ 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
+ 	$(Q)$(MAKE) -C $(srctree) KBUILD_SRC= .kernelrelease
+diff -ruN busybox-1.13.2.orig/Makefile busybox-1.13.2/Makefile
+--- busybox-1.13.2.orig/Makefile	2011-02-14 13:22:04.761904751 -0700
++++ busybox-1.13.2/Makefile	2011-02-14 13:23:13.892588542 -0700
+@@ -1266,7 +1266,7 @@
+ 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
+ 
+ # Modules
+-/ %/: prepare scripts FORCE
++%/: prepare scripts FORCE
+ 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) \
+ 	$(build)=$(build-dir)
+ %.ko: prepare scripts FORCE
