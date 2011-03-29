@@ -1,0 +1,578 @@
+diff -ruN u-boot-1.3.4.orig/board/atmel/at91sam9g20ek/Makefile u-boot-1.3.4/board/atmel/at91sam9g20ek/Makefile
+--- u-boot-1.3.4.orig/board/atmel/at91sam9g20ek/Makefile	2011-02-18 09:58:00.263981989 -0700
++++ u-boot-1.3.4/board/atmel/at91sam9g20ek/Makefile	2011-03-15 14:24:01.194310964 -0600
+@@ -33,6 +33,7 @@
+ COBJS-y	+= led.o
+ COBJS-y	+= partition.o
+ COBJS-$(CONFIG_CMD_NAND) += nand.o
++COBJS-y += eeprom.o
+ 
+ SRCS	:= $(SOBJS:.o=.S) $(COBJS-y:.o=.c)
+ OBJS	:= $(addprefix $(obj),$(COBJS-y))
+diff -ruN u-boot-1.3.4.orig/board/atmel/at91sam9g20ek/at91sam9g20ek.c u-boot-1.3.4/board/atmel/at91sam9g20ek/at91sam9g20ek.c
+--- u-boot-1.3.4.orig/board/atmel/at91sam9g20ek/at91sam9g20ek.c	2011-02-18 09:58:00.262981829 -0700
++++ u-boot-1.3.4/board/atmel/at91sam9g20ek/at91sam9g20ek.c	2011-03-15 17:13:49.399245378 -0600
+@@ -41,6 +41,17 @@
+  * Miscelaneous platform dependent initialisations
+  */
+ 
++void at91_twi0_hw_init(void)
++{
++	at91_set_A_periph(AT91_PIN_PA23, 0);	/* TWD */
++	at91_set_multi_drive(AT91_PIN_PA23, 1);
++
++	at91_set_A_periph(AT91_PIN_PA24, 0);	/* TWCK */
++	at91_set_multi_drive(AT91_PIN_PA24, 1);
++
++	at91_sys_write(AT91_PMC_PCER, 1 << AT91SAM9260_ID_TWI);
++}
++
+ static void at91sam9g20ek_serial_hw_init(void)
+ {
+ #ifdef CONFIG_USART0
+@@ -233,6 +244,9 @@
+ #ifdef CONFIG_MACB
+ 	at91sam9g20ek_macb_hw_init();
+ #endif
++#ifdef CONFIG_HARD_I2C
++    at91_twi0_hw_init();
++#endif
+ 
+ 	return 0;
+ }
+@@ -244,6 +258,15 @@
+ 	return 0;
+ }
+ 
++void eeprom_mac_init(void)
++{
++    char buf[18];
++    eeprom_init();
++    eeprom_read(CFG_I2C_EEPROM_ADDR,CFG_MAC_EEPROM_OFFSET,buf,18);
++    printf("Read MAC=\"%s\"\n",buf);
++    setenv("ethaddr", buf);
++}
++
+ #ifdef CONFIG_RESET_PHY_R
+ void reset_phy(void)
+ {
+diff -ruN u-boot-1.3.4.orig/board/atmel/at91sam9g20ek/eeprom.c u-boot-1.3.4/board/atmel/at91sam9g20ek/eeprom.c
+--- u-boot-1.3.4.orig/board/atmel/at91sam9g20ek/eeprom.c	1969-12-31 17:00:00.000000000 -0700
++++ u-boot-1.3.4/board/atmel/at91sam9g20ek/eeprom.c	2011-03-15 17:12:19.713362920 -0600
+@@ -0,0 +1,104 @@
++/*
++ * Add by Alan Lu, 07-29-2005
++ * For ATMEL AT24C16 EEPROM
++ *
++ * See file CREDITS for list of people who contributed to this
++ * project.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++ * MA 02111-1307 USA
++ */
++
++#include <common.h>
++#include <i2c.h>
++#ifdef CFG_EEPROM_AT24512
++#undef DEBUG
++
++void eeprom_init(void)
++{
++#if defined(CONFIG_HARD_I2C) || defined(CONFIG_SOFT_I2C)
++	i2c_init(CFG_I2C_SPEED, CFG_I2C_SLAVE);
++#endif
++}
++
++int eeprom_read(unsigned dev_addr, unsigned offset, uchar *buffer,
++			unsigned cnt)
++{
++	int page, count = 0, i = 0;
++	page = offset / 0x100;
++	i = offset % 0x100;
++
++	while (count < cnt) {
++		if (i2c_read(dev_addr|page, i++, CFG_I2C_EEPROM_ADDR_LEN, buffer+count++, 1) != 0)
++        {
++			return 1;
++        }
++		if (i > 0xff) {
++			page++;
++			i = 0;
++		}
++	}
++
++	return 0;
++}
++
++/*
++ * for CFG_I2C_EEPROM_ADDR_LEN == 2 (16-bit EEPROM address) offset is
++ *   0x000nxxxx for EEPROM address selectors at n, offset xxxx in EEPROM.
++ *
++ * for CFG_I2C_EEPROM_ADDR_LEN == 1 (8-bit EEPROM page address) offset is
++ *   0x00000nxx for EEPROM address selectors and page number at n.
++ */
++int eeprom_write(unsigned dev_addr, unsigned offset, uchar *buffer,
++			unsigned cnt)
++{
++	int page, i = 0, count = 0;
++
++	page = offset / 0x100;
++	i = offset % 0x100;
++
++	while (count < cnt) {
++		if (i2c_write(dev_addr|page, i++, 1, buffer+count++, 1) != 0)
++			return 1;
++		if (i > 0xff) {
++			page++;
++			i = 0;
++		}
++	}
++
++#if defined(CFG_EEPROM_PAGE_WRITE_DELAY_MS)
++	udelay(CFG_EEPROM_PAGE_WRITE_DELAY_MS * 1000);
++#endif
++
++	return 0;
++}
++
++#ifndef CONFIG_SPI
++int eeprom_probe(unsigned dev_addr, unsigned offset)
++{
++	unsigned char chip;
++
++	/* Probe the chip address */
++#if CFG_I2C_EEPROM_ADDR_LEN == 1 && !defined(CONFIG_SPI_X)
++	chip = offset >> 8; /* block number */
++#else
++	chip = offset >> 16; /* block number */
++#endif /* CFG_I2C_EEPROM_ADDR_LEN, CONFIG_SPI_X */
++
++	chip |= dev_addr; /* insert device address */
++	return (i2c_probe(chip));
++}
++#endif
++#endif
+diff -ruN u-boot-1.3.4.orig/drivers/i2c/Makefile u-boot-1.3.4/drivers/i2c/Makefile
+--- u-boot-1.3.4.orig/drivers/i2c/Makefile	2008-08-12 08:08:38.000000000 -0600
++++ u-boot-1.3.4/drivers/i2c/Makefile	2011-03-15 11:41:32.845301676 -0600
+@@ -30,6 +30,7 @@
+ COBJS-y += omap24xx_i2c.o
+ COBJS-y += tsi108_i2c.o
+ COBJS-y += mxc_i2c.o
++COBJS-$(CONFIG_I2C_ATMEL) += atmel_i2c.o
+ 
+ COBJS	:= $(COBJS-y)
+ SRCS	:= $(COBJS:.o=.c)
+diff -ruN u-boot-1.3.4.orig/drivers/i2c/atmel_i2c.c u-boot-1.3.4/drivers/i2c/atmel_i2c.c
+--- u-boot-1.3.4.orig/drivers/i2c/atmel_i2c.c	1969-12-31 17:00:00.000000000 -0700
++++ u-boot-1.3.4/drivers/i2c/atmel_i2c.c	2011-03-15 17:12:20.867541572 -0600
+@@ -0,0 +1,250 @@
++/*
++ *  i2c Support for Atmel's AT91RM9200 Two-Wire Interface
++ *
++ *  (c) Rick Bronson
++ *
++ *  Borrowed heavily from original work by:
++ *  Copyright (c) 2000 Philip Edelbrock <phil at stimpy.netroedge.com>
++ *
++ *  Modified to work with u-boot by (C) 2004 Gary Jennejohn garyj at denx.de
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; if not, write to the Free Software
++ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ *
++*/
++#include <common.h>
++
++#ifdef CONFIG_HARD_I2C
++
++#include <i2c.h>
++#include <asm/io.h>
++#include <asm/arch/hardware.h>
++#include <asm/arch/at91_twi.h>
++#include <asm/arch/clk.h>
++
++#define TWI_CLOCK		400000		/* Hz. max 400 Kbits/sec */
++
++#define at91_twi_read(reg)		__raw_readl(AT91_BASE_TWI + (reg))
++#define at91_twi_write(reg, val)	__raw_writel((val), AT91_BASE_TWI + (reg))
++/* define DEBUG */
++
++/*
++ * Poll the i2c status register until the specified bit is set.
++ * Returns 0 if timed out (100 msec)
++ */
++static short at91_poll_status(unsigned long bit)
++{
++	int loop_cntr = 10000;
++
++	do {
++		udelay(10);
++	} while (!(at91_twi_read(AT91_TWI_SR) & bit) && (--loop_cntr > 0));
++
++	return (loop_cntr > 0);
++}
++
++static int xfer_read_single(unsigned char *buf)
++{
++	/* Send Start */
++	at91_twi_write(AT91_TWI_CR, AT91_TWI_START|AT91_TWI_STOP);
++
++	/* Read data */
++	if (!at91_poll_status(AT91_TWI_RXRDY)) {
++		debug("at91_i2c: RXRDY timeout\n");
++		return 1;
++	}
++	*buf = (at91_twi_read(AT91_TWI_RHR) & 0xff);
++
++	return 0;
++}
++
++static int xfer_read(unsigned char *buf, int length)
++{
++	/* Send Start */
++	at91_twi_write(AT91_TWI_CR, AT91_TWI_START);
++
++	/* Read data */
++	while (length--) {
++		if (!length)	/* need to send Stop before reading last byte */
++			at91_twi_write(AT91_TWI_CR, AT91_TWI_STOP);
++		if (!at91_poll_status(AT91_TWI_RXRDY)) {
++			debug("at91_i2c: RXRDY timeout\n");
++			return 1;
++		}
++		*buf++ = (at91_twi_read(AT91_TWI_RHR) & 0xff);
++	}
++
++	return 0;
++}
++
++static int xfer_write(unsigned char *buf, int length)
++{
++	/* Load first byte into transmitter */
++	at91_twi_write(AT91_TWI_THR, *buf++);
++
++	/* Send Start */
++	at91_twi_write(AT91_TWI_CR, AT91_TWI_START);
++
++	do {
++		if (!at91_poll_status(AT91_TWI_TXRDY)) {
++			debug ("at91_i2c: TXRDY timeout\n");
++			return 1;
++		}
++
++		length--;	/* byte was transmitted */
++
++		if (length > 0)		/* more data to send? */
++			at91_twi_write(AT91_TWI_THR, *buf++);
++	} while (length);
++
++	/* Send Stop */
++	at91_twi_write(AT91_TWI_CR, AT91_TWI_STOP);
++
++	return 0;
++}
++
++/*
++ * Generic i2c master transfer entrypoint
++ *
++ * rw == 1 means that this is a read
++ */
++static int at91_xfer(unsigned char chip, unsigned int addr, int alen,
++		     unsigned char *buffer, int len, int rw)
++{
++	int length;
++	int ret = -1;
++	unsigned char *buf;
++
++	/* Set the TWI Master Mode Register */
++	at91_twi_write(AT91_TWI_MMR, (chip << 16) | (alen << 8)
++				    | ((rw == 1) ? AT91_TWI_MREAD : 0));
++
++	/* Set TWI Internal Address Register with first messages data field */
++	if (alen > 0)
++		at91_twi_write(AT91_TWI_IADR, addr);
++
++	length = len;
++	buf = buffer;
++	if (length && buf) {	/* sanity check */
++		if (rw)
++			ret = xfer_read(buf, len);
++		else
++			ret = xfer_write(buf, len);
++	}
++
++	return ret;
++}
++
++int
++i2c_probe(unsigned char chip)
++{
++	unsigned char buffer[1];
++
++	return at91_xfer(chip, 0, 0, buffer, 1, 1);
++}
++
++int
++i2c_read (unsigned char chip, unsigned int addr, int alen,
++	  unsigned char *buffer, int len)
++{
++#ifdef CONFIG_SYS_I2C_EEPROM_ADDR_OVERFLOW
++	/* we only allow one address byte */
++	if (alen > 1)
++		return 1;
++	/* XXX assume an ATMEL AT24C16 */
++	if (alen == 1) {
++#if 0 /* EEPROM code already sets this correctly */
++		chip |= (addr >> 8) & 0xff;
++#endif
++		addr = addr & 0xff;
++	}
++#endif
++	return at91_xfer(chip, addr, alen, buffer, len, 1);
++}
++
++int
++i2c_write(unsigned char chip, unsigned int addr, int alen,
++	  unsigned char *buffer, int len)
++{
++#ifdef CONFIG_SYS_I2C_EEPROM_ADDR_OVERFLOW
++	int i;
++	unsigned char *buf;
++
++	/* we only allow one address byte */
++	if (alen > 1)
++		return 1;
++	/* XXX assume an ATMEL AT24C16 */
++	if (alen == 1) {
++		buf = buffer;
++		/* do single byte writes */
++		for (i = 0; i < len; i++) {
++#if 0 /* EEPROM code already sets this correctly */
++			chip |= (addr >> 8) & 0xff;
++#endif
++			addr = addr & 0xff;
++			if (at91_xfer(chip, addr, alen, buf++, 1, 0))
++				return 1;
++			addr++;
++		}
++		return 0;
++	}
++#endif
++	return at91_xfer(chip, addr, alen, buffer, len, 0);
++}
++
++/*
++ * Main initialization routine
++ */
++void i2c_init(int speed, int slaveaddr)
++{
++	unsigned long cdiv, ckdiv;
++
++	at91_twi_write(AT91_TWI_IDR, 0xffffffff);	/* Disable all interrupts */
++	at91_twi_write(AT91_TWI_CR, AT91_TWI_SWRST);	/* Reset peripheral */
++	at91_twi_write(AT91_TWI_CR, AT91_TWI_MSEN);	/* Set Master mode */
++
++	/* Calcuate clock dividers */
++	cdiv = (get_twi_clk_rate(0) / (2 * TWI_CLOCK)) - 3;
++	cdiv = cdiv + 1;	/* round up */
++	ckdiv = 0;
++	while (cdiv > 255) {
++		ckdiv++;
++		cdiv = cdiv >> 1;
++	}
++
++#ifdef CONFIG_AT91RM9200
++	if (ckdiv > 5) {
++		printf("AT91 I2C: Invalid TWI_CLOCK value!\n");
++		ckdiv = 5;
++	}
++#endif
++
++	at91_twi_write(AT91_TWI_CWGR, (ckdiv << 16) | (cdiv << 8) | cdiv);
++
++	debug ("Found AT91 i2c\n");
++	return;
++}
++
++int i2c_set_bus_speed(unsigned int speed)
++{
++	return -1;
++}
++
++unsigned int i2c_get_bus_speed(void)
++{
++	return CFG_I2C_SPEED;
++}
++
++#endif /* CONFIG_HARD_I2C */
++
+diff -ruN u-boot-1.3.4.orig/include/asm-arm/arch-at91sam9/at91_twi.h u-boot-1.3.4/include/asm-arm/arch-at91sam9/at91_twi.h
+--- u-boot-1.3.4.orig/include/asm-arm/arch-at91sam9/at91_twi.h	1969-12-31 17:00:00.000000000 -0700
++++ u-boot-1.3.4/include/asm-arm/arch-at91sam9/at91_twi.h	2011-03-15 11:48:32.811171433 -0600
+@@ -0,0 +1,69 @@
++/*
++ * arch/arm/mach-at91/include/mach/at91_twi.h
++ *
++ * Copyright (C) 2005 Ivan Kokshaysky
++ * Copyright (C) SAN People
++ *
++ * Two-wire Interface (TWI) registers.
++ * Based on AT91RM9200 datasheet revision E.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef AT91_TWI_H
++#define AT91_TWI_H
++
++#define	AT91_TWI_CR		0x00		/* Control Register */
++#define		AT91_TWI_START		(1 <<  0)	/* Send a Start Condition */
++#define		AT91_TWI_STOP		(1 <<  1)	/* Send a Stop Condition */
++#define		AT91_TWI_MSEN		(1 <<  2)	/* Master Transfer Enable */
++#define		AT91_TWI_MSDIS		(1 <<  3)	/* Master Transfer Disable */
++#define		AT91_TWI_SVEN		(1 <<  4)	/* Slave Transfer Enable [SAM9260 only] */
++#define		AT91_TWI_SVDIS		(1 <<  5)	/* Slave Transfer Disable [SAM9260 only] */
++#define		AT91_TWI_SWRST		(1 <<  7)	/* Software Reset */
++
++#define	AT91_TWI_MMR		0x04		/* Master Mode Register */
++#define		AT91_TWI_IADRSZ		(3    <<  8)	/* Internal Device Address Size */
++#define			AT91_TWI_IADRSZ_NO		(0 << 8)
++#define			AT91_TWI_IADRSZ_1		(1 << 8)
++#define			AT91_TWI_IADRSZ_2		(2 << 8)
++#define			AT91_TWI_IADRSZ_3		(3 << 8)
++#define		AT91_TWI_MREAD		(1    << 12)	/* Master Read Direction */
++#define		AT91_TWI_DADR		(0x7f << 16)	/* Device Address */
++
++#define	AT91_TWI_SMR		0x08		/* Slave Mode Register [SAM9260 only] */
++#define		AT91_TWI_SADR		(0x7f << 16)	/* Slave Address */
++
++#define	AT91_TWI_IADR		0x0c		/* Internal Address Register */
++
++#define	AT91_TWI_CWGR		0x10		/* Clock Waveform Generator Register */
++#define		AT91_TWI_CLDIV		(0xff <<  0)	/* Clock Low Divisor */
++#define		AT91_TWI_CHDIV		(0xff <<  8)	/* Clock High Divisor */
++#define		AT91_TWI_CKDIV		(7    << 16)	/* Clock Divider */
++
++#define	AT91_TWI_SR		0x20		/* Status Register */
++#define		AT91_TWI_TXCOMP		(1 <<  0)	/* Transmission Complete */
++#define		AT91_TWI_RXRDY		(1 <<  1)	/* Receive Holding Register Ready */
++#define		AT91_TWI_TXRDY		(1 <<  2)	/* Transmit Holding Register Ready */
++#define		AT91_TWI_SVREAD		(1 <<  3)	/* Slave Read [SAM9260 only] */
++#define		AT91_TWI_SVACC		(1 <<  4)	/* Slave Access [SAM9260 only] */
++#define		AT91_TWI_GACC		(1 <<  5)	/* General Call Access [SAM9260 only] */
++#define		AT91_TWI_OVRE		(1 <<  6)	/* Overrun Error [AT91RM9200 only] */
++#define		AT91_TWI_UNRE		(1 <<  7)	/* Underrun Error [AT91RM9200 only] */
++#define		AT91_TWI_NACK		(1 <<  8)	/* Not Acknowledged */
++#define		AT91_TWI_ARBLST		(1 <<  9)	/* Arbitration Lost [SAM9260 only] */
++#define		AT91_TWI_SCLWS		(1 << 10)	/* Clock Wait State [SAM9260 only] */
++#define		AT91_TWI_EOSACC		(1 << 11)	/* End of Slave Address [SAM9260 only] */
++
++#define	AT91_TWI_IER		0x24		/* Interrupt Enable Register */
++#define	AT91_TWI_IDR		0x28		/* Interrupt Disable Register */
++#define	AT91_TWI_IMR		0x2c		/* Interrupt Mask Register */
++#define	AT91_TWI_RHR		0x30		/* Receive Holding Register */
++#define	AT91_TWI_THR		0x34		/* Transmit Holding Register */
++
++#endif
++
++
+diff -ruN u-boot-1.3.4.orig/include/asm-arm/arch-at91sam9/clk.h u-boot-1.3.4/include/asm-arm/arch-at91sam9/clk.h
+--- u-boot-1.3.4.orig/include/asm-arm/arch-at91sam9/clk.h	2008-08-12 08:08:38.000000000 -0600
++++ u-boot-1.3.4/include/asm-arm/arch-at91sam9/clk.h	2011-03-15 11:49:30.245042525 -0600
+@@ -41,5 +41,9 @@
+ 	return AT91_MASTER_CLOCK;
+ }
+ 
++static inline unsigned long get_twi_clk_rate(unsigned int dev_id)
++{
++	return AT91_MASTER_CLOCK;
++}
+ 
+ #endif /* __ASM_ARM_ARCH_CLK_H__ */
+diff -ruN u-boot-1.3.4.orig/include/asm-arm/arch-at91sam9/hardware.h u-boot-1.3.4/include/asm-arm/arch-at91sam9/hardware.h
+--- u-boot-1.3.4.orig/include/asm-arm/arch-at91sam9/hardware.h	2011-02-18 09:58:00.231977041 -0700
++++ u-boot-1.3.4/include/asm-arm/arch-at91sam9/hardware.h	2011-03-15 11:50:16.936254267 -0600
+@@ -22,6 +22,7 @@
+ #include <asm/arch/at91sam9260.h>
+ #define AT91_BASE_EMAC	AT91SAM9260_BASE_EMAC
+ #define AT91_BASE_SPI	AT91SAM9260_BASE_SPI0
++#define AT91_BASE_TWI	AT91SAM9260_BASE_TWI
+ #define AT91_ID_UHP	AT91SAM9260_ID_UHP
+ #define AT91_PMC_UHP	AT91SAM926x_PMC_UHP
+ #elif defined(CONFIG_AT91SAM9261) || defined(CONFIG_AT91SAM9G10)
+diff -ruN u-boot-1.3.4.orig/include/common.h u-boot-1.3.4/include/common.h
+--- u-boot-1.3.4.orig/include/common.h	2008-08-12 08:08:38.000000000 -0600
++++ u-boot-1.3.4/include/common.h	2011-03-15 12:40:27.087195796 -0600
+@@ -701,4 +701,8 @@
+ #define CONFIG_HAS_POST
+ #endif
+ 
++#ifdef CONFIG_MAC_ON_EEPROM
++void eeprom_mac_init(void);
++#endif
++
+ #endif	/* __COMMON_H_ */
+diff -ruN u-boot-1.3.4.orig/include/configs/at91sam9g20ek.h u-boot-1.3.4/include/configs/at91sam9g20ek.h
+--- u-boot-1.3.4.orig/include/configs/at91sam9g20ek.h	2011-02-18 09:58:00.845071773 -0700
++++ u-boot-1.3.4/include/configs/at91sam9g20ek.h	2011-03-15 16:48:54.664865704 -0600
+@@ -169,6 +169,18 @@
+ 				"128k(env2)ro,2M(linux),-(root) "	\
+ 				"rw rootfstype=jffs2"
+ 
++#define CFG_I2C_SPEED 400
++#define CFG_I2C_SLAVE 0x50
++#define CFG_MAC_EEPROM_OFFSET 0x40
++#define CONFIG_I2C_ATMEL 1
++#define CONFIG_MAC_ON_EEPROM
++#define CONFIG_HARD_I2C
++#define CFG_EEPROM_AT24512
++#define CFG_I2C_EEPROM_ADDR 0x50        /* EEPROM AT24C512  */
++#define CFG_I2C_EEPROM_ADDR_LEN 2       /* two byte address */
++#define CFG_EEPROM_PAGE_WRITE_BITS  4
++#define CFG_EEPROM_PAGE_WRITE_DELAY_MS  10  /* and takes up to 10 msec */
++
+ #endif
+ 
+ #define CONFIG_BAUDRATE		115200
+diff -ruN u-boot-1.3.4.orig/lib_arm/board.c u-boot-1.3.4/lib_arm/board.c
+--- u-boot-1.3.4.orig/lib_arm/board.c	2008-08-12 08:08:38.000000000 -0600
++++ u-boot-1.3.4/lib_arm/board.c	2011-03-15 12:59:00.771322938 -0600
+@@ -392,6 +392,12 @@
+ 	serial_initialize();
+ #endif
+ 
++#ifdef CONFIG_MAC_ON_EEPROM
++    /* MAC Address from EEPROM */
++	puts ("EEPROM:  ");
++    eeprom_mac_init();
++#endif
++
+ 	/* IP Address */
+ 	gd->bd->bi_ip_addr = getenv_IPaddr ("ipaddr");
+ 
