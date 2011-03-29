@@ -1,0 +1,2 @@
+./copy_flash
+cp -v flash/*.jffs2 flash/*.bin /home/nathanb/devel/atm/open_embedded_stable_ati/flash

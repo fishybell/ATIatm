@@ -1,9 +1,9 @@
 #!/bin/bash
 
-cd ~/devel/atm/open_embedded_stable_ati/tmp/deploy/glibc/images/at91sam9g20ek_2mmc
+cd /usr/local/var/oe/tmp/deploy/glibc/images/at91sam9g20ek_2mmc
 cp -v uImage-at91sam9g20ek_2mmc.bin \
   console-image-at91sam9g20ek_2mmc.jffs2 \
   u-boot-at91sam9g20ek_2mmc-nandflash.bin \
   at91bootstrap.bin \
-  ~/devel/atm/open_embedded_stable_ati/flash
+  /usr/local/var/oe/flash
 
