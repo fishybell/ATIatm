@@ -15,6 +15,7 @@ ANGSTROM_EXTRA_INSTALL += " \
 	gdb \
 	tcl \
 	tcludp \
+	libnl \
 #	nbench-byte \
 	"
 
@@ -26,6 +27,7 @@ DEPENDS = "task-base-extended \
            compat-wireless \
 	   tcl \
 	   tcludp \
+	   libnl \
            u-boot-utils \
            ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
