@@ -1,0 +1,514 @@
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h linux-2.6.30/arch/arm/mach-at91/include/mach/heartbeat.h
+--- linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h	1969-12-31 17:00:00.000000000 -0700
++++ linux-2.6.30/arch/arm/mach-at91/include/mach/heartbeat.h	2011-03-28 16:53:28.001231268 -0600
+@@ -0,0 +1,69 @@
++/*
++ * include/mach/heartbeat.h
++ *
++ */
++
++#ifndef HEARTBEAT_H
++#define HEARTBEAT_H
++
++/* callback function that will be passed
++ *   the number of clock ticks since it was last ran */
++typedef void (*heartbeat_callback_ticks)(unsigned int);
++
++/* callback function that will NOT be passed
++ *   the number of clock ticks since it was last ran */
++typedef void (*heartbeat_callback_no_ticks)(void);
++
++/* the heartbeat table uses these objects to run
++ *   callback functions at periodic intervals
++ * only one callback function can be defined per object
++ * every time the heartbeat_run() function gets called
++ *   all objects on the current spoke get ran
++ * the heartbeat will incrimenta `counter' making it
++ *   so each object, using `offset,' `counter,' and
++ *   `modulo,' will run on (counter % modulo == offset)
++ * the heartbeat counter will accumulate 3000 times
++ *   every second, but the minumum modulo is 3
++ * the offset will be adjusted automatically */
++typedef struct heartbeat_object {
++    heartbeat_callback_ticks callback_t;
++    heartbeat_callback_no_ticks callback_nt;
++    unsigned int offset;
++    unsigned int modulo;
++} heartbeat_object_t;
++
++/* add a heartbeat object into the table
++ * returns HB_SUCCESS on success
++ * returns HB_DEAD on critical failure
++ * returns HB_INVALID on an invalid object
++ * a heartbeat object may be deemed invalid if the 
++ *   modulo is too low or if too many have the same
++ *   modulo have already been added */
++extern int heartbeat_add(struct heartbeat_object);
++enum {
++   HB_SUCCESS,
++   HB_DEAD,
++   HB_INVALID,
++};
++
++/* clear a heartbeat object from the table */
++extern void heartbeat_clear(struct heartbeat_object);
++
++/* run all objects on the table currently scheduled to run
++ * if the table is being manipulated, heartbeat_run()
++ *   returns immediately, only increasing its accumulator
++ * needs to be ran by a periodic interval timer running
++ * the timer needs to run at 3 khz (preferably precisely)
++ * needs to be passed the number of computer ticks since
++ *   the last time it was called */
++extern void heartbeat_run(int);
++
++/* initialize the heartbeat table for later use */
++extern void heartbeat_init(void);
++
++/* helper macros to initialize heartbeat objects */
++#define HB_ZERO(a) memset(&a,0,sizeof(struct heartbeat_object))
++#define HZ_TO_MOD(hz) (3000 / (hz))
++
++#endif
++
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/Makefile linux-2.6.30/arch/arm/mach-at91/Makefile
+--- linux-2.6.30.orig/arch/arm/mach-at91/Makefile	2011-03-14 14:10:11.548376609 -0600
++++ linux-2.6.30/arch/arm/mach-at91/Makefile	2011-03-28 11:30:54.860945982 -0600
+@@ -16,7 +16,7 @@
+ obj-$(CONFIG_ARCH_AT91SAM9G10)	+= at91sam9261.o at91sam926x_time.o at91sam9261_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9263)	+= at91sam9263.o at91sam926x_time.o at91sam9263_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9RL)	+= at91sam9rl.o at91sam926x_time.o at91sam9rl_devices.o sam9_smc.o
+-obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o
++obj-$(CONFIG_ARCH_AT91SAM9G20)	+= at91sam9260.o heartbeat.o at91sam926x_time.o at91sam9260_devices.o  sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o
+ obj-$(CONFIG_ARCH_AT91SAM9M10)	+= at91sam9g45.o at91sam926x_time.o at91sam9g45_devices.o sam9_smc.o hx170dec.o memalloc.o
+ obj-$(CONFIG_ARCH_AT91CAP9)	+= at91cap9.o at91sam926x_time.o at91cap9_devices.o sam9_smc.o
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/at91sam926x_time.c linux-2.6.30/arch/arm/mach-at91/at91sam926x_time.c
+--- linux-2.6.30.orig/arch/arm/mach-at91/at91sam926x_time.c	2009-06-09 21:05:27.000000000 -0600
++++ linux-2.6.30/arch/arm/mach-at91/at91sam926x_time.c	2011-03-28 17:09:42.592659701 -0600
+@@ -19,6 +19,8 @@
+ 
+ #include <mach/at91_pit.h>
+ 
++#include <mach/heartbeat.h>
++
+ 
+ #define PIT_CPIV(x)	((x) & AT91_PIT_CPIV)
+ #define PIT_PICNT(x)	(((x) & AT91_PIT_PICNT) >> 20)
+@@ -114,6 +116,9 @@
+ 			nr_ticks--;
+ 		} while (nr_ticks);
+ 
++		/* run heartbeat */
++		heartbeat_run(nr_ticks);
++
+ 		return IRQ_HANDLED;
+ 	}
+ 
+@@ -152,9 +157,13 @@
+ 	 * 1/HZ period (instead of a compile-time constant LATCH).
+ 	 */
+ 	pit_rate = clk_get_rate(clk_get(NULL, "mck")) / 16;
+-	pit_cycle = (pit_rate + HZ/2) / HZ;
++	pit_cycle = (pit_rate + HZ/2) / HZ; /* 100 hz original */
++	pit_cycle /= 30; /* 3 khz new */
+ 	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
+ 
++	/* initialize heartbeat table */
++	heartbeat_init();
++
+ 	/* Initialize and enable the timer */
+ 	at91sam926x_pit_reset();
+ 
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/heartbeat.c linux-2.6.30/arch/arm/mach-at91/heartbeat.c
+--- linux-2.6.30.orig/arch/arm/mach-at91/heartbeat.c	1969-12-31 17:00:00.000000000 -0700
++++ linux-2.6.30/arch/arm/mach-at91/heartbeat.c	2011-03-28 17:13:45.167715979 -0600
+@@ -0,0 +1,254 @@
++/*
++ * heartbeat.c
++ *
++ */
++
++#include <linux/semaphore.h>
++#include <linux/slab.h>
++#include <linux/module.h>
++
++#include <mach/heartbeat.h>
++
++// the minimum modulus allowed
++#define MINIMUM_MODULO 3
++
++// preallocate this many table items (can't use kmalloc during initial kernel boot, and don't want to conflate alloc_bootmem() and kmalloc() calls)
++#define MIN_TABLE_SIZE 5
++
++// global variables
++static unsigned int counter; // accumulator increased on each heartbeat_run() call
++typedef struct hb_table_entry {
++    struct heartbeat_object hb_obj;
++    unsigned int ticks;
++    struct hb_table_entry *next; // really a linked list, not a table
++    bool use_table;
++} hb_table_entry_t;
++static struct hb_table_entry *table_head; // start of table
++static struct hb_table_entry hb_init_table[MIN_TABLE_SIZE];
++
++// locking structures
++static struct semaphore hb_sem;
++
++// initialize lock
++static inline void hb_lock_init(void) {
++    sema_init(&hb_sem, 1);
++}
++
++// acquire lock, blocking if necessary, return false on critical failure
++static inline bool hb_lock_blocking(void) {
++    return down_interruptible(&hb_sem) == 0;
++}
++
++// acquire lock and return true, or not and return false
++static inline bool hb_lock(void) {
++    return down_trylock(&hb_sem) == 0;
++}
++
++// release lock
++static inline void hb_unlock(void) {
++    up(&hb_sem);
++}
++
++// initialize the table
++void heartbeat_init(void) {
++    int i;
++    // set preallocated table entries for use
++    for (i = 0; i < MIN_TABLE_SIZE; i++) {
++        hb_init_table[i].hb_obj.modulo = 0; // marked as "free"
++        hb_init_table[i].use_table = true;
++    }
++    table_head = NULL;
++    counter = 0;
++    hb_lock_init();
++}
++EXPORT_SYMBOL(heartbeat_init);
++
++// run the table, accumulate once, never block
++void heartbeat_run(int ticks) {
++    struct hb_table_entry *this;
++
++    counter++; // doesn't matter if this is invalid due to race condition
++
++    // lock
++    if (!hb_lock()) {
++        // ...or not
++        return;
++    }
++
++    // run through each item in the table
++    this = table_head;
++    while (this != NULL) {
++        // move up ticks for this entry
++        this->ticks += ticks;
++
++        // do we run this entry?
++        if (counter%this->hb_obj.modulo==this->hb_obj.offset) {
++            // pass ticks or not?
++            if (this->hb_obj.callback_nt == NULL) {
++                this->hb_obj.callback_t(this->ticks); // call callback with ticks value
++                this->ticks = 0; // calculate new ticks value next time
++            } else {
++                this->hb_obj.callback_nt(); // callback with nothing passed
++            }
++        }
++        // move on to the next entry
++        this = this->next;
++    }
++
++    // unlock
++    hb_unlock();
++}
++EXPORT_SYMBOL(heartbeat_run);
++
++// add to the table, block if necessary
++int heartbeat_add(struct heartbeat_object hb_object) {
++    struct hb_table_entry *this;
++    struct hb_table_entry *te;
++    int i, retval = HB_SUCCESS, min_m = 0, mult = 2, max_mod = 0;
++
++    // callbacks set correctly?
++    if ((hb_object.callback_t == NULL && hb_object.callback_nt == NULL) ||
++        (hb_object.callback_t != NULL && hb_object.callback_nt != NULL)) {
++        return HB_INVALID;
++    }
++
++    // modulo big enough?
++    if (hb_object.modulo < MINIMUM_MODULO) {
++        return HB_INVALID;
++    }
++
++    // allocate memory for a new table entry
++    te = NULL;
++    for (i = 0; i < MIN_TABLE_SIZE; i++) {
++        // a table entry with no modulo indicates it being free
++        if (hb_init_table[i].hb_obj.modulo == 0) {
++            te = &(hb_init_table[i]);
++        }
++    }
++    // couldn't allocate via preallocated table, allocate more memory
++    if (te == NULL) {
++        te = kmalloc(sizeof(struct hb_table_entry), GFP_KERNEL);
++        te->use_table = false; // not in the preallocated table
++    }
++    if (te == NULL) {
++        return HB_DEAD; // critical failure, give up now
++    }
++    te->hb_obj = hb_object; // copy object to new spot in memory
++    te->ticks = 0; // SET To be ready for initial call
++
++    // lock around this section
++    if (!hb_lock_blocking()) {
++        return HB_DEAD; // critical failure, give up now
++    }
++
++    // adjust offsets of all matching modulos
++    this = table_head;
++    // initial loop looking for identical modulo items
++    while (this != NULL) {
++        if (this->hb_obj.modulo == MINIMUM_MODULO) {
++            // found a minimum modulo item: count it
++            min_m++;
++        }
++        if (this->hb_obj.modulo == te->hb_obj.modulo) {
++            // start the new one on the next slot
++            te->hb_obj.offset++;
++        }
++        if (this->hb_obj.modulo > max_mod) {
++            // keep track of the largest modulo in the table
++            max_mod = this->hb_obj.modulo;
++        }
++        // move on to the next entry
++        this = this->next;
++    }
++    // if we have too many minimum modulo items, don't add another
++    if (te->hb_obj.modulo == MINIMUM_MODULO && min_m == MINIMUM_MODULO) {
++        goto add_fail;
++    }
++    // further loops looking for "factor-of" modulo items
++    while (te->hb_obj.modulo * mult < max_mod) {
++        this = table_head; // start list loop over
++        while (this != NULL) {
++            if (this->hb_obj.modulo == te->hb_obj.modulo * mult) {
++                // found a factor, move the two items away from eachother
++                // it doesn't matter which goes forward and which goes reverse
++                this->hb_obj.offset--;
++                te->hb_obj.offset++;
++            }
++            // move on to the next entry
++            this = this->next;
++        }
++        // move on to the next multiplier
++        mult++;
++    }
++
++    // add to front of the table
++    te->next = table_head;
++    table_head = te;
++
++    // final loop to fix all offsets to be within allowable ranges
++    this = table_head;
++    while (this != NULL) {
++        // fix negative numbers
++        while (this->hb_obj.offset < 0) {
++            this->hb_obj.offset += this->hb_obj.modulo;
++        }
++        // fix numbers that are too big
++        this->hb_obj.offset = this->hb_obj.offset % this->hb_obj.modulo;
++
++        // move on to the next entry
++        this = this->next;
++    }
++
++    // end locking section
++    goto add_end;
++
++add_fail:
++    // free new table entry
++    if (te->use_table) {
++        te->hb_obj.modulo = 0; // mark as "free"
++    } else {
++        kfree(te); // free allocated memory
++    }
++    retval = HB_INVALID;
++
++add_end:
++    // unlock
++    hb_unlock();
++    return retval;
++}
++EXPORT_SYMBOL(heartbeat_add);
++
++// clear from the table, block if necessary
++extern void heartbeat_clear(struct heartbeat_object hb_object) {
++    struct hb_table_entry *this = table_head;
++    struct hb_table_entry *last = NULL;
++    // loop through until we've found the given object
++    while (this != NULL) {
++        // match by matching callback function and modulo (offset could have changed)
++        if (this->hb_obj.callback_t == hb_object.callback_t &&
++            this->hb_obj.callback_nt == hb_object.callback_nt &&
++            this->hb_obj.modulo == hb_object.modulo) {
++            // remove from linked list
++            if (last == NULL) {
++                // we were the head of the list
++                table_head = this->next;
++            } else {
++                // somewhere in middle of list
++                last->next = this->next;
++            }
++
++            // free
++            if (this->use_table) {
++                this->hb_obj.modulo = 0; // mark as "free"
++            } else {
++                kfree(this); // free allocated memory
++            }
++            this = NULL; // exit loop
++        } else {
++            // move on to the next entry
++            last = this;
++            this = this->next;
++        }
++    }
++}
++EXPORT_SYMBOL(heartbeat_clear);
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h linux-2.6.30/arch/arm/mach-at91/include/mach/heartbeat.h
+--- linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h	2011-03-28 17:21:19.989197934 -0600
++++ linux-2.6.30/arch/arm/mach-at91/include/mach/heartbeat.h	2011-03-29 11:52:35.457903164 -0600
+@@ -63,7 +63,8 @@
+ 
+ /* helper macros to initialize heartbeat objects */
+ #define HB_ZERO(a) memset(&a,0,sizeof(struct heartbeat_object))
+-#define HZ_TO_MOD(hz) (3000 / (hz))
++#define TICKS_PER_HZ 3000
++#define HZ_TO_MOD(hz) (TICKS_PER_HZ / (hz))
+ 
+ #endif
+ 
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/at91sam926x_time.c linux-2.6.30/arch/arm/mach-at91/at91sam926x_time.c
+--- linux-2.6.30.orig/arch/arm/mach-at91/at91sam926x_time.c	2011-03-28 17:21:19.991198042 -0600
++++ linux-2.6.30/arch/arm/mach-at91/at91sam926x_time.c	2011-03-29 11:38:54.495789346 -0600
+@@ -24,6 +24,7 @@
+ 
+ #define PIT_CPIV(x)	((x) & AT91_PIT_CPIV)
+ #define PIT_PICNT(x)	(((x) & AT91_PIT_PICNT) >> 20)
++#define ATI_MULT	30
+ 
+ static u32 pit_cycle;		/* write-once */
+ static u32 pit_cnt;		/* access only w/system irq blocked */
+@@ -46,7 +47,7 @@
+ 
+ 	elapsed += PIT_PICNT(t) * pit_cycle;
+ 	elapsed += PIT_CPIV(t);
+-	return elapsed;
++	return elapsed*ATI_MULT; // comes in too small?
+ }
+ 
+ static struct clocksource pit_clk = {
+@@ -108,13 +109,8 @@
+ 			&& (at91_sys_read(AT91_PIT_SR) & AT91_PIT_PITS)) {
+ 		unsigned nr_ticks;
+ 
+-		/* Get number of ticks performed before irq, and ack it */
++		/* Get number of ticks performed before irq */
+ 		nr_ticks = PIT_PICNT(at91_sys_read(AT91_PIT_PIVR));
+-		do {
+-			pit_cnt += pit_cycle;
+-			pit_clkevt.event_handler(&pit_clkevt);
+-			nr_ticks--;
+-		} while (nr_ticks);
+ 
+ 		/* run heartbeat */
+ 		heartbeat_run(nr_ticks);
+@@ -125,6 +121,18 @@
+ 	return IRQ_NONE;
+ }
+ 
++static void pit_callback(unsigned int nr_ticks) {
++	if (nr_ticks > 0) {
++		nr_ticks /= ATI_MULT; // comes in too big
++		/* acknowledge the ticks */
++		do {
++			pit_cnt += pit_cycle;
++			pit_clkevt.event_handler(&pit_clkevt);
++			nr_ticks--;
++		} while (nr_ticks);
++	}
++}
++
+ static struct irqaction at91sam926x_pit_irq = {
+ 	.name		= "at91_tick",
+ 	.flags		= IRQF_SHARED | IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+@@ -151,6 +159,7 @@
+ {
+ 	unsigned long	pit_rate;
+ 	unsigned	bits;
++	struct heartbeat_object pit_hb = {pit_callback, NULL, 0, HZ_TO_MOD(100)}; // callback with ticks, no offset, 100 hz
+ 
+ 	/*
+ 	 * Use our actual MCK to figure out how many MCK/16 ticks per
+@@ -158,12 +167,15 @@
+ 	 */
+ 	pit_rate = clk_get_rate(clk_get(NULL, "mck")) / 16;
+ 	pit_cycle = (pit_rate + HZ/2) / HZ; /* 100 hz original */
+-	pit_cycle /= 30; /* 3 khz new */
++	pit_cycle /= ATI_MULT; /* 3 khz new */
+ 	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
+ 
+ 	/* initialize heartbeat table */
+ 	heartbeat_init();
+ 
++	/* add original functionality as heartbeat object */
++	heartbeat_add(pit_hb);
++
+ 	/* Initialize and enable the timer */
+ 	at91sam926x_pit_reset();
+ 
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/at91sam926x_time.c linux-2.6.30/arch/arm/mach-at91/at91sam926x_time.c
+--- linux-2.6.30.orig/arch/arm/mach-at91/at91sam926x_time.c	2011-03-29 12:05:54.203842309 -0600
++++ linux-2.6.30/arch/arm/mach-at91/at91sam926x_time.c	2011-03-29 12:33:53.743135300 -0600
+@@ -159,7 +159,7 @@
+ {
+ 	unsigned long	pit_rate;
+ 	unsigned	bits;
+-	struct heartbeat_object pit_hb = {pit_callback, NULL, 0, HZ_TO_MOD(100)}; // callback with ticks, no offset, 100 hz
++	struct heartbeat_object pit_hb;
+ 
+ 	/*
+ 	 * Use our actual MCK to figure out how many MCK/16 ticks per
+@@ -174,6 +174,7 @@
+ 	heartbeat_init();
+ 
+ 	/* add original functionality as heartbeat object */
++    hb_obj_init_t(&pit_hb, pit_callback, 100); // callback with ticks, no offset, 100 hz
+ 	heartbeat_add(pit_hb);
+ 
+ 	/* Initialize and enable the timer */
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h linux-2.6.30/arch/arm/mach-at91/include/mach/heartbeat.h
+--- linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h	2011-03-29 12:05:54.202842255 -0600
++++ linux-2.6.30/arch/arm/mach-at91/include/mach/heartbeat.h	2011-03-29 12:35:20.204784220 -0600
+@@ -66,5 +66,18 @@
+ #define TICKS_PER_HZ 3000
+ #define HZ_TO_MOD(hz) (TICKS_PER_HZ / (hz))
+ 
++/* helper functions to initialize heartbeat objects */
++static inline void hb_obj_init_t(struct heartbeat_object *obj, heartbeat_callback_ticks cb, int hz) {
++    HB_ZERO(*obj);
++    obj->callback_t = cb;
++    obj->modulo = HZ_TO_MOD(hz);
++}
++
++static inline void hb_obj_init_nt(struct heartbeat_object *obj, heartbeat_callback_no_ticks cb, int hz) {
++    HB_ZERO(*obj);
++    obj->callback_nt = cb;
++    obj->modulo = HZ_TO_MOD(hz);
++}
++
+ #endif
+ 

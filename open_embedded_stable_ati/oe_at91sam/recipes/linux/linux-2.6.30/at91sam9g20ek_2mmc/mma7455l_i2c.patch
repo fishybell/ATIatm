@@ -1,0 +1,11 @@
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c linux-2.6.30/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
+--- linux-2.6.30.orig/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c	2011-02-18 10:10:19.000995416 -0700
++++ linux-2.6.30/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c	2011-03-11 16:22:14.339287212 -0700
+@@ -290,6 +290,6 @@
+ 	{
+ 		I2C_BOARD_INFO("24c512", 0x50),
+-		I2C_BOARD_INFO("wm8731", 0x1b),
++		I2C_BOARD_INFO("mma7455l", 0x1d),
+ 	},
+ };
+ 

@@ -22,7 +22,7 @@
  #endif
  
 -
-+// 24c512 = eeprom , wm8731 = sound
++// 24c512 = eeprom , mma7455l = accelerometer
  static struct i2c_board_info __initdata ek_i2c_devices[] = {
  	{
  		I2C_BOARD_INFO("24c512", 0x50),
