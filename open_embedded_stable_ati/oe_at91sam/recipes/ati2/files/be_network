@@ -1,0 +1,1 @@
+echo -n "network" | /usr/bin/eeprom_rw write -addr 0x80 -size 8 -blank 0x40

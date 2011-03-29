@@ -14,15 +14,13 @@ SERVER_START="radio_conv -s /dev/ttyS1"
 FASIT_START="python fasit_client_main.py -t MIT"
 SERVER_STOP="killall radio_conv"
 FASIT_STOP="killall python"
-if [ -f network ] ; then
+network=$(/usr/bin/is_comm)
+if [ "$network" = "network" ] ; then
+    ip_address=$(/usr/bin/is_ip)
     SERVER_START="echo -n"
-    if [ -f wimax ] ; then
-        FASIT_START="python fasit_client_main.py -t MIT -s `cat wimax`"
-        killall ping
-        ping -q `cat wimax` &
-    else
-        FASIT_START="python fasit_client_main.py -t MIT -s `findbase.tcl`"
-    fi
+    FASIT_START="python fasit_client_main.py -t MIT -s $ip_address"
+    killall ping
+    ping -q $ip_address &
 fi
 
 if [ -n "$1" ] ; then

@@ -1,1 +1,2 @@
-SIT
+/usr/bin/eeprom_rw read -addr 0x00
+echo

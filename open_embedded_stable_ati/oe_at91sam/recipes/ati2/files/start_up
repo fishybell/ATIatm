@@ -2,25 +2,23 @@
 #
 # manage startup of drivers and python code
 
-if ! [ -f /home/root/is_board ] ; then
-    exit 0
-fi
-
 # set keepalive timeouts
 sysctl -w \
  net.ipv4.tcp_keepalive_time=20 \
  net.ipv4.tcp_keepalive_intvl=10 \
  net.ipv4.tcp_keepalive_probes=3
 
+is_board=$(/usr/bin/is_board)
+
 case "$1" in
     start)
-        /usr/bin/$(cat /home/root/is_board) start &
+        /usr/bin/$is_board start &
         ;;
     stop)
-        /usr/bin/$(cat /home/root/is_board) stop &
+        /usr/bin/$is_board stop &
         ;;
     force-reload|restart)
-        /usr/bin/$(cat /home/root/is_board) restart &
+        /usr/bin/$is_board restart &
         ;;
     *)
         echo "Usage: /etc/init.d/start_up {start|stop|restart|force-reload}"

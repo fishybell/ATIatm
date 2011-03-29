@@ -1,0 +1,4 @@
+echo -n "Enter new (full) MAC Address: "
+read mac_address
+size=$(echo $mac_address | wc -c)
+echo -n $mac_address | /usr/bin/eeprom_rw write -addr 0x40 -size $size -blank 0x40

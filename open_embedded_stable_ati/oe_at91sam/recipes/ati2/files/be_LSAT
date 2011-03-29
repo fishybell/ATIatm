@@ -1,0 +1,1 @@
+echo -n "LSAT" | /usr/bin/eeprom_rw write -addr 0x00 -size 5 -blank 0x40

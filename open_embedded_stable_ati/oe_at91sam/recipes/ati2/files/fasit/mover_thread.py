@@ -1,5 +1,5 @@
 MOVER_PATH          = "/sys/class/target/mover/"
-MOVER_POSITION_PATH = "/sys/class/target/mover_position/"
+MOVER_POSITION_PATH = "/sys/class/target/mover/"
 
 import os
 import select
@@ -48,7 +48,7 @@ class mover_thread(QThread):
             raise ValueError('Wrong mover type.')
         
         self.movement_fd = os.open(self.movement_path,os.O_RDWR)
-        self.position_fd = os.open(self.position_path,os.O_RDWR)
+        self.position_fd = os.open(self.position_path,os.O_RDONLY)
         self.logger.debug('correct type...')
         
     # not to be called from within the thread context

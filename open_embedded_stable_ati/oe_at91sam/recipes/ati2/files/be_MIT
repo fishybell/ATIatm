@@ -1,0 +1,1 @@
+echo -n "MIT" | /usr/bin/eeprom_rw write -addr 0x00 -size 4 -blank 0x40

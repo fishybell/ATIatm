@@ -5,13 +5,19 @@ PR = "r0"
 SRC_URI =  "file://*gpio*"
 SRC_URI += "file://issue*"
 SRC_URI += "file://ati2-0.9/*.cpp"
+SRC_URI += "file://ati2-0.9/*.c"
 SRC_URI += "file://ati2-0.9/*.h"
+SRC_URI += "file://ati2-0.9/*.hh"
+SRC_URI += "file://ati2-0.9/at91lib"
+SRC_URI += "file://ati2-0.9/eeprom"
 SRC_URI += "file://ati2-0.9/Makefile"
 SRC_URI += "file://*.fw"
 SRC_URI += "file://*.tcl"
 SRC_URI += "file://*.bin"
 SRC_URI += "file://start_up"
 SRC_URI += "file://interfaces"
+SRC_URI += "file://be_*"
+SRC_URI += "file://is_*"
 SRC_URI += "file://SIT"
 SRC_URI += "file://LSAT"
 SRC_URI += "file://HSAT"
@@ -46,10 +52,13 @@ do_install () {
     install -m 755 -d ${D}/lib/firmware
     install -m 755 ${WORKDIR}/*gpio* ${D}/usr/bin
     install -m 755 ${WORKDIR}/${P}/radio_conv ${D}/usr/bin
+    install -m 755 ${WORKDIR}/${P}/eeprom_rw ${D}/usr/bin
     install -m 644 ${WORKDIR}/issue* ${D}/etc
     install -m 644 ${WORKDIR}/fasit/*.py ${D}/home/root/fasit
     install -m 644 ${WORKDIR}/fasit/*.mp3 ${D}/home/root/fasit/sounds
     install -m 755 ${WORKDIR}/start_up ${D}/etc/init.d
+    install -m 755 ${WORKDIR}/is_* ${D}/usr/bin
+    install -m 755 ${WORKDIR}/be_* ${D}/usr/bin
     install -m 755 ${WORKDIR}/SIT ${D}/usr/bin
     install -m 755 ${WORKDIR}/LSAT ${D}/usr/bin
     install -m 755 ${WORKDIR}/HSAT ${D}/usr/bin

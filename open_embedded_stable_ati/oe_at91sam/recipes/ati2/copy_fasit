@@ -8,7 +8,7 @@ flush stdout
 gets stdin num
 
 system sed -i -e "s/^sam$num.*//" ~/.ssh/known_hosts
-eval spawn scp [glob files/*gpio* ] [glob files/be_* ] [glob files/is_* ] files/SES files/SIT files/HSAT files/LSAT files/MIT files/MAT root@sam$num:/usr/bin
+eval spawn scp [glob files/fasit/*.py] root@sam$num:/home/root/fasit
 set timeout 3.5
 while 1 {
     expect {
@@ -23,20 +23,4 @@ while 1 {
         }
     }
 }
-sleep 1
-eval spawn scp -r files/fasit root@sam$num:/home/root/
-set timeout 3.5
-while 1 {
-    expect {
-        -re {.*word:.*} {
-            send "\r"
-        }
-        -re {.*yes/no.*} {
-            send "yes\r"
-        }
-        default {
-            break
-        }
-    }
-}
-sleep 10
+sleep 2
