@@ -26,6 +26,8 @@ SRC_URI = " \
 		file://modules/target_miles_transmitter.h \
 		file://modules/target_mover_armor.c \
 		file://modules/target_mover_armor.h \
+		file://modules/target_mover_generic.c \
+		file://modules/target_mover_generic.h \
 		file://modules/target_mover_infantry.c \
 		file://modules/target_mover_infantry.h \
 		file://modules/target_mover_position.c \
@@ -38,6 +40,10 @@ SRC_URI = " \
 		file://modules/target_ses_interface.h \
 		file://modules/target_user_interface.c \
 		file://modules/target_user_interface.h \
+		file://modules/netlink_provider.c \
+		file://modules/netlink_userspace.c \
+		file://modules/netlink_user.h \
+		file://modules/user_conn.c \
           "
 SRCNAME = "${PN}"
 #S = "${WORKDIR}/${SRCNAME}-${PV}/modules"
@@ -48,6 +54,7 @@ inherit module
 #oe_runmake 'MODPATH=${D}${base_libdir}/modules/${KERNEL_VERSION}/kernel/drivers/ecu' \
 
 do_compile() {
+    oe_runmake user_conn
 	unset CFLAGS CPPFLAGS CXXFLAGS LDFLAGS CC LD CPP
         oe_runmake 'KERNEL_SOURCE=${STAGING_KERNEL_DIR}' \
 	    'KDIR=${STAGING_KERNEL_DIR}' \
@@ -64,15 +71,18 @@ ROOT_USER_INSTALL_DIR = "/home/root"
 do_install(){
     install -d ${D}${TARGET_MODULES_INSTALL_DIR}
     install -d ${D}/etc
+    install -d ${D}/usr/bin
     install -m 0644 ${S}/*.ko ${D}${TARGET_MODULES_INSTALL_DIR}
 #    install -m 0755 ${WORKDIR}/start_target_modules.sh ${D}${ROOT_USER_INSTALL_DIR}/start_target_modules.sh
     install -m 0644 ${WORKDIR}/asoundrc ${D}/etc/asound.conf
+    install -m 0755 ${S}/user_conn ${D}/usr/bin
 }
 
 PACKAGE_ARCH = "at91sam9g20ek_2mmc"
 PACKAGES = "${PN}"
 FILES_${PN} = "${TARGET_MODULES_INSTALL_DIR}"
 FILES_${PN} += "/etc/asound.conf"
+FILES_${PN} += "/usr/bin/user_conn"
 
 
 

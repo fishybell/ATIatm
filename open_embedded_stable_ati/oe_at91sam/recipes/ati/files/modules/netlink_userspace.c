@@ -36,6 +36,7 @@ int create_nl_socket(int groups) {
 
     memset(&local, 0, sizeof(local));
     local.nl_family = AF_NETLINK;
+    local.nl_pid = getpid();
     local.nl_groups = groups;
     if (bind(fd, (struct sockaddr *) &local, sizeof(local)) < 0)
         goto error;

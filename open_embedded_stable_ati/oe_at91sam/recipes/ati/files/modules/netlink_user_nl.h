@@ -12,6 +12,13 @@ enum {
 };
 #define NL_A_MAX (__NL_A_MAX - 1)
 
+/* attribute policy: defines which attribute has which type (e.g int, char * etc)
+ * possible values defined in net/netlink.h 
+ */
+static struct nla_policy provider_genl_policy[NL_A_MAX + 1] = {
+    [NL_A_MSG] = { .type = NLA_STRING },
+};
+
 /* commands: enumeration of all commands (functions), 
  * used by userspace application to identify command to be ececuted
  */
@@ -24,12 +31,6 @@ enum {
     __NL_C_MAX,
 };
 #define NL_C_MAX (__NL_C_MAX - 1)
-
-int create_nl_socket(int groups);
-int sendto_fd(int s, const char *buf, int bufLen);
-int get_family_id(int sd);
-int send_command(int nl_sd, int id, int command, char *message, size_t mlength);
-int rec_response(int nl_sd, char *result, size_t rlength);
 
 #define TRIGGER_MIN 1
 #define TRIGGER_MAX 1000

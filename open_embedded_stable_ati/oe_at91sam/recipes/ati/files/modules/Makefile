@@ -39,5 +39,12 @@ user_wait: user_wait.c netlink_userspace.c
 		${CC} ${CFLAGS} ${LDFLAGS} user_wait.c netlink_userspace.c -o user_wait
     endif
 
+user_wait_nl: user_wait_nl.c
+    ifeq ($(CURD),modules)
+		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} -g -lnl user_wait_nl.c -o user_wait_nl
+    else
+		${CC} ${CFLAGS} ${LDFLAGS} -lnl user_wait_nl.c -o user_wait_nl
+    endif
+
 clean:
-	$(RM) .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers user_conn user_wait
+	$(RM) .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers user_conn user_wait user_wait_nl
