@@ -1,0 +1,69 @@
+#!/usr/bin/tclsh
+
+package require md5
+package require Tclx
+
+# will change one directory down, md5 all files, fill in array, and go back up
+proc md5dir {dirname arrname {ignore {}}} {
+    upvar $arrname arr
+
+    cd $dirname ;# change to directory
+    foreach f [glob *] {
+        if {![lcontain $ignore $f]} { ;# don't add to array if file is in the ignore list
+            set arr($f) [md5::md5 -hex -file "$f"]
+#puts "$dirname/$f: $arr($f)"
+        } else {
+puts "ignore $dirname/$f"
+        }
+    }
+    cd .. ;# change back to prior directory
+}
+
+# change to daily build directory
+cd "/ati/share/Research & Development/ATM/Daily"
+
+# get list of build directories
+set dirs [lsort [glob 20*]]
+
+# loop over the list (while resizing the list)
+set i 1 ;# start looking at second item
+while {$i < [llength $dirs]} {
+    # create empty arrays for this directory and the previous directory
+    array set prev {}
+    array set this {}
+    
+    # fill in the arrays with md5 hashes of each file
+    set ignore [list "build.log"]
+puts "comparing [lindex $dirs [expr $i - 1]] to [lindex $dirs $i]"
+    md5dir [lindex $dirs [expr $i - 1]] prev $ignore ;# previous directory is $i-1
+    md5dir [lindex $dirs $i] this $ignore            ;# this directory is $i
+
+    # variable to keep track of whether we need to delete this directory or not
+    set del 1 ;# by default, we'll delete
+
+    # compare hashes to see if they all match
+    foreach key [array names this] {
+        if {[info exists prev($key)]} {
+            if {$this($key) != $prev($key)} {
+puts "$key different in [lindex $dirs [expr $i - 1]] ($this($key)):($prev($key))"
+                set del 0 ;# file exists has changed, don't delete
+                break ;# only need one file to be different
+            }
+        } else {
+puts "$key doesn't exist in [lindex $dirs [expr $i - 1]]"
+            set del 0 ;# file exists only in this directory, don't delete
+            break ;# only need one file to be different
+        }
+    }
+
+    # delete the directory if necessary
+    if {$del} {
+puts "We would delete [lindex $dirs $i]"
+
+        # remove this directory from the dirs list
+        set dirs [concat [lrange $dirs 0 [expr $i - 1]] [lrange $dirs [expr $i + 1] end]]
+        incr i -1 ;# move back one so when we move forward, we stay the same
+    }
+
+    incr i ;# move to next item
+}
