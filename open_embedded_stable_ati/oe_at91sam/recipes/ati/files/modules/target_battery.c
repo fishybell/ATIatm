@@ -6,6 +6,9 @@
 #include <linux/clk.h>
 #include <mach/gpio.h>
 
+#include "netlink_kernel.h"
+#include "delay_printk.h"
+
 #include "target.h"
 #include "target_battery.h"
 //---------------------------------------------------------------------------
@@ -49,6 +52,7 @@
 
 	#define OUTPUT_LED_LOW_BAT_ACTIVE_STATE			ACTIVE_LOW
 	#define	OUTPUT_LED_LOW_BAT 						AT91_PIN_PB8 //PA6 LED on dev. board
+	#define	OUTPUT_LED_TEST 						AT91_PIN_PB9 //power LED on dev. board
 
 	#define INPUT_CHARGING_BAT_ACTIVE_STATE			ACTIVE_LOW
 	#define INPUT_CHARGING_BAT_PULLUP_STATE			PULLUP_ON
@@ -152,6 +156,11 @@ static const char * battery_charging_state[] =
 atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to hold our driver id from netlink provider
+//---------------------------------------------------------------------------
+atomic_t driver_id = ATOMIC_INIT(-1);
+
+//---------------------------------------------------------------------------
 // This atomic variable used for storing the last adc value read
 //---------------------------------------------------------------------------
 atomic_t adc_atomic = ATOMIC_INIT(0);
@@ -194,7 +203,7 @@ static void adc_read_fire(unsigned long data)
 		{
 		// Read the conversion
 		adc_val = __raw_readl(adc_base + ADC_CDR);
-		printk(KERN_ALERT "ADC = %i (%s)\n", adc_val, adc_val < minvoltval ? "low" : "normal");
+		delay_printk("ADC = %i (%s)\n", adc_val, adc_val < minvoltval ? "low" : "normal");
 
 		// has the value changed?
 		old_adc_val = atomic_read(&adc_atomic);
@@ -246,14 +255,14 @@ irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
     //  we are responding.
     if (at91_get_gpio_value(INPUT_CHARGING_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE)
         {
-        printk(KERN_ALERT "%s - %s - ACTIVE\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s - ACTIVE\n",TARGET_NAME, __func__);
         // we're connected, start the timer and turn off the led
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
         mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_OFF_IN_MSECONDS*HZ)/1000));
         }
     else
         {
-        printk(KERN_ALERT "%s - %s - INACTIVE\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s - INACTIVE\n",TARGET_NAME, __func__);
         // we're disconnected, delete the timer and turn on the led
 	del_timer(&charging_timer_list);
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
@@ -281,7 +290,7 @@ static void charging_fire(unsigned long data)
         }
     else
         {
-        // turn back on, decriment counter
+        // turn back on, decrement counter
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
         mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_ON_IN_MSECONDS*HZ)/1000));
         }
@@ -317,7 +326,7 @@ static void led_blink_fire(unsigned long data)
             }
         else
             {
-            // turn back on, decriment counter
+            // turn back on, decrement counter
             at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
             atomic_set(&blink_count, --count);
             }
@@ -343,7 +352,6 @@ static int hardware_adc_init(void)
 	at91_set_A_periph(INPUT_ADC_LOW_BAT, 0); 			// Set the pin to ADC
 
 	adc_base = ioremap(AT91SAM9260_BASE_ADC,SZ_16K); 	// Map the ADC memory region
-printk("adc_base: %08x\n",(int)adc_base);
 	__raw_writel(0x01, adc_base + ADC_CR); 				// Reset the ADC
 
 	__raw_writel(ADC_MODE, adc_base + ADC_MR); 			// Mode setup
@@ -379,7 +387,7 @@ static int hardware_init(void)
         case 48: minvoltval = 204; break;
         default: minvoltval = 255; break;
         }
-    printk(KERN_ALERT "%s charge: %i, minvoltval: %i\n",__func__,  charge, minvoltval);
+   delay_printk("%s charge: %i, minvoltval: %i\n",__func__,  charge, minvoltval);
 
     // Enable USB 5V
     at91_set_gpio_input(USB_ENABLE, USB_ENABLE_PULLUP_STATE);
@@ -411,11 +419,11 @@ static int hardware_init(void)
             {
             if (status == -EINVAL)
                 {
-                    printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_CHARGING_BAT);
+                   delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_CHARGING_BAT);
                 }
             else if (status == -EBUSY)
                 {
-                    printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_CHARGING_BAT);
+                   delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_CHARGING_BAT);
                 }
 
             return status;
@@ -538,16 +546,58 @@ static void level_changed(struct work_struct * work)
 	}
 
 //---------------------------------------------------------------------------
+// netlink command handler for battery commands
+//---------------------------------------------------------------------------
+int nl_battery_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value = 0;
+//delay_printk("handling battery command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    if (na) {
+        // grab value from attribute
+        value = nla_get_u8(na);
+//delay_printk("received value: %i\n", value);
+
+        // prepare response
+        rc = nla_put_u8(skb, GEN_INT8_A_MSG, atomic_read(&adc_atomic));
+
+        // huge success
+        if (rc == 0) {
+            rc = HANDLE_SUCCESS;
+        } else {
+           delay_printk("BATTERY: could not create return message\n");
+            rc = HANDLE_FAILURE;
+        }
+    } else {
+       delay_printk("BATTERY: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+//delay_printk("returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
+}
+
+//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init target_battery_init(void)
     {
-	int retval;
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+	int retval, d_id;
+    struct driver_command commands[] = {{NL_C_BATTERY, nl_battery_handler}};
+    struct nl_driver driver = {NULL, commands, 1, NULL}; // no heartbeat object, 1 command in list, no identifying data structure
+
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 	hardware_init();
 	retval = target_sysfs_add(&target_device_battery);
 
         INIT_WORK(&level_work, level_changed);
+
+    // install driver w/ netlink provider
+    d_id = install_nl_driver(&driver);
+    atomic_set(&driver_id, d_id);
 
 	// signal that we are fully initialized
 	atomic_set(&full_init, TRUE);
@@ -559,6 +609,7 @@ static int __init target_battery_init(void)
 //---------------------------------------------------------------------------
 static void __exit target_battery_exit(void)
     {
+    uninstall_nl_driver(atomic_read(&driver_id));
 	hardware_exit();
     target_sysfs_remove(&target_device_battery);
     }
