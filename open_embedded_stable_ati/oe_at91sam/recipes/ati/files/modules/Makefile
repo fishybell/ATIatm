@@ -14,10 +14,12 @@ obj-m := 	target.o \
 			target_mover_position.o \
 			target_mover_generic.o \
 			netlink_provider.o \
+			delay_printk.o \
 
 PWD := $(shell pwd)
 CURD := $(shell basename `pwd`)
 #EXTRA_CFLAGS += -mfloat-abi=softfp -mfpu=vfp
+CU_FLAGS :=-I/usr/local/var/oe/tmp/work/at91sam9g20ek_2mmc-angstrom-linux-gnueabi/linux-2.6.30-r1/linux-2.6.30/include
 
 default: 
 #	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
@@ -25,25 +27,11 @@ default:
 	
 #export	EXTRA_CFLAGS
 
-user_conn: user_conn.c netlink_userspace.c
+user_conn: user_conn.c
     ifeq ($(CURD),modules)
-		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} user_conn.c netlink_userspace.c -o user_conn
+		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -g -lnl user_conn.c -o user_conn
     else
-		${CC} ${CFLAGS} ${LDFLAGS} user_conn.c netlink_userspace.c -o user_conn
-    endif
-
-user_wait: user_wait.c netlink_userspace.c
-    ifeq ($(CURD),modules)
-		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} user_wait.c netlink_userspace.c -o user_wait
-    else
-		${CC} ${CFLAGS} ${LDFLAGS} user_wait.c netlink_userspace.c -o user_wait
-    endif
-
-user_wait_nl: user_wait_nl.c
-    ifeq ($(CURD),modules)
-		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} -g -lnl user_wait_nl.c -o user_wait_nl
-    else
-		${CC} ${CFLAGS} ${LDFLAGS} -lnl user_wait_nl.c -o user_wait_nl
+		${CC} ${CFLAGS} ${LDFLAGS} user_conn.c -o user_conn
     endif
 
 clean:
