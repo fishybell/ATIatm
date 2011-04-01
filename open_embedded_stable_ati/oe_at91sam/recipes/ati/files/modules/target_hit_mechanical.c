@@ -126,7 +126,7 @@ static enum hrtimer_restart hr_timer_get_sample(struct hrtimer *timer)
 
 	if (sample_count_total == 0)
 		{
-		printk(KERN_ALERT "%02i:%i\n",  sample_count_active, setting_sample_count_total);
+	delay_printk("%02i:%i\n",  sample_count_active, setting_sample_count_total);
 
 		// TODO - is it a hit? check the sensitivity setting - currently a hack, maybe
 		// have a look-up table...
@@ -134,7 +134,7 @@ static enum hrtimer_restart hr_timer_get_sample(struct hrtimer *timer)
 			{
 			atomic_inc(&hit_count_atomic);
 
-			printk(KERN_ALERT "%s - %s() - HIT!\n", TARGET_NAME, __func__);
+		delay_printk("%s - %s() - HIT!\n", TARGET_NAME, __func__);
 
 	        // notify user-space
 			schedule_work(&hit_work);
@@ -185,14 +185,14 @@ irqreturn_t hit_int(int irq, void *dev_id, struct pt_regs *regs)
     // check if we are enabled, if not ignore any input
     if (!atomic_read(&sensor_enable_atomic))
 		{
-    	printk(KERN_ALERT "%s - %s() - disabled, ignoring input.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() - disabled, ignoring input.\n",TARGET_NAME, __func__);
         return IRQ_HANDLED;
 		}
 
 	// We get an interrupt on both edges, so we have to check to which edge we should respond.
     if (at91_get_gpio_value(INPUT_HIT_SENSOR) == INPUT_HIT_SENSOR_ACTIVE_STATE)
         {
-    	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     	// Disable the interrupt (ourselves)
     	disable_irq_nosync(INPUT_HIT_SENSOR);
@@ -222,11 +222,11 @@ static int hardware_init(void)
 		{
 		if (status == -EINVAL)
 			{
-			printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_HIT_SENSOR);
+		delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_HIT_SENSOR);
 			}
 		else if (status == -EBUSY)
 			{
-			printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_HIT_SENSOR);
+		delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_HIT_SENSOR);
 			}
 		return status;
 		}
@@ -267,7 +267,7 @@ static ssize_t hit_show(struct device *dev, struct device_attribute *attr, char 
 		}
 	else
 		{
-    	printk(KERN_ALERT "%s - %s() : hits cannot be read while sensor is disabled.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : hits cannot be read while sensor is disabled.\n",TARGET_NAME, __func__);
 		count = 0;
 		}
 	return sprintf(buf, "%d\n", count);
@@ -288,7 +288,7 @@ static ssize_t enable_store(struct device *dev, struct device_attribute *attr, c
     {
    if (sysfs_streq(buf, "disable") && (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_ENABLED))
         {
-    	printk(KERN_ALERT "%s - %s() : hit sensor disabled\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : hit sensor disabled\n",TARGET_NAME, __func__);
 
     	atomic_set(&sensor_enable_atomic, HIT_SENSOR_DISABLED);
 
@@ -298,7 +298,7 @@ static ssize_t enable_store(struct device *dev, struct device_attribute *attr, c
         }
     else if (sysfs_streq(buf, "enable") && (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_DISABLED))
         {
-    	printk(KERN_ALERT "%s - %s() : hit sensor enabled\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : hit sensor enabled\n",TARGET_NAME, __func__);
 
     	atomic_set(&hit_count_atomic, 0);
 
@@ -329,16 +329,16 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr, con
     // check if we are enabled, if so ignore any changes to settings
     if (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_ENABLED)
 		{
-    	printk(KERN_ALERT "%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
 		}
     else if (sysfs_streq(buf, "single"))
         {
-    	printk(KERN_ALERT "%s - %s() : mode set to single\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : mode set to single\n",TARGET_NAME, __func__);
     	sensor_mode = HIT_SENSOR_MODE_SINGLE;
         }
     else if (sysfs_streq(buf, "burst"))
         {
-    	printk(KERN_ALERT "%s - %s() : mode set to burst\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : mode set to burst\n",TARGET_NAME, __func__);
     	sensor_mode = HIT_SENSOR_MODE_BURST;
         }
 
@@ -363,7 +363,7 @@ static ssize_t sensitivity_store(struct device *dev, struct device_attribute *at
     // check if we are enabled, if so ignore any changes to settings
     if (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_ENABLED)
 		{
-    	printk(KERN_ALERT "%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
 		}
 	else
 		{
@@ -375,7 +375,7 @@ static ssize_t sensitivity_store(struct device *dev, struct device_attribute *at
 			}
 		else
 			{
-			printk(KERN_ALERT "%s - %s() : sensitivity out of range 1-15 (%s)\n",TARGET_NAME, __func__, buf);
+		delay_printk("%s - %s() : sensitivity out of range 1-15 (%s)\n",TARGET_NAME, __func__, buf);
 			}
 		}
     return size;
@@ -399,7 +399,7 @@ static ssize_t burst_separation_store(struct device *dev, struct device_attribut
     // check if we are enabled, if so ignore any changes to settings
     if (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_ENABLED)
 		{
-    	printk(KERN_ALERT "%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
 		}
     else
 		{
@@ -411,7 +411,7 @@ static ssize_t burst_separation_store(struct device *dev, struct device_attribut
 			}
 		else
 			{
-			printk(KERN_ALERT "%s - %s() : burst separation out of range 100-10000 (%s)\n",TARGET_NAME, __func__, buf);
+		delay_printk("%s - %s() : burst separation out of range 100-10000 (%s)\n",TARGET_NAME, __func__, buf);
 			}
 		}
     return size;
@@ -435,7 +435,7 @@ static ssize_t sample_count_store(struct device *dev, struct device_attribute *a
     // check if we are enabled, if so ignore any changes to settings
     if (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_ENABLED)
 		{
-    	printk(KERN_ALERT "%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
 		}
     else
 		{
@@ -447,7 +447,7 @@ static ssize_t sample_count_store(struct device *dev, struct device_attribute *a
 			}
 		else
 			{
-			printk(KERN_ALERT "%s - %s() : sample count out of range 100-1000 (%s)\n",TARGET_NAME, __func__, buf);
+		delay_printk("%s - %s() : sample count out of range 100-1000 (%s)\n",TARGET_NAME, __func__, buf);
 			}
 		}
 
@@ -472,7 +472,7 @@ static ssize_t sample_period_store(struct device *dev, struct device_attribute *
     // check if we are enabled, if so ignore any changes to settings
     if (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_ENABLED)
 		{
-    	printk(KERN_ALERT "%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : no changes can be made to settings while the sensor is enabled.\n",TARGET_NAME, __func__);
 		}
     else
 		{
@@ -484,7 +484,7 @@ static ssize_t sample_period_store(struct device *dev, struct device_attribute *
 			}
 		else
 			{
-			printk(KERN_ALERT "%s - %s() : sample period out of range 1-10 (%s)\n",TARGET_NAME, __func__, buf);
+		delay_printk("%s - %s() : sample period out of range 1-10 (%s)\n",TARGET_NAME, __func__, buf);
 			}
 		}
 
@@ -559,7 +559,7 @@ static void hit_change(struct work_struct * work)
 //---------------------------------------------------------------------------
 static int __init target_hit_mechanical_init(void)
     {
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	// we are disabled until user-space enables us
 	atomic_set(&sensor_enable_atomic, HIT_SENSOR_DISABLED);

@@ -164,7 +164,7 @@ atomic_t blink_count = ATOMIC_INIT(0);
 
 
 //---------------------------------------------------------------------------
-// Incriment counter, for different fake ADC value each time
+// Increment counter, for different fake ADC value each time
 //---------------------------------------------------------------------------
 atomic_t fake_count = ATOMIC_INIT(0);
 
@@ -202,12 +202,12 @@ static void adc_read_fire(unsigned long data)
 		// Read the conversion
 		adc_val = __raw_readl(adc_base + ADC_CDR);
 		
-		// add fake value to read value, and incriment fake counter
+		// add fake value to read value, and increment fake counter
 		fake = atomic_read(&fake_count);
 		adc_val += fake;
 		atomic_set(&fake_count, fake + 1);
 
-		printk(KERN_ALERT "ADC = %i (%s)\n", adc_val, adc_val < minvoltval ? "low" : "normal");
+	delay_printk("ADC = %i (%s)\n", adc_val, adc_val < minvoltval ? "low" : "normal");
 
 		// has the value changed?
 		old_adc_val = atomic_read(&adc_atomic);
@@ -259,14 +259,14 @@ irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
     //  we are responding.
     if (at91_get_gpio_value(INPUT_CHARGING_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE)
         {
-        printk(KERN_ALERT "%s - %s - ACTIVE\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s - ACTIVE\n",TARGET_NAME, __func__);
         // we're connected, start the timer and turn off the led
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
         mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_OFF_IN_MSECONDS*HZ)/1000));
         }
     else
         {
-        printk(KERN_ALERT "%s - %s - INACTIVE\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s - INACTIVE\n",TARGET_NAME, __func__);
         // we're disconnected, delete the timer and turn on the led
 	del_timer(&charging_timer_list);
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
@@ -294,7 +294,7 @@ static void charging_fire(unsigned long data)
         }
     else
         {
-        // turn back on, decriment counter
+        // turn back on, decrement counter
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
         mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_ON_IN_MSECONDS*HZ)/1000));
         }
@@ -330,7 +330,7 @@ static void led_blink_fire(unsigned long data)
             }
         else
             {
-            // turn back on, decriment counter
+            // turn back on, decrement counter
             at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
             atomic_set(&blink_count, --count);
             }
@@ -392,7 +392,7 @@ static int hardware_init(void)
         case 48: minvoltval = 204; break;
         default: minvoltval = 255; break;
         }
-    printk(KERN_ALERT "%s charge: %i, minvoltval: %i\n",__func__,  charge, minvoltval);
+   delay_printk("%s charge: %i, minvoltval: %i\n",__func__,  charge, minvoltval);
 
     // Enable USB 5V
     at91_set_gpio_input(USB_ENABLE, USB_ENABLE_PULLUP_STATE);
@@ -424,11 +424,11 @@ static int hardware_init(void)
             {
             if (status == -EINVAL)
                 {
-                    printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_CHARGING_BAT);
+                   delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_CHARGING_BAT);
                 }
             else if (status == -EBUSY)
                 {
-                    printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_CHARGING_BAT);
+                   delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_CHARGING_BAT);
                 }
 
             return status;
@@ -556,7 +556,7 @@ static void level_changed(struct work_struct * work)
 static int __init target_battery_init(void)
     {
 	int retval;
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 	hardware_init();
 	retval = target_sysfs_add(&target_device_battery);
 

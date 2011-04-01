@@ -68,7 +68,7 @@ irqreturn_t hit_int(int irq, void *dev_id, struct pt_regs *regs)
     // check if we are enabled, if not ignore any input
     if (!atomic_read(&sensor_enable_atomic))
 		{
-    	printk(KERN_ALERT "%s - %s() - disabled, ignoring input.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() - disabled, ignoring input.\n",TARGET_NAME, __func__);
         return IRQ_HANDLED;
 		}
 
@@ -77,7 +77,7 @@ irqreturn_t hit_int(int irq, void *dev_id, struct pt_regs *regs)
         {
 		atomic_inc(&hit_count_atomic);
 
-		printk(KERN_ALERT "%s - %s() - HIT!\n", TARGET_NAME, __func__);
+	delay_printk("%s - %s() - HIT!\n", TARGET_NAME, __func__);
 
 		// TODO - when do we reset the miles receiver?
 
@@ -107,11 +107,11 @@ static int hardware_init(void)
 		{
 		if (status == -EINVAL)
 			{
-			printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MILES_HIT);
+		delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MILES_HIT);
 			}
 		else if (status == -EBUSY)
 			{
-			printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MILES_HIT);
+		delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MILES_HIT);
 			}
 		return status;
 		}
@@ -152,7 +152,7 @@ static ssize_t hit_show(struct device *dev, struct device_attribute *attr, char 
 		}
 	else
 		{
-    	printk(KERN_ALERT "%s - %s() : hits cannot be read while sensor is disabled.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : hits cannot be read while sensor is disabled.\n",TARGET_NAME, __func__);
 		count = 0;
 		}
 	return sprintf(buf, "%d\n", count);
@@ -173,7 +173,7 @@ static ssize_t enable_store(struct device *dev, struct device_attribute *attr, c
     {
    if (sysfs_streq(buf, "disable") && (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_ENABLED))
         {
-    	printk(KERN_ALERT "%s - %s() : hit sensor disabled\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : hit sensor disabled\n",TARGET_NAME, __func__);
 
     	atomic_set(&sensor_enable_atomic, HIT_SENSOR_DISABLED);
 
@@ -181,7 +181,7 @@ static ssize_t enable_store(struct device *dev, struct device_attribute *attr, c
         }
     else if (sysfs_streq(buf, "enable") && (atomic_read(&sensor_enable_atomic) == HIT_SENSOR_DISABLED))
         {
-    	printk(KERN_ALERT "%s - %s() : hit sensor enabled\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : hit sensor enabled\n",TARGET_NAME, __func__);
 
     	atomic_set(&hit_count_atomic, 0);
 
@@ -254,7 +254,7 @@ static void hit_change(struct work_struct * work)
 //---------------------------------------------------------------------------
 static int __init target_hit_miles_init(void)
     {
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	// we are disabled until user-space enables us
 	atomic_set(&sensor_enable_atomic, HIT_SENSOR_DISABLED);

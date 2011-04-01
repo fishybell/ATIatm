@@ -74,7 +74,7 @@ static int hardware_motor_on(int direction)
     {
     unsigned long flags;
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
     spin_lock_irqsave(&motor_lock, flags);
 
     // These don't get used with the SAT but we set them everytime we get the chance for safety
@@ -86,19 +86,19 @@ static int hardware_motor_on(int direction)
 
     if (direction == LIFTER_POSITION_UP)
         {
-    printk(KERN_ALERT "%s - %s() - up\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s() - up\n",TARGET_NAME, __func__);
 
         at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// forward on
         }
     else if (direction == LIFTER_POSITION_DOWN)
         {
-    printk(KERN_ALERT "%s - %s() - down\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s() - down\n",TARGET_NAME, __func__);
 
         at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// reverse on
         }
     else
         {
-		printk(KERN_ALERT "%s - %s() - error\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() - error\n",TARGET_NAME, __func__);
         }
 
     spin_unlock_irqrestore(&motor_lock, flags);
@@ -111,7 +111,7 @@ static int hardware_motor_on(int direction)
 static int hardware_motor_off(void)
     {
     unsigned long flags;
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
     spin_lock_irqsave(&motor_lock, flags);
 
     // These don't get used with the SAT but we set them everytime we get the chance for safety
@@ -151,7 +151,7 @@ static void timeout_fire(unsigned long data)
         return;
         }
 
-    printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME, __func__);
+   delay_printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME, __func__);
 
     // Turn the motor off
     hardware_motor_off();
@@ -179,7 +179,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
     // we are responding.
     if (at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
-	    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+	   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
         timeout_timer_stop();
 
@@ -194,7 +194,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
     else
     	{
-		printk(KERN_ALERT "%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
     	}
 
     return IRQ_HANDLED;
@@ -216,7 +216,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
     // we are responding.
     if (at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
-		printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
         timeout_timer_stop();
 
@@ -231,7 +231,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
     else
     	{
-		printk(KERN_ALERT "%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
     	}
 
     return IRQ_HANDLED;
@@ -264,11 +264,11 @@ static int hardware_init(void)
         {
         if (status == -EINVAL)
             {
-            printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", INPUT_LIFTER_POS_DOWN_LIMIT);
+           delay_printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", INPUT_LIFTER_POS_DOWN_LIMIT);
             }
         else if (status == -EBUSY)
             {
-            printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", INPUT_LIFTER_POS_DOWN_LIMIT);
+           delay_printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", INPUT_LIFTER_POS_DOWN_LIMIT);
             }
         return status;
         }
@@ -278,11 +278,11 @@ static int hardware_init(void)
         {
         if (status == -EINVAL)
             {
-            printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", INPUT_LIFTER_POS_UP_LIMIT);
+           delay_printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", INPUT_LIFTER_POS_UP_LIMIT);
             }
         else if (status == -EBUSY)
             {
-            printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", INPUT_LIFTER_POS_UP_LIMIT);
+           delay_printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", INPUT_LIFTER_POS_UP_LIMIT);
             }
 
         return status;
@@ -377,7 +377,7 @@ static ssize_t position_store(struct device *dev, struct device_attribute *attr,
 		}
     else if (sysfs_streq(buf, "up"))
         {
-        printk(KERN_ALERT "%s - %s() : user command up\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s() : user command up\n",TARGET_NAME, __func__);
         status = size;
         // TODO - need to check error condition first
         if (hardware_position_get() != LIFTER_POSITION_UP)
@@ -387,7 +387,7 @@ static ssize_t position_store(struct device *dev, struct device_attribute *attr,
         }
     else if (sysfs_streq(buf, "down"))
         {
-        printk(KERN_ALERT "%s - %s() : user command down\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s() : user command down\n",TARGET_NAME, __func__);
         status = size;
         // TODO - need to check error condition first
         if (hardware_position_get() != LIFTER_POSITION_DOWN)
@@ -461,7 +461,7 @@ static void position_change(struct work_struct * work)
 static int __init target_lifter_armor_init(void)
     {
     int retval;
-    printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+   delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
     INIT_WORK(&position_work, position_change);
     hardware_init();
     retval=target_sysfs_add(&target_device_lifter_armor);

@@ -151,7 +151,7 @@ static const int knob_map[16] = {0,1,3,2,7,6,4,5,15,14,12,13,8,9,11,10};
 static void do_mode(void)
     {
     int mode = atomic_read(&mode_value_atomic);
-    printk(KERN_ALERT "%s - %s() : %i\n",TARGET_NAME, __func__, mode);
+   delay_printk("%s - %s() : %i\n",TARGET_NAME, __func__, mode);
 
     // turn off all indicator
     del_timer(&blink_timeout_timer_list);
@@ -196,7 +196,7 @@ static int knob_read(void)
 
     spin_unlock_irqrestore(&knob_lock, flags);
 
-    printk(KERN_ALERT "%s - pins : %i %i %i %i\n",TARGET_NAME, pin1, pin2, pin4, pin8);
+   delay_printk("%s - pins : %i %i %i %i\n",TARGET_NAME, pin1, pin2, pin4, pin8);
 
     return (pin1 * 1) + (pin2 * 2) + (pin4 * 4) + (pin8 * 8);
     }
@@ -206,7 +206,7 @@ static int knob_read(void)
 //---------------------------------------------------------------------------
 static void blink_timeout_fire(unsigned long data)
     {
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
     if (at91_get_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR) == OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE)
         {
         at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED off
@@ -230,7 +230,7 @@ irqreturn_t mode_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     // read the mode in 50 milliseconds
     del_timer(&mode_timeout_timer_list);
@@ -249,11 +249,11 @@ static void mode_timeout_fire(unsigned long data)
 
     if (at91_get_gpio_value(INPUT_SES_MODE_BUTTON) != INPUT_SES_MODE_BUTTON_ACTIVE_STATE)
         {
-    printk(KERN_ALERT "%s - %s - skipping\n",TARGET_NAME,__func__);
+   delay_printk("%s - %s - skipping\n",TARGET_NAME,__func__);
         return;
         }
 
-    printk(KERN_ALERT "%s - %s\n",TARGET_NAME,__func__);
+   delay_printk("%s - %s\n",TARGET_NAME,__func__);
 
     // change value, if we're allowed
     if (atomic_read(&knob_value_atomic) == KNOB_LIVEFIRE)
@@ -289,7 +289,7 @@ irqreturn_t knob_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     // read the knob in 10 milliseconds
     del_timer(&knob_timeout_timer_list);
@@ -308,7 +308,7 @@ static void knob_timeout_fire(unsigned long data)
     ovalue = atomic_read(&knob_value_atomic);
     value = knob_read();
 
-    printk(KERN_ALERT "%s - %s : value %i\n",TARGET_NAME,__func__,value);
+   delay_printk("%s - %s : value %i\n",TARGET_NAME,__func__,value);
 
     // change value
     if (value == KNOB_LIVEFIRE)
@@ -378,11 +378,11 @@ static int hardware_init(void)
         {
         if (status == -EINVAL)
             {
-        	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_SES_MODE_BUTTON);
+        delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_SES_MODE_BUTTON);
             }
         else if (status == -EBUSY)
             {
-        	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_SES_MODE_BUTTON);
+        delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_SES_MODE_BUTTON);
             }
 
         return status;
@@ -393,11 +393,11 @@ static int hardware_init(void)
         {
         if (status == -EINVAL)
             {
-        	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_SELECTOR_KNOB_PIN_1);
+        delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_SELECTOR_KNOB_PIN_1);
             }
         else if (status == -EBUSY)
             {
-        	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_SELECTOR_KNOB_PIN_1);
+        delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_SELECTOR_KNOB_PIN_1);
             }
 
         return status;
@@ -500,7 +500,7 @@ static void mode_changed(struct work_struct * work)
 static int __init target_ses_interface_init(void)
     {
     int retval;
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	hardware_init();
 

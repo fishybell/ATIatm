@@ -150,7 +150,7 @@ static int hardware_state_set(unsigned int on)
 		}
 	else
 		{
-		printk(KERN_ALERT "%s - %s() : unrecognized command\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : unrecognized command\n",TARGET_NAME, __func__);
 		}
 
 	return 0;
@@ -188,17 +188,17 @@ static ssize_t state_store(struct device *dev, struct device_attribute *attr, co
 
     if (sysfs_streq(buf, "on"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command on\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : user command on\n",TARGET_NAME, __func__);
         hardware_state_set(TRUE);
         }
     else if (sysfs_streq(buf, "off"))
 		{
-		printk(KERN_ALERT "%s - %s() : user command off\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : user command off\n",TARGET_NAME, __func__);
 		hardware_state_set(FALSE);
 		}
     else
 		{
-		printk(KERN_ALERT "%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
 		}
 
     return status;
@@ -281,7 +281,7 @@ struct target_device target_device_miles_transmitter =
 //---------------------------------------------------------------------------
 static int __init target_miles_transmitter_init(void)
     {
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 	hardware_init();
     return target_sysfs_add(&target_device_miles_transmitter);
     }

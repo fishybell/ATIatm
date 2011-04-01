@@ -251,7 +251,7 @@ static int hardware_state_set(int on)
 		}
 	else
 		{
-		printk(KERN_ALERT "%s - %s() : unrecognized command\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : unrecognized command\n",TARGET_NAME, __func__);
 		}
 
 	return 0;
@@ -289,17 +289,17 @@ static ssize_t state_store(struct device *dev, struct device_attribute *attr, co
 
     if (sysfs_streq(buf, "on"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command on\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : user command on\n",TARGET_NAME, __func__);
         hardware_state_set(TRUE);
         }
     else if (sysfs_streq(buf, "off"))
 		{
-		printk(KERN_ALERT "%s - %s() : user command off\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : user command off\n",TARGET_NAME, __func__);
         hardware_state_set(FALSE);
 		}
     else
 		{
-		printk(KERN_ALERT "%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
 		}
 
     return status;
@@ -324,17 +324,17 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr, con
 
     if (sysfs_streq(buf, "single"))
         {
-    	printk(KERN_ALERT "%s - %s() : mode set to single\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : mode set to single\n",TARGET_NAME, __func__);
     	atomic_set(&mode_atomic, MUZZLE_FLASH_MODE_SINGLE);
         }
     else if (sysfs_streq(buf, "burst"))
         {
-    	printk(KERN_ALERT "%s - %s() : mode set to burst\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : mode set to burst\n",TARGET_NAME, __func__);
     	atomic_set(&mode_atomic, MUZZLE_FLASH_MODE_BURST);
         }
     else
 		{
-		printk(KERN_ALERT "%s - %s() : mode setting unrecognized\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : mode setting unrecognized\n",TARGET_NAME, __func__);
 		}
 
     return status;
@@ -366,7 +366,7 @@ static ssize_t repeat_delay_store(struct device *dev, struct device_attribute *a
 		}
 	else
 		{
-		printk(KERN_ALERT "%s - %s() : repeat delay out of range 0-60 (%s)\n",TARGET_NAME, __func__, buf);
+	delay_printk("%s - %s() : repeat delay out of range 0-60 (%s)\n",TARGET_NAME, __func__, buf);
 		}
 
     return status;
@@ -398,7 +398,7 @@ static ssize_t initial_delay_store(struct device *dev, struct device_attribute *
 		}
 	else
 		{
-		printk(KERN_ALERT "%s - %s() : initial delay out of range 0-60 (%s)\n",TARGET_NAME, __func__, buf);
+	delay_printk("%s - %s() : initial delay out of range 0-60 (%s)\n",TARGET_NAME, __func__, buf);
 		}
 
     return status;
@@ -456,7 +456,7 @@ struct target_device target_device_muzzle_flash =
 //---------------------------------------------------------------------------
 static int __init target_muzzle_flash_init(void)
     {
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 	hardware_init();
     return target_sysfs_add(&target_device_muzzle_flash);
     }

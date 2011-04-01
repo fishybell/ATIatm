@@ -109,11 +109,11 @@ static int hardware_init(void)
         {
         if (status == -EINVAL)
             {
-        	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_TEST_BUTTON);
+        delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_TEST_BUTTON);
             }
         else if (status == -EBUSY)
             {
-        	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_TEST_BUTTON);
+        delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_TEST_BUTTON);
             }
 
         return status;
@@ -177,17 +177,17 @@ static ssize_t led_status_store(struct device *dev, struct device_attribute *att
 
     if (sysfs_streq(buf, "on"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command on\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : user command on\n",TARGET_NAME, __func__);
         hardware_led_status_on();
         }
     else if (sysfs_streq(buf, "off"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command off\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : user command off\n",TARGET_NAME, __func__);
         hardware_led_status_off();
         }
     else
 		{
-		printk(KERN_ALERT "%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
 		}
 
     return status;
@@ -250,7 +250,7 @@ static void button_pressed(struct work_struct * work)
 static int __init scott_test_init(void)
     {
     int retval;
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	hardware_init();
 

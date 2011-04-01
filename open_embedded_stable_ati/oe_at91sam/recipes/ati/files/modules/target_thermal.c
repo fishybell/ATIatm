@@ -170,7 +170,7 @@ static ssize_t state_store(struct device *dev, struct device_attribute *attr, co
 		}
     else if (sysfs_streq(buf, "on"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command on\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : user command on\n",TARGET_NAME, __func__);
         hardware_state_set();
         }
 
@@ -225,7 +225,7 @@ struct target_device target_device_thermal =
 //---------------------------------------------------------------------------
 static int __init target_thermal_init(void)
     {
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 	hardware_init();
     return target_sysfs_add(&target_device_thermal);
     }

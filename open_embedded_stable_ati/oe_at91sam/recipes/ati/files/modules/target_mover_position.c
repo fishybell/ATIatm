@@ -164,7 +164,7 @@ irqreturn_t target_mover_position_int(int irq, void *dev_id, struct pt_regs *reg
     rb = __raw_readl(tc->regs + ATMEL_TC_REG(PWM_CHANNEL, RB));
     cv = __raw_readl(tc->regs + ATMEL_TC_REG(PWM_CHANNEL, CV));
 
-//printk(KERN_ALERT "O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, status & ATMEL_TC_LDRAS, atomic_read(&last_t), this_t, cv, atomic_read(&o_count) );
+//delay_printk("O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, status & ATMEL_TC_LDRAS, atomic_read(&last_t), this_t, cv, atomic_read(&o_count) );
 
     /* Overlflow caused IRQ? */
     if ( status & ATMEL_TC_COVFS )
@@ -271,18 +271,18 @@ static void init_pins(void)
 static int hardware_init(void)
     {
     int status = 0;
-printk(KERN_ALERT "initializing clock\n");
+printk("initializing clock\n");
 
     // initialize timer
     tc = target_timer_alloc(PWM_BLOCK, "gen_tc");
-    printk(KERN_ALERT "target_timer_alloc(): %08x\n", (unsigned int) tc);
+   delay_printk("target_timer_alloc(): %08x\n", (unsigned int) tc);
 
     if (!tc) return -EINVAL;
 
     init_pins();
     clk_enable(tc->clk[PWM_CHANNEL]);
 
-printk(KERN_ALERT "clock enabled\n");
+printk("clock enabled\n");
 
     /* initialize counter */
     __raw_writel(ATMEL_TC_TIMER_CLOCK5				/* Master clock / 128 : 66 mhz */
@@ -302,27 +302,27 @@ printk(KERN_ALERT "clock enabled\n");
                     tc->regs + ATMEL_TC_REG(PWM_CHANNEL, BMR)); /* block mode register*/
     __raw_writel(0xffff, tc->regs + ATMEL_TC_REG(PWM_CHANNEL, RC));
 
-printk(KERN_ALERT "bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(PWM_CHANNEL, IMR)));
+printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(PWM_CHANNEL, IMR)));
 
     /* setup system irq */
-printk(KERN_ALERT "going to request irq: %i\n", tc->irq[PWM_CHANNEL]);
+printk("going to request irq: %i\n", tc->irq[PWM_CHANNEL]);
     status = request_irq(tc->irq[PWM_CHANNEL], (void*)target_mover_position_int, 0, "target_mover_position_int", NULL);
-printk(KERN_ALERT "requested irq: %i\n", status);
+printk("requested irq: %i\n", status);
     if (status != 0)
         {
         if (status == -EINVAL)
             {
-            printk(KERN_ERR "request_irq(): Bad irq number or handler\n");
+           delay_printk(KERN_ERR "request_irq(): Bad irq number or handler\n");
             }
         else if (status == -EBUSY)
             {
-            printk(KERN_ERR "request_irq(): IRQ is busy, change your config\n");
+           delay_printk(KERN_ERR "request_irq(): IRQ is busy, change your config\n");
             }
         target_timer_free(tc);
         return status;
         }
    
-printk(KERN_ALERT "moving on\n");
+printk("moving on\n");
 
 
     /* enable, sync clock */
@@ -342,17 +342,17 @@ printk(KERN_ALERT "moving on\n");
         {
         if (status == -EINVAL)
             {
-                printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TRACK_SENSOR_1);
+               delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TRACK_SENSOR_1);
             }
         else if (status == -EBUSY)
             {
-                printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TRACK_SENSOR_1);
+               delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TRACK_SENSOR_1);
             }
 
         return status;
         }
 
-printk(KERN_ALERT "done\n");
+printk("done\n");
     return status;
     }
 
@@ -463,7 +463,7 @@ static void do_delta(struct work_struct * work)
 static int __init target_mover_position_init(void)
     {
     int retval;
-    printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+   delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
     hardware_init();
 

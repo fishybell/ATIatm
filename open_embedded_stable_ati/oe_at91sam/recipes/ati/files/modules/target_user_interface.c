@@ -218,7 +218,7 @@ static void move_button_int(int button)
         return;
         }
 
-    printk(KERN_ALERT "%s - %s(%i)\n",TARGET_NAME, __func__, button);
+   delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, button);
 
     // look at all three values
     //bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
@@ -234,8 +234,8 @@ static void move_button_int(int button)
         (button == REVERSE_BUTTON && !rev_value))
         {
 
-    //printk(KERN_ALERT "%s - %s fail: (!%i) || (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, bit_value,button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
-    printk(KERN_ALERT "%s - %s fail: (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
+    //delay_printk("%s - %s fail: (!%i) || (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, bit_value,button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
+   delay_printk("%s - %s fail: (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
         // were we moving?
         if (atomic_read(&move_button_atomic) != MOVING_STOP)
             {
@@ -274,7 +274,7 @@ static void move_timeout_fire(unsigned long data)
     {
     int bit_value, fwd_value, rev_value;
     // if we're not a mover, don't bother
-    printk(KERN_ALERT "%s - %s\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s\n",TARGET_NAME, __func__);
     if (!mover)
         {
         return;
@@ -288,7 +288,7 @@ static void move_timeout_fire(unsigned long data)
     // check for an error state
     /*if (!bit_value)
         {
-        printk(KERN_ALERT "%s - %s - NONE\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s - NONE\n",TARGET_NAME, __func__);
         move_button_int(TEST_BUTTON);
         return;
         }*/
@@ -297,19 +297,19 @@ static void move_timeout_fire(unsigned long data)
     if (fwd_value && !rev_value)
         {
         // forward
-        printk(KERN_ALERT "%s - %s - FORWARD\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s - FORWARD\n",TARGET_NAME, __func__);
         atomic_set(&move_button_atomic, MOVING_FWD);
         }
     else if (!fwd_value && rev_value)
         {
         // reverse
-        printk(KERN_ALERT "%s - %s - REVERSE\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s - REVERSE\n",TARGET_NAME, __func__);
         atomic_set(&move_button_atomic, MOVING_REV);
         }
     else
         {
         // error
-        printk(KERN_ALERT "%s - %s - STOP\n",TARGET_NAME, __func__);
+       delay_printk("%s - %s - STOP\n",TARGET_NAME, __func__);
         move_button_int(TEST_BUTTON);
         return;
         }
@@ -322,7 +322,7 @@ static void move_timeout_fire(unsigned long data)
 //---------------------------------------------------------------------------
 static void bit_timeout_fire(unsigned long data)
     {
-    printk(KERN_ALERT "%s - %s\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s\n",TARGET_NAME, __func__);
     if (atomic_read(&bit_button_atomic) != BUTTON_STATUS_PRESSED)
         {
         atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
@@ -334,7 +334,7 @@ static void bit_timeout_fire(unsigned long data)
 //---------------------------------------------------------------------------
 static void press_timeout_fire(unsigned long data)
     {
-    printk(KERN_ALERT "%s - %s\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s\n",TARGET_NAME, __func__);
     atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
 
     // notify user-space only when fully double-clicked
@@ -395,13 +395,13 @@ static void bit_read_timeout_fire(unsigned long data)
     // read in value of bit button
     value = atomic_read(&bit_button_atomic);
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     // We get an interrupt on both edges, so we have to check to which edge
     //  we are responding.
     if (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE)
         {
-        printk(KERN_ALERT "%s - ACTIVE\n",TARGET_NAME);
+       delay_printk("%s - ACTIVE\n",TARGET_NAME);
         if (value == BUTTON_STATUS_CLEAR || BUTTON_STATUS_RECLEAR)
             {
             // signal that the wake-up button has been pressed
@@ -424,7 +424,7 @@ static void bit_read_timeout_fire(unsigned long data)
         }
     else
         {
-        printk(KERN_ALERT "%s - INACTIVE\n",TARGET_NAME);
+       delay_printk("%s - INACTIVE\n",TARGET_NAME);
         if (value == BUTTON_STATUS_UNCLEAR)
             {
             // signal that the wake-up button has been pressed
@@ -435,7 +435,7 @@ static void bit_read_timeout_fire(unsigned long data)
             }
         }
 
-    printk(KERN_ALERT "%s - %i\n",TARGET_NAME, value);
+   delay_printk("%s - %i\n",TARGET_NAME, value);
     }
 
 //---------------------------------------------------------------------------
@@ -444,7 +444,7 @@ static void bit_read_timeout_fire(unsigned long data)
 static int hardware_init(void)
     {
     int status = 0;
-    printk(KERN_ALERT "%s mover: %i\n",__func__, mover);
+   delay_printk("%s mover: %i\n",__func__, mover);
 
     // configure bit status gpio for output and set initial output
     at91_set_gpio_output(OUTPUT_TEST_INDICATOR, !OUTPUT_TEST_INDICATOR_ACTIVE_STATE);
@@ -467,11 +467,11 @@ static int hardware_init(void)
         {
         if (status == -EINVAL)
             {
-        	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_TEST_BUTTON);
+        delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_TEST_BUTTON);
             }
         else if (status == -EBUSY)
             {
-        	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_TEST_BUTTON);
+        delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_TEST_BUTTON);
             }
 
         return status;
@@ -485,11 +485,11 @@ static int hardware_init(void)
             {
             if (status == -EINVAL)
                 {
-                printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_FWD);
+               delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_FWD);
                 }
             else if (status == -EBUSY)
                 {
-            	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_FWD);
+            delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_FWD);
                 }
 
             return status;
@@ -499,11 +499,11 @@ static int hardware_init(void)
             {
             if (status == -EINVAL)
                 {
-            	printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_REV);
+            delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_MOVER_TEST_BUTTON_REV);
                 }
             else if (status == -EBUSY)
                 {
-            	printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_REV);
+            delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_MOVER_TEST_BUTTON_REV);
                 }
 
             return status;
@@ -592,24 +592,24 @@ static ssize_t bit_status_store(struct device *dev, struct device_attribute *att
 
     if (sysfs_streq(buf, "on"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command on\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : user command on\n",TARGET_NAME, __func__);
     	del_timer(&blink_timeout_timer_list);
         hardware_bit_status_on();
         }
     else if (sysfs_streq(buf, "off"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command off\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : user command off\n",TARGET_NAME, __func__);
     	del_timer(&blink_timeout_timer_list);
         hardware_bit_status_off();
         }
     else if (sysfs_streq(buf, "blink"))
 		{
-		printk(KERN_ALERT "%s - %s() : user command blink\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : user command blink\n",TARGET_NAME, __func__);
 		mod_timer(&blink_timeout_timer_list, jiffies+(100*HZ/1000));
 		}
     else
 		{
-		printk(KERN_ALERT "%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
 		}
 
     return status;
@@ -682,7 +682,7 @@ static void move_pressed(struct work_struct * work)
 static int __init target_user_interface_init(void)
     {
     int retval;
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	hardware_init();
 

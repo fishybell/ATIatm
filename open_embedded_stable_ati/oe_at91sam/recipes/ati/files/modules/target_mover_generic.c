@@ -332,16 +332,16 @@ static int hardware_motor_on(int direction)
     if (direction == MOVER_DIRECTION_REVERSE)
         {
         atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_REVERSE);
-        printk(KERN_ALERT "%s - %s() - reverse\n",TARGET_NAME[mover_type], __func__);
+       delay_printk("%s - %s() - reverse\n",TARGET_NAME[mover_type], __func__);
         }
     else if (direction == MOVER_DIRECTION_FORWARD)
         {
         atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
-        printk(KERN_ALERT "%s - %s() - forward\n",TARGET_NAME[mover_type], __func__);
+       delay_printk("%s - %s() - forward\n",TARGET_NAME[mover_type], __func__);
         }
     else
         {
-        printk(KERN_ALERT "%s - %s() - error\n",TARGET_NAME[mover_type], __func__);
+       delay_printk("%s - %s() - error\n",TARGET_NAME[mover_type], __func__);
         }
 
     // turn off brake?
@@ -360,7 +360,7 @@ static int hardware_motor_off(void)
     {
     unsigned long flags;
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // turn off irrelevant timers
     del_timer(&timeout_timer_list);
@@ -412,12 +412,12 @@ static int hardware_speed_set(int new_speed)
     {
     int old_speed;
 
-    printk(KERN_ALERT "%s - %s(%i)\n",TARGET_NAME[mover_type], __func__, new_speed);
+   delay_printk("%s - %s(%i)\n",TARGET_NAME[mover_type], __func__, new_speed);
 
     // check for full initialization
     if (!atomic_read(&full_init))
         {
-                printk(KERN_ALERT "%s - %s() error - driver not fully initialized.\n",TARGET_NAME[mover_type], __func__);
+               delay_printk("%s - %s() error - driver not fully initialized.\n",TARGET_NAME[mover_type], __func__);
         return FALSE;
         }
     if (!tc)
@@ -445,7 +445,7 @@ static int hardware_speed_set(int new_speed)
         {
         atomic_set(&goal_atomic, new_speed); // reset goal speed
         atomic_set(&goal_start_atomic, old_speed); // reset ramp start
-        printk(KERN_ALERT "%s - %s : old (%i), new (%i)\n",TARGET_NAME[mover_type], __func__, old_speed, new_speed);
+       delay_printk("%s - %s : old (%i), new (%i)\n",TARGET_NAME[mover_type], __func__, old_speed, new_speed);
         del_timer(&ramp_timer_list); // start ramp over
         if (new_speed < old_speed)
             {
@@ -534,7 +534,7 @@ static void timeout_fire(unsigned long data)
         return;
         }
 
-    printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME[mover_type], __func__);
+   delay_printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME[mover_type], __func__);
     hardware_movement_stop(FALSE);
     }
 
@@ -590,7 +590,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
     rb = __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, RB));
     cv = __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, CV));
 
-//printk(KERN_ALERT "O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, status & ATMEL_TC_LDRAS, atomic_read(&last_t), this_t, cv, atomic_read(&o_count) );
+//delay_printk("O:%i A:%i l:%i t:%i c:%i o:%08x\n", status & ATMEL_TC_COVFS, status & ATMEL_TC_LDRAS, atomic_read(&last_t), this_t, cv, atomic_read(&o_count) );
 
     // Overlflow caused IRQ?
     if ( status & ATMEL_TC_COVFS )
@@ -660,7 +660,7 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // check to see if this one needs to be ignored
     if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)
@@ -688,7 +688,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // check to see if this one needs to be ignored
     if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)
@@ -758,7 +758,7 @@ static int hardware_pwm_init(void)
 
     // initialize timer counter
     tc = target_timer_alloc(PWM_BLOCK, "gen_tc");
-    printk(KERN_ALERT "timer_alloc(): %08x\n", (unsigned int) tc);
+   delay_printk("timer_alloc(): %08x\n", (unsigned int) tc);
 
     if (!tc)
         {
@@ -766,7 +766,7 @@ static int hardware_pwm_init(void)
         }
 
     mck_freq = clk_get_rate(tc->clk[MOTOR_PWM_CHANNEL]);
-    printk(KERN_ALERT "mck_freq: %i\n", (unsigned int) mck_freq);
+   delay_printk("mck_freq: %i\n", (unsigned int) mck_freq);
 
     // initialize quad encoder pins
     init_quad_pins();
@@ -799,13 +799,13 @@ static int hardware_pwm_init(void)
 
     if (clk_enable(tc->clk[ENCODER_PWM_CHANNEL]) != 0)
             {
-            printk(KERN_ERR "ENCODER clk_enable() failed\n");
+           delay_printk(KERN_ERR "ENCODER clk_enable() failed\n");
             return -EINVAL;
             }
 
     if (clk_enable(tc->clk[MOTOR_PWM_CHANNEL]) != 0)
             {
-            printk(KERN_ERR "MOTOR clk_enable() failed\n");
+           delay_printk(KERN_ERR "MOTOR clk_enable() failed\n");
             return -EINVAL;
             }
 
@@ -826,7 +826,7 @@ static int hardware_pwm_init(void)
                     tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, BMR)); // block mode register
     __raw_writel(0xffff, tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, RC));
 
-printk(KERN_ALERT "bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, IMR)));
+printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, IMR)));
 
      // initialize pwm output timer
      switch (mover_type)
@@ -860,18 +860,18 @@ printk(KERN_ALERT "bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(E
         }
 
     // setup encoder irq
-printk(KERN_ALERT "going to request irq: %i\n", tc->irq[ENCODER_PWM_CHANNEL]);
+printk("going to request irq: %i\n", tc->irq[ENCODER_PWM_CHANNEL]);
     status = request_irq(tc->irq[ENCODER_PWM_CHANNEL], (void*)quad_encoder_int, 0, "quad_encoder_int", NULL);
-printk(KERN_ALERT "requested irq: %i\n", status);
+printk("requested irq: %i\n", status);
     if (status != 0)
         {
         if (status == -EINVAL)
             {
-            printk(KERN_ERR "request_irq(): Bad irq number or handler\n");
+           delay_printk(KERN_ERR "request_irq(): Bad irq number or handler\n");
             }
         else if (status == -EBUSY)
             {
-            printk(KERN_ERR "request_irq(): IRQ is busy, change your config\n");
+           delay_printk(KERN_ERR "request_irq(): IRQ is busy, change your config\n");
             }
         target_timer_free(tc);
         return status;
@@ -917,11 +917,11 @@ static int hardware_set_gpio_input_irq(int pin_number,
         {
         if (status == -EINVAL)
             {
-            printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", pin_number);
+           delay_printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", pin_number);
             }
         else if (status == -EBUSY)
             {
-            printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", pin_number);
+           delay_printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", pin_number);
             }
         return FALSE;
         }
@@ -935,7 +935,7 @@ static int hardware_set_gpio_input_irq(int pin_number,
 static int hardware_init(void)
     {
     int status = 0;
-    printk(KERN_ALERT "%s reverse: %i\n",__func__,  reverse);
+   delay_printk("%s reverse: %i\n",__func__,  reverse);
 
     // turn on brake?
     if (USE_BRAKE[mover_type])
@@ -1107,7 +1107,7 @@ static void horn_on_fire(unsigned long data)
         {
         return;
         }
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // start the ramp up/down of the mover
     mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS[mover_type]*HZ)/1000)/RAMP_STEPS[mover_type]));
@@ -1128,7 +1128,7 @@ static void horn_off_fire(unsigned long data)
         {
         return;
         }
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME[mover_type], __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // turn off horn?
     if (HORN_ON_IN_MSECONDS[mover_type] > 0)
@@ -1184,7 +1184,7 @@ static void ramp_fire(unsigned long data)
         atomic_set(&goal_step_atomic, goal_step + 1);
         }
 
-    //printk(KERN_ALERT "%s - %s : %i, %i, %i %i\n",TARGET_NAME[mover_type], __func__, ticks_change, start_speed, ramp, new_speed);
+    //delay_printk("%s - %s : %i, %i, %i %i\n",TARGET_NAME[mover_type], __func__, ticks_change, start_speed, ramp, new_speed);
 
     // take another step?
     if (abs(goal_step) < RAMP_STEPS[mover_type])
@@ -1252,7 +1252,7 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
     // We always react to the stop command
     if (sysfs_streq(buf, "stop"))
 		{
-		printk(KERN_ALERT "%s - %s() : user command stop\n",TARGET_NAME[mover_type], __func__);
+	delay_printk("%s - %s() : user command stop\n",TARGET_NAME[mover_type], __func__);
                 // unset direction ignore...
                 atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
 
@@ -1262,26 +1262,26 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
     // check if an operation is in progress, if so ignore any command other than 'stop' above
     else if (atomic_read(&moving_atomic))
 		{
-    	printk(KERN_ALERT "%s - %s() : operation in progress, ignoring command.\n",TARGET_NAME[mover_type], __func__);
+    delay_printk("%s - %s() : operation in progress, ignoring command.\n",TARGET_NAME[mover_type], __func__);
 		}
 
     else if (sysfs_streq(buf, "forward"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command forward\n",TARGET_NAME[mover_type], __func__);
+    delay_printk("%s - %s() : user command forward\n",TARGET_NAME[mover_type], __func__);
 
     	hardware_movement_set(MOVER_DIRECTION_FORWARD);
         }
 
     else if (sysfs_streq(buf, "reverse"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command reverse\n",TARGET_NAME[mover_type], __func__);
+    delay_printk("%s - %s() : user command reverse\n",TARGET_NAME[mover_type], __func__);
     	status = size;
 
         hardware_movement_set(MOVER_DIRECTION_REVERSE);
         }
     else
 		{
-    	printk(KERN_ALERT "%s - %s() : unknown user command %s\n",TARGET_NAME[mover_type], __func__, buf);
+    delay_printk("%s - %s() : unknown user command %s\n",TARGET_NAME[mover_type], __func__, buf);
 		}
 
     return status;
@@ -1464,7 +1464,7 @@ static void movement_change(struct work_struct * work)
 static int __init target_mover_generic_init(void)
     {
     int retval;
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
     // initialize hardware registers
 	hardware_init();

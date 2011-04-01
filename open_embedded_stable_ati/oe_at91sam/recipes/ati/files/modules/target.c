@@ -8,6 +8,7 @@
 #include <linux/hrtimer.h>
 
 #include "target.h"
+#include "delay_printk.h"
 //---------------------------------------------------------------------------
 
 
@@ -126,21 +127,21 @@ int target_sysfs_add(struct target_device * target_device)
     if (target_device->dev)
         {
         const struct attribute_group * attr_group = target_device->get_attr_group();
-        printk(KERN_ALERT "device_create() succeeded.\n");
+       delay_printk("device_create() succeeded.\n");
         status = sysfs_create_group(&(target_device->dev->kobj), attr_group);
         if (status != 0)
             {
-            printk(KERN_ALERT "sysfs_create_group() failed.\n");
+           delay_printk("sysfs_create_group() failed.\n");
             device_unregister(target_device->dev);
             }
         else
             {
-            printk(KERN_ALERT "sysfs_create_group() succeeded.\n");
+           delay_printk("sysfs_create_group() succeeded.\n");
             }
         }
     else
         {
-        printk(KERN_ALERT "device_create() failed.\n");
+       delay_printk("device_create() failed.\n");
         status = -ENODEV;
         }
 
@@ -180,14 +181,14 @@ static int __init target_init(void)
     {
     int status = 0;
 
-    printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+   delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
     mutex_lock(&sysfs_lock);
 
     status = class_register(&target_class);
     if (status < 0)
         {
-        printk(KERN_ALERT "class_register() failed.\n");
+       delay_printk("class_register() failed.\n");
         }
 
     mutex_unlock(&sysfs_lock);
@@ -201,7 +202,7 @@ static int __init target_init(void)
 //---------------------------------------------------------------------------
 static void __exit target_exit(void)
     {
-    printk(KERN_ALERT "%s()\n", __func__);
+   delay_printk("%s()\n", __func__);
 
     // this is here only while debugging. We would not want to remove the class
     // while other drivers may still need it or while user space has a handle open.

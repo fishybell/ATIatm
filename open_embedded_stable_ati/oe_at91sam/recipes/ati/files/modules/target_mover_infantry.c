@@ -209,7 +209,7 @@ static int hardware_motor_on(int direction)
 		at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
 
 	    atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_REVERSE);
-	    printk(KERN_ALERT "%s - %s() - reverse\n",TARGET_NAME, __func__);
+	   delay_printk("%s - %s() - reverse\n",TARGET_NAME, __func__);
 		}
     else if (direction == MOVER_DIRECTION_FORWARD)
 		{
@@ -218,11 +218,11 @@ static int hardware_motor_on(int direction)
 		at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
 
     	atomic_set(&movement_atomic, MOVER_MOVEMENT_MOVING_FORWARD);
-    	printk(KERN_ALERT "%s - %s() - forward\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() - forward\n",TARGET_NAME, __func__);
 		}
     else
     	{
-		printk(KERN_ALERT "%s - %s() - error\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() - error\n",TARGET_NAME, __func__);
     	}
 
 //    spin_lock_irqsave(&motor_lock, flags);
@@ -247,7 +247,7 @@ static int hardware_motor_on(int direction)
 static int hardware_motor_off(void)
 	{
 
-	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
 //	spin_lock_irqsave(&motor_lock, flags);
 
@@ -299,7 +299,7 @@ static void timeout_fire(unsigned long data)
         return;
         }
 
-	printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME, __func__);
+delay_printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME, __func__);
 	hardware_movement_stop(FALSE);
 	}
 
@@ -313,7 +313,7 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     // check to see if this one needs to be ignored
     if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)
@@ -341,7 +341,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-    printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     // check to see if this one needs to be ignored
     if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)
@@ -368,10 +368,10 @@ static int hardware_motor_pwm_init(void)
 
     // initialize timer counter
     motor_pwm_tc = target_timer_alloc(MOTOR_PWM_BLOCK, "gen_tc");
-    printk(KERN_ALERT "timer_alloc(): %08x\n", (unsigned int) motor_pwm_tc);
+   delay_printk("timer_alloc(): %08x\n", (unsigned int) motor_pwm_tc);
 
     mck_freq = clk_get_rate(motor_pwm_tc->clk[MOTOR_PWM_CHANNEL]);
-    printk(KERN_ALERT "mck_freq: %i\n", (unsigned int) mck_freq);
+   delay_printk("mck_freq: %i\n", (unsigned int) mck_freq);
 
     if (!motor_pwm_tc)
 		{
@@ -454,11 +454,11 @@ static int hardware_set_gpio_input_irq(	int pin_number,
         {
         if (status == -EINVAL)
             {
-            printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", pin_number);
+           delay_printk(KERN_ERR "request_irq() failed - invalid irq number (0x%08X) or handler\n", pin_number);
             }
         else if (status == -EBUSY)
             {
-            printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", pin_number);
+           delay_printk(KERN_ERR "request_irq(): irq number (0x%08X) is busy, change your config\n", pin_number);
             }
         return FALSE;
         }
@@ -595,11 +595,11 @@ static int hardware_speed_set(int speed)
     {
         int new_speed;
 
-	printk(KERN_ALERT "%s - %s()\n",TARGET_NAME, __func__);
+delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     if (!atomic_read(&full_init))
         {
-		printk(KERN_ALERT "%s - %s() error - driver not fully initialized.\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() error - driver not fully initialized.\n",TARGET_NAME, __func__);
         return FALSE;
         }
 
@@ -650,7 +650,7 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
     // We always react to the stop command
     if (sysfs_streq(buf, "stop"))
 		{
-		printk(KERN_ALERT "%s - %s() : user command stop\n",TARGET_NAME, __func__);
+	delay_printk("%s - %s() : user command stop\n",TARGET_NAME, __func__);
                 // unset direction ignore...
                 atomic_set(&ignore_next_direction, MOVER_DIRECTION_STOP);
 
@@ -660,26 +660,26 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
     // check if an operation is in progress, if so ignore any command other than 'stop' above
     else if (atomic_read(&moving_atomic))
 		{
-    	printk(KERN_ALERT "%s - %s() : operation in progress, ignoring command.\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : operation in progress, ignoring command.\n",TARGET_NAME, __func__);
 		}
 
     else if (sysfs_streq(buf, "forward"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command forward\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : user command forward\n",TARGET_NAME, __func__);
 
     	hardware_movement_set(MOVER_DIRECTION_FORWARD);
         }
 
     else if (sysfs_streq(buf, "reverse"))
         {
-    	printk(KERN_ALERT "%s - %s() : user command reverse\n",TARGET_NAME, __func__);
+    delay_printk("%s - %s() : user command reverse\n",TARGET_NAME, __func__);
     	status = size;
 
         hardware_movement_set(MOVER_DIRECTION_REVERSE);
         }
     else
 		{
-    	printk(KERN_ALERT "%s - %s() : unknown user command %s\n",TARGET_NAME, __func__, buf);
+    delay_printk("%s - %s() : unknown user command %s\n",TARGET_NAME, __func__, buf);
 		}
 
     return status;
@@ -722,7 +722,7 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr, co
 		}
 	else
 		{
-		printk(KERN_ALERT "%s - %s() : speed out of range or malformed (%s)\n",TARGET_NAME, __func__, buf);
+	delay_printk("%s - %s() : speed out of range or malformed (%s)\n",TARGET_NAME, __func__, buf);
 		}
 
 	return status;
@@ -788,7 +788,7 @@ static void movement_change(struct work_struct * work)
 //---------------------------------------------------------------------------
 static int __init target_mover_infantry_init(void)
     {
-	printk(KERN_ALERT "%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	hardware_init();
 
