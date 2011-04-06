@@ -1,0 +1,25 @@
+diff -ruN e2fsprogs-libs-1.41.2.orig/Makefile.in e2fsprogs-libs-1.41.2/Makefile.in
+--- e2fsprogs-libs-1.41.2.orig/Makefile.in	2011-04-04 15:16:18.390388153 -0600
++++ e2fsprogs-libs-1.41.2/Makefile.in	2011-04-04 15:27:18.043185366 -0600
+@@ -238,7 +238,6 @@
+ all:: subs
+ 	$(MAKE) libs
+ 	$(MAKE) progs
+-	$(MAKE) docs
+ 
+ subs:
+ 	@for i in $(SUBS) ; do if test -d `dirname $$i` ; \
+@@ -271,11 +270,11 @@
+ 	-test -d doc && cd doc && $(MAKE) distclean
+ 
+ install: subs all-libs-recursive install-progs-recursive \
+-  install-shlibs-libs-recursive install-doc-libs
++  install-shlibs-libs-recursive
+ 	if test ! -d e2fsck && test ! -d debugfs && test ! -d misc && test ! -d ext2ed ; then $(MAKE) install-libs ; fi
+ 
+ install-strip: subs all-libs-recursive install-strip-progs-recursive \
+-  install-shlibs-strip-libs-recursive install-doc-libs
++  install-shlibs-strip-libs-recursive
+ 
+ uninstall: uninstall-progs-recursive uninstall-shlibs-libs-recursive uninstall-doc-libs
+ 
