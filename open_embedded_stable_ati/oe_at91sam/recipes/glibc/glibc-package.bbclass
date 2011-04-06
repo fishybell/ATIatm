@@ -74,7 +74,9 @@ do_install() {
 		install -m 0644 ${S}/sunrpc/rpcsvc/$h ${D}/${includedir}/rpcsvc/
 	done
 	install -d ${D}${libdir}/locale
-	make -f ${WORKDIR}/generate-supported.mk IN="${S}/localedata/SUPPORTED" OUT="${WORKDIR}/SUPPORTED"
+	echo "SUPPORTED-LOCALES=${SUPPORTED-LOCALES}" > ${WORKDIR}/SUPPORTED.in
+	make -f ${WORKDIR}/generate-supported.mk IN="${WORKDIR}/SUPPORTED.in" OUT="${WORKDIR}/SUPPORTED"
+	# make -f ${WORKDIR}/generate-supported.mk IN="${S}/localedata/SUPPORTED" OUT="${WORKDIR}/SUPPORTED"
 	# get rid of some broken files...
 	for i in ${GLIBC_BROKEN_LOCALES}; do
 		grep -v $i ${WORKDIR}/SUPPORTED > ${WORKDIR}/SUPPORTED.tmp

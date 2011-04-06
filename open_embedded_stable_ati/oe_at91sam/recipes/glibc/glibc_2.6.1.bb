@@ -14,6 +14,8 @@ FILESDIR = "${@os.path.dirname(bb.data.getVar('FILE',d,1))}/glibc-2.4"
 GLIBC_ADDONS ?= "ports,nptl,libidn"
 
 GLIBC_BROKEN_LOCALES = " _ER _ET so_ET yn_ER sid_ET tr_TR mn_MN gez_ET gez_ER bn_BD te_IN"
+# GLIBC_BROKEN_LOCALES = " [^e][^n]_"
+SUPPORTED-LOCALES = "en_US.UTF-8\/UTF-8"
 
 #
 # For now, we will skip building of a gcc package if it is a uclibc one
