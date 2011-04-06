@@ -178,12 +178,16 @@ int provider_command_handler(struct sk_buff *skb_2, struct genl_info *info) {
     rc = -1;
 
     /* verify message integrity */
-    if (info == NULL || info->genlhdr == NULL)
+    if (info == NULL || info->genlhdr == NULL) {
+delay_printk("NL ERROR: bad info or info->genlhdr\n");
         goto out;
+    }
 
 //delay_printk("received nl message w/ cmd id: %i\n", info->genlhdr->cmd);
-    if (info->genlhdr->cmd <= NL_C_UNSPEC || info->genlhdr->cmd > NL_C_MAX)
+    if (info->genlhdr->cmd <= NL_C_UNSPEC || info->genlhdr->cmd > NL_C_MAX) {
+delay_printk("NL ERROR: bad command: %i\n", info->genlhdr->cmd);
         goto out;
+    }
 
     /* grab the initial sequence number */
     seq = info->snd_seq;
@@ -202,8 +206,10 @@ int provider_command_handler(struct sk_buff *skb_2, struct genl_info *info) {
         /* allocate the reply, since the size is not yet known use NLMSG_GOODSIZE */    
         skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
 //delay_printk("found nl handler\n");
-        if (skb == NULL)
+        if (skb == NULL) {
+delay_printk("NL ERROR: no memory for genlmsg_new\n");
             goto out;
+        }
         /* arguments of genlmsg_put: 
            struct sk_buff *, 
            int (sending) pid, 
@@ -215,6 +221,7 @@ int provider_command_handler(struct sk_buff *skb_2, struct genl_info *info) {
         msg_head = genlmsg_put(skb, 0, ++seq, &provider_gnl_family, 0, info->genlhdr->cmd);
         if (msg_head == NULL) {
             rc = -ENOMEM;
+delay_printk("NL ERROR: no memory for genlmsg_put\n");
             goto out;
         }
 
@@ -247,15 +254,18 @@ int provider_command_handler(struct sk_buff *skb_2, struct genl_info *info) {
                 /* all of the above responses will send a message */
                 /* finalize the message */
                 rc = genlmsg_end(skb, msg_head);
-                if (rc < 0)
+                if (rc < 0) {
+delay_printk("NL ERROR: genlmsg_end in HANDLE_SUCCESS or HANDLE_FAILURE_MESSAGE\n");
                     goto out; /* give up on other message handlers */
+                }
 
                 /* send the message back */
                 rc = genlmsg_unicast(skb,info->snd_pid );
                 if (rc != 0) {
-                    /* give up on other message handlers */
-                    skb = NULL; // already free at this point
-                    goto out;
+                    /* so what if they didn't work? move on */
+                    ///* give up on other message handlers */
+                    //skb = NULL; // already free at this point
+                    //goto out;
                 }
 
                 /* successful send, increment largest_seq */
@@ -360,7 +370,7 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_POSITION */	&provider_gnl_ops_position,
     /* NL_C_STOP */		&provider_gnl_ops_stop,
     /* NL_C_HITS */		&provider_gnl_ops_hits,
-    /* NL_C_HITS_CAL */	&provider_gnl_ops_hits_cal,
+    /* NL_C_HIT_CAL */	&provider_gnl_ops_hits_cal,
 };
 
 typedef struct hb_obj_list {
