@@ -14,20 +14,16 @@ ANGSTROM_EXTRA_INSTALL += " \
 	mtd-utils \
 	gdb \
 	tcl \
-	tcludp \
-	libnl \
-#	nbench-byte \
 	"
 
 DEPENDS = "task-base-extended \
            at91bootstrap \
            u-boot \
            python \
+	   libnl \
 	   ati ati2\
            compat-wireless \
 	   tcl \
-	   tcludp \
-	   libnl \
            u-boot-utils \
            ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
@@ -36,10 +32,12 @@ IMAGE_INSTALL = "task-base-extended \
 	   ${ANGSTROM_EXTRA_INSTALL} \
            python-modules \
            kernel-modules \
+	   libnl \
 	   ati ati2\
            compat-wireless \
            lame \
            u-boot-utils \
+           ncurses-terminfo \
 	   ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
 
