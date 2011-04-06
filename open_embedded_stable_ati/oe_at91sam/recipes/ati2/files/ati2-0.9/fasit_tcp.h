@@ -68,7 +68,7 @@ private :
    int handle_16001(int start, int end);
    int handle_16005(int start, int end);
 
-   int seq; // incrimenting sequence to send with each message
+   int seq; // incrementing sequence to send with each message
    void seqForResp(int mnum, int seq);
    map<int,int> respMap; // map of messages to sequences
 

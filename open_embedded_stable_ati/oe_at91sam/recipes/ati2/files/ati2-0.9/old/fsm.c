@@ -61,7 +61,7 @@ void clearFromList(int fd, int size, int *fds[]) {
          *fds[i] = *fds[i+1];
       }
    }
-   // leave the last item alone as size will be decrimented and it will then be ignored
+   // leave the last item alone as size will be decremented and it will then be ignored
 }
 
 int main(int argc, char *argv[]) {
