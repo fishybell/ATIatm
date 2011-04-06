@@ -1,6 +1,9 @@
 require busybox.inc
 PR = "r18"
 
+DEPENEDS = "glibc"
+PARALLEL_MAKE = ""
+
 SRC_URI = "\
   http://www.busybox.net/downloads/busybox-${PV}.tar.gz \
   file://busybox-1.13.2-awk.patch;patch=1 \
