@@ -1,0 +1,30 @@
+Step 1: (didn't build busybox) : 89m6.806s
+NOTE: Multiple libraries (libnss_hesiod.so.2, libnss_nis.so.2, libnss_nisplus.so.2) found, but LEAD_SONAME 'libc.so' doesn't match any of them
+NOTE: Couldn't find shared library provider for libgcc_s.so.1
+~~~ added glibc dependency
+~~~ disabled parallel build
+Step 2: (didn't build ati) : 18m35.555s
+| user_conn.c:1:29: error: netlink/netlink.h: No such file or directory
+| user_conn.c:2:31: error: netlink/genl/genl.h: No such file or directory
+| user_conn.c:3:31: error: netlink/genl/ctrl.h: No such file or directory
+~~~ added libnl dependency
+Step 3: (didn't build procps) : 11m56.176s
+| display.c:(.text+0x20): undefined reference to `signal_number_to_name'
+| display.c:(.text+0x4c): undefined reference to `procps_version'
+....etc.
+~~~ disabled parallel build
+Step 4: (finished) : 19m23.824s
+Total: 139m2.361s
+
+~~~ removed excess locales from glibc
+~~~ increased from -j 12 to -j 18 for compiling
+
+After changes:  
+Step 1: (didn't build procps) : 72m46.946s
+~~~ fixed with a Makefile patch
+Step 2: (finished) : 22m39.463s
+Total: 96m26.409s
+
+After more changes:
+Step 1: (finished) : 98m5.451s
+Total: 98m5.451s
