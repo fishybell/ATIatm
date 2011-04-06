@@ -34,13 +34,13 @@ CONFFILES_${PN} = "${sysconfdir}/sysctl.conf"
 # EXTRA_OEMAKE = "CFLAGS=-I${STAGING_INCDIR} \
 #                 CPPFLAGS=-I${STAGING_INCDIR} \
 #                 LDFLAGS="${LDFLAGS}" \
-#                 CURSES=-lncursesw \
+#                 CURSES=-lncurses \
 #                 install='install -D' \
 #                 ldconfig=echo"
 
 EXTRA_OEMAKE = "CFLAGS=-I${STAGING_INCDIR} \
                 CPPFLAGS=-I${STAGING_INCDIR} \
-                CURSES=-lncursesw \
+                CURSES=-lncurses \
                 install='install -D' \
                 ldconfig=echo"
 
