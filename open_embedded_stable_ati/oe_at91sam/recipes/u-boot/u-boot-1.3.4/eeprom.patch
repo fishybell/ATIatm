@@ -40,7 +40,7 @@ diff -ruN u-boot-1.3.4.orig/board/atmel/at91sam9g20ek/at91sam9g20ek.c u-boot-1.3
  
  	return 0;
  }
-@@ -244,6 +258,15 @@
+@@ -244,6 +259,16 @@
  	return 0;
  }
  
@@ -48,6 +48,7 @@ diff -ruN u-boot-1.3.4.orig/board/atmel/at91sam9g20ek/at91sam9g20ek.c u-boot-1.3
 +{
 +    char buf[18];
 +    eeprom_init();
++    udelay(1); /* small delay to take into account boot-time for eeprom */
 +    eeprom_read(CFG_I2C_EEPROM_ADDR,CFG_MAC_EEPROM_OFFSET,buf,18);
 +    printf("Read MAC=\"%s\"\n",buf);
 +    setenv("ethaddr", buf);
