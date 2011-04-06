@@ -54,10 +54,11 @@ enum {
     HIT_OVERWRITE_ALL,   /* overwrites every value */
     HIT_OVERWRITE_CAL,   /* overwrites calibration values (upper, lower) */
     HIT_OVERWRITE_OTHER, /* overwrites non-calibration values (burst, etc.) */
-    HIT_OVERWRITE_LOWER, /* overwrites lower value only */
-    HIT_OVERWRITE_UPPER, /* overwrites upper value only */
     HIT_OVERWRITE_BURST, /* overwrites burst value only */
     HIT_OVERWRITE_HITS,  /* overwrites hit_to_fall value only */
+    HIT_GET_CAL,         /* overwrites nothing (gets calibration values) */
+    HIT_GET_BURST,       /* overwrites nothing (gets burst value) */
+    HIT_GET_HITS,        /* overwrites nothing (gets hit_to_fall value) */
 };
 enum {
     HIT_A_UNSPEC,
