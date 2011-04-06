@@ -2,7 +2,7 @@ DESCRIPTION = "ATI Target Modules"
 LICENSE = "unknown"
 PR = "r4"
 RDEPENDS = "kernel (${KERNEL_VERSION})"
-DEPENDS = "virtual/kernel"
+DEPENDS = "virtual/kernel linux libnl"
 
 #        file://ati-1.0.tar.gz  \
 #        file://start_target_modules.sh \
@@ -40,10 +40,13 @@ SRC_URI = " \
 		file://modules/target_ses_interface.h \
 		file://modules/target_user_interface.c \
 		file://modules/target_user_interface.h \
-		file://modules/netlink_provider.c \
-		file://modules/netlink_userspace.c \
+		file://modules/netlink_kernel.h \
 		file://modules/netlink_user.h \
+		file://modules/netlink_shared.h \
+		file://modules/netlink_provider.c \
 		file://modules/user_conn.c \
+		file://modules/delay_printk.c \
+		file://modules/delay_printk.h \
           "
 SRCNAME = "${PN}"
 #S = "${WORKDIR}/${SRCNAME}-${PV}/modules"
