@@ -126,8 +126,6 @@ signed int delay_printk(const char *pFormat, ...)
 EXPORT_SYMBOL(delay_printk);
 
 static int __init delay_printk_init(void) {
-    int d_id;
-
     INIT_WORK(&printk_work, printk_do_work);
     delay_printk("INIT DELAY PRINTK MODULE\n");
 
