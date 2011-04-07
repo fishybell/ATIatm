@@ -45,7 +45,7 @@ static int ignore_cb(struct nl_msg *msg, void *arg) {
 }
 
 static int parse_cb(struct nl_msg *msg, void *arg) {
-    struct nlattr *attrs[GEN_INT8_A_MAX+1];
+    struct nlattr *attrs[NL_A_MAX+1];
     struct nlmsghdr *nlh = nlmsg_hdr(msg);
     struct genlmsghdr *ghdr = nlmsg_data(nlh);
     int client = (int)arg;
@@ -89,7 +89,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
             if (attrs[GEN_INT8_A_MSG]) {
                 // moving at # mph
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-                snprintf(wbuf, 128, "M %i\n", value);
+                snprintf(wbuf, 128, "M %i\n", value-128);
             }
 
             break;
@@ -155,6 +155,24 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
                 }
             }
 
+            break;
+        case NL_C_BIT:
+            genlmsg_parse(nlh, 0, attrs, BIT_A_MAX, bit_event_policy);
+
+            if (attrs[BIT_A_MSG]) {
+                // bit event data
+                struct bit_event *bit = (struct bit_event*)nla_data(attrs[HIT_A_MSG]);
+                if (bit != NULL) {
+                    char btyp = 'x';
+                    switch (bit->bit_type) {
+                        case BIT_TEST: btyp = 'T'; break;
+                        case BIT_MOVE_FWD: btyp = 'F'; break;
+                        case BIT_MOVE_REV: btyp = 'R'; break;
+                        case BIT_MOVE_STOP: btyp = 'S'; break;
+                    }
+                    snprintf(wbuf, 128, "T %c %i\n", btyp, bit->is_on);
+                }
+            }
             break;
         case NL_C_FAILURE:
             genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_int8_policy);
@@ -293,7 +311,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     } else if (cmd[0] == 'C' || cmd[0] == 'c') {
                         nla_put_u8(msg, GEN_INT8_A_MSG, 0); // conceal request
                     } else {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, -1); // exposure status request
+                        nla_put_u8(msg, GEN_INT8_A_MSG, 255); // exposure status request
                     }
                     break;
                 case NL_C_MOVE:
