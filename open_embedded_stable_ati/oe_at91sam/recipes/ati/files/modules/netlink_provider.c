@@ -118,8 +118,10 @@ int send_nl_message_multi(void *package, message_filler_handler mfh, int cmd) {
 
     /* allocate some memory, since the size is not yet known use NLMSG_GOODSIZE */    
     skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
-    if (skb == NULL)
+    if (skb == NULL) {
+delay_printk("NL ERROR: no memory for genlmsg_new\n");
         goto out;
+    }
 
     /* create the message headers */
     /* arguments of genlmsg_put: 
@@ -133,18 +135,23 @@ int send_nl_message_multi(void *package, message_filler_handler mfh, int cmd) {
     msg_head = genlmsg_put(skb, 0, atomic_add_return(1,&largest_seq), &provider_gnl_family, 0, cmd);
     if (msg_head == NULL) {
         rc = -ENOMEM;
+delay_printk("NL ERROR: no memory for genlmsg_put\n");
         goto out;
     }
 
     /* assemble message via message filler handler */
     rc = mfh(skb, package);
-    if (rc != 0)
+    if (rc != 0) {
+delay_printk("NL ERROR: mfh error: %i\n", rc);
         goto out;
+    }
 
     /* finalize the message */
     rc = genlmsg_end(skb, msg_head);
-    if (rc < 0)
+    if (rc < 0) {
+delay_printk("NL ERROR: no memory for genlmsg_end\n");
         goto out;
+    }
 
     /* send the message */
     rc = genlmsg_multicast(skb, 0, nl_event_mcgrp.id, GFP_KERNEL);
@@ -152,6 +159,7 @@ int send_nl_message_multi(void *package, message_filler_handler mfh, int cmd) {
         if (rc == -ESRCH) {
 //delay_printk("multicast message %i sent, but no one listening\n", cmd);
         } else {
+delay_printk("NL ERROR: genlmsg_new\n");
             skb = NULL; // already free at this point
             goto out;
         }
@@ -361,6 +369,14 @@ struct genl_ops provider_gnl_ops_hits_cal = {
     .dumpit = NULL,
 };
 
+struct genl_ops provider_gnl_ops_bit = {
+    .cmd = NL_C_BIT,
+    .flags = 0,
+    .policy = bit_event_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
+
 static struct genl_ops *command_op_map[] = {
     /* NL_C_UNSPEC */	NULL,
     /* NL_C_FAILURE */	&provider_gnl_ops_failure,
@@ -371,6 +387,7 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_STOP */		&provider_gnl_ops_stop,
     /* NL_C_HITS */		&provider_gnl_ops_hits,
     /* NL_C_HIT_CAL */	&provider_gnl_ops_hits_cal,
+    /* NL_C_BIT */		&provider_gnl_ops_bit,
 };
 
 typedef struct hb_obj_list {
