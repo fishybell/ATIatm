@@ -6,6 +6,7 @@
 #include <mach/gpio.h>
 
 #include "target.h"
+#include "netlink_kernel.h"
 #include "target_user_interface.h"
 //---------------------------------------------------------------------------
 
@@ -39,7 +40,7 @@
 #define MOVING_REV	1
 #define MOVING_STOP	2
 
-//#define TESTING_ON_EVAL
+#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
 	#undef INPUT_TEST_BUTTON_ACTIVE_STATE
 	#undef INPUT_TEST_BUTTON_PULLUP_STATE
@@ -218,7 +219,7 @@ static void move_button_int(int button)
         return;
         }
 
-   delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, button);
+    delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, button);
 
     // look at all three values
     //bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
@@ -368,12 +369,14 @@ irqreturn_t bit_button_int(int irq, void *dev_id, struct pt_regs *regs)
         {
         return IRQ_HANDLED;
         }
+    delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, 0);
 
     // tell the movement code that the test button has changed
     //move_button_int(TEST_BUTTON);
 
     // check if the button has been pressed but not read by user-space
     value = atomic_read(&bit_button_atomic);
+    delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, value);
     if (value == BUTTON_STATUS_PRESSED)
 	{
 	return IRQ_HANDLED;
@@ -383,6 +386,7 @@ irqreturn_t bit_button_int(int irq, void *dev_id, struct pt_regs *regs)
     del_timer(&bit_read_timeout_timer_list);
     mod_timer(&bit_read_timeout_timer_list, jiffies+(BIT_READ_IN_MSECONDS*HZ/1000));
 
+    delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, 3);
     return IRQ_HANDLED;
     }
 
@@ -661,10 +665,25 @@ struct target_device target_device_user_interface =
     };
 
 //---------------------------------------------------------------------------
+// Message filler handler for bit functions
+//---------------------------------------------------------------------------
+int bit_mfh(struct sk_buff *skb, void *bit_data) {
+    // the bit_data argument is a pre-made bit_event structure
+    return nla_put(skb, BIT_A_MSG, sizeof(struct bit_event), (struct bit_event*)bit_data);
+}
+
+//---------------------------------------------------------------------------
 // Work item to notify the user-space about a bit button press
 //---------------------------------------------------------------------------
 static void bit_pressed(struct work_struct * work)
 	{
+    // notify netlink userspace
+    struct bit_event bit_data;
+    bit_data.bit_type = BIT_TEST;
+    bit_data.is_on = atomic_read(&bit_button_atomic) == BUTTON_STATUS_PRESSED;
+    send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
+
+    // notify sysfs userspace
 	target_sysfs_notify(&target_device_user_interface, "bit_button");
 	}
 
@@ -673,6 +692,18 @@ static void bit_pressed(struct work_struct * work)
 //---------------------------------------------------------------------------
 static void move_pressed(struct work_struct * work)
 	{
+    // notify netlink userspace
+    struct bit_event bit_data;
+    switch (atomic_read(&move_button_atomic)) {
+        case MOVING_FWD: bit_data.bit_type = BIT_MOVE_FWD; break;
+        case MOVING_REV: bit_data.bit_type = BIT_MOVE_REV; break;
+        default: /* any other value = stop */
+        case MOVING_STOP: bit_data.bit_type = BIT_MOVE_STOP; break;
+    }
+    bit_data.is_on = 1; // move event is always on
+    send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
+
+    // notify sysfs userspace
 	target_sysfs_notify(&target_device_user_interface, "move_button");
 	}
 
