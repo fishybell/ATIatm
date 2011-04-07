@@ -7,7 +7,6 @@
 #include <mach/gpio.h>
 
 #include "netlink_kernel.h"
-#include "delay_printk.h"
 
 #include "target.h"
 #include "target_battery.h"
