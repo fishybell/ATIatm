@@ -2,8 +2,6 @@
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 
-#include "netlink_kernel.h"
-
 #include "delay_printk.h"
 
 // small printk message buffer, so use wisely
@@ -16,11 +14,6 @@ typedef struct printk_buffer {
 } printk_buffer_t;
 struct printk_buffer *start = NULL; // start of queue
 struct printk_buffer *end = NULL; // end of queue
-
-//---------------------------------------------------------------------------
-// This atomic variable is use to hold our driver id from netlink provider
-//---------------------------------------------------------------------------
-atomic_t driver_id = ATOMIC_INIT(-1);
 
 //---------------------------------------------------------------------------
 // Global queue lock
