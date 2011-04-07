@@ -34,5 +34,12 @@ user_conn: user_conn.c
 		${CC} ${CFLAGS} ${LDFLAGS} user_conn.c -o user_conn
     endif
 
+bit_button: bit_button.c
+    ifeq ($(CURD),modules)
+		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -g -lnl bit_button.c -o bit_button
+    else
+		${CC} ${CFLAGS} ${LDFLAGS} bit_button.c -o bit_button
+    endif
+
 clean:
-	$(RM) .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers user_conn user_wait user_wait_nl
+	$(RM) .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers user_conn bit_button

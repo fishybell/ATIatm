@@ -46,7 +46,7 @@ typedef struct hit_calibration {
     u16 lower __attribute__ ((packed)); /* lower calibration value */
     u16 upper __attribute__ ((packed)); /* upper calibration value */
     u16 burst __attribute__ ((packed)); /* burst seperation value */
-    u8  hit_to_fall;                    /* number of his required to fall (0 for infinity) */
+    u8  hit_to_fall;                    /* number of hits required to fall (0 for infinity) */
     u8  set;                            /* explained below */
 } hit_calibration_t;
 enum {
@@ -73,9 +73,33 @@ static struct nla_policy hit_calibration_policy[HIT_A_MAX + 1] = {
     [HIT_A_MSG] = { .len = sizeof(struct hit_calibration) },
 #endif
 };
+/* specific policy for bit button events */
+typedef struct bit_event {
+    u16 bit_type __attribute__ ((packed)); /* type of bit button used (enum below) */
+    u16 is_on __attribute__ ((packed));    /* 1 for the current state being on, 0 for off */
+} bit_event_t;
+enum {
+    BIT_TEST,       /* test button */
+    BIT_MOVE_FWD,   /* move forward */
+    BIT_MOVE_REV,   /* move reverse */
+    BIT_MOVE_STOP,  /* move stop */
+};
+enum {
+    BIT_A_UNSPEC,
+    BIT_A_MSG, /* bit event structure */
+    __BIT_A_MAX,
+};
+#define BIT_A_MAX (__BIT_A_MAX - 1)
+static struct nla_policy bit_event_policy[BIT_A_MAX + 1] = {
+#ifdef NETLINK_USER_H
+    [BIT_A_MSG] = { .minlen = sizeof(struct bit_event), .maxlen = sizeof(struct bit_event) },
+#else
+    [BIT_A_MSG] = { .len = sizeof(struct bit_event) },
+#endif
+};
 
-/* this value needs to be the highest among MAX attribute values */
-#define NL_A_MAX HIT_A_MAX
+/* this value needs to be the highest among MAX attribute values (so far, mine are all the same) */
+#define NL_A_MAX BIT_A_MAX
 
 /* commands: enumeration of all commands (functions), 
  * used by userspace application to identify command to be ececuted
@@ -92,6 +116,7 @@ enum {
     NL_C_STOP,		/* stop (command/reply) (generic 8-bit int) */
     NL_C_HITS,		/* hit log (request/reply) (generic string) */
     NL_C_HIT_CAL,	/* calibrate hit sensor (command/reply) (hit calibrate structure) */
+    NL_C_BIT,		/* bit button event (broadcast) (bit event structure) */
     __NL_C_MAX,
 };
 #define NL_C_MAX (__NL_C_MAX - 1)
