@@ -1,7 +1,6 @@
 from FasitPd import *
 from QThread import *
 from play_sound_thread import *
-from user_interface_thread import *
 import time
 import logging
 

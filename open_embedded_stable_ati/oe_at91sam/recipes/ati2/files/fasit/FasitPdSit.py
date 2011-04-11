@@ -4,7 +4,6 @@ MUZZLE_FLASH_PATH   = "/sys/class/target/muzzle_flash/"
 from FasitPd import *
 from hit_thread import *
 from lifter_thread import *
-from user_interface_thread import *
 import logging
 import os
 import uuid
@@ -22,10 +21,6 @@ class FasitPdSit(FasitPd):
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = dtype
        
-        self.__ui_thread__= user_interface_thread(False)
-        self.__ui_thread__.check_driver()
-#        self.__ui_thread__.set_setting("bit_status", "on")
-
         # Check if we have MILES TX
         if (os.path.exists(MILES_TX_PATH + "delay") == True):
             self.logger.debug("MILES Transmitter driver found.")
@@ -75,8 +70,6 @@ class FasitPdSit(FasitPd):
         
         self.__lifter_thread__.start()
         self.__hit_thread__.start()
-        self.__ui_thread__.start()
-#        self.__ui_thread__.set_setting("bit_status", "on")
         
     def get_setting_string(self, path):
         fd = os.open(path, os.O_RDONLY)
@@ -99,7 +92,6 @@ class FasitPdSit(FasitPd):
         self.logger.info('stop_threads()')
         self.__lifter_thread__.write("stop")
         self.__hit_thread__.write("stop")
-        self.__ui_thread__.write("stop")
         
         if (self.__lifter_thread__.isAlive()):
             self.__lifter_thread__.join()
@@ -107,10 +99,6 @@ class FasitPdSit(FasitPd):
         if (self.__hit_thread__.isAlive()):
             self.__hit_thread__.join()
             
-        if (self.__ui_thread__.isAlive()):
-            self.__ui_thread__.join()
-        
-        
     def expose(self, expose = fasit_packet_pd.PD_EXPOSURE_CONCEALED):
         FasitPd.expose(self, expose)
         self.__lifter_thread__.write(expose)
@@ -158,17 +146,6 @@ class FasitPdSit(FasitPd):
     
     def check_for_updates(self):
         check_for_updates_status = False
-        
-        # check the ui thread
-        bit_status = self.__ui_thread__.read()
-        if (bit_status == "pressed"):
-            current_position = self.__lifter_thread__.get_current_position() 
-            if (current_position == fasit_packet_pd.PD_EXPOSURE_CONCEALED):
-                self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED) 
-            elif (current_position == fasit_packet_pd.PD_EXPOSURE_EXPOSED):
-                self.expose(fasit_packet_pd.PD_EXPOSURE_CONCEALED)
-            else:
-                self.expose(fasit_packet_pd.PD_EXPOSURE_EXPOSED) 
         
         # check the hit thread
         new_hits = self.__hit_thread__.read()

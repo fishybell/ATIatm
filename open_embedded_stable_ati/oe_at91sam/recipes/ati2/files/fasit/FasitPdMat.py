@@ -1,6 +1,5 @@
 from FasitPd import *
 from mover_thread import *
-from user_interface_thread import *
 import logging
 import uuid
 
@@ -16,9 +15,6 @@ class FasitPdMat(FasitPd):
         self.__device_id__          = uuid.getnode()
         self.__device_type__        = fasit_packet_pd.PD_TYPE_MIT
        
-        self.__ui_thread__= user_interface_thread(True)
-        self.__ui_thread__.check_driver()
-        
         self.__mover_thread__= mover_thread("armor")
         self.__mover_thread__.check_driver()
             
@@ -32,18 +28,13 @@ class FasitPdMat(FasitPd):
         self.__speed__ = self.__mover_thread__.get_setting_speed() 
        
         self.__mover_thread__.start()
-        self.__ui_thread__.start()
         
     def stop_threads(self):
         self.__mover_thread__.write("stop")
-        self.__ui_thread__.write("stop")
         
         if (self.__mover_thread__.isAlive()):
             self.__mover_thread__.join()
 
-        if (self.__ui_thread__.isAlive()):
-            self.__ui_thread__.join()
-        
     def move(self, direction = 0, movement = fasit_packet_pd.PD_MOVE_STOP, speed = 0):
         FasitPd.move(self, direction, movement, speed)
         self.__mover_thread__.set_setting_speed(speed)  
@@ -53,15 +44,6 @@ class FasitPdMat(FasitPd):
     def check_for_updates(self):
         check_for_updates_status = False
                    
-        # check the ui thread
-        bit_status = self.__ui_thread__.read()
-        if (bit_status == "forward"):
-            self.move(0, fasit_packet_pd.PD_MOVE_FORWARD, 1)
-        elif (bit_status == "reverse"):
-            self.move(0, fasit_packet_pd.PD_MOVE_REVERSE, 1)
-        elif (bit_status == "stop"):
-            self.move(0, fasit_packet_pd.PD_MOVE_STOP, 0)
-
         # check the mover thread
         mover_status = 0
         mover_status = self.__mover_thread__.read()
