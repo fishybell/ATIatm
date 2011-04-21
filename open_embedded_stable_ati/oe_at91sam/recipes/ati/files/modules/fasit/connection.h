@@ -21,6 +21,7 @@ public:
    static Connection *findByRnum(__uint32_t rnum); // returns null if not found
    static Connection *findByTnum(__uint16_t tnum); // returns null if not found
    void queueMsg(const char *msg, int size);
+   void queueMsg(const void *msg, int size) {queueMsg((const char*)msg, size);} // auto-cast for various data pointers
    __uint64_t getUUID() {return uuid;};
    __uint32_t getRnum() {return rnum;};
    __uint16_t getTnum() {return tnum;};
@@ -31,6 +32,8 @@ public:
    int getFD() { return fd; }; // retrieve the file descriptor for use in epoll or select or similar
    void deleteLater(); // cause this tcp to be deleted at a later point in time
    virtual void makeWritable(bool writable); // allows the global event fd to watch for writable status of this connection or not
+
+   static bool addToEPoll(int fd, void *ptr); // add a file descriptor to the epoll
 
 protected:
    virtual int handleWrite(const epoll_event *ev); // could be overwritten

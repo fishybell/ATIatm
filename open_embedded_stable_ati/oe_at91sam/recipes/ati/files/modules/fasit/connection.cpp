@@ -282,9 +282,9 @@ FUNCTION_START("::makeWritable(bool writable)")
          case EBADF : IERROR("EBADF\n") ; break;
          case EEXIST : IERROR("EEXIST\n") ; break;
          case EINVAL : IERROR("EINVAL\n") ; break;
-         case ENOENT : IERROR("ENOENT\n") ; break;
          case ENOMEM : IERROR("ENOMEM\n") ; break;
          case EPERM : IERROR("EPERM\n") ; break;
+         case ENOENT : break; /* no entry: it's already gone or was never there */
       }
    }
 FUNCTION_END("::makeWritable(bool writable)")
@@ -317,4 +317,22 @@ PRINT_HEXB(msg, size)
    makeWritable(true);
 FUNCTION_END("::queueMsg(char *msg, int size)")
 }
+
+bool Connection::addToEPoll(int fd, void *ptr) {
+FUNCTION_START("::addToEPoll(int fd, void *ptr)")
+   // create new TCP_Class (with predefined tnum) and to our epoll list
+   struct epoll_event ev;
+   memset(&ev, 0, sizeof(ev));
+   bool retval = true;
+   ev.events = EPOLLIN;
+   ev.data.ptr = (void*)ptr;
+   if (epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ev) < 0) {
+      // failure to add fd to epoll
+      retval = false;
+   }
+
+FUNCTION_INT("::addToEPoll(int fd, void *ptr)", retval)
+   return retval;
+}
+
 

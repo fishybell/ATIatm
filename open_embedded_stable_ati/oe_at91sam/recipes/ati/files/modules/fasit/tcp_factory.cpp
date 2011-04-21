@@ -9,6 +9,10 @@ using namespace std;
 #include "timers.h"
 #include "common.h"
 
+// for explicit declarations of template function
+#include "tcp_client.h"
+#include "sit_client.h"
+
 #define MAX_CONN 1200
 
 FASIT_TCP_Factory::FASIT_TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF) { // always invalid fd will close with an error, but do so silently
@@ -27,60 +31,6 @@ FUNCTION_END("::FASIT_TCP_Factory(const char *destIP, int port) : Connection(0xD
 FASIT_TCP_Factory::~FASIT_TCP_Factory() {
 FUNCTION_START("::~FASIT_TCP_Factory()")
 FUNCTION_END("::~FASIT_TCP_Factory()")
-}
-
-TCP_Client *FASIT_TCP_Factory::newConn() {
-FUNCTION_START("::newConn()")
-   int sock;
-
-   // create the TCP socket
-   if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-FUNCTION_HEX("::newConn()", NULL)
-      return NULL;
-   }
-   IMSG("Created new TCP socket: %i\n", sock)
-
-   // connect TCP socket to given IP and port
-   if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
-      switch (errno) {
-         case EACCES : IERROR("errno: EACCES\n") break;
-         case EPERM : IERROR("errno: EPERM\n") break;
-         case EADDRINUSE : IERROR("errno: EADDRINUSE\n") break;
-         case EAFNOSUPPORT : IERROR("errno: EAFNOSUPPORT\n") break;
-         case EAGAIN : IERROR("errno: EAGAIN\n") break;
-         case EALREADY : IERROR("errno: EALREADY\n") break;
-         case EBADF : IERROR("errno: EBADF\n") break;
-         case ECONNREFUSED : IERROR("errno: ECONNREFUSED\n") break;
-         case EFAULT : IERROR("errno: EFAULT\n") break;
-         case EINPROGRESS : IERROR("errno: EINPROGRESS\n") break;
-         case EINTR : IERROR("errno: EINTR\n") break;
-         case EISCONN : IERROR("errno: ISCONN\n") break;
-         case ENETUNREACH : IERROR("errno: ENETUNREACH\n") break;
-         case ENOTSOCK : IERROR("errno: ENOTSOCK\n") break;
-         case ETIMEDOUT : IERROR("errno: ETIMEDOUT\n") break;
-      }
-FUNCTION_HEX("::newConn()", NULL)
-      return NULL;
-   }
-HERE
-   setnonblocking(sock);
-
-   // create new TCP_Client (with predefined tnum) and to our epoll list
-   struct epoll_event ev;
-   memset(&ev, 0, sizeof(ev));
-   TCP_Client *tcp = new TCP_Client(sock, findNextTnum());
-DMSG("Created new connection %i with tnum %i\n", tcp->getFD(), tcp->getTnum())
-   ev.events = EPOLLIN;
-   ev.data.ptr = (void*)tcp;
-   if (epoll_ctl(efd, EPOLL_CTL_ADD, sock, &ev) < 0) {
-      delete tcp;
-FUNCTION_HEX("::newConn()", NULL)
-      return NULL;
-   }
-
-   // return the result
-FUNCTION_HEX("::newConn()", tcp)
-   return tcp;
 }
 
 // look for the lowest available tnum
@@ -103,3 +53,59 @@ FUNCTION_START("::findNextTnum()")
 FUNCTION_INT("::findNextTnum()", lowTnum)
    return lowTnum;
 }
+
+template <class TCP_Class>
+TCP_Class *FASIT_TCP_Factory::newConn() {
+FUNCTION_START("::newConn()")
+   int sock;
+
+   // create the TCP socket
+   if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+FUNCTION_HEX("::newConn()", NULL)
+      return NULL;
+   }
+   IMSG("Created new TCP socket: %i\n", sock)
+
+   // connect TCP socket to given IP and port
+   DMSG("server: %s : %i\n", inet_ntoa(server.sin_addr), ntohs(server.sin_port));
+   if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
+      switch (errno) {
+         case EACCES : IERROR("errno: EACCES\n") break;
+         case EPERM : IERROR("errno: EPERM\n") break;
+         case EADDRINUSE : IERROR("errno: EADDRINUSE\n") break;
+         case EAFNOSUPPORT : IERROR("errno: EAFNOSUPPORT\n") break;
+         case EAGAIN : IERROR("errno: EAGAIN\n") break;
+         case EALREADY : IERROR("errno: EALREADY\n") break;
+         case EBADF : IERROR("errno: EBADF\n") break;
+         case ECONNREFUSED : IERROR("errno: ECONNREFUSED\n") break;
+         case EFAULT : IERROR("errno: EFAULT\n") break;
+         case EINPROGRESS : IERROR("errno: EINPROGRESS\n") break;
+         case EINTR : IERROR("errno: EINTR\n") break;
+         case EISCONN : IERROR("errno: ISCONN\n") break;
+         case ENETUNREACH : IERROR("errno: ENETUNREACH\n") break;
+         case ENOTSOCK : IERROR("errno: ENOTSOCK\n") break;
+         case ETIMEDOUT : IERROR("errno: ETIMEDOUT\n") break;
+      }
+FUNCTION_HEX("::newConn()", NULL)
+      return NULL;
+   }
+   setnonblocking(sock);
+
+   // create new TCP_Class (with predefined tnum) and to our epoll list
+   TCP_Class *tcp = new TCP_Class(sock, findNextTnum());
+DMSG("Created new connection %i with tnum %i\n", tcp->getFD(), tcp->getTnum())
+   if (!addToEPoll(tcp->getFD(), tcp)) {
+      delete tcp;
+FUNCTION_HEX("::newConn()", NULL)
+      return NULL;
+   }
+
+   // return the result
+FUNCTION_HEX("::newConn()", tcp)
+   return tcp;
+}
+
+// explicit declarations of newConn() template function
+template TCP_Client *FASIT_TCP_Factory::newConn<TCP_Client>();
+template SIT_Client *FASIT_TCP_Factory::newConn<SIT_Client>();
+

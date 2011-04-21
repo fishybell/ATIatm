@@ -94,6 +94,9 @@ typedef struct FASIT_2005 {
    FASIT_RESPONSE response;
    FASIT_2005b body;
 } FASIT_2005;
+#define PYRO_LEGACY (1 << 0)
+#define PYRO_PYRO (1 << 1)
+#define PYRO_RESERVED ((1 << 2) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7))
 
 /********************************************/
 /* 2006 - Pyro Device Status                */
@@ -154,6 +157,10 @@ typedef struct FASIT_2111 {
    FASIT_RESPONSE response;
    FASIT_2111b body;
 } FASIT_2111;
+#define PD_MILES (1 << 0)
+#define PD_MUZZLE (1 << 1)
+#define PD_GPS (1 << 2)
+#define PD_RESERVED ((1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7))
 
 /********************************************/
 /* 2102 - Presentation Device Status        */

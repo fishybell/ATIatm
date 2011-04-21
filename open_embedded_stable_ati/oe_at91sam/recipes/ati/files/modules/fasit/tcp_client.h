@@ -3,8 +3,6 @@
 
 using namespace std;
 
-#include <list>
-#include <map>
 #include "fasit.h"
 #include "connection.h"
 #include "common.h"
@@ -19,10 +17,15 @@ public :
    friend class FASIT_TCP;
 
 private :
-   // individual message handlers, all return -1 if the connectionneeds to be
+
+   // server instance
+   FASIT_TCP *server;
+
+protected:
+   // individual message handlers, all return -1 if the connection needs to be
    //   deleted afterwards
    // the message data itself is in the read buffer from start to end
-   int handle_100(int start, int end);
+/*   int handle_100(int start, int end);
    int handle_2000(int start, int end);
    int handle_2004(int start, int end);
    int handle_2005(int start, int end);
@@ -35,10 +38,11 @@ private :
    int handle_2115(int start, int end);
    int handle_2110(int start, int end);
    int handle_2112(int start, int end);
-   int handle_2113(int start, int end);
+   int handle_2113(int start, int end);*/
 
    // server instance
-   FASIT_TCP *server;
+   virtual bool hasPair() { return server != NULL;};
+   virtual Connection *pair() { return (Connection*)server; }
 };
 
 #endif

@@ -10,7 +10,8 @@ public :
    FASIT_TCP_Factory(const char *destIP, int port);
    ~FASIT_TCP_Factory();
 
-   TCP_Client *newConn(); // creates a new connection to the IP and port given in the constructor
+   template <class TCP_Class> // class needs to be similar to or inherit TCP_Client
+      TCP_Class *newConn(); // creates a new connection to the IP and port given in the constructor
 
 protected :
    // we don't actually have a valid file descriptor, so we'll just overwrite these to do nothing

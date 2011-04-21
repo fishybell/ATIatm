@@ -20,7 +20,6 @@ FUNCTION_START("::FASIT_TCP(int fd) : Connection(fd)")
 
    // initialize the client connection later
    client = NULL;
-   doclose = false;
    new ConnTimer(this, CONNECTCLIENT);
 
 FUNCTION_END("::FASIT_TCP(int fd) : Connection(fd)")
@@ -71,27 +70,87 @@ FUNCTION_START("::~FASIT_TCP()")
 
    // remove from linked list
    FASIT_TCP *tlink = flink;
+   FASIT_TCP *llink = NULL;
    while (tlink != NULL) {
-      if (tlink->link == this) {
-         tlink->link = this->link; // connect to next link in chain (if last, this drops this link off chain)
+      if (tlink == this) {
+         if (llink == NULL) {
+            flink = tlink->link; // was head of chain, move head to next link
+         } else {
+            llink->link = this->link; // connect last link to next link in chain (if last, this drops this link off chain)
+         }
          break;
+      } else {
+         llink = tlink; // remember last item
+         tlink = tlink->link; // move on to next item
       }
+HERE
    }
 
 FUNCTION_END("::~FASIT_TCP()")
 }
 
+// fill out default header information
+void FASIT_TCP::defHeader(int mnum, FASIT_header *fhdr) {
+FUNCTION_START("::defHeader(int mnum, FASIT_header *fhdr)")
+   fhdr->num = htons(mnum);
+   fhdr->icd1 = htons(1);
+   fhdr->icd2 = htons(1);
+   fhdr->rsrvd = htonl(0);
+   fhdr->seq = htonl(getSequence());
+   switch (mnum) {
+      case 100:
+      case 2000:
+      case 2004:
+      case 2005:
+      case 2006:
+         fhdr->icd1 = htons(2);
+         break;
+   }
+FUNCTION_END("::defHeader(int mnum, FASIT_header *fhdr)")
+}
+
+// if none is found, FASIT_RESPONSE will be blank. this is the valid response to give
+struct FASIT_RESPONSE FASIT_TCP::getResponse(int mnum) {
+FUNCTION_START("::getResponse(int mnum)")
+   FASIT_RESPONSE resp;
+   resp.rnum = 0;
+   resp.rseq = 0;
+
+   map<int,int>::iterator rIt;
+   rIt = respMap.find(mnum);
+   if (rIt != respMap.end()) {
+      // use last remembered response for this message number
+      resp.rnum = htons(mnum);
+      resp.rseq = htonl(rIt->second);
+
+      // this is a one shot deal, delete it now
+      respMap.erase(rIt);
+   }
+
+FUNCTION_END("::getResponse(int mnum)")
+   return resp;
+}
+
+void FASIT_TCP::seqForResp(int mnum, int seq) {
+FUNCTION_START("::seqForResp(int mnum, int seq)")
+   respMap[mnum] = seq;
+FUNCTION_END("::seqForResp(int mnum, int seq)")
+}
+
 // connect a new client
 void FASIT_TCP::newClient() {
-   client = factory->newConn();
+FUNCTION_START("::newClient()")
+   client = factory->newConn <TCP_Client> ();
 
+DMSG("Client added: 0x%08X to server 0x%08X\n", client, this);
    // if we failed to connect, mark this server instance as dead
    if (client == NULL) {
-      doclose = true;
+      deleteLater();
    } else {
       // success, let the client know the server instance
       client->server = this;
    }
+FUNCTION_END("::newClient()")
 }
 
 // macro used in parseData
@@ -104,12 +163,8 @@ FUNCTION_START("::parseData(int size, char *buf)")
    addToBuffer(size, buf);
 
    // check client
-   if (client == NULL) {
-      if (doclose) {
-         // we failed to acquire a client connection, delete this connection
-         return -1;
-      }
-      // ignore all data until we have a client connection
+   if (!hasPair()) {
+FUNCTION_INT("::parseData(int size, char *buf)", 0)
       return 0;
    }
 
@@ -206,34 +261,6 @@ FUNCTION_INT("::validMessage(int *start, int *end)", 0)
    return 0;
 }
 
-// if none is found, FASIT_RESPONSE will be blank. this is the valid response to give
-struct FASIT_RESPONSE FASIT_TCP::getResponse(int mnum) {
-FUNCTION_START("::getResponse(int mnum)")
-   FASIT_RESPONSE resp;
-   resp.rnum = 0;
-   resp.rseq = 0;
-
-   map<int,int>::iterator rIt;
-   rIt = respMap.find(mnum);
-   if (rIt != respMap.end()) {
-      // use last remembered response for this message number
-      resp.rnum = htons(mnum);
-      resp.rseq = htonl(rIt->second);
-
-      // this is a one shot deal, delete it now
-      respMap.erase(rIt);
-   }
-
-FUNCTION_END("::getResponse(int mnum)")
-   return resp;
-}
-
-void FASIT_TCP::seqForResp(int mnum, int seq) {
-FUNCTION_START("::seqForResp(int mnum, int seq)")
-   respMap[mnum] = seq;
-FUNCTION_END("::seqForResp(int mnum, int seq)")
-}
-
 // clears out all tcp connections on non-base station units
 void FASIT_TCP::clearSubscribers() {
 FUNCTION_START("::clearSubscribers()")
@@ -261,8 +288,10 @@ FUNCTION_START("::handle_100(int start, int end)")
    // map header (no body for 100)
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
 
-   // remember sequence for this connection
-   seqForResp(100, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+   }
 
 FUNCTION_INT("::handle_100(int start, int end)", 0)
    return 0;
@@ -274,8 +303,11 @@ FUNCTION_START("::handle_2000(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2000 *msg = (FASIT_2000*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2000, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2000));
+   }
 
 FUNCTION_INT("::handle_2000(int start, int end)", 0)
    return 0;
@@ -287,8 +319,11 @@ FUNCTION_START("::handle_2004(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2004 *msg = (FASIT_2004*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2004, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2004));
+   }
 
 FUNCTION_INT("::handle_2004(int start, int end)", 0)
    return 0;
@@ -300,8 +335,11 @@ FUNCTION_START("::handle_2005(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2005 *msg = (FASIT_2005*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2005, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2005));
+   }
 
 FUNCTION_INT("::handle_2005(int start, int end)", 0)
    return 0;
@@ -313,8 +351,18 @@ FUNCTION_START("::handle_2006(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2006 *msg = (FASIT_2006*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2006, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2006));
+
+      // send zone data
+      int znum = ntohs(msg->body.zones);
+      FASIT_2006z *zone = (FASIT_2006z*)(rbuf + start + sizeof(FASIT_header) + sizeof(FASIT_2006));
+      while (znum--) {
+         pair()->queueMsg(zone++, sizeof(FASIT_2006z));
+      }
+   }
 
 FUNCTION_INT("::handle_2006(int start, int end)", 0)
    return 0;
@@ -326,8 +374,11 @@ FUNCTION_START("::handle_2100(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2100 *msg = (FASIT_2100*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2100, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2100));
+   }
 
 FUNCTION_INT("::handle_2100(int start, int end)", 0)
    return 0;
@@ -339,8 +390,11 @@ FUNCTION_START("::handle_2101(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2101 *msg = (FASIT_2101*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2101, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2101));
+   }
 
 FUNCTION_INT("::handle_2101(int start, int end)", 0)
    return 0;
@@ -352,8 +406,11 @@ FUNCTION_START("::handle_2111(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2111 *msg = (FASIT_2111*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2111, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2111));
+   }
 
 FUNCTION_INT("::handle_2111(int start, int end)", 0)
    return 0;
@@ -365,8 +422,11 @@ FUNCTION_START("::handle_2102(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2102 *msg = (FASIT_2102*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2102, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2102));
+   }
 
 FUNCTION_INT("::handle_2102(int start, int end)", 0)
    return 0;
@@ -378,8 +438,11 @@ FUNCTION_START("::handle_2114(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2114 *msg = (FASIT_2114*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2114, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2114));
+   }
 
 FUNCTION_INT("::handle_2114(int start, int end)", 0)
    return 0;
@@ -391,8 +454,11 @@ FUNCTION_START("::handle_2115(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2115 *msg = (FASIT_2115*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2115, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2115));
+   }
 
 FUNCTION_INT("::handle_2115(int start, int end)", 0)
    return 0;
@@ -404,8 +470,11 @@ FUNCTION_START("::handle_2110(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2110 *msg = (FASIT_2110*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2110, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2110));
+   }
 
 FUNCTION_INT("::handle_2110(int start, int end)", 0)
    return 0;
@@ -417,8 +486,11 @@ FUNCTION_START("::handle_2112(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2112 *msg = (FASIT_2112*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2112, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2112));
+   }
 
 FUNCTION_INT("::handle_2112(int start, int end)", 0)
    return 0;
@@ -430,8 +502,11 @@ FUNCTION_START("::handle_2113(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2113 *msg = (FASIT_2113*)(rbuf + start + sizeof(FASIT_header));
 
-   // remember sequence for this connection
-   seqForResp(2113, ntohl(hdr->seq));
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_2113));
+   }
 
 FUNCTION_INT("::handle_2113(int start, int end)", 0)
    return 0;

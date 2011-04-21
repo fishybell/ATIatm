@@ -6,6 +6,7 @@
 // timer types
 enum timerTypes {
    conn_timer,
+   nl_timer,
 };
 
 // for manipulating an individual timeout

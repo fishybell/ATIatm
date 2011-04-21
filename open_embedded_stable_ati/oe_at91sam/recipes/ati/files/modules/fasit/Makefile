@@ -1,9 +1,19 @@
 # Makefile for Action Target specific files
 
+CURD := $(shell basename `pwd`)
+CU_FLAGS :=-I/usr/local/var/oe/tmp/work/at91sam9g20ek_2mmc-angstrom-linux-gnueabi/linux-2.6.30-r1/linux-2.6.30/include
+
+C_FILES := connection.cpp epoll.cpp fasit.cpp fasit_tcp.cpp nl_conn.cpp sit_client.cpp tcp_client.cpp tcp_factory.cpp timeout.cpp timer.cpp timers.cpp
+H_FILES := common.h connection.h fasit.h fasit_tcp.h nl_conn.h sit_client.h tcp_client.h tcp_factory.h timeout.h timer.h timers.h 
+
 all: fasit_conn
 
-fasit_conn: connection.cpp  epoll.cpp  fasit.cpp  fasit_tcp.cpp  tcp_client.cpp tcp_factory.cpp  timeout.cpp  timer.cpp  timers.cpp common.h  connection.h  fasit.h  fasit_tcp.h  tcp_client.h tcp_factory.h  timeout.h  timer.h  timers.h
-	${CXX} ${CFLAGS} ${LDFLAGS} -g connection.cpp  epoll.cpp  fasit.cpp  fasit_tcp.cpp  tcp_client.cpp tcp_factory.cpp  timeout.cpp  timer.cpp  timers.cpp -o fasit_conn
+fasit_conn: ${C_FILES} ${H_FILES}
+    ifeq ($(CURD),fasit)
+		arm-angstrom-linux-gnueabi-g++ ${CFLAGS} ${LDFLAGS} -I../ ${CU_FLAGS} -g -lnl ${C_FILES} -o fasit_conn
+    else
+		${CXX} ${CFLAGS} ${LDFLAGS} -I../ -g -lnl ${C_FILES} -o fasit_conn
+    endif
 
 clean:
 	rm -rv fasit_conn
