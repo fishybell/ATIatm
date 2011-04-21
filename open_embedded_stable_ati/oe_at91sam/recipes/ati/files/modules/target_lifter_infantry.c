@@ -7,17 +7,15 @@
 
 #include "target.h"
 #include "target_lifter_infantry.h"
+
+#include "netlink_kernel.h"
+
 //---------------------------------------------------------------------------
 
 #define TARGET_NAME		"infantry lifter"
 #define LIFTER_TYPE  	"infantry"
 
 #define TIMEOUT_IN_SECONDS		3
-
-#define LIFTER_POSITION_DOWN   			0
-#define LIFTER_POSITION_UP    			1
-#define LIFTER_POSITION_MOVING  		2
-#define LIFTER_POSITION_ERROR_NEITHER	3	// Neither limit switch is active, but the lifter is not moving
 
 //#define FIX_FOR_JPY_IO_BOARD
 #ifdef FIX_FOR_JPY_IO_BOARD
@@ -347,7 +345,7 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
-static int hardware_position_set(int position)
+int lifter_position_set(int position)
     {
 	// signal that an operation is in progress
 	atomic_set(&operating_atomic, TRUE);
@@ -360,11 +358,12 @@ static int hardware_position_set(int position)
 
 	return 0;
     }
+EXPORT_SYMBOL(lifter_position_set);
 
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
-static int hardware_position_get(void)
+int lifter_position_get(void)
     {
     // check if an operation is in progress...
     if (atomic_read(&operating_atomic))
@@ -384,6 +383,7 @@ static int hardware_position_get(void)
 
     return LIFTER_POSITION_ERROR_NEITHER;
     }
+EXPORT_SYMBOL(lifter_position_get);
 
 //---------------------------------------------------------------------------
 // Handles reads to the type attribute through sysfs
@@ -398,7 +398,7 @@ static ssize_t type_show(struct device *dev, struct device_attribute *attr, char
 //---------------------------------------------------------------------------
 static ssize_t position_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
-    return sprintf(buf, "%s\n", lifter_position[hardware_position_get()]);
+    return sprintf(buf, "%s\n", lifter_position[lifter_position_get()]);
     }
 
 //---------------------------------------------------------------------------
@@ -418,9 +418,9 @@ static ssize_t position_store(struct device *dev, struct device_attribute *attr,
     delay_printk("%s - %s() : user command up\n",TARGET_NAME, __func__);
         status = size;
         // TODO - need to check error condition first
-        if (hardware_position_get() != LIFTER_POSITION_UP)
+        if (lifter_position_get() != LIFTER_POSITION_UP)
             {
-        	hardware_position_set(LIFTER_POSITION_UP);
+        	lifter_position_set(LIFTER_POSITION_UP);
             }
         }
     else if (sysfs_streq(buf, "down"))
@@ -428,9 +428,9 @@ static ssize_t position_store(struct device *dev, struct device_attribute *attr,
     delay_printk("%s - %s() : user command down\n",TARGET_NAME, __func__);
         status = size;
         // TODO - need to check error condition first
-        if (hardware_position_get() != LIFTER_POSITION_DOWN)
+        if (lifter_position_get() != LIFTER_POSITION_DOWN)
             {
-            hardware_position_set(LIFTER_POSITION_DOWN);
+            lifter_position_set(LIFTER_POSITION_DOWN);
             }
         }
     else
@@ -490,19 +490,37 @@ struct target_device target_device_lifter_infantry =
 static void position_default(struct work_struct * work)
     {
    delay_printk("%s - %s()\n",TARGET_NAME, __func__);
-    if (hardware_position_get() != LIFTER_POSITION_DOWN)
+    if (lifter_position_get() != LIFTER_POSITION_DOWN)
         {
     delay_printk("resetting to down\n");
-        hardware_position_set(LIFTER_POSITION_DOWN);
+        lifter_position_set(LIFTER_POSITION_DOWN);
         }
     }
 
 //---------------------------------------------------------------------------
+// Message filler handler for expose functions
+//---------------------------------------------------------------------------
+int pos_mfh(struct sk_buff *skb, void *pos_data) {
+    // the pos_data argument is a pre-made pos_event structure
+    return nla_put_u8(skb, GEN_INT8_A_MSG, *((int*)pos_data));
+}
+
 //---------------------------------------------------------------------------
 // Work item to notify the user-space about a position change or error
 //---------------------------------------------------------------------------
 static void position_change(struct work_struct * work)
 	{
+    // notify netlink userspace
+    int pos_data;
+    switch (lifter_position_get()) { // map internal to external values
+        case LIFTER_POSITION_DOWN: pos_data = CONCEAL; break;
+        case LIFTER_POSITION_UP: pos_data = EXPOSE; break;
+        case LIFTER_POSITION_MOVING: pos_data = LIFTING; break;
+        default: pos_data = EXPOSURE_REQ; break; //error
+    }
+    send_nl_message_multi(&pos_data, pos_mfh, NL_C_EXPOSE);
+
+    // notify sysfs userspace
 	target_sysfs_notify(&target_device_lifter_infantry, "position");
 	}
 
