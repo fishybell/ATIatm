@@ -86,10 +86,18 @@ FUNCTION_START("::~FASIT_TCP()")
 
    // remove from linked list
    FASIT_TCP *tlink = flink;
+   FASIT_TCP *llink = NULL;
    while (tlink != NULL) {
-      if (tlink->link == this) {
-         tlink->link = this->link; // connect to next link in chain (if last, this drops this link off chain)
+      if (tlink == this) {
+         if (llink == NULL) {
+            flink = tlink->link; // was head of chain, move head to next link
+         } else {
+            llink->link = this->link; // connect last link to next link in chain (if last, this drops this link off chain)
+         }
          break;
+      } else {
+         llink = tlink; // remember last item
+         tlink = tlink->link; // move on to next item
       }
    }
 
