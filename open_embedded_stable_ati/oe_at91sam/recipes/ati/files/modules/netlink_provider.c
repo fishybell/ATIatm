@@ -368,7 +368,6 @@ struct genl_ops provider_gnl_ops_hits_cal = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
-
 struct genl_ops provider_gnl_ops_bit = {
     .cmd = NL_C_BIT,
     .flags = 0,
@@ -376,18 +375,34 @@ struct genl_ops provider_gnl_ops_bit = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
+struct genl_ops provider_gnl_ops_accessory = {
+    .cmd = NL_C_ACCESSORY,
+    .flags = 0,
+    .policy = accessory_conf_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
+struct genl_ops provider_gnl_ops_gps = {
+    .cmd = NL_C_GPS,
+    .flags = 0,
+    .policy = gps_conf_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
 
 static struct genl_ops *command_op_map[] = {
-    /* NL_C_UNSPEC */	NULL,
-    /* NL_C_FAILURE */	&provider_gnl_ops_failure,
-    /* NL_C_BATTERY */	&provider_gnl_ops_battery,
-    /* NL_C_EXPOSE */	&provider_gnl_ops_expose,
-    /* NL_C_MOVE */		&provider_gnl_ops_move,
-    /* NL_C_POSITION */	&provider_gnl_ops_position,
-    /* NL_C_STOP */		&provider_gnl_ops_stop,
-    /* NL_C_HITS */		&provider_gnl_ops_hits,
-    /* NL_C_HIT_CAL */	&provider_gnl_ops_hits_cal,
-    /* NL_C_BIT */		&provider_gnl_ops_bit,
+    /* NL_C_UNSPEC */		NULL,
+    /* NL_C_FAILURE */		&provider_gnl_ops_failure,
+    /* NL_C_BATTERY */		&provider_gnl_ops_battery,
+    /* NL_C_EXPOSE */		&provider_gnl_ops_expose,
+    /* NL_C_MOVE */			&provider_gnl_ops_move,
+    /* NL_C_POSITION */		&provider_gnl_ops_position,
+    /* NL_C_STOP */			&provider_gnl_ops_stop,
+    /* NL_C_HITS */			&provider_gnl_ops_hits,
+    /* NL_C_HIT_CAL */		&provider_gnl_ops_hits_cal,
+    /* NL_C_BIT */			&provider_gnl_ops_bit,
+    /* NL_C_ACCESSORY */	&provider_gnl_ops_accessory,
+    /* NL_C_GPS */			&provider_gnl_ops_gps,
 };
 
 typedef struct hb_obj_list {

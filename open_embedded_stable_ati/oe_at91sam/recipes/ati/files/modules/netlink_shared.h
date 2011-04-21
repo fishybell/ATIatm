@@ -18,7 +18,11 @@ enum {
 };
 #define GEN_STRING_A_MAX (__GEN_STRING_A_MAX - 1)
 static struct nla_policy generic_string_policy[GEN_STRING_A_MAX + 1] = {
+#ifdef NETLINK_USER_H
+    {}, {NLA_STRING, 0, 0},
+#else
     [GEN_STRING_A_MSG] = { .type = NLA_STRING },
+#endif
 };
 /* generic policy with a single 16-bit integer attribute */
 enum {
@@ -28,7 +32,11 @@ enum {
 };
 #define GEN_INT16_A_MAX (__GEN_INT16_A_MAX - 1)
 static struct nla_policy generic_int16_policy[GEN_INT16_A_MAX + 1] = {
+#ifdef NETLINK_USER_H
+    {}, {NLA_U16, 0, 0},
+#else
     [GEN_INT16_A_MSG] = { .type = NLA_U16 },
+#endif
 };
 /* generic policy with a single 8-bit integer attribute */
 enum {
@@ -38,14 +46,18 @@ enum {
 };
 #define GEN_INT8_A_MAX (__GEN_INT8_A_MAX - 1)
 static struct nla_policy generic_int8_policy[GEN_INT8_A_MAX + 1] = {
+#ifdef NETLINK_USER_H
+    {}, {NLA_U8, 0, 0},
+#else
     [GEN_INT8_A_MSG] = { .type = NLA_U8 },
+#endif
 };
 
 /* specific policy for hit sensor calibration */
 typedef struct hit_calibration {
     u16 lower __attribute__ ((packed)); /* lower calibration value */
     u16 upper __attribute__ ((packed)); /* upper calibration value */
-    u16 burst __attribute__ ((packed)); /* burst seperation value */
+    u16 burst __attribute__ ((packed)); /* burst seperation value (0 for NCHS, 1 for single) */
     u8  hit_to_fall;                    /* number of hits required to fall (0 for infinity) */
     u8  set;                            /* explained below */
 } hit_calibration_t;
@@ -68,7 +80,7 @@ enum {
 #define HIT_A_MAX (__HIT_A_MAX - 1)
 static struct nla_policy hit_calibration_policy[HIT_A_MAX + 1] = {
 #ifdef NETLINK_USER_H
-    [HIT_A_MSG] = { .minlen = sizeof(struct hit_calibration), .maxlen = sizeof(struct hit_calibration) },
+    {}, { NLA_UNSPEC, sizeof(struct hit_calibration), sizeof(struct hit_calibration) },
 #else
     [HIT_A_MSG] = { .len = sizeof(struct hit_calibration) },
 #endif
@@ -92,14 +104,73 @@ enum {
 #define BIT_A_MAX (__BIT_A_MAX - 1)
 static struct nla_policy bit_event_policy[BIT_A_MAX + 1] = {
 #ifdef NETLINK_USER_H
-    [BIT_A_MSG] = { .minlen = sizeof(struct bit_event), .maxlen = sizeof(struct bit_event) },
+    {}, { NLA_UNSPEC, sizeof(struct bit_event), sizeof(struct bit_event) },
 #else
     [BIT_A_MSG] = { .len = sizeof(struct bit_event) },
 #endif
 };
 
+/* specific policy for accessory configuration */
+typedef struct accessory_conf {
+    u8 acc_type:6;                             /* type of accessory used (enum below) */
+    u8 request:1;                              /* request all data for this accessory (on reply, on_immediate will indicate current status, once will indicate existence of accessory */
+    u8 on_immediate:1;                         /* 1 for activate immediately */
+    u16 once:1 __attribute__ ((packed));       /* 1 for the following to be used for a single action, but not override any saved settings, 0 to overwrite saved settings */
+    u16 on_exp:1 __attribute__ ((packed));     /* 1 for activate on expose */
+    u16 on_hit:1 __attribute__ ((packed));     /* 1 for activate on hit */
+    u16 on_kill:1 __attribute__ ((packed));    /* 1 for activate on kill */
+    u16 ex_data1:12 __attribute__ ((packed));  /* extra data specific to the accessory type */
+    u8 ex_data2;                               /* more extra data specific to the accessory type */
+    u16 start_delay __attribute__ ((packed));  /* time to delay before activation (in milliseconds or seconds dependent on accessory type) */
+    u16 repeat_delay __attribute__ ((packed)); /* time to delay before repeat (in milliseconds or seconds dependent on accessory type) */
+} accessory_conf_t;
+enum {
+    ACC_NES_MOON_GLOW,      /* Night Effects Simulator, Moon Glow light */
+    ACC_NES_PHI,            /* Night Effects Simulator, Positive Hit Indicator light */
+    ACC_NES_MFS,            /* Night Effects Simulator, Muzzle Flash Simulator light : ex_data1 = flash type, ex_data2 = flash repeat */
+    ACC_SES,                /* Sound Effects Simulator : ex_data1 = track #, ex_data2 = record length (in seconds, 0 for play) */
+    ACC_SMOKE,              /* Smoke generator : ex_data1 = smoke # */
+    ACC_THERMAL,            /* Thermal device : ex_data1 = thermal # */
+    ACC_MILES_SDH,          /* MILES, Shootback Device Holder : ex_data1 = MILES Code, ex_data2 = Ammo Type, repeat_dalay = Player ID, start_delay = Fire Delay */
+};
+enum {
+    ACC_A_UNSPEC,
+    ACC_A_MSG, /* accesory conf structure */
+    __ACC_A_MAX,
+};
+#define ACC_A_MAX (__ACC_A_MAX - 1)
+static struct nla_policy accessory_conf_policy[ACC_A_MAX + 1] = {
+#ifdef NETLINK_USER_H
+    {}, { NLA_UNSPEC, sizeof(struct accessory_conf), sizeof(struct accessory_conf) },
+#else
+    [ACC_A_MSG] = { .len = sizeof(struct accessory_conf) },
+#endif
+};
+
+/* specific policy for gps configuration */
+typedef struct gps_conf {
+    u32 fom;                             /* GPS Field of Merit */
+    u16 intLat __attribute__ ((packed)); /* Integral Latitude */
+    u32 fraLat;                          /* Fractional Latitude */
+    u16 intLon __attribute__ ((packed)); /* Integral Longitude */
+    u32 fraLon;                          /* Fractional Longitude */
+} gps_t;
+enum {
+    GPS_A_UNSPEC,
+    GPS_A_MSG, /* gps conf structure */
+    __GPS_A_MAX,
+};
+#define GPS_A_MAX (__GPS_A_MAX - 1)
+static struct nla_policy gps_conf_policy[GPS_A_MAX + 1] = {
+#ifdef NETLINK_USER_H
+    {}, { NLA_UNSPEC, sizeof(struct gps_conf), sizeof(struct gps_conf) },
+#else
+    [GPS_A_MSG] = { .len = sizeof(struct gps_conf) },
+#endif
+};
+
 /* this value needs to be the highest among MAX attribute values (so far, mine are all the same) */
-#define NL_A_MAX BIT_A_MAX
+#define NL_A_MAX GPS_A_MAX
 
 /* commands: enumeration of all commands (functions), 
  * used by userspace application to identify command to be ececuted
@@ -114,11 +185,20 @@ enum {
     NL_C_MOVE,		/* move as mph (command/reply) (generic 8-bit int) */
     NL_C_POSITION,	/* position in feet from home (request/reply) (generic 16-bit int) */
     NL_C_STOP,		/* stop (command/reply) (generic 8-bit int) */
-    NL_C_HITS,		/* hit log (request/reply) (generic string) */
+    NL_C_HITS,		/* hit log (request/reply) (generic 8-bit int) */
     NL_C_HIT_CAL,	/* calibrate hit sensor (command/reply) (hit calibrate structure) */
     NL_C_BIT,		/* bit button event (broadcast) (bit event structure) */
+    NL_C_ACCESSORY,	/* configure accesories (command/reply) (accessory structure) */
+    NL_C_GPS,		/* gps status (request/reply) (gps structure) */
     __NL_C_MAX,
 };
 #define NL_C_MAX (__NL_C_MAX - 1)
+
+#define CONCEAL 0
+#define EXPOSE 1
+#define LIFTING 2
+#define EXPOSURE_REQ 255
+
+#define HIT_REQ 255
 
 #endif

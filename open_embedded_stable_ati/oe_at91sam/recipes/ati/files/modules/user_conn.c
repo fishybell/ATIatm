@@ -174,8 +174,65 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
                 }
             }
             break;
+        case NL_C_ACCESSORY:
+            genlmsg_parse(nlh, 0, attrs, ACC_A_MAX, accessory_conf_policy);
+
+            if (attrs[ACC_A_MSG]) {
+                // calibration data
+                struct accessory_conf *acc_c = (struct accessory_conf*)nla_data(attrs[ACC_A_MSG]);
+                if (acc_c != NULL) {
+                    switch (acc_c->acc_type) {
+                        case ACC_NES_MOON_GLOW:
+                            // Moon Glow data
+                            snprintf(wbuf, 128, "Q MGL");
+                            break;
+                        case ACC_NES_PHI:
+                            // Positive Hit Indicator data
+                            snprintf(wbuf, 128, "Q PHI");
+                            break;
+                        case ACC_NES_MFS:
+                            // Muzzle Flash Simulator data
+                            snprintf(wbuf, 128, "Q MFS");
+                            break;
+                        case ACC_SES:
+                            // SES data
+                            snprintf(wbuf, 128, "Q SES");
+                            break;
+                        case ACC_SMOKE:
+                            // Smoke generator data
+                            snprintf(wbuf, 128, "Q SMK");
+                            break;
+                        case ACC_THERMAL:
+                            // Thermal device data
+                            snprintf(wbuf, 128, "Q THM");
+                            break;
+                        case ACC_MILES_SDH:
+                            // MILES Shootback Device Holder data 
+                            snprintf(wbuf, 128, "Q MSD");
+                            break;
+                    }
+
+                    // on now, on at expose, on at hit, on at kill, ex_data1, ex_data2, start_delay, repeat_delay (some mean different things for different accessories)
+                    snprintf(wbuf+5, 128-5, " %i %i %i %i %i %i %i %i %i", acc_c->on_immediate, acc_c->once, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->ex_data1, acc_c->ex_data2, acc_c->start_delay, acc_c->repeat_delay);
+                }
+            }
+            break;
+
+        case NL_C_GPS:
+            genlmsg_parse(nlh, 0, attrs, GPS_A_MAX, gps_conf_policy);
+
+            if (attrs[GPS_A_MSG]) {
+                // calibration data
+                struct gps_conf *gps_c = (struct gps_conf*)nla_data(attrs[GPS_A_MSG]);
+                if (gps_c != NULL) {
+                    // field of merit, integral latitude, fractional latitude, integral longitude, fractional longitude
+                    snprintf(wbuf, 128, "G %i %i %i %i %i", gps_c->fom, gps_c->intLat, gps_c->fraLat, gps_c->intLon, gps_c->fraLon);
+                }
+            }
+            break;
+
         case NL_C_FAILURE:
-            genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_int8_policy);
+            genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_string_policy);
 
             if (attrs[GEN_STRING_A_MSG]) {
                 char *data = nla_get_string(attrs[GEN_STRING_A_MSG]);
@@ -283,6 +340,12 @@ printf("TODO: fill in feature N\n");
             case 'X': case 'x':
                 nl_cmd = NL_C_STOP;
                 break;
+            case 'Q': case 'q':
+                nl_cmd = NL_C_ACCESSORY;
+                break;
+            case 'G': case 'g':
+                nl_cmd = NL_C_GPS;
+                break;
             case '\0':
                 // empty string, just ignore
                 break;
@@ -296,6 +359,8 @@ printf("unrecognized command '%c'\n", cmd[0]);
             struct nl_msg *msg;
             int arg1, arg2;
             struct hit_calibration hit_c;
+            struct accessory_conf acc_c;
+            struct gps_conf gps_c;
             msg = nlmsg_alloc();
             genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, nl_cmd, 1);
 
@@ -307,11 +372,11 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     break;
                 case NL_C_EXPOSE:
                     if (cmd[0] == 'E' || cmd[0] == 'e') {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, 1); // expose request
+                        nla_put_u8(msg, GEN_INT8_A_MSG, EXPOSE); // expose request
                     } else if (cmd[0] == 'C' || cmd[0] == 'c') {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, 0); // conceal request
+                        nla_put_u8(msg, GEN_INT8_A_MSG, CONCEAL); // conceal request
                     } else {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, 255); // exposure status request
+                        nla_put_u8(msg, GEN_INT8_A_MSG, EXPOSURE_REQ); // exposure status request
                     }
                     break;
                 case NL_C_MOVE:
@@ -336,16 +401,15 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     break;
                 case NL_C_HITS:
                     if (cmd[1] == '\0') {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, 255); // request hits message
+                        nla_put_u8(msg, GEN_INT8_A_MSG, HIT_REQ); // request hits message
                     } else if (sscanf(cmd+1, "%i", arg1) == 1) {
                         if (arg1 > 254 || arg1 < 0) {
                             arg1 = 0; // stay away from the edge conditions
                         }
                         nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // reset hits (to X) message
                     } else {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, 255); // request hits message
+                        nla_put_u8(msg, GEN_INT8_A_MSG, HIT_REQ); // request hits message
                     }
-                    break;
                     break;
                 case NL_C_HIT_CAL:
                     arg2 = sscanf(cmd+1, "%i", arg1);
@@ -387,6 +451,104 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     }
                     // put calibration data in message
                     nla_put(msg, HIT_A_MSG, sizeof(struct hit_calibration), &hit_c);
+                    break;
+                case NL_C_ACCESSORY:
+                    arg1 = cmd[1] == ' ' ? 2 : 3; // next letter location in the command (ignore up to one space)
+                    arg2 = arg1 + 3; // start of arguments
+                    // find the type of accessory
+                    switch (cmd[arg1]) { /* first letter of second group */
+                        case 'M' : case 'm' :
+                           switch (cmd[arg1 + 1]) { /* second letter */
+                               case 'F' : case 'f' :
+                                   switch (cmd[arg1 + 2]) { /* third letter */
+                                       case 'S' : case 's' :
+                                           acc_c.acc_type = ACC_NES_MFS;
+                                           break;
+                                   }
+                                   break;
+                               case 'G' : case 'g' :
+                                   switch (cmd[arg1 + 2]) { /* third letter */
+                                       case 'L' : case 'l' :
+                                           acc_c.acc_type = ACC_NES_MOON_GLOW;
+                                           break;
+                                   }
+                                   break;
+                               case 'S' : case 's' :
+                                   switch (cmd[arg1 + 2]) { /* third letter */
+                                       case 'D' : case 'd' :
+                                           acc_c.acc_type = ACC_MILES_SDH;
+                                           break;
+                                   }
+                                   break;
+                           }
+                           break;
+                        case 'P' : case 'p' :
+                           switch (cmd[arg1 + 1]) { /* second letter */
+                               case 'H' : case 'h' :
+                                   switch (cmd[arg1 + 2]) { /* third letter */
+                                       case 'I' : case 'i' :
+                                           acc_c.acc_type = ACC_NES_PHI;
+                                           break;
+                                   }
+                                   break;
+                           }
+                           break;
+                        case 'S' : case 's' :
+                           switch (cmd[arg1 + 1]) { /* second letter */
+                               case 'E' : case 'e' :
+                                   switch (cmd[arg1 + 2]) { /* third letter */
+                                       case 'S' : case 's' :
+                                           acc_c.acc_type = ACC_SES;
+                                           break;
+                                   }
+                                   break;
+                               case 'M' : case 'm' :
+                                   switch (cmd[arg1 + 2]) { /* third letter */
+                                       case 'K' : case 'k' :
+                                           acc_c.acc_type = ACC_SMOKE;
+                                           break;
+                                   }
+                                   break;
+                           }
+                           break;
+                        case 'T' : case 't' :
+                           switch (cmd[arg1 + 1]) { /* second letter */
+                               case 'H' : case 'h' :
+                                   switch (cmd[arg1 + 2]) { /* third letter */
+                                       case 'M' : case 'm' :
+                                           acc_c.acc_type = ACC_THERMAL;
+                                           break;
+                                   }
+                                   break;
+                           }
+                           break;
+                    }
+
+                    // grab as many pieces as we can get (always in same order for all accessory types)
+                    int req, imm, onc, one, onh, onk, ex1, ex2, std, rpd; // placeholders as we can't take address of bit-field from structure
+                    req = imm = onc = one = onh = onk = ex1 = ex2 = std = rpd = 0; // zero by default
+                    sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i", &req, &imm, &onc, &one, &onh, &onk, &ex1, &ex2, &std, &rpd);
+                    acc_c.request = req;
+                    acc_c.on_immediate = imm;
+                    acc_c.once = onc;
+                    acc_c.on_exp = one;
+                    acc_c.on_hit = onh;
+                    acc_c.on_kill = onk;
+                    acc_c.ex_data1 = ex1;
+                    acc_c.ex_data2 = ex2;
+                    acc_c.start_delay = std;
+                    acc_c.repeat_delay = rpd;
+
+                    // put configuration data in message
+                    nla_put(msg, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c);
+                    break;
+
+                case NL_C_GPS:
+                    // for request, everything is zeroed out
+                    memset(&gps_c, 0, sizeof(struct gps_conf));
+
+                    // put gps request data in message
+                    nla_put(msg, GPS_A_MSG, sizeof(struct gps_conf), &gps_c);
                     break;
             }
 
