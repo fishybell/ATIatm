@@ -2,7 +2,13 @@
 
 cd /usr/local/var/oe
 ls | egrep -v "^oe_sources$|^openembedded$|^tmp$" | while read fd ; do
-    find $fd -perm /400 ! -perm /044 | while read i ; do
+    find $fd -perm /400 ! -perm /004 | while read i ; do
         chmod go+r "$i"
+        if [ -d "$i" ] ; then
+           chmod go+rx "$i"
+        fi
+    done
+    find $fd -perm /500 ! -perm /005 | while read i ; do
+        chmod go+rx "$i"
     done
 done
