@@ -123,7 +123,7 @@ printf("Parsing: %i\n", ghdr->cmd);
             }
             break;
         case NL_C_FAILURE:
-            genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_int8_policy);
+            genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_string_policy);
 
             if (attrs[GEN_STRING_A_MSG]) {
                 char *data = nla_get_string(attrs[GEN_STRING_A_MSG]);
