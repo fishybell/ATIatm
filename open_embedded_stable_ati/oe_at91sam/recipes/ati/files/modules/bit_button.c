@@ -22,27 +22,11 @@ void handle_bit_test(struct nl_handle *handle, int is_on) {
     // ignore button not pressed events
     if (is_on != 1) { return; }
 
-    // send a request to the kernel to see which way we're going
+    // toggle lifter position
     struct nl_msg *msg;
     msg = nlmsg_alloc();
     genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_EXPOSE, 1);
-    nla_put_u8(msg, GEN_INT8_A_MSG, 255); // exposure status request
-
-    // Send message over netlink handle
-    nl_send_auto_complete(handle, msg);
-
-    // Free message
-    nlmsg_free(msg);
-
-    // the response will cause me to send it the opposite direction
-}
-// swith a lifter from up to down or vice versa
-void toggle_lifter_exposure(struct nl_handle *handle, int value) {
-    // now go the opposite direction
-    struct nl_msg *msg;
-    msg = nlmsg_alloc();
-    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_EXPOSE, 1);
-    nla_put_u8(msg, GEN_INT8_A_MSG, value == 1?0:1); // was up? go down, otherwise go up
+    nla_put_u8(msg, GEN_INT8_A_MSG, TOGGLE);
 
     // Send message over netlink handle
     nl_send_auto_complete(handle, msg);
@@ -60,15 +44,15 @@ void handle_bit_move(struct nl_handle *handle, int type) {
     // fill with the correct movement data
     switch (type) {
         case BIT_MOVE_FWD:
-printf("sending FWD\n");
+printf("BIT: sending FWD\n");
             nla_put_u8(msg, GEN_INT8_A_MSG, 128 + 1); // fwd at 1 mph
             break;
         case BIT_MOVE_REV:
-printf("sending REV\n");
+printf("BIT: sending REV\n");
             nla_put_u8(msg, GEN_INT8_A_MSG, 128 - 1); // rev at 1 mph
             break;
         case BIT_MOVE_STOP:
-printf("sending STOP\n");
+printf("BIT: sending STOP\n");
             nla_put_u8(msg, GEN_INT8_A_MSG, 1); // stop = true
             break;
     }
@@ -91,8 +75,9 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
     struct nl_handle *handle = (struct nl_handle*)arg;
 
     // Validate message and parse attributes
-printf("Parsing: %i\n", ghdr->cmd);
+printf("BIT: Parsing: %i\n", ghdr->cmd);
     switch (ghdr->cmd) {
+#if 0
         case NL_C_EXPOSE:
             genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
 
@@ -102,6 +87,7 @@ printf("Parsing: %i\n", ghdr->cmd);
                 toggle_lifter_exposure(handle, value); // do the opposite of the current exposure
             }
             break;
+#endif // if 0
         case NL_C_BIT:
             genlmsg_parse(nlh, 0, attrs, BIT_A_MAX, bit_event_policy);
 
@@ -127,12 +113,12 @@ printf("Parsing: %i\n", ghdr->cmd);
 
             if (attrs[GEN_STRING_A_MSG]) {
                 char *data = nla_get_string(attrs[GEN_STRING_A_MSG]);
-                printf("failure attribute: %s\n", data);
+                printf("BIT: failure attribute: %s\n", data);
             }
 
             break;
         default:
-            fprintf(stderr, "failure to parse unkown command\n"); fflush(stderr);
+//            fprintf(stderr, "BIT: failure to parse unkown command\n"); fflush(stderr);
             break;
     }
 
@@ -173,7 +159,7 @@ int main(int argc, char **argv) {
     ev.events = EPOLLIN;
     ev.data.fd = nl_fd;
     if (epoll_ctl(efd, EPOLL_CTL_ADD, nl_fd, &ev) < 0) {
-        fprintf(stderr, "epoll insertion error: nl_fd\n");
+        fprintf(stderr, "BIT: epoll insertion error: nl_fd\n");
         return -1;
     }
 
@@ -200,7 +186,7 @@ int main(int argc, char **argv) {
 
         if (nfds == -1) {
             /* select cancelled or other error */
-            fprintf(stderr, "select cancelled: "); fflush(stderr);
+            fprintf(stderr, "BIT: select cancelled: "); fflush(stderr);
             switch (errno) {
                 case EBADF: fprintf(stderr, "EBADF\n"); break;
                 case EFAULT: fprintf(stderr, "EFAULT\n"); break;
@@ -216,7 +202,7 @@ int main(int argc, char **argv) {
             for (i=0; i<nfds; i++) {
                 if (events[i].data.fd == nl_fd) {
                     // netlink talking 
-printf("nl\n");
+printf("BIT: nl\n");
                     nl_recvmsgs_default(handle); // will call callback functions
                 }
             }
