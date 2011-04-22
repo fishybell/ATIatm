@@ -17,12 +17,6 @@
 
 #define TIMEOUT_IN_SECONDS		3
 
-//#define FIX_FOR_JPY_IO_BOARD
-#ifdef FIX_FOR_JPY_IO_BOARD
-	#undef INPUT_LIFTER_POS_UP_LIMIT
-	#define	INPUT_LIFTER_POS_UP_LIMIT 			AT91_PIN_PC3
-#endif // FIX_FOR_JPY_IO_BOARD
-
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
 	//for testing using eval. board buttons and LED
@@ -38,11 +32,14 @@
 	#define INPUT_LIFTER_POS_UP_LIMIT     		AT91_PIN_PA31   // BP4 on dev. board
 
 	#define OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE    ACTIVE_LOW
-	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PA6
+	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PB8
 #endif // TESTING_ON_EVAL
 
-
-
+//#define FIX_FOR_JPY_IO_BOARD
+#ifdef FIX_FOR_JPY_IO_BOARD
+	#undef INPUT_LIFTER_POS_UP_LIMIT
+	#define	INPUT_LIFTER_POS_UP_LIMIT 			AT91_PIN_PC3
+#endif // FIX_FOR_JPY_IO_BOARD
 
 //---------------------------------------------------------------------------
 // This lock protects against motor control from simultaneously access from
@@ -64,14 +61,13 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to store the current movement
+// As the infantry motor always spins the same direction, we only stop
+// moving when we hit the correct position (unlike the armor) or timeout
 //---------------------------------------------------------------------------
-#define IGNORE_MOVE_INTERRUPT
-#ifdef IGNORE_MOVE_INTERRUPT
-	#define LIFTER_MOVEMENT_NONE			0
-	#define LIFTER_MOVEMENT_UP				1
-	#define LIFTER_MOVEMENT_DOWN			2
-	atomic_t movement_atomic = ATOMIC_INIT(LIFTER_MOVEMENT_NONE);
-#endif // IGNORE_MOVE_INTERRUPT
+#define LIFTER_MOVEMENT_NONE			0
+#define LIFTER_MOVEMENT_UP				1
+#define LIFTER_MOVEMENT_DOWN			2
+atomic_t movement_atomic = ATOMIC_INIT(LIFTER_MOVEMENT_NONE);
 
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space of a position
@@ -112,11 +108,8 @@ static const char * lifter_position[] =
 static int hardware_motor_on(int direction)
 	{
 	unsigned long flags;
-	// with the infantry lifter we don't care about direction,
-	// just turn on the motor
-delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
-#ifdef IGNORE_MOVE_INTERRUPT
+    // remember the direction
 	if (direction == LIFTER_POSITION_UP)
 		{
 		atomic_set(&movement_atomic, LIFTER_MOVEMENT_UP);
@@ -125,7 +118,10 @@ delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 		{
 		atomic_set(&movement_atomic, LIFTER_MOVEMENT_DOWN);
 		}
-#endif // IGNORE_MOVE_INTERRUPT
+
+	// with the infantry lifter we don't care about direction,
+	// just turn on the motor
+delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     spin_lock_irqsave(&motor_lock, flags);
     at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake off
@@ -145,9 +141,8 @@ delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor off
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake on
 
-#ifdef IGNORE_MOVE_INTERRUPT
+    // stop remembering direction
     atomic_set(&movement_atomic, LIFTER_MOVEMENT_NONE);
-#endif // IGNORE_MOVE_INTERRUPT
 
 	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
@@ -201,13 +196,12 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-#ifdef IGNORE_MOVE_INTERRUPT
+    // ignore down limit on up movement
 	if (atomic_read(&movement_atomic) ==  LIFTER_MOVEMENT_UP)
 		{
 	delay_printk("%s - %s() ignoring...\n",TARGET_NAME, __func__);
 		return IRQ_HANDLED;
 		}
-#endif // IGNORE_MOVE_INTERRUPT
 
     // We get an interrupt on both edges, so we have to check to which edge
 	// we are responding.
@@ -228,7 +222,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
     else
     	{
-	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
+//	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
     	}
 
     return IRQ_HANDLED;
@@ -245,13 +239,12 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
 
-#ifdef IGNORE_MOVE_INTERRUPT
+    // ignore up limit on down movement
 	if (atomic_read(&movement_atomic) ==  LIFTER_MOVEMENT_DOWN)
 		{
 	delay_printk("%s - %s() ignoring...\n",TARGET_NAME, __func__);
 		return IRQ_HANDLED;
 		}
-#endif // IGNORE_MOVE_INTERRUPT
 
     // We get an interrupt on both edges, so we have to check to which edge
 	// we are responding.
@@ -272,7 +265,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
     else
     	{
-	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
+//	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
     	}
 
     return IRQ_HANDLED;
