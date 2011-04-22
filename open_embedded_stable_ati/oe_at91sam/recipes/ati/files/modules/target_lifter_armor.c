@@ -7,17 +7,35 @@
 
 #include "target.h"
 #include "target_lifter_armor.h"
+#include "target_lifter_infantry.h" // shared constants and function definitions
+
+#include "netlink_kernel.h"
 //---------------------------------------------------------------------------
+// #define TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL
+	//for testing using eval. board buttons and LED
+	#undef INPUT_LIFTER_POS_ACTIVE_STATE
+	#undef INPUT_LIFTER_POS_DOWN_LIMIT
+	#undef INPUT_LIFTER_POS_UP_LIMIT
+
+	#undef OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE
+	#undef OUTPUT_LIFTER_MOTOR_FWD_POS
+	#undef OUTPUT_LIFTER_MOTOR_REV_POS
+
+	#define INPUT_LIFTER_POS_ACTIVE_STATE   	ACTIVE_LOW
+	#define INPUT_LIFTER_POS_DOWN_LIMIT    		AT91_PIN_PA30   // BP3 on dev. board
+	#define INPUT_LIFTER_POS_UP_LIMIT     		AT91_PIN_PA31   // BP4 on dev. board
+
+	#define OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE    ACTIVE_LOW
+	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PB8
+	#define OUTPUT_LIFTER_MOTOR_REV_POS    			AT91_PIN_PB9
+#endif // TESTING_ON_EVAL
+
 
 #define TARGET_NAME  "armor lifter"
 #define LIFTER_TYPE  "armor"
 
-#define TIMEOUT_IN_SECONDS  12
-
-#define LIFTER_POSITION_DOWN   			0
-#define LIFTER_POSITION_UP    			1
-#define LIFTER_POSITION_MOVING  		2
-#define LIFTER_POSITION_ERROR_NEITHER	3	// Neither limit switch is active, but the lifter is not moving
+#define TIMEOUT_IN_SECONDS  14
 
 #undef INPUT_LIFTER_POS_ACTIVE_STATE
 #define INPUT_LIFTER_POS_ACTIVE_STATE		ACTIVE_LOW
@@ -194,7 +212,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
     else
     	{
-	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
+//	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
     	}
 
     return IRQ_HANDLED;
@@ -231,7 +249,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
     else
     	{
-	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
+//	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
     	}
 
     return IRQ_HANDLED;
@@ -310,7 +328,7 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
-static int hardware_position_set(int position)
+int lifter_position_set(int position)
     {
     // signal that an operation is in progress
     atomic_set(&operating_atomic, TRUE);
@@ -322,11 +340,12 @@ static int hardware_position_set(int position)
 
     return 0;
     }
+EXPORT_SYMBOL(lifter_position_set);
 
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
-static int hardware_position_get(void)
+int lifter_position_get(void)
     {
     // check if an operation is in progress...
     if (atomic_read(&operating_atomic))
@@ -346,6 +365,7 @@ static int hardware_position_get(void)
 
     return LIFTER_POSITION_ERROR_NEITHER;
     }
+EXPORT_SYMBOL(lifter_position_get);
 
 //---------------------------------------------------------------------------
 // Handles reads to the type attribute through sysfs
@@ -360,7 +380,7 @@ static ssize_t type_show(struct device *dev, struct device_attribute *attr, char
 //---------------------------------------------------------------------------
 static ssize_t position_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
-    return sprintf(buf, "%s\n", lifter_position[hardware_position_get()]);
+    return sprintf(buf, "%s\n", lifter_position[lifter_position_get()]);
     }
 
 //---------------------------------------------------------------------------
@@ -380,9 +400,9 @@ static ssize_t position_store(struct device *dev, struct device_attribute *attr,
        delay_printk("%s - %s() : user command up\n",TARGET_NAME, __func__);
         status = size;
         // TODO - need to check error condition first
-        if (hardware_position_get() != LIFTER_POSITION_UP)
+        if (lifter_position_get() != LIFTER_POSITION_UP)
             {
-            hardware_position_set(LIFTER_POSITION_UP);
+            lifter_position_set(LIFTER_POSITION_UP);
             }
         }
     else if (sysfs_streq(buf, "down"))
@@ -390,9 +410,9 @@ static ssize_t position_store(struct device *dev, struct device_attribute *attr,
        delay_printk("%s - %s() : user command down\n",TARGET_NAME, __func__);
         status = size;
         // TODO - need to check error condition first
-        if (hardware_position_get() != LIFTER_POSITION_DOWN)
+        if (lifter_position_get() != LIFTER_POSITION_DOWN)
             {
-            hardware_position_set(LIFTER_POSITION_DOWN);
+            lifter_position_set(LIFTER_POSITION_DOWN);
             }
         }
     else
@@ -447,11 +467,29 @@ struct target_device target_device_lifter_armor =
     };
 
 //---------------------------------------------------------------------------
+// Message filler handler for expose functions
+//---------------------------------------------------------------------------
+int pos_mfh(struct sk_buff *skb, void *pos_data) {
+    // the pos_data argument is a pre-made pos_event structure
+    return nla_put_u8(skb, GEN_INT8_A_MSG, *((int*)pos_data));
+}
+
 //---------------------------------------------------------------------------
 // Work item to notify the user-space about a position change or error
 //---------------------------------------------------------------------------
 static void position_change(struct work_struct * work)
     {
+    // notify netlink userspace
+    int pos_data;
+    switch (lifter_position_get()) { // map internal to external values
+        case LIFTER_POSITION_DOWN: pos_data = CONCEAL; break;
+        case LIFTER_POSITION_UP: pos_data = EXPOSE; break;
+        case LIFTER_POSITION_MOVING: pos_data = LIFTING; break;
+        default: pos_data = EXPOSURE_REQ; break; //error
+    }
+    send_nl_message_multi(&pos_data, pos_mfh, NL_C_EXPOSE);
+
+    // notify sysfs userspace
     target_sysfs_notify(&target_device_lifter_armor, "position");
     }
 
