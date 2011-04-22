@@ -652,11 +652,11 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
                   break;
                case ACC_NES_MFS:
                   // MFS on when activate on exposure is set (flash type/burst mode in ex_data1)
-                  sit_client->didMFS(acc_c->on_exp, acc_c->ex_data1, acc_c->start_delay, acc_c->repeat_delay); // tell client
+                  sit_client->didMFS(acc_c->on_exp, acc_c->ex_data1, acc_c->start_delay/2, acc_c->repeat_delay/2); // tell client
                   break;
                case ACC_MILES_SDH:
-                  // MILES data : ex_data1 = MILES Code, ex_data2 = Ammo type, repeat_delay = Player ID, start_delay = Fire Delay
-                  sit_client->didMSDH(acc_c->ex_data1, acc_c->ex_data2, acc_c->repeat_delay, acc_c->start_delay);
+                  // MILES data : ex_data1 = Player ID, ex_data2 = MILES Code, ex_data3 = Ammo type, start_delay = Fire Delay
+                  sit_client->didMSDH(acc_c->ex_data2, acc_c->ex_data3, acc_c->ex_data1, acc_c->start_delay/2);
                   break;
             }
          }
@@ -747,11 +747,11 @@ FUNCTION_START("::doMSDH(int code, int ammo, int player, int delay)")
    struct accessory_conf acc_c;
    memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out
    acc_c.acc_type = ACC_MILES_SDH;
-   acc_c.on_exp = 1; // turn on on exposed
-   acc_c.ex_data1 = code;
-   acc_c.ex_data2 = ammo;
-   acc_c.repeat_delay = player;
-   acc_c.start_delay = delay;
+   acc_c.on_exp = 1; // turn on when fully exposed
+   acc_c.ex_data2 = code;
+   acc_c.ex_data3 = ammo;
+   acc_c.ex_data1 = player;
+   acc_c.start_delay = 2 * delay;
 
    // Queue command
    queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // MSDH is an accessory
@@ -768,9 +768,16 @@ FUNCTION_START("::doMFS(int on, int mode, int idelay, int rdelay)")
    memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out
    acc_c.acc_type = ACC_NES_MFS;
    acc_c.on_exp = on;
-   acc_c.ex_data1 = mode;
-   acc_c.start_delay = idelay;
-   acc_c.start_delay = rdelay;
+   if (mode == 1) {
+      acc_c.ex_data1 = 1; // do burst
+      acc_c.ex_data2 = 5; // burst 5 times
+      acc_c.on_time = 50; // on 50 milliseconds
+      acc_c.off_time = 100; // off 100 milliseconds
+      acc_c.repeat_delay = 2 * rdelay; // when burst, burst every rdelay*2 half-seconds
+   } else {
+      acc_c.on_time = 75; // on 75 milliseconds
+   }
+   acc_c.start_delay = 2 * idelay; // start after idelay*2 half-seconds
 
    // Queue command
    queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // MFS is an accessory
