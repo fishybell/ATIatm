@@ -212,8 +212,8 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
                             break;
                     }
 
-                    // on now, on at expose, on at hit, on at kill, ex_data1, ex_data2, start_delay, repeat_delay (some mean different things for different accessories)
-                    snprintf(wbuf+5, 128-5, " %i %i %i %i %i %i %i %i %i", acc_c->on_immediate, acc_c->once, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->ex_data1, acc_c->ex_data2, acc_c->start_delay, acc_c->repeat_delay);
+                    // some mean different things for different accessories
+                    snprintf(wbuf+5, 128-5, " %i %i %i %i %i %i %i %i %i %i %i %i %i", acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
                 }
             }
             break;
@@ -317,6 +317,9 @@ printf("TODO: fill in feature R\n");
             case 'C': case 'c':
                 nl_cmd = NL_C_EXPOSE;
                 break;
+            case 'T': case 't':
+                nl_cmd = NL_C_EXPOSE;
+                break;
             case 'L': case 'l':
                 nl_cmd = NL_C_HIT_CAL;
                 break;
@@ -372,9 +375,11 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     break;
                 case NL_C_EXPOSE:
                     if (cmd[0] == 'E' || cmd[0] == 'e') {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, EXPOSE); // expose request
+                        nla_put_u8(msg, GEN_INT8_A_MSG, EXPOSE); // expose command
                     } else if (cmd[0] == 'C' || cmd[0] == 'c') {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, CONCEAL); // conceal request
+                        nla_put_u8(msg, GEN_INT8_A_MSG, CONCEAL); // conceal command
+                    } else if (cmd[0] == 'T' || cmd[0] == 't') {
+                        nla_put_u8(msg, GEN_INT8_A_MSG, TOGGLE); // toggle command
                     } else {
                         nla_put_u8(msg, GEN_INT8_A_MSG, EXPOSURE_REQ); // exposure status request
                     }
@@ -525,19 +530,20 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     }
 
                     // grab as many pieces as we can get (always in same order for all accessory types)
-                    int req, imm, onc, one, onh, onk, ex1, ex2, std, rpd; // placeholders as we can't take address of bit-field from structure
-                    req = imm = onc = one = onh = onk = ex1 = ex2 = std = rpd = 0; // zero by default
-                    sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i", &req, &imm, &onc, &one, &onh, &onk, &ex1, &ex2, &std, &rpd);
+                    int req, onn, one, onh, onk, ont, oft, std, rpd, rpt, ex1, ex2, ex3; // placeholders as we can't take address of bit-field for sscanf
+                    req = onn =  one = onh = onk = std = rpd = ex1 = ex2 = ex3 = 0; // zero by default
+                    sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i", &req, &onn, &one, &onh, &onk, &ont, &oft, &std, &rpd, &rpt, &ex1, &ex2, &ex3);
                     acc_c.request = req;
-                    acc_c.on_immediate = imm;
-                    acc_c.once = onc;
+                    acc_c.exists = 0;
+                    acc_c.on_now = onn;
                     acc_c.on_exp = one;
                     acc_c.on_hit = onh;
                     acc_c.on_kill = onk;
-                    acc_c.ex_data1 = ex1;
-                    acc_c.ex_data2 = ex2;
                     acc_c.start_delay = std;
                     acc_c.repeat_delay = rpd;
+                    acc_c.ex_data1 = ex1;
+                    acc_c.ex_data2 = ex2;
+                    acc_c.ex_data3 = ex3;
 
                     // put configuration data in message
                     nla_put(msg, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c);
@@ -706,7 +712,7 @@ printf("is child\n");
             close_nicely = 1; // exit loop
         } else if (nfds == 0) {
             // timeout occurred
-printf("child %i timed out\n", client);
+//printf("child %i timed out\n", client);
         } else {
             int i, b, rsize;
             for (i=0; i<nfds; i++) {
