@@ -112,26 +112,30 @@ static struct nla_policy bit_event_policy[BIT_A_MAX + 1] = {
 
 /* specific policy for accessory configuration */
 typedef struct accessory_conf {
-    u8 acc_type:6;                             /* type of accessory used (enum below) */
-    u8 request:1;                              /* request all data for this accessory (on reply, on_immediate will indicate current status, once will indicate existence of accessory */
-    u8 on_immediate:1;                         /* 1 for activate immediately */
-    u16 once:1 __attribute__ ((packed));       /* 1 for the following to be used for a single action, but not override any saved settings, 0 to overwrite saved settings */
-    u16 on_exp:1 __attribute__ ((packed));     /* 1 for activate on expose */
-    u16 on_hit:1 __attribute__ ((packed));     /* 1 for activate on hit */
-    u16 on_kill:1 __attribute__ ((packed));    /* 1 for activate on kill */
-    u16 ex_data1:12 __attribute__ ((packed));  /* extra data specific to the accessory type */
-    u8 ex_data2;                               /* more extra data specific to the accessory type */
-    u16 start_delay __attribute__ ((packed));  /* time to delay before activation (in milliseconds or seconds dependent on accessory type) */
-    u16 repeat_delay __attribute__ ((packed)); /* time to delay before repeat (in milliseconds or seconds dependent on accessory type) */
+    u8 acc_type:6;	/* type of accessory used (enum below) */
+    u8 request:1;	/* request all data for this accessory (on reply, on_now will indicate current status (if available), exists will indicate existence of accessory */
+    u8 exists:1;	/* 1 for exists, not used except for requests */
+    u8 on_now:2;	/* 1 for activate normal, 2 for activate immediate */
+    u8 on_exp:2;	/* 1 for active when fully exposed, 2 for active when partially exposed and fully exposed, 3 for active only while exposing/concealing */
+    u8 on_hit:2;	/* 1 for activate on hit, 2 for deactivate on hit */
+    u8 on_kill:2;	/* 1 for activate on kill, 2 for deactivate on kill */
+    u16 on_time __attribute__ ((packed));			/* time on (in milliseconds, 0 for forever) */
+    u16 off_time __attribute__ ((packed));			/* time off (in milliseconds, 0 for forever) */
+    u32 start_delay:8 __attribute__ ((packed));		/* time to delay before activation (in half-seconds) */
+    u32 repeat_delay:8 __attribute__ ((packed));	/* time to delay before repeat (in half-seconds) */
+    u32 repeat:6 __attribute__ ((packed));			/* repeat count (0 for no repeat, 63 for forever) */
+    u32 ex_data1:10 __attribute__ ((packed));		/* extra data specific to the accessory type */
+    u8 ex_data2;	/* more extra data specific to the accessory type */
+    u8 ex_data3;	/* even more extra data specific to the accessory type */
 } accessory_conf_t;
 enum {
     ACC_NES_MOON_GLOW,      /* Night Effects Simulator, Moon Glow light */
     ACC_NES_PHI,            /* Night Effects Simulator, Positive Hit Indicator light */
-    ACC_NES_MFS,            /* Night Effects Simulator, Muzzle Flash Simulator light : ex_data1 = flash type, ex_data2 = flash repeat */
+    ACC_NES_MFS,            /* Night Effects Simulator, Muzzle Flash Simulator light : ex_data1 = flash type, ex_data2 = burst count */
     ACC_SES,                /* Sound Effects Simulator : ex_data1 = track #, ex_data2 = record length (in seconds, 0 for play) */
     ACC_SMOKE,              /* Smoke generator : ex_data1 = smoke # */
     ACC_THERMAL,            /* Thermal device : ex_data1 = thermal # */
-    ACC_MILES_SDH,          /* MILES, Shootback Device Holder : ex_data1 = MILES Code, ex_data2 = Ammo Type, repeat_dalay = Player ID, start_delay = Fire Delay */
+    ACC_MILES_SDH,          /* MILES, Shootback Device Holder : ex_data1 = Player ID, ex_data2 = MILES Code, ex_data3 = Ammo Type*/
 };
 enum {
     ACC_A_UNSPEC,
@@ -197,6 +201,7 @@ enum {
 #define CONCEAL 0
 #define EXPOSE 1
 #define LIFTING 2
+#define TOGGLE 3
 #define EXPOSURE_REQ 255
 
 #define HIT_REQ 255
