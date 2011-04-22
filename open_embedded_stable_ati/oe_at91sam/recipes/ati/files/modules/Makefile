@@ -13,6 +13,7 @@ obj-m := 	target.o \
 			netlink_provider.o \
 			delay_printk.o \
 			lifter.o \
+			target_generic_output.o \
 
 PWD := $(shell pwd)
 CURD := $(shell basename `pwd`)
