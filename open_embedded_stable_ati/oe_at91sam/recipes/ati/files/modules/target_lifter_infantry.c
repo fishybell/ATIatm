@@ -8,6 +8,8 @@
 #include "target.h"
 #include "target_lifter_infantry.h"
 
+#include "target_generic_output.h"
+
 #include "netlink_kernel.h"
 
 //---------------------------------------------------------------------------
@@ -127,6 +129,15 @@ delay_printk("%s - %s()\n",TARGET_NAME, __func__);
     at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake off
 	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor on
 	spin_unlock_irqrestore(&motor_lock, flags);
+
+    // when not locking, signal an event
+    if (direction == LIFTER_POSITION_UP) {
+        generic_output_event(EVENT_RAISE); // start of raise
+    } else if (direction == LIFTER_POSITION_DOWN) {
+        generic_output_event(EVENT_LOWER); // start of lower
+    } else {
+        generic_output_event(EVENT_ERROR); // error
+    }
 	return 0;
 	}
 
@@ -179,6 +190,9 @@ delay_printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME, 
     // Turn the motor off
     hardware_motor_off();
 
+    // signal an event
+    generic_output_event(EVENT_ERROR); // error
+
     // signal that the operation has finished
     atomic_set(&operating_atomic, FALSE);
 
@@ -213,6 +227,9 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
         // Turn the motor off
         hardware_motor_off();
+
+        // signal an event
+        generic_output_event(EVENT_DOWN); // finished lowering
 
         // signal that the operation has finished
         atomic_set(&operating_atomic, FALSE);
@@ -256,6 +273,9 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
         // Turn the motor off
         hardware_motor_off();
+
+        // signal an event
+        generic_output_event(EVENT_UP); // finished raising
 
         // signal that the operation has finished
     	atomic_set(&operating_atomic, FALSE);

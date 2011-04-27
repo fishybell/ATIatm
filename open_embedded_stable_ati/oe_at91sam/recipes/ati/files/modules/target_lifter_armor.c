@@ -9,6 +9,8 @@
 #include "target_lifter_armor.h"
 #include "target_lifter_infantry.h" // shared constants and function definitions
 
+#include "target_generic_output.h"
+
 #include "netlink_kernel.h"
 //---------------------------------------------------------------------------
 // #define TESTING_ON_EVAL
@@ -120,6 +122,15 @@ static int hardware_motor_on(int direction)
         }
 
     spin_unlock_irqrestore(&motor_lock, flags);
+
+    // when not locking, signal an event
+    if (direction == LIFTER_POSITION_UP) {
+        generic_output_event(EVENT_RAISE); // start of raise
+    } else if (direction == LIFTER_POSITION_DOWN) {
+        generic_output_event(EVENT_LOWER); // start of lower
+    } else {
+        generic_output_event(EVENT_ERROR); // error
+    }
     return 0;
     }
 
@@ -174,6 +185,9 @@ static void timeout_fire(unsigned long data)
     // Turn the motor off
     hardware_motor_off();
 
+    // signal an event
+    generic_output_event(EVENT_ERROR); // error
+
     // signal that the operation has finished
     atomic_set(&operating_atomic, FALSE);
 
@@ -203,6 +217,9 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
         // Turn the motor off
         hardware_motor_off();
+
+        // signal an event
+        generic_output_event(EVENT_DOWN); // finished lowering
 
         // signal that the operation has finished
         atomic_set(&operating_atomic, FALSE);
@@ -240,6 +257,9 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
         // Turn the motor off
         hardware_motor_off();
+
+        // signal an event
+        generic_output_event(EVENT_UP); // finished raising
 
         // signal that the operation has finished
     	atomic_set(&operating_atomic, FALSE);
