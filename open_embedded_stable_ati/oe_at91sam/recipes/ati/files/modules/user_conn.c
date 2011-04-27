@@ -530,20 +530,26 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     }
 
                     // grab as many pieces as we can get (always in same order for all accessory types)
-                    int req, onn, one, onh, onk, ont, oft, std, rpd, rpt, ex1, ex2, ex3; // placeholders as we can't take address of bit-field for sscanf
-                    req = onn =  one = onh = onk = std = rpd = ex1 = ex2 = ex3 = 0; // zero by default
+                    unsigned int req = 0, onn = 0, one = 0, onh = 0, onk = 0, ont = 0, oft = 0, std = 0, rpd = 0, rpt = 0, ex1 = 0, ex2 = 0, ex3 = 0; // placeholders as we can't take address of bit-field for sscanf
+//                    req = onn =  one = onh = onk = std = rpd = ex1 = ex2 = ex3 = 0; // zero by default
                     sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i", &req, &onn, &one, &onh, &onk, &ont, &oft, &std, &rpd, &rpt, &ex1, &ex2, &ex3);
+                    memset(&acc_c, 0, sizeof(struct accessory_conf));
                     acc_c.request = req;
                     acc_c.exists = 0;
                     acc_c.on_now = onn;
                     acc_c.on_exp = one;
                     acc_c.on_hit = onh;
                     acc_c.on_kill = onk;
+                    acc_c.on_time = ont;
+                    acc_c.off_time = oft;
                     acc_c.start_delay = std;
                     acc_c.repeat_delay = rpd;
+                    acc_c.repeat = rpt;
                     acc_c.ex_data1 = ex1;
                     acc_c.ex_data2 = ex2;
                     acc_c.ex_data3 = ex3;
+
+printf("Q X%iX %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c.acc_type, acc_c.exists, acc_c.on_now, acc_c.on_exp, acc_c.on_hit, acc_c.on_kill, acc_c.on_time, acc_c.off_time, acc_c.start_delay, acc_c.repeat_delay, acc_c.repeat, acc_c.ex_data1, acc_c.ex_data2, acc_c.ex_data3);
 
                     // put configuration data in message
                     nla_put(msg, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c);
