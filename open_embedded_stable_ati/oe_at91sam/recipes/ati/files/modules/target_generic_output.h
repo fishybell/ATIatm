@@ -72,7 +72,7 @@ extern int generic_output_get_repeat_delay(int type, int num); // time between r
 extern void generic_output_set_repeat_delay(int type, int num, int msecs);
 
 extern int generic_output_get_repeat_count(int type, int num); // repeat X times (-1 for infinity, 0 for never)
-extern void generic_output_set_repeat_count(int type, int num, int msecs);
+extern void generic_output_set_repeat_count(int type, int num, int count);
 
 // get/set routines for intermittent firing (only used when the mode uses intermittents)
 extern int generic_output_get_on_time(int type, int num); // active time
@@ -97,7 +97,7 @@ typedef enum {
     EVENT_STOPPED,	// finished stopping
     EVENT_HIT,		// hit
     EVENT_KILL,		// kill
-    EVENT_ERROR,    // error with one of the above (always causes immediate deactivate)
+    EVENT_ERROR,	// error with one of the above (always causes immediate deactivate)
 } GO_event_t;
 extern void generic_output_event(GO_event_t type); // can be called from interrupt
 
