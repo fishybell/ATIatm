@@ -441,6 +441,7 @@ int install_nl_driver(const struct nl_driver *driver) {
         /* install at head of list */
         this->next = hb_list;
         hb_list = this;
+delay_printk("NL Installed heartbeat object\n");
     }
 
     /* install driver commands */
@@ -468,6 +469,7 @@ int install_nl_driver(const struct nl_driver *driver) {
         }
         ch_new->next = command_map[ch_new->drv.command]; // find existing head
         command_map[ch_new->drv.command] = ch_new; // install as new head of list
+delay_printk("NL Installed netlink command handler for %i\n", ch_new->drv.command);
     }
     write_unlock(&map_rwlock); /* unlock */
 
