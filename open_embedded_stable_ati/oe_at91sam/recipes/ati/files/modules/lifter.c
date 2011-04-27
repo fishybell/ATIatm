@@ -356,6 +356,7 @@ delay_printk("Lifter: handling accessory command\n");
                         break;
                 }
 
+                delay_printk("Lifter: Returning Accessory data\n");
                 nla_put(skb, ACC_A_MSG, sizeof(struct accessory_conf), acc_c);
                 rc = HANDLE_SUCCESS; // we now have a response
             } else {
@@ -402,6 +403,9 @@ delay_printk("Lifter: handling accessory command\n");
             }
         }
     }
+
+    // return status
+    return rc;
 }
 
 //---------------------------------------------------------------------------
@@ -417,12 +421,11 @@ static int __init Lifter_init(void)
         {NL_C_ACCESSORY, nl_accessory_handler},
         /*{NL_C_HIT_CAL,   nl_hit_cal_handler},*/
     };
-    struct nl_driver driver = {NULL, commands, 1, NULL}; // no heartbeat object, 1 command in list, no identifying data structure
-
-delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+    struct nl_driver driver = {NULL, commands, 4, NULL}; // no heartbeat object, 4 command in list, no identifying data structure
 
     // install driver w/ netlink provider
     d_id = install_nl_driver(&driver);
+delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     atomic_set(&driver_id, d_id);
 
 	// signal that we are fully initialized
