@@ -9,10 +9,14 @@ DEPENDS = "virtual/kernel linux libnl"
 SRC_URI = " \
 		file://asoundrc \
 		file://modules/Makefile \
+		file://modules/lifter.c \
+		file://modules/lifter.h \
 		file://modules/target_battery.c \
 		file://modules/target_battery.h \
 		file://modules/target.c \
 		file://modules/target.h \
+		file://modules/target_generic_output.c \
+		file://modules/target_generic_output.h \
 		file://modules/target_hardware.h \
 		file://modules/target_hit_mechanical.c \
 		file://modules/target_hit_mechanical.h \
@@ -44,6 +48,7 @@ SRC_URI = " \
 		file://modules/netlink_user.h \
 		file://modules/netlink_shared.h \
 		file://modules/netlink_provider.c \
+		file://modules/bit_button.c \
 		file://modules/user_conn.c \
 		file://modules/delay_printk.c \
 		file://modules/delay_printk.h \
@@ -57,7 +62,7 @@ inherit module
 #oe_runmake 'MODPATH=${D}${base_libdir}/modules/${KERNEL_VERSION}/kernel/drivers/ecu' \
 
 do_compile() {
-    oe_runmake user_conn
+    oe_runmake user_conn bit_button
 	unset CFLAGS CPPFLAGS CXXFLAGS LDFLAGS CC LD CPP
         oe_runmake 'KERNEL_SOURCE=${STAGING_KERNEL_DIR}' \
 	    'KDIR=${STAGING_KERNEL_DIR}' \
