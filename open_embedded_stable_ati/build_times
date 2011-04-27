@@ -28,3 +28,8 @@ Total: 96m26.409s
 After more changes:
 Step 1: (finished) : 98m5.451s
 Total: 98m5.451s
+
+After change to solid state drives:
+Step 1: (quilt-native failed) : 2m17.024s
+Step 2: (finished) : 64m29.368s
+Total: 66:46.392
