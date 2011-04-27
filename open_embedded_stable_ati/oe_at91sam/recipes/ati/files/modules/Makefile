@@ -26,14 +26,14 @@ default:
 	
 #export	EXTRA_CFLAGS
 
-user_conn: user_conn.c
+user_conn: user_conn.c netlink_shared.h netlink_user.h
     ifeq ($(CURD),modules)
 		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -g -lnl user_conn.c -o user_conn
     else
 		${CC} ${CFLAGS} ${LDFLAGS} -lnl user_conn.c -o user_conn
     endif
 
-bit_button: bit_button.c
+bit_button: bit_button.c netlink_shared.h netlink_user.h
     ifeq ($(CURD),modules)
 		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -g -lnl bit_button.c -o bit_button
     else
