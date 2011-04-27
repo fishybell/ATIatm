@@ -121,10 +121,10 @@ typedef struct accessory_conf {
     u8 on_kill:2;	/* 1 for activate on kill, 2 for deactivate on kill */
     u16 on_time __attribute__ ((packed));			/* time on (in milliseconds, 0 for forever) */
     u16 off_time __attribute__ ((packed));			/* time off (in milliseconds, 0 for forever) */
-    u32 start_delay:8 __attribute__ ((packed));		/* time to delay before activation (in half-seconds) */
-    u32 repeat_delay:8 __attribute__ ((packed));	/* time to delay before repeat (in half-seconds) */
-    u32 repeat:6 __attribute__ ((packed));			/* repeat count (0 for no repeat, 63 for forever) */
-    u32 ex_data1:10 __attribute__ ((packed));		/* extra data specific to the accessory type */
+    u8 start_delay;	/* time to delay before activation (in half-seconds) */
+    u8 repeat_delay;/* time to delay before repeat (in half-seconds) */
+    u16 repeat:6 __attribute__ ((packed));			/* repeat count (0 for no repeat, 63 for forever) */
+    u16 ex_data1:10 __attribute__ ((packed));		/* extra data specific to the accessory type */
     u8 ex_data2;	/* more extra data specific to the accessory type */
     u8 ex_data3;	/* even more extra data specific to the accessory type */
 } accessory_conf_t;
