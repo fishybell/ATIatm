@@ -3,9 +3,15 @@
 #include <linux/interrupt.h>
 
 #include <mach/gpio.h>
+#include "target.h"
 #include "target_hardware.h"
 
 #include "netlink_kernel.h"
+
+//---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we are fully initialized
+//---------------------------------------------------------------------------
+atomic_t full_init = ATOMIC_INIT(FALSE);
 
 /* delayed work queues */
 static struct work_struct init_work; // work to perform just after init
@@ -538,6 +544,11 @@ EXPORT_SYMBOL(uninstall_nl_driver);
 static void init_final(struct work_struct * work) {
 //delay_printk("doing final initialization\n");
 
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
 /*    // initialize heartbeat callback function
     switch (heartbeat_add(nl_hb)) {
         case HB_SUCCESS: delay_printk("Heartbeat Callback Initialized\n"); break;
@@ -599,6 +610,8 @@ static void __exit gnKernel_exit(void) {
     int ret, i;
     struct command_handler *this;
     struct command_handler *last;
+    atomic_set(&full_init, FALSE);
+    ati_flush_work(&init_work); // close any open work queue items
    delay_printk("EXIT GENERIC NETLINK PROVIDER MODULE\n");
 
     /* clear heartbeat callback */

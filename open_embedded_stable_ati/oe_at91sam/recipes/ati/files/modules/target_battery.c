@@ -541,6 +541,10 @@ struct target_device target_device_battery =
 //---------------------------------------------------------------------------
 static void level_changed(struct work_struct * work)
 	{
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
 	target_sysfs_notify(&target_device_battery, "level");
 	}
 
@@ -608,6 +612,8 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 //---------------------------------------------------------------------------
 static void __exit target_battery_exit(void)
     {
+	atomic_set(&full_init, FALSE);
+    ati_flush_work(&level_work); // close any open work queue items
     uninstall_nl_driver(atomic_read(&driver_id));
 	hardware_exit();
     target_sysfs_remove(&target_device_battery);

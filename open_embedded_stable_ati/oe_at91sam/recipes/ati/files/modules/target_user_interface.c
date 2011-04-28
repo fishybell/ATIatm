@@ -677,8 +677,13 @@ int bit_mfh(struct sk_buff *skb, void *bit_data) {
 //---------------------------------------------------------------------------
 static void bit_pressed(struct work_struct * work)
 	{
-    // notify netlink userspace
     struct bit_event bit_data;
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
+    // notify netlink userspace
     bit_data.bit_type = BIT_TEST;
     bit_data.is_on = atomic_read(&bit_button_atomic) == BUTTON_STATUS_PRESSED;
     send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
@@ -692,8 +697,13 @@ static void bit_pressed(struct work_struct * work)
 //---------------------------------------------------------------------------
 static void move_pressed(struct work_struct * work)
 	{
-    // notify netlink userspace
     struct bit_event bit_data;
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
+    // notify netlink userspace
     switch (atomic_read(&move_button_atomic)) {
         case MOVING_FWD: bit_data.bit_type = BIT_MOVE_FWD; break;
         case MOVING_REV: bit_data.bit_type = BIT_MOVE_REV; break;
@@ -732,6 +742,9 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 //---------------------------------------------------------------------------
 static void __exit target_user_interface_exit(void)
     {
+    atomic_set(&full_init, FALSE);
+    ati_flush_work(&bit_button_work); // close any open work queue items
+    ati_flush_work(&move_button_work); // close any open work queue items
 	hardware_exit();
     target_sysfs_remove(&target_device_user_interface);
     }

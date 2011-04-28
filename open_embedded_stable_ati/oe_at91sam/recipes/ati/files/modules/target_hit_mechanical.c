@@ -26,6 +26,11 @@
 #define SAMPLE_PERIOD_IN_MS_DEFAULT 	2
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we are fully initialized
+//---------------------------------------------------------------------------
+atomic_t full_init = ATOMIC_INIT(FALSE);
+
+//---------------------------------------------------------------------------
 // Keep track settings
 //---------------------------------------------------------------------------
 static int sensor_mode 				= HIT_SENSOR_MODE_SINGLE;
@@ -551,6 +556,11 @@ struct target_device target_device_hit_mechanical =
 //---------------------------------------------------------------------------
 static void hit_change(struct work_struct * work)
 	{
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
 	target_sysfs_notify(&target_device_hit_mechanical, "hit");
 	}
 
@@ -574,6 +584,7 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	hardware_init();
 
+    atomic_set(&full_init, TRUE);
     return target_sysfs_add(&target_device_hit_mechanical);
     }
 
@@ -582,6 +593,8 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 //---------------------------------------------------------------------------
 static void __exit target_hit_mechanical_exit(void)
     {
+    atomic_set(&full_init, FALSE);
+    ati_flush_work(&hit_work); // close any open work queue items
 	hr_timers_stop();
 	hardware_exit();
     target_sysfs_remove(&target_device_hit_mechanical);

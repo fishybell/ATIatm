@@ -1036,6 +1036,11 @@ struct target_device target_device_mover_armor =
 //---------------------------------------------------------------------------
 static void movement_change(struct work_struct * work)
 	{
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
 	target_sysfs_notify(&target_device_mover_armor, "movement");
 	}
 
@@ -1059,6 +1064,8 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 //---------------------------------------------------------------------------
 static void __exit target_mover_armor_exit(void)
     {
+    atomic_set(&full_init, FALSE);
+    ati_flush_work(&movement_work); // close any open work queue items
 	hardware_exit();
     target_sysfs_remove(&target_device_mover_armor);
     }

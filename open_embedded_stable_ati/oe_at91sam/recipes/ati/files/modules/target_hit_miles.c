@@ -35,6 +35,11 @@
 #endif // TESTING_ON_EVAL
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we are fully initialized
+//---------------------------------------------------------------------------
+atomic_t full_init = ATOMIC_INIT(FALSE);
+
+//---------------------------------------------------------------------------
 // This atomic variable keeps track of the hit count
 //---------------------------------------------------------------------------
 atomic_t hit_count_atomic = ATOMIC_INIT(0);
@@ -246,6 +251,11 @@ struct target_device target_device_hit_miles =
 //---------------------------------------------------------------------------
 static void hit_change(struct work_struct * work)
 	{
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
 	target_sysfs_notify(&target_device_hit_miles, "hit");
 	}
 
@@ -263,6 +273,7 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	hardware_init();
 	
+    atomic_set(&full_init, TRUE);
     return target_sysfs_add(&target_device_hit_miles);
     }
 
@@ -271,6 +282,8 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 //---------------------------------------------------------------------------
 static void __exit target_hit_miles_exit(void)
     {
+    atomic_set(&full_init, FALSE);
+    ati_flush_work(&hit_work); // close any open work queue items
 	hardware_exit();
     target_sysfs_remove(&target_device_hit_miles);
     }

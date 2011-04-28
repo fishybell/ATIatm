@@ -486,11 +486,21 @@ struct target_device target_device_ses_interface =
 
 static void knob_twisted(struct work_struct * work)
 	{
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
 	target_sysfs_notify(&target_device_ses_interface, "knob");
 	}
 
 static void mode_changed(struct work_struct * work)
 	{
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
 	target_sysfs_notify(&target_device_ses_interface, "mode");
 	}
 
@@ -519,6 +529,10 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 //---------------------------------------------------------------------------
 static void __exit target_ses_interface_exit(void)
     {
+    atomic_set(&full_init, FALSE);
+    ati_flush_work(&knob_work); // close any open work queue items
+    ati_flush_work(&mode_work); // close any open work queue items
+
 	hardware_exit();
     target_sysfs_remove(&target_device_ses_interface);
     }
