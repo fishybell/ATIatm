@@ -136,6 +136,7 @@ enum {
     ACC_SMOKE,              /* Smoke generator : ex_data1 = smoke # */
     ACC_THERMAL,            /* Thermal device : ex_data1 = thermal # */
     ACC_MILES_SDH,          /* MILES, Shootback Device Holder : ex_data1 = Player ID, ex_data2 = MILES Code, ex_data3 = Ammo Type*/
+    ACC_INTERNAL,           /* Internal type for other outputs: don't use */
 };
 enum {
     ACC_A_UNSPEC,
