@@ -13,6 +13,8 @@
 #ifdef TESTING_ON_EVAL
     #undef OUTPUT_MUZZLE_FLASH
     #define OUTPUT_MUZZLE_FLASH    	AT91_PIN_PB8
+    #undef OUTPUT_LED_LOW_BAT
+    #define OUTPUT_LED_LOW_BAT    	AT91_PIN_PB8
 #endif // TESTING_ON_EVAL
 
 //---------------------------------------------------------------------------
@@ -37,6 +39,8 @@ static int has_thermalX = FALSE;			// has X thermal generators
 module_param(has_thermalX, int, S_IRUGO);
 static int has_smokeX = FALSE;				// has X smoke generators
 module_param(has_smokeX, int, S_IRUGO);
+static int has_internal = FALSE;			// has internal output
+module_param(has_internal, bool, S_IRUGO);
 
 //---------------------------------------------------------------------------
 // Structure for controlling generic output line
@@ -84,6 +88,29 @@ static void state_run(unsigned long index);
 // Table of various generic output lines
 //---------------------------------------------------------------------------
 struct generic_output output_table[] = {
+    // Internal (used for error-state flash)
+    {
+        ACC_INTERNAL,			// type
+        1,						// number
+        0,						// exists
+        ENABLED,				// enabled
+        S_WAITING,				// state
+        S_WAITING,				// next_state
+        ACTIVE_ERROR,			// active_on (activate on error/deactivate otherwise)
+        BURST_FIRE,				// mode (burst fire)
+        0,						// initial delay
+        1000,					// repeat delay (1 second delay)
+        75,						// on time (75 millisecond burst on)
+        75,						// off time (75 millisecond burst off)
+        10,						// repeat count (10 total fires)
+        0,						// repeat at
+        20,						// on/off repeat count (20 bursts per fire)
+        0,						// on/off repeat at
+        TIMER_INITIALIZER(state_run, 0, 0), // state function, no expire, index 0
+        OUTPUT_LED_LOW_BAT,		// gpio pin
+        OUTPUT_LED_LOW_BAT_ACTIVE_STATE,	// gpio active high/low
+        RW_LOCK_UNLOCKED,		// lock
+    },
     // MFS
     {
         ACC_NES_MFS,			// type
@@ -102,11 +129,11 @@ struct generic_output output_table[] = {
         0,						// repeat at
         0,						// on/off repeat count
         0,						// on/off repeat at
-        TIMER_INITIALIZER(state_run, 0, 0), // state function, no expire, index 0
+        TIMER_INITIALIZER(state_run, 0, 1), // state function, no expire, index 1
         OUTPUT_MUZZLE_FLASH,	// gpio pin
         OUTPUT_MUZZLE_FLASH_ACTIVE_STATE,	// gpio active high/low
         RW_LOCK_UNLOCKED,		// lock
-    }
+    },
 };
 #define TABLE_SIZE 1 /* size of output_table */
 
@@ -123,6 +150,7 @@ int generic_output_exists(int type) { // returns the number that exist
 
     // look at each item in list and count up the haves
     for (i = 0; i < TABLE_SIZE; i++) {
+delay_printk("Looking for %i at %i : %i (%i)\n", type, i, output_table[i].type, output_table[i].exists);
         if (output_table[i].type == type) {
             // lock as read-only
             read_lock(&output_table[i].lock);
@@ -133,7 +161,7 @@ int generic_output_exists(int type) { // returns the number that exist
             }
 
             // unlock
-            read_lock(&output_table[i].lock);
+            read_unlock(&output_table[i].lock);
         }
     }
 
@@ -157,18 +185,18 @@ EXPORT_SYMBOL(generic_output_exists);
                 found = output_table[i].NAME; \
             } \
             /* unlock */ \
-            read_lock(&output_table[i].lock); \
+            read_unlock(&output_table[i].lock); \
             break; /* stop looking */ \
         } \
     } \
-delay_printk("%s(%i, %i): %i\n",__func__, type, num, found); \
+/*delay_printk("%s(%i, %i): %i\n",__func__, type, num, found);*/ \
     return found; \
 }
 
 // set macro
 #define SET_GO_VALUE(NAME, VALUE) { \
     int i; \
-delay_printk("%s(%i, %i): %i\n",__func__, type, num, VALUE); \
+/*delay_printk("%s(%i, %i): %i\n",__func__, type, num, VALUE);*/ \
     /* find the correct item in the list for the given variable */ \
     for (i = 0; i < TABLE_SIZE; i++) { \
         /* check type and number */ \
@@ -180,7 +208,7 @@ delay_printk("%s(%i, %i): %i\n",__func__, type, num, VALUE); \
                 output_table[i].NAME = VALUE; \
             } \
             /* unlock */ \
-            write_lock(&output_table[i].lock); \
+            write_unlock(&output_table[i].lock); \
             break; /* stop looking */ \
         } \
     } \
@@ -308,7 +336,7 @@ GO_state_t generic_output_get_state(int type, int num) {
             }
 
             // unlock
-            read_lock(&output_table[i].lock);
+            read_unlock(&output_table[i].lock);
 
             break; // stop looking
         }
@@ -318,57 +346,33 @@ delay_printk("%s(%i, %i): %i\n",__func__, type, num, found);
 }
 EXPORT_SYMBOL(generic_output_get_state);
 
-// helper functions to schedule a timer change (can't schedule while locked or in the wrong context, so schedule for process context)
-static struct timer_list *global_timer;
-static int global_msecs;
-static struct work_struct timer_work;
-spinlock_t q_lock = SPIN_LOCK_UNLOCKED;
-
-void schedule_timer(struct timer_list *timer, int msecs) {
-    // spin so we only have on timer being scheduled at once
-    spin_lock(&q_lock);
-
-    // set global variables
-    global_timer = timer;
-    global_msecs = msecs;
- 
-    // schedule the work
-    schedule_work(&timer_work);
-
-    // wait for work to finish
-    target_flush_work(&timer_work);
-
-    // unlock
-    spin_unlock(&q_lock);
-}
-
-static void timer_sched(struct work_struct * work) {
-    // use global variables with impunity as we always lock and wait for this to finish
-    mod_timer(global_timer, jiffies+((global_msecs*HZ)/1000));
+// wrapper around the mod_timer function for code clarity
+inline void schedule_timer(int index, int msecs) {
+    mod_timer(&output_table[index].timer, jiffies+((msecs*HZ)/1000));
 }
 
 // helper function to change the internal state using GO_state_t values for a given index (assumes already locked)
-int index_set_state(int i, GO_state_t value) {
-delay_printk("%s(%i): %i\n",__func__, i, value);
+void index_set_state(int i, GO_state_t value) {
+//delay_printk("%s(%i): %i\n",__func__, i, value);
     // does this device exist and is it enabled?
     if (output_table[i].exists && output_table[i].enabled == ENABLED) {
         switch (value) {
            case ON_IMMEDIATE:	// on now, only ignores initial delay value
                output_table[i].next_state = S_FIRE_ON; // turn on
-               schedule_timer(&output_table[i].timer, 0); // immediately
+               schedule_timer(i, 0); // immediately
                break;
            case OFF_IMMEDIATE:	// off immediate (stops current burst, repeat, etc.)
                output_table[i].next_state = S_WAITING; // turn off
-               schedule_timer(&output_table[i].timer, 0); // immediately
+               schedule_timer(i, 0); // immediately
                break;
            case   ON_SOON:		// manual on (uses initial delay)
                output_table[i].next_state = S_FIRE_ON; // turn on
-               schedule_timer(&output_table[i].timer, output_table[i].idelay); // after initial delay
+               schedule_timer(i, output_table[i].idelay); // after initial delay
                break;
            case   OFF_SOON:		// manual off (waits for current burst, repeat, etc., cancels infinite repeat)
                if (output_table[i].mode == CONSTANT_ON) { // turn off immediately if we're constant on
                    output_table[i].next_state = S_WAITING; // turn off
-                   schedule_timer(&output_table[i].timer, 0);
+                   schedule_timer(i, 0);
                } else if (output_table[i].next_state == S_FIRE_ON) { // 
                    output_table[i].next_state = S_STOP_ON; // turn on next, off soon
                    // timer running already, let it run its course
@@ -377,7 +381,7 @@ delay_printk("%s(%i): %i\n",__func__, i, value);
                    // timer running already, let it run its course
                } else {
                    output_table[i].next_state = S_WAITING; // turn off
-                   schedule_timer(&output_table[i].timer, 0); // immediately
+                   schedule_timer(i, 0); // immediately
                }
                break;
         }
@@ -398,7 +402,7 @@ delay_printk("%s(%i, %i): %i\n",__func__, type, num, value);
             index_set_state(i, value); // use helper function to change internal state
 
             // unlock
-            write_lock(&output_table[i].lock);
+            write_unlock(&output_table[i].lock);
 
             break; // stop looking
         }
@@ -406,8 +410,61 @@ delay_printk("%s(%i, %i): %i\n",__func__, type, num, value);
 }
 EXPORT_SYMBOL(generic_output_set_state);
 
-void generic_output_event(GO_event_t type) { // can be called from interrupt
+//---------------------------------------------------------------------------
+// Event handler routines and event queue data
+//---------------------------------------------------------------------------
+typedef struct event_item {
+    GO_event_t type;
+    struct event_item *next;
+} event_item_t;
+struct event_item *start = NULL; // start of queue
+struct event_item *end = NULL; // end of queue
+static spinlock_t e_lock = SPIN_LOCK_UNLOCKED; // queue lock
+static struct work_struct event_work; // event work queue
+
+static void handle_event(struct work_struct * work) { // actual handler: can't be called by interrupt, so use a queue
     int i;
+    struct event_item top; // not a pointer
+    int type;
+    
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+
+    // lock
+    spin_lock(&e_lock);
+
+    // do we have a full queue?
+    if (start == NULL) {
+        // no, so don't do anything
+        spin_unlock(&e_lock);
+        return;
+    }
+
+    // make a copy of the top queue item
+    top = *start;
+
+    // free allocated memory
+    kfree(start);
+
+    // rearrange the queue
+    start = top.next; // new start
+    if (top.next == NULL) {
+        end = NULL; // no ending
+    }
+    
+    // do we still have items on the queue?
+    if (start != NULL) {
+        // schedule more work
+        schedule_work(&event_work);
+    }
+
+    // unlock
+    spin_unlock(&e_lock);
+
+    // start handling of event
+    type = top.type;
 
 delay_printk("%s(): %i\n",__func__, type);
     // change the state of all effected items in the table
@@ -529,17 +586,52 @@ delay_printk("%s(): %i\n",__func__, type);
             }
 
             // if we had an error, disable until re-enabled (doesn't lose configuration info)
-            if (type == EVENT_ERROR) {
+            if (type == EVENT_ERROR && !(output_table[i].active_on & ACTIVE_ERROR)) {
                 // we disable after index_set_state() call so it will function as normal
-                output_table[i].enabled = DISABLED; // will prevent another event from activating the accessory (or in the case of ACTIVE_ERROR, deactivating the accessory)
+                output_table[i].enabled = DISABLED; // will prevent another event from activating the accessory
             }
         }
 
         // unlock
-        write_lock(&output_table[i].lock);
-
-        break; // stop looking
+        write_unlock(&output_table[i].lock);
     }
+}
+
+void generic_output_event(GO_event_t type) { // can be called from interrupt (by use of a queue)
+    struct event_item *msg = NULL;
+
+    // allocate message buffer
+    msg = kmalloc(sizeof(struct event_item), GFP_KERNEL); // don't use GFP_ATOMIC as we would like to always work if there is memory available
+    if (msg == NULL) {
+        // out of memory
+        return;
+    }
+
+    // fill in data
+    msg->type = type;
+
+    // Put at the end of the message queue
+
+    // lock
+    spin_lock(&e_lock);
+
+    // add to end of queue
+    msg->next = NULL;
+    if (end == NULL) {
+        // also the start
+        start = msg;
+    } else {
+        // move end back
+        end->next = msg;
+    }
+    end = msg; // new is always the end
+
+    // unlock
+    spin_unlock(&e_lock);
+
+    // schedule work
+    schedule_work(&event_work);
+delay_printk("Scheduled event %i\n", type);
 }
 EXPORT_SYMBOL(generic_output_event);
 
@@ -553,6 +645,8 @@ int do_repeat(int count, int *at) {
     // if we're infinite repeat, reset counter
     if (count == -1) {
         *at = 0;
+        // return 1 for more repeats
+        return 1;
     }
 
     // check if repeat cycle finished
@@ -578,7 +672,7 @@ static void state_run(unsigned long index) {
     struct generic_output *this = &output_table[index];
     int add_delay = 0; // additional delay to add to timer
 
-delay_printk("%s(): %i\n",__func__, index);
+//delay_printk("%s(): %i\n",__func__, index);
     // lock as read/write
     write_lock(&this->lock);
 
@@ -635,7 +729,7 @@ delay_printk("%s(): %i\n",__func__, index);
                     }
 
                     // change timer
-                    schedule_timer(&this->timer, this->on_time); // next state after "on time"
+                    schedule_timer(index, this->on_time); // next state after "on time"
                     break;
             }
             break;
@@ -655,13 +749,16 @@ delay_printk("%s(): %i\n",__func__, index);
                     // move on/off repeat variables and repeat if necessary
                     if (do_repeat(this->onoff_repeat_count, &this->onoff_repeat_at)) {
                         // do on/off repeat: next state is off, then on again
-                        if (this->state == S_FIRE_ON) {
+                        if (this->state == S_FIRE_OFF) {
+delay_printk("burst repeating %i\n", this->onoff_repeat_at);
                             this->next_state = S_FIRE_ON; // is off, next on
                         } else {
                             // on stop condition, let it follow through but cancel infinite repeat
                             if (this->onoff_repeat_count == -1) {
+delay_printk("burst infinite repeat stopped\n");
                                 this->next_state = S_WAITING; // is off, next off (stay off)
                             } else {
+delay_printk("burst repeating %i\n", this->onoff_repeat_at);
                                 this->next_state = S_STOP_ON; // is off, next on
                             }
                         }
@@ -670,14 +767,17 @@ delay_printk("%s(): %i\n",__func__, index);
                         // move normal repeat variables and repeat if necessary
                         if (do_repeat(this->repeat_count, &this->repeat_at)) {
                             // do normal repeat: next state is on, then off again
-                            if (this->state == S_FIRE_ON) {
+                            if (this->state == S_FIRE_OFF) {
+delay_printk("repeating %i\n", this->repeat_at);
                                 this->next_state = S_FIRE_ON; // is off, next on
                                 add_delay = this->rdelay; // add repeat delay to delay time
                             } else {
                                 // on stop condition, let it follow through but cancel infinite repeat
                                 if (this->repeat_count == -1) {
+delay_printk("infinite repeat stopped\n");
                                     this->next_state = S_WAITING; // is off, next off (stay off)
                                 } else {
+delay_printk("repeating %i\n", this->repeat_at);
                                     this->next_state = S_STOP_ON; // is off, next on
                                     add_delay = this->rdelay; // add repeat delay to delay time
 
@@ -694,14 +794,17 @@ delay_printk("%s(): %i\n",__func__, index);
                     // move repeat variables and repeat if necessary
                     if (do_repeat(this->repeat_count, &this->repeat_at)) {
                         // do repeat: next state is on, then off again
-                        if (this->state == S_FIRE_ON) {
+                        if (this->state == S_FIRE_OFF) {
+delay_printk("repeating %i\n", this->repeat_at);
                             this->next_state = S_FIRE_ON; // is off, next on
                             add_delay = this->rdelay; // add repeat delay to delay time
                         } else {
                             // on stop condition, let it follow through but cancel infinite repeat
                             if (this->repeat_count == -1) {
+delay_printk("infinite repeat stopped\n");
                                 this->next_state = S_WAITING; // is off, next off (stay off)
                             } else {
+delay_printk("repeating %i\n", this->repeat_at);
                                 this->next_state = S_STOP_ON; // is off, next on
                                 add_delay = this->rdelay; // add repeat delay to delay time
                             }
@@ -718,21 +821,21 @@ delay_printk("%s(): %i\n",__func__, index);
                 default:
                 case S_DISABLED:
                 case S_WAITING:
-                    schedule_timer(&this->timer, 0); // next state immediately
+                    schedule_timer(index, 0); // next state immediately
                 case S_FIRE_ON:
                 case S_FIRE_OFF:
                 case S_STOP_ON:
                 case S_STOP_OFF:
-                    schedule_timer(&this->timer, (this->off_time+add_delay)); // next state after "off time" and additional delay together
+                    schedule_timer(index, (this->off_time+add_delay)); // next state after "off time" and additional delay together
                     break;
             }
             break;
     }
 
-delay_printk("%s() %i to %i\n",__func__,  this->state, this->next_state);
-
     // unlock
-    write_lock(&this->lock);
+    write_unlock(&this->lock);
+
+//delay_printk("%s() %i to %i\n",__func__,  this->state, this->next_state);
 }
 
 
@@ -744,6 +847,7 @@ static int hardware_init(void) {
 
     // configure flash gpio for output and set initial output
     for (i = 0; i < TABLE_SIZE; i++) {
+delay_printk("Looking at %i : %i\n", i, output_table[i].type);
         // lock for read/write
         write_lock(&output_table[i].lock);
 
@@ -795,6 +899,13 @@ delay_printk("Has Thermal %i\n", output_table[i].number);
                 // potentially multiple smoke generators
                 if (output_table[i].number <= has_smokeX) {
 delay_printk("Has Smoke %i\n", output_table[i].number);
+                    output_table[i].exists = 1; // it exists
+                }
+                break;
+            case ACC_INTERNAL:
+                // only one muzzle flash simulator
+                if (has_internal && output_table[i].number == 1) {
+delay_printk("Has Internal\n");
                     output_table[i].exists = 1; // it exists
                 }
                 break;
@@ -852,7 +963,7 @@ static int __init target_generic_output_init(void) {
 delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
     hardware_init();
 
-	INIT_WORK(&timer_work, timer_sched);
+	INIT_WORK(&event_work, handle_event);
 
     // signal that we are fully initialized
     atomic_set(&full_init, TRUE);
@@ -863,6 +974,8 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 // exit handler for the module
 //---------------------------------------------------------------------------
 static void __exit target_generic_output_exit(void) {
+    atomic_set(&full_init, FALSE);
+    ati_flush_work(&event_work); // close any open work queue items
     hardware_exit();
 }
 
