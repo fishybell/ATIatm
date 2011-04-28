@@ -174,14 +174,6 @@ void target_sysfs_notify(struct target_device * target_device, char * attribute_
 EXPORT_SYMBOL(target_sysfs_notify);
 
 //---------------------------------------------------------------------------
-//
-//---------------------------------------------------------------------------
-void target_flush_work(struct work_struct *work) {
-    flush_work(work);
-}
-EXPORT_SYMBOL(target_flush_work);
-
-//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init target_init(void)
