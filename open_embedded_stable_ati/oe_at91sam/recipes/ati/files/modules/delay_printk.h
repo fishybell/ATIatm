@@ -7,4 +7,7 @@
 //   context
 extern signed int delay_printk(const char *pFormat, ...);
 
+// wrapper for flush_work() function
+extern void ati_flush_work(struct work_struct *work);
+
 #endif

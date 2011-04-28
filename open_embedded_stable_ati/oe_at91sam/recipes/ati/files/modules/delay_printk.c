@@ -4,6 +4,9 @@
 
 #include "delay_printk.h"
 
+#define FALSE				0
+#define TRUE				1
+
 // small printk message buffer, so use wisely
 #define MAX_PRINTK_MSG 124 /* 128 - sizeof(void*) */
 
@@ -18,7 +21,7 @@ struct printk_buffer *end = NULL; // end of queue
 //---------------------------------------------------------------------------
 // Global queue lock
 //---------------------------------------------------------------------------
-spinlock_t q_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t q_lock = SPIN_LOCK_UNLOCKED;
 
 //---------------------------------------------------------------------------
 // This work queue item is used to delay the operation of a printk call
@@ -26,14 +29,24 @@ spinlock_t q_lock = SPIN_LOCK_UNLOCKED;
 static struct work_struct printk_work;
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we are fully initialized
+//---------------------------------------------------------------------------
+atomic_t full_init = ATOMIC_INIT(FALSE);
+
+//---------------------------------------------------------------------------
 // Work item to do the actual printk call
 //---------------------------------------------------------------------------
 static void printk_do_work(struct work_struct * work) {
     struct printk_buffer top; // not a pointer
     int s;
+
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
     
     // lock
-    spin_trylock(&q_lock);
+    spin_lock(&q_lock);
 
     // do we have a full queue?
     if (start == NULL) {
@@ -105,7 +118,7 @@ signed int delay_printk(const char *pFormat, ...)
             // move end back
             end->next = msg;
         }
-        end = msg;
+        end = msg; // new is always the end
 
         // unlock
         spin_unlock(&q_lock);
@@ -118,18 +131,34 @@ signed int delay_printk(const char *pFormat, ...)
 }
 EXPORT_SYMBOL(delay_printk);
 
+//---------------------------------------------------------------------------
+//
+//---------------------------------------------------------------------------
+void ati_flush_work(struct work_struct *work) {
+    printk("flushing...");
+    flush_work(work);
+    printk("flushed\n");
+}
+
+EXPORT_SYMBOL(ati_flush_work);
+
 static int __init delay_printk_init(void) {
     INIT_WORK(&printk_work, printk_do_work);
-    delay_printk("INIT DELAY PRINTK MODULE\n");
+    printk("INIT DELAY PRINTK MODULE\n");
 
+    atomic_set(&full_init, TRUE);
     return 0;
 }
 
 static void __exit delay_printk_exit(void) {
-    delay_printk("EXIT DELAY PRINTK MODULE\n");
+    atomic_set(&full_init, FALSE);
+    flush_work(&printk_work); // close any open work queue items
+    printk("EXIT DELAY PRINTK MODULE\n");
 }
 
 module_init(delay_printk_init);
 module_exit(delay_printk_exit);
-MODULE_LICENSE("proprietary");
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("ATI delayed printk module");
+MODULE_AUTHOR("ndb");
 
