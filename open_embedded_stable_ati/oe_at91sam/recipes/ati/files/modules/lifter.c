@@ -194,10 +194,12 @@ delay_printk("Lifter: handling stop command\n");
         value = nla_get_u8(na); // value is ignored
 delay_printk("Lifter: received value: %i\n", value);
 
-        // TODO -- stop hardware motor wherever it is
+        // stop motor wherever it is
+        lifter_position_set(LIFTER_POSITION_ERROR_NEITHER);
+
         // TODO -- disable hit sensor (but don't clear hit log)
 
-        // Stop accessories
+        // Stop accessories (will disable them as well)
         generic_output_event(EVENT_ERROR);
 
         // prepare response
@@ -239,6 +241,7 @@ delay_printk("Lifter: handling accessory command\n");
             // prepare mode and active mode value for later
             int a_mode = 0, mode = CONSTANT_ON; // may be overwritten depending on accessory type
             int i, num = 0;
+delay_printk("Q X%iX %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c->acc_type, acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
             switch (acc_c->on_exp) {
                 case 1: a_mode |= ACTIVE_UP | UNACTIVE_LOWER; break; // active when fully exposed only
                 case 2: a_mode |= ACTIVE_RAISE | UNACTIVE_LOWER; break; // active when partially and fully expose
@@ -281,6 +284,7 @@ delay_printk("Lifter: handling accessory command\n");
             if (acc_c->request) {
                 // replace existing accessory_conf
                 int type = acc_c->acc_type;
+delay_printk("Filling accessory request\n");
                 memset(acc_c, 0, sizeof(struct accessory_conf)); // clean completely
                 acc_c->acc_type = type; // but not too completely
 
@@ -333,6 +337,7 @@ delay_printk("Lifter: handling accessory command\n");
                         if (mode == BURST_FIRE) {
                             // burst mode
                             int repeat = generic_output_get_onoff_repeat(acc_c->acc_type, num);
+delay_printk("MFS burst\n");
                             acc_c->ex_data1 = 1;
 
                             // cram into 8-bits
@@ -346,6 +351,7 @@ delay_printk("Lifter: handling accessory command\n");
                                 acc_c->ex_data2 = repeat;
                             }
                         } else {
+delay_printk("MFS single\n");
                             // single-fire mode
                             acc_c->ex_data1 = 0;
                         }
@@ -360,6 +366,7 @@ delay_printk("Lifter: handling accessory command\n");
                 nla_put(skb, ACC_A_MSG, sizeof(struct accessory_conf), acc_c);
                 rc = HANDLE_SUCCESS; // we now have a response
             } else {
+delay_printk("Doing accessory configure\n");
                 // configure based on accessory type
                 switch (acc_c->acc_type) {
                     case ACC_NES_MFS:
@@ -367,12 +374,15 @@ delay_printk("Lifter: handling accessory command\n");
                         if (acc_c->ex_data1) {
                             // burst mode
                             if (acc_c->ex_data2 >= 255) { // 8-bits, so shouldn't be bigger
+delay_printk("MFS burst infinite repeat\n");
                                 generic_output_set_onoff_repeat(acc_c->acc_type, num, -1); // infinite repeat
                             } else {
+delay_printk("MFS burst repeat: %i\n", acc_c->ex_data2);
                                 generic_output_set_onoff_repeat(acc_c->acc_type, num, acc_c->ex_data2);
                             }
                             mode = BURST_FIRE;
                         } else {
+delay_printk("MFS not bursting\n");
                             mode = TEMP_ON;
                         }
                         break;
@@ -383,6 +393,11 @@ delay_printk("Lifter: handling accessory command\n");
                 }
 
                 // configure generic
+                if (acc_c->on_now || acc_c->on_exp || acc_c->on_hit || acc_c->on_kill) {
+                    generic_output_set_enable(acc_c->acc_type, num, ENABLED);
+                } else {
+                    generic_output_set_enable(acc_c->acc_type, num, DISABLED);
+                }
                 generic_output_set_active_on(acc_c->acc_type, num, a_mode);
                 generic_output_set_mode(acc_c->acc_type, num, mode);
                 generic_output_set_initial_delay(acc_c->acc_type, num, acc_c->start_delay*500); // convert to milliseconds
@@ -421,7 +436,7 @@ static int __init Lifter_init(void)
         {NL_C_ACCESSORY, nl_accessory_handler},
         /*{NL_C_HIT_CAL,   nl_hit_cal_handler},*/
     };
-    struct nl_driver driver = {NULL, commands, 4, NULL}; // no heartbeat object, 4 command in list, no identifying data structure
+    struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 
     // install driver w/ netlink provider
     d_id = install_nl_driver(&driver);
