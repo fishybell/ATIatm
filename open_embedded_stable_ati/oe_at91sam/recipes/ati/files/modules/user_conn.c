@@ -213,7 +213,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
                     }
 
                     // some mean different things for different accessories
-                    snprintf(wbuf+5, 128-5, " %i %i %i %i %i %i %i %i %i %i %i %i %i", acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
+                    snprintf(wbuf+5, 128-5, " %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
                 }
             }
             break;
@@ -226,7 +226,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
                 struct gps_conf *gps_c = (struct gps_conf*)nla_data(attrs[GPS_A_MSG]);
                 if (gps_c != NULL) {
                     // field of merit, integral latitude, fractional latitude, integral longitude, fractional longitude
-                    snprintf(wbuf, 128, "G %i %i %i %i %i", gps_c->fom, gps_c->intLat, gps_c->fraLat, gps_c->intLon, gps_c->fraLon);
+                    snprintf(wbuf, 128, "G %i %i %i %i %i\n", gps_c->fom, gps_c->intLat, gps_c->fraLat, gps_c->intLon, gps_c->fraLon);
                 }
             }
             break;
@@ -461,6 +461,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     arg1 = cmd[1] == ' ' ? 2 : 3; // next letter location in the command (ignore up to one space)
                     arg2 = arg1 + 3; // start of arguments
                     // find the type of accessory
+                    memset(&acc_c, 0, sizeof(struct accessory_conf));
                     switch (cmd[arg1]) { /* first letter of second group */
                         case 'M' : case 'm' :
                            switch (cmd[arg1 + 1]) { /* second letter */
@@ -533,7 +534,6 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     unsigned int req = 0, onn = 0, one = 0, onh = 0, onk = 0, ont = 0, oft = 0, std = 0, rpd = 0, rpt = 0, ex1 = 0, ex2 = 0, ex3 = 0; // placeholders as we can't take address of bit-field for sscanf
 //                    req = onn =  one = onh = onk = std = rpd = ex1 = ex2 = ex3 = 0; // zero by default
                     sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i", &req, &onn, &one, &onh, &onk, &ont, &oft, &std, &rpd, &rpt, &ex1, &ex2, &ex3);
-                    memset(&acc_c, 0, sizeof(struct accessory_conf));
                     acc_c.request = req;
                     acc_c.exists = 0;
                     acc_c.on_now = onn;
