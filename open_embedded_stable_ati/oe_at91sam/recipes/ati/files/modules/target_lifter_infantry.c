@@ -19,7 +19,7 @@
 
 #define TIMEOUT_IN_SECONDS		3
 
-//#define TESTING_ON_EVAL
+#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
 	//for testing using eval. board buttons and LED
 	#undef INPUT_LIFTER_POS_ACTIVE_STATE
@@ -34,7 +34,7 @@
 	#define INPUT_LIFTER_POS_UP_LIMIT     		AT91_PIN_PA31   // BP4 on dev. board
 
 	#define OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE    ACTIVE_LOW
-	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PB8
+	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PB9
 #endif // TESTING_ON_EVAL
 
 //#define FIX_FOR_JPY_IO_BOARD
@@ -107,6 +107,24 @@ static const char * lifter_position[] =
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
+static int hardware_motor_off(void)
+	{
+	unsigned long flags;
+delay_printk("%s - %s()\n",TARGET_NAME, __func__);
+	spin_lock_irqsave(&motor_lock, flags);
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor off
+	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake on
+
+    // stop remembering direction
+    atomic_set(&movement_atomic, LIFTER_MOVEMENT_NONE);
+
+	spin_unlock_irqrestore(&motor_lock, flags);
+	return 0;
+	}
+
+//---------------------------------------------------------------------------
+//
+//---------------------------------------------------------------------------
 static int hardware_motor_on(int direction)
 	{
 	unsigned long flags;
@@ -125,37 +143,21 @@ static int hardware_motor_on(int direction)
 	// just turn on the motor
 delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
-    spin_lock_irqsave(&motor_lock, flags);
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake off
-	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor on
-	spin_unlock_irqrestore(&motor_lock, flags);
+    if (direction != LIFTER_POSITION_UP && direction != LIFTER_POSITION_DOWN) {
+        hardware_motor_off();
+    } else {
+        spin_lock_irqsave(&motor_lock, flags);
+        at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake off
+    	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor on
+    	spin_unlock_irqrestore(&motor_lock, flags);
+    }
 
     // when not locking, signal an event
     if (direction == LIFTER_POSITION_UP) {
         generic_output_event(EVENT_RAISE); // start of raise
     } else if (direction == LIFTER_POSITION_DOWN) {
         generic_output_event(EVENT_LOWER); // start of lower
-    } else {
-        generic_output_event(EVENT_ERROR); // error
     }
-	return 0;
-	}
-
-//---------------------------------------------------------------------------
-//
-//---------------------------------------------------------------------------
-static int hardware_motor_off(void)
-	{
-	unsigned long flags;
-delay_printk("%s - %s()\n",TARGET_NAME, __func__);
-	spin_lock_irqsave(&motor_lock, flags);
-	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor off
-	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake on
-
-    // stop remembering direction
-    atomic_set(&movement_atomic, LIFTER_MOVEMENT_NONE);
-
-	spin_unlock_irqrestore(&motor_lock, flags);
 	return 0;
 	}
 
@@ -523,8 +525,13 @@ int pos_mfh(struct sk_buff *skb, void *pos_data) {
 //---------------------------------------------------------------------------
 static void position_change(struct work_struct * work)
 	{
-    // notify netlink userspace
     int pos_data;
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
+    // notify netlink userspace
     switch (lifter_position_get()) { // map internal to external values
         case LIFTER_POSITION_DOWN: pos_data = CONCEAL; break;
         case LIFTER_POSITION_UP: pos_data = EXPOSE; break;
@@ -559,6 +566,8 @@ static int __init target_lifter_infantry_init(void)
 //---------------------------------------------------------------------------
 static void __exit target_lifter_infantry_exit(void)
     {
+    atomic_set(&full_init, FALSE);
+    ati_flush_work(&position_work); // close any open work queue items
 	hardware_exit();
     target_sysfs_remove(&target_device_lifter_infantry);
     }

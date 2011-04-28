@@ -128,8 +128,6 @@ static int hardware_motor_on(int direction)
         generic_output_event(EVENT_RAISE); // start of raise
     } else if (direction == LIFTER_POSITION_DOWN) {
         generic_output_event(EVENT_LOWER); // start of lower
-    } else {
-        generic_output_event(EVENT_ERROR); // error
     }
     return 0;
     }
@@ -499,8 +497,13 @@ int pos_mfh(struct sk_buff *skb, void *pos_data) {
 //---------------------------------------------------------------------------
 static void position_change(struct work_struct * work)
     {
-    // notify netlink userspace
     int pos_data;
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
+    // notify netlink userspace
     switch (lifter_position_get()) { // map internal to external values
         case LIFTER_POSITION_DOWN: pos_data = CONCEAL; break;
         case LIFTER_POSITION_UP: pos_data = EXPOSE; break;
@@ -533,6 +536,8 @@ static int __init target_lifter_armor_init(void)
 //---------------------------------------------------------------------------
 static void __exit target_lifter_armor_exit(void)
     {
+    atomic_set(&full_init, FALSE);
+    ati_flush_work(&position_work); // close any open work queue items
     hardware_exit();
     target_sysfs_remove(&target_device_lifter_armor);
     }
