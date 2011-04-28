@@ -35,7 +35,6 @@ struct target_device
 extern int 	target_sysfs_add	(struct target_device * target_device);
 extern void target_sysfs_remove	(struct target_device * target_device);
 extern void target_sysfs_notify	(struct target_device * target_device, char * attribute_name);
-extern void target_flush_work(struct work_struct *work);
 
 extern struct atmel_tc * 	target_timer_alloc	(unsigned block, const char *name);
 extern void 				target_timer_free	(struct atmel_tc *tc);
