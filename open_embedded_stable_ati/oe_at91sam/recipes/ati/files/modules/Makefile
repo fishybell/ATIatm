@@ -21,7 +21,7 @@ CURD := $(shell basename `pwd`)
 #EXTRA_CFLAGS += -mfloat-abi=softfp -mfpu=vfp
 CU_FLAGS :=-I/usr/local/var/oe/tmp/work/at91sam9g20ek_2mmc-angstrom-linux-gnueabi/linux-2.6.30-r1/linux-2.6.30/include
 
-default: 
+default: bit_button user_conn
 #	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
 	make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- -C $(KDIR) SUBDIRS=$(PWD)  modules
 	
