@@ -16,6 +16,7 @@
 //---------------------------------------------------------------------------
 #include "target_lifter_infantry.h"
 #include "target_generic_output.h"
+#include "target_hit_poll.h"
 
 //---------------------------------------------------------------------------
 #define TARGET_NAME		"lifter"
@@ -424,6 +425,70 @@ delay_printk("MFS not bursting\n");
 }
 
 //---------------------------------------------------------------------------
+// netlink command handler for accessory commands
+//---------------------------------------------------------------------------
+atomic_t hit_to_fall = ATOMIC_INIT(0); // infinite hits to fall
+atomic_t burst_seperation = ATOMIC_INIT(1); // single hit mode
+int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc = HANDLE_SUCCESS_NO_REPLY; // by default this is a command with no response
+    struct hit_calibration *hit_c;
+delay_printk("Lifter: handling hit-calibration command\n");
+    
+    // get attribute from message
+    na = info->attrs[HIT_A_MSG]; // accessory message
+    if (na) {
+        // grab value from attribute
+        hit_c = (struct hit_calibration*)nla_data(na);
+        if (hit_c != NULL) {
+            switch (hit_c->set) {
+                case HIT_GET_CAL:         /* overwrites nothing (gets calibration values) */
+                case HIT_GET_BURST:       /* overwrites nothing (gets burst value) */
+                case HIT_GET_HITS:        /* overwrites nothing (gets hit_to_fall value) */
+                case HIT_OVERWRITE_NONE:  /* overwrite nothing (gets reply with current values) */
+                    // fill in all data, the unused portions will be ignored
+                    get_hit_calibration(&hit_c->lower, &hit_c->upper); // use existing hit_c structure
+                    hit_c->hit_to_fall = atomic_read(&hit_to_fall);
+                    hit_c->burst = atomic_read(&burst_seperation);
+                    nla_put(skb, HIT_A_MSG, sizeof(struct hit_calibration), hit_c);
+                    rc = HANDLE_SUCCESS; // with return message
+                    break;
+                case HIT_OVERWRITE_ALL:   /* overwrites every value */
+                    set_hit_calibration(hit_c->lower, hit_c->upper);
+                    atomic_set(&hit_to_fall, hit_c->hit_to_fall);
+                    atomic_set(&burst_seperation, hit_c->burst);
+                    break;
+                case HIT_OVERWRITE_CAL:   /* overwrites calibration values (upper, lower) */
+                    set_hit_calibration(hit_c->lower, hit_c->upper);
+                    break;
+                case HIT_OVERWRITE_OTHER: /* overwrites non-calibration values (burst, etc.) */
+                    atomic_set(&hit_to_fall, hit_c->hit_to_fall);
+                    atomic_set(&burst_seperation, hit_c->burst);
+                    break;
+                case HIT_OVERWRITE_BURST: /* overwrites burst value only */
+                    atomic_set(&burst_seperation, hit_c->burst);
+                    break;
+                case HIT_OVERWRITE_HITS:  /* overwrites hit_to_fall value only */
+                    atomic_set(&hit_to_fall, hit_c->hit_to_fall);
+                    break;
+            }
+        }
+    }
+
+    // return status
+    return rc;
+}
+
+
+//---------------------------------------------------------------------------
+// init handler for the module
+//---------------------------------------------------------------------------
+void hit_event() {
+    delay_printk("hit_event()\n");
+}
+
+
+//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init Lifter_init(void)
@@ -434,7 +499,7 @@ static int __init Lifter_init(void)
         {NL_C_STOP,      nl_stop_handler},
         {NL_C_HITS,      nl_hits_handler},
         {NL_C_ACCESSORY, nl_accessory_handler},
-        /*{NL_C_HIT_CAL,   nl_hit_cal_handler},*/
+        {NL_C_HIT_CAL,   nl_hit_cal_handler},
     };
     struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 
@@ -442,6 +507,9 @@ static int __init Lifter_init(void)
     d_id = install_nl_driver(&driver);
 delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     atomic_set(&driver_id, d_id);
+
+    // set callback handlers
+    set_hit_callback(hit_event);
 
 	// signal that we are fully initialized
 	atomic_set(&full_init, TRUE);

@@ -19,7 +19,7 @@
 
 #define TIMEOUT_IN_SECONDS		3
 
-#define TESTING_ON_EVAL
+//#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
 	//for testing using eval. board buttons and LED
 	#undef INPUT_LIFTER_POS_ACTIVE_STATE

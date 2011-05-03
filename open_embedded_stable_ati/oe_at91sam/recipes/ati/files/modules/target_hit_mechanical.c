@@ -25,6 +25,12 @@
 #define SAMPLE_COUNT_MAX_DEFAULT 		50
 #define SAMPLE_PERIOD_IN_MS_DEFAULT 	2
 
+#define TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL
+    #undef INPUT_HIT_SENSOR
+    #define	INPUT_HIT_SENSOR 					AT91_PIN_PB31
+#endif
+
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are fully initialized
 //---------------------------------------------------------------------------

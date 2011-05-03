@@ -111,7 +111,7 @@
 //---------------------------------------------------------------------------
 // HIT SENSOR - MILES RECEIVER
 //---------------------------------------------------------------------------
-#define INPUT_MILES_ACTIVE_STATE			ACTIVE_LOW
+#define INPUT_MILES_ACTIVE_STATE			ACTIVE_HIGH
 #define INPUT_MILES_PULLUP_STATE			PULLUP_ON
 #define INPUT_MILES_DEGLITCH_STATE			DEGLITCH_ON
 #define	INPUT_MILES_HIT 					AT91_PIN_PB23

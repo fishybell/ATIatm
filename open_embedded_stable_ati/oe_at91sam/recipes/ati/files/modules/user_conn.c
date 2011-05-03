@@ -124,6 +124,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
 
             break;
         case NL_C_HIT_CAL:
+printf("NL_C_HIT_CAL\n");
             genlmsg_parse(nlh, 0, attrs, HIT_A_MAX, hit_calibration_policy);
 
             if (attrs[HIT_A_MSG]) {
@@ -131,6 +132,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
                 struct hit_calibration *hit_c = (struct hit_calibration*)nla_data(attrs[HIT_A_MSG]);
                 if (hit_c != NULL) {
                     switch (hit_c->set) {
+                        case HIT_OVERWRITE_NONE:
                         case HIT_OVERWRITE_ALL:
                             // all calibration data
                             snprintf(wbuf, 128, "L %i %i\nU %i\nK %i\n", hit_c->lower, hit_c->upper, hit_c->burst, hit_c->hit_to_fall);
@@ -139,14 +141,17 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
                             // burst and hit_to_fall
                             snprintf(wbuf, 128, "U %i\nK %i\n", hit_c->burst, hit_c->hit_to_fall);
                             break;
+                        case HIT_GET_CAL:
                         case HIT_OVERWRITE_CAL:
                             // upper and lower
                             snprintf(wbuf, 128, "L %i %i\n", hit_c->lower, hit_c->upper);
                             break;
+                        case HIT_GET_BURST:
                         case HIT_OVERWRITE_BURST:
                             // burst only
                             snprintf(wbuf, 128, "U %i\n", hit_c->burst);
                             break;
+                        case HIT_GET_HITS:
                         case HIT_OVERWRITE_HITS:
                             // hit_to_fall only
                             snprintf(wbuf, 128, "K %i\n", hit_c->hit_to_fall);
@@ -387,7 +392,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                 case NL_C_MOVE:
                     if (cmd[1] == '\0') {
                         nla_put_u8(msg, GEN_INT8_A_MSG, 0); // stop request
-                    } else if (sscanf(cmd+1, "%i", arg1) == 1) {
+                    } else if (sscanf(cmd+1, "%i", &arg1) == 1) {
                         if (arg1 > 126 || arg1 < -127) {
                             arg1 = 0; // stay away from the edge conditions
                         }
@@ -407,7 +412,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                 case NL_C_HITS:
                     if (cmd[1] == '\0') {
                         nla_put_u8(msg, GEN_INT8_A_MSG, HIT_REQ); // request hits message
-                    } else if (sscanf(cmd+1, "%i", arg1) == 1) {
+                    } else if (sscanf(cmd+1, "%i", &arg1) == 1) {
                         if (arg1 > 254 || arg1 < 0) {
                             arg1 = 0; // stay away from the edge conditions
                         }
@@ -417,16 +422,17 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     }
                     break;
                 case NL_C_HIT_CAL:
-                    arg2 = sscanf(cmd+1, "%i", arg1);
+                    arg2 = sscanf(cmd+1, "%i", &arg1);
+                    memset(&hit_c, 0, sizeof(struct hit_calibration));
                     switch (cmd[0]) {
                         case 'L': case 'l':
                             if (arg2 == 1) {
                                 // set calibration bounds message
-                                if (sscanf(cmd+1, "%i %i", arg1, arg2) != 2) {
+                                if (sscanf(cmd+1, "%i %i", &arg1, &arg2) != 2) {
                                     arg2 = arg1; // set both bounds the same
                                 }
                                 hit_c.lower = arg1;
-                                hit_c.lower = arg2;
+                                hit_c.upper = arg2;
                                 hit_c.set = HIT_OVERWRITE_CAL;
                             } else {
                                 // get calibration bounds request
@@ -455,6 +461,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                             break;
                     }
                     // put calibration data in message
+                    printf("changing hit calibration: %i %i %i %i %i\n", hit_c.lower, hit_c.upper, hit_c.burst, hit_c.hit_to_fall, hit_c.set);
                     nla_put(msg, HIT_A_MSG, sizeof(struct hit_calibration), &hit_c);
                     break;
                 case NL_C_ACCESSORY:

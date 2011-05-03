@@ -14,6 +14,7 @@ obj-m := 	target.o \
 			delay_printk.o \
 			lifter.o \
 			target_generic_output.o \
+			target_hit_poll.o \
 
 PWD := $(shell pwd)
 CURD := $(shell basename `pwd`)
