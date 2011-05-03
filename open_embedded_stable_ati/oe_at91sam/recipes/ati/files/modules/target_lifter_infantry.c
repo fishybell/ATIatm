@@ -19,7 +19,7 @@
 
 #define TIMEOUT_IN_SECONDS		3
 
-//#define TESTING_ON_EVAL
+#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
 	//for testing using eval. board buttons and LED
 	#undef INPUT_LIFTER_POS_ACTIVE_STATE
@@ -33,8 +33,8 @@
 	#define INPUT_LIFTER_POS_DOWN_LIMIT    		AT91_PIN_PA30   // BP3 on dev. board
 	#define INPUT_LIFTER_POS_UP_LIMIT     		AT91_PIN_PA31   // BP4 on dev. board
 
-	#define OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE    ACTIVE_LOW
-	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PB9
+	#define OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE    ACTIVE_LOW // PB9 is active high, PB8 active low
+	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PB9 // PB9 is power LED ... PB8 is the user LED
 #endif // TESTING_ON_EVAL
 
 //#define FIX_FOR_JPY_IO_BOARD
