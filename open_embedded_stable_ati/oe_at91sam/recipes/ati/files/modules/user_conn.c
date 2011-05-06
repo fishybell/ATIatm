@@ -49,7 +49,7 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
     struct nlmsghdr *nlh = nlmsg_hdr(msg);
     struct genlmsghdr *ghdr = nlmsg_data(nlh);
     int client = (int)arg;
-    char wbuf[128];
+    char wbuf[1024];
     wbuf[0] = '\0';
 
     // Validate message and parse attributes
@@ -61,7 +61,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
             if (attrs[GEN_INT8_A_MSG]) {
                 // battery value percentage
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-                snprintf(wbuf, 128, "B %i\n", value);
+                snprintf(wbuf, 1024, "B %i\n", value);
             }
 
             break;
@@ -72,13 +72,13 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
                 if (value == 1) {
                     // 1 for exposed
-                    snprintf(wbuf, 128, "E\n");
+                    snprintf(wbuf, 1024, "E\n");
                 } else if (value == 0) {
                     // 0 for concealed
-                    snprintf(wbuf, 128, "C\n");
+                    snprintf(wbuf, 1024, "C\n");
                 } else {
                     // uknown or moving
-                    snprintf(wbuf, 128, "S %i\n", value);
+                    snprintf(wbuf, 1024, "S %i\n", value);
                 }
             }
 
@@ -89,7 +89,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
             if (attrs[GEN_INT8_A_MSG]) {
                 // moving at # mph
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-                snprintf(wbuf, 128, "M %i\n", value-128);
+                snprintf(wbuf, 1024, "M %i\n", value-128);
             }
 
             break;
@@ -99,7 +99,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
             if (attrs[GEN_INT16_A_MSG]) {
                 // # feet from home
                 int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
-                snprintf(wbuf, 128, "A %i\n", value);
+                snprintf(wbuf, 1024, "A %i\n", value);
             }
 
             break;
@@ -109,7 +109,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
             if (attrs[GEN_INT8_A_MSG]) {
                 // emergency stop reply (will likely cause other messages as well)
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-                snprintf(wbuf, 128, "X\n");
+                snprintf(wbuf, 1024, "X\n");
             }
 
             break;
@@ -119,7 +119,17 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
             if (attrs[GEN_INT8_A_MSG]) {
                 // current number of hits
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-                snprintf(wbuf, 128, "H %i\n", value);
+                snprintf(wbuf, 1024, "H %i\n", value);
+            }
+
+            break;
+        case NL_C_HIT_LOG:
+            genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_string_policy);
+
+            if (attrs[GEN_STRING_A_MSG]) {
+                // current hit log
+                char *data = nla_get_string(attrs[GEN_STRING_A_MSG]);
+                snprintf(wbuf, 1024, "%s\n", data);
             }
 
             break;
@@ -135,26 +145,26 @@ printf("NL_C_HIT_CAL\n");
                         case HIT_OVERWRITE_NONE:
                         case HIT_OVERWRITE_ALL:
                             // all calibration data
-                            snprintf(wbuf, 128, "L %i %i\nU %i\nK %i\n", hit_c->lower, hit_c->upper, hit_c->burst, hit_c->hit_to_fall);
+                            snprintf(wbuf, 1024, "L %i %i %i\nY %i %i\nF %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->type, hit_c->invert, hit_c->hits_to_fall, hit_c->after_fall);
                             break;
                         case HIT_OVERWRITE_OTHER:
-                            // burst and hit_to_fall
-                            snprintf(wbuf, 128, "U %i\nK %i\n", hit_c->burst, hit_c->hit_to_fall);
+                            // type and hits_to_fall
+                            snprintf(wbuf, 1024, "Y %i %i\nF %i %i\n", hit_c->type, hit_c->invert, hit_c->hits_to_fall, hit_c->after_fall);
                             break;
                         case HIT_GET_CAL:
                         case HIT_OVERWRITE_CAL:
-                            // upper and lower
-                            snprintf(wbuf, 128, "L %i %i\n", hit_c->lower, hit_c->upper);
+                            // sensitivity and seperation
+                            snprintf(wbuf, 1024, "L %i %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time);
                             break;
-                        case HIT_GET_BURST:
-                        case HIT_OVERWRITE_BURST:
-                            // burst only
-                            snprintf(wbuf, 128, "U %i\n", hit_c->burst);
+                        case HIT_GET_TYPE:
+                        case HIT_OVERWRITE_TYPE:
+                            // type only
+                            snprintf(wbuf, 1024, "Y %i %i\n", hit_c->type, hit_c->invert);
                             break;
-                        case HIT_GET_HITS:
-                        case HIT_OVERWRITE_HITS:
-                            // hit_to_fall only
-                            snprintf(wbuf, 128, "K %i\n", hit_c->hit_to_fall);
+                        case HIT_GET_FALL:
+                        case HIT_OVERWRITE_FALL:
+                            // hits_to_fall only
+                            snprintf(wbuf, 1024, "F %i %i\n", hit_c->hits_to_fall, hit_c->after_fall);
                             break;
                     }
                 }
@@ -175,7 +185,7 @@ printf("NL_C_HIT_CAL\n");
                         case BIT_MOVE_REV: btyp = 'R'; break;
                         case BIT_MOVE_STOP: btyp = 'S'; break;
                     }
-                    snprintf(wbuf, 128, "T %c %i\n", btyp, bit->is_on);
+                    snprintf(wbuf, 1024, "T %c %i\n", btyp, bit->is_on);
                 }
             }
             break;
@@ -189,36 +199,36 @@ printf("NL_C_HIT_CAL\n");
                     switch (acc_c->acc_type) {
                         case ACC_NES_MOON_GLOW:
                             // Moon Glow data
-                            snprintf(wbuf, 128, "Q MGL");
+                            snprintf(wbuf, 1024, "Q MGL");
                             break;
                         case ACC_NES_PHI:
                             // Positive Hit Indicator data
-                            snprintf(wbuf, 128, "Q PHI");
+                            snprintf(wbuf, 1024, "Q PHI");
                             break;
                         case ACC_NES_MFS:
                             // Muzzle Flash Simulator data
-                            snprintf(wbuf, 128, "Q MFS");
+                            snprintf(wbuf, 1024, "Q MFS");
                             break;
                         case ACC_SES:
                             // SES data
-                            snprintf(wbuf, 128, "Q SES");
+                            snprintf(wbuf, 1024, "Q SES");
                             break;
                         case ACC_SMOKE:
                             // Smoke generator data
-                            snprintf(wbuf, 128, "Q SMK");
+                            snprintf(wbuf, 1024, "Q SMK");
                             break;
                         case ACC_THERMAL:
                             // Thermal device data
-                            snprintf(wbuf, 128, "Q THM");
+                            snprintf(wbuf, 1024, "Q THM");
                             break;
                         case ACC_MILES_SDH:
                             // MILES Shootback Device Holder data 
-                            snprintf(wbuf, 128, "Q MSD");
+                            snprintf(wbuf, 1024, "Q MSD");
                             break;
                     }
 
                     // some mean different things for different accessories
-                    snprintf(wbuf+5, 128-5, " %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
+                    snprintf(wbuf+5, 1024-5, " %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
                 }
             }
             break;
@@ -231,7 +241,7 @@ printf("NL_C_HIT_CAL\n");
                 struct gps_conf *gps_c = (struct gps_conf*)nla_data(attrs[GPS_A_MSG]);
                 if (gps_c != NULL) {
                     // field of merit, integral latitude, fractional latitude, integral longitude, fractional longitude
-                    snprintf(wbuf, 128, "G %i %i %i %i %i\n", gps_c->fom, gps_c->intLat, gps_c->fraLat, gps_c->intLon, gps_c->fraLon);
+                    snprintf(wbuf, 1024, "G %i %i %i %i %i\n", gps_c->fom, gps_c->intLat, gps_c->fraLat, gps_c->intLon, gps_c->fraLon);
                 }
             }
             break;
@@ -241,7 +251,7 @@ printf("NL_C_HIT_CAL\n");
 
             if (attrs[GEN_STRING_A_MSG]) {
                 char *data = nla_get_string(attrs[GEN_STRING_A_MSG]);
-                snprintf(wbuf, 128, "failure attribute: %s\n", data);
+                snprintf(wbuf, 1024, "failure attribute: %s\n", data);
             }
 
             break;
@@ -252,7 +262,7 @@ printf("NL_C_HIT_CAL\n");
 
     /* write back to the client */
     if (wbuf[0] != '\0') {
-        write(client, wbuf, strnlen(wbuf,128));
+        write(client, wbuf, strnlen(wbuf,1024));
     } else {
         write(client, "error\n", 6);
     }
@@ -263,7 +273,10 @@ printf("NL_C_HIT_CAL\n");
 // global family id for ATI netlink family
 int family;
 
-int telnet_client(struct nl_handle *handle, char *client_buf) {
+int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
+    char wbuf[1024];
+    wbuf[0] = '\0';
+    int arg1, arg2, arg3;
     // read as many commands out of the buffer as possible
     while (1) {
         // read line from client buffer
@@ -296,63 +309,105 @@ int telnet_client(struct nl_handle *handle, char *client_buf) {
         // send specific command to kernel
         int nl_cmd = NL_C_UNSPEC;
         switch (cmd[0]) {
-            case 'B': case 'b':
-                nl_cmd = NL_C_BATTERY;
-                break;
-            case 'P': case 'p':
-printf("TODO: fill in feature P\n");
-                nl_cmd = NL_C_UNSPEC;
-                break;
-            case 'R': case 'r':
-printf("TODO: fill in feature R\n");
-                nl_cmd = NL_C_UNSPEC;
-                break;
-            case 'M': case 'm':
-                nl_cmd = NL_C_MOVE;
-                break;
             case 'A': case 'a':
                 nl_cmd = NL_C_POSITION;
                 break;
-            case 'S': case 's':
+            case 'B': case 'b':
+                nl_cmd = NL_C_BATTERY;
+                break;
+            case 'C': case 'c':
                 nl_cmd = NL_C_EXPOSE;
+                break;
+            case 'D': case 'd':
+                nl_cmd = NL_C_HIT_LOG;
                 break;
             case 'E': case 'e':
                 nl_cmd = NL_C_EXPOSE;
                 break;
-            case 'C': case 'c':
+            case 'F': case 'f':
+                nl_cmd = NL_C_HIT_CAL;
+                break;
+            case 'G': case 'g':
+                nl_cmd = NL_C_GPS;
+                break;
+            case 'H': case 'h':
+                nl_cmd = NL_C_HITS;
+                break;
+            case 'L': case 'l':
+                nl_cmd = NL_C_HIT_CAL;
+                break;
+            case 'M': case 'm':
+                nl_cmd = NL_C_MOVE;
+                break;
+            case 'Q': case 'q':
+                nl_cmd = NL_C_ACCESSORY;
+                break;
+            case 'S': case 's':
                 nl_cmd = NL_C_EXPOSE;
                 break;
             case 'T': case 't':
                 nl_cmd = NL_C_EXPOSE;
                 break;
-            case 'L': case 'l':
+            case 'Y': case 'y':
                 nl_cmd = NL_C_HIT_CAL;
-                break;
-            case 'U': case 'u':
-                nl_cmd = NL_C_HIT_CAL;
-                break;
-            case 'K': case 'k':
-                nl_cmd = NL_C_HIT_CAL;
-                break;
-            case 'O': case 'o':
-printf("TODO: fill in feature O\n");
-                nl_cmd = NL_C_UNSPEC;
-                break;
-            case 'N': case 'n':
-printf("TODO: fill in feature N\n");
-                nl_cmd = NL_C_UNSPEC;
-                break;
-            case 'H': case 'h':
-                nl_cmd = NL_C_HITS;
                 break;
             case 'X': case 'x':
                 nl_cmd = NL_C_STOP;
                 break;
-            case 'Q': case 'q':
-                nl_cmd = NL_C_ACCESSORY;
-                break;
-            case 'G': case 'g':
-                nl_cmd = NL_C_GPS;
+            case '?':
+                // help command
+                arg1 = cmd[1] == ' ' ? 2 : 1; // next letter location in the command (ignore up to one space)
+                switch (cmd[arg1]) { /* second letter */
+                    case 'A': case 'a':
+                        snprintf(wbuf, 1024, "Request position\nFormat: A\n");
+                        break;
+                    case 'B': case 'b':
+                        snprintf(wbuf, 1024, "Request battery\nFormat: B\n");
+                        break;
+                    case 'C': case 'c':
+                        snprintf(wbuf, 1024, "Conceal\nFormat: C\n");
+                        break;
+                    case 'D': case 'd':
+                        snprintf(wbuf, 1024, "Request full hit data\nFormat: D\n");
+                        break;
+                    case 'E': case 'e':
+                        snprintf(wbuf, 1024, "Expose\nFormat: E\n");
+                        break;
+                    case 'F': case 'f':
+                        snprintf(wbuf, 1024, "Request fall parameters\nFormat: F\nChange fall parameters\nFormat: F (0-100)fall_at_x_hits (1|0)bob_after_fall\n");
+                        break;
+                    case 'G': case 'g':
+                        snprintf(wbuf, 1024, "Request GPS data\nFormat: G\n");
+                        break;
+                    case 'H': case 'h':
+                        snprintf(wbuf, 1024, "Request hit data\nFormat: H\nReset Hit data\nFormat: H 0");
+                        break;
+                    case 'L': case 'l':
+                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose\n");
+                        break;
+                    case 'M': case 'm':
+                        snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-127 to 126)speed_in_mph\n");
+                        break;
+                    case 'Q': case 'q':
+                        snprintf(wbuf, 1024, "Types of accessories: MFS, MGL, SES, PHI, MSD, SMK, THM\nRequest accessory paramaters\nFormat: Q accessory_type\nChange accessory parameters\nFormat: Q accessory_type (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
+                        break;
+                    case 'S': case 's':
+                        snprintf(wbuf, 1024, "Request exposure data\nFormat: S\n");
+                        break;
+                    case 'T': case 't':
+                        snprintf(wbuf, 1024, "Toggle target\nFormat: T\n");
+                        break;
+                    case 'Y': case 'y':
+                        snprintf(wbuf, 1024, "Request hit sensor type\nFormat: Y\nChange hit sensor type\nFormat: Y (0|1|2)mechanical_or_nchs_or_miles (0|1)invert_input_line\n");
+                        break;
+                    case 'X': case 'x':
+                        snprintf(wbuf, 1024, "Emergency stop\nFormat: X\n");
+                        break;
+                    default: // print default help
+                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nL: Hit Calibration\nM: Movement\nQ: Accessory\nS: Exposure Status\nT: Toggle\nY: Hit Sensor Type\nX: Emergency Stop\n");
+                        break;
+                }
+                write(client, wbuf, strnlen(wbuf,1024));
                 break;
             case '\0':
                 // empty string, just ignore
@@ -365,7 +420,6 @@ printf("unrecognized command '%c'\n", cmd[0]);
         if (nl_cmd != NL_C_UNSPEC) {
             // Construct a generic netlink by allocating a new message
             struct nl_msg *msg;
-            int arg1, arg2;
             struct hit_calibration hit_c;
             struct accessory_conf acc_c;
             struct gps_conf gps_c;
@@ -413,13 +467,18 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     if (cmd[1] == '\0') {
                         nla_put_u8(msg, GEN_INT8_A_MSG, HIT_REQ); // request hits message
                     } else if (sscanf(cmd+1, "%i", &arg1) == 1) {
-                        if (arg1 > 254 || arg1 < 0) {
-                            arg1 = 0; // stay away from the edge conditions
+                        if (arg1 == 0) {
+                            nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // reset hits (to X) message
+                        } else {
+                            nla_put_u8(msg, GEN_INT8_A_MSG, HIT_REQ); // request hits message
                         }
-                        nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // reset hits (to X) message
                     } else {
                         nla_put_u8(msg, GEN_INT8_A_MSG, HIT_REQ); // request hits message
                     }
+                    break;
+                case NL_C_HIT_LOG:
+                    // hit log message
+                    nla_put_string(msg, GEN_STRING_A_MSG, ""); // ignored
                     break;
                 case NL_C_HIT_CAL:
                     arg2 = sscanf(cmd+1, "%i", &arg1);
@@ -427,45 +486,50 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     switch (cmd[0]) {
                         case 'L': case 'l':
                             if (arg2 == 1) {
-                                // set calibration bounds message
-                                if (sscanf(cmd+1, "%i %i", &arg1, &arg2) != 2) {
-                                    arg2 = arg1; // set both bounds the same
+                                // set calibration message
+                                if (sscanf(cmd+1, "%i %i %i", &arg1, &arg2, &arg3) == 3) {
+                                    hit_c.seperation = arg1;
+                                    hit_c.sensitivity = arg2;
+                                    hit_c.blank_time = arg3;
+                                    hit_c.set = HIT_OVERWRITE_CAL;
                                 }
-                                hit_c.lower = arg1;
-                                hit_c.upper = arg2;
-                                hit_c.set = HIT_OVERWRITE_CAL;
                             } else {
                                 // get calibration bounds request
                                 hit_c.set = HIT_GET_CAL;
                             }
                             break;
-                        case 'U': case 'u':
+                        case 'Y': case 'y':
                             if (arg2 == 1) {
-                                // set burst value message
-                                hit_c.burst = arg1;
-                                hit_c.set = HIT_OVERWRITE_BURST;
+                                if (sscanf(cmd+1, "%i %i", &arg1, &arg2) == 2) {
+                                    // set type and invert values message
+                                    hit_c.type = arg1;
+                                    hit_c.invert = arg3;
+                                    hit_c.set = HIT_OVERWRITE_TYPE;
+                                }
                             } else {
-                                // get burst value request
-                                hit_c.set = HIT_GET_BURST;
+                                // get type value request
+                                hit_c.set = HIT_GET_TYPE;
                             }
                             break;
-                        case 'K': case 'k':
+                        case 'F': case 'f':
                             if (arg2 == 1) {
-                                // set hit_to_fall value message
-                                hit_c.hit_to_fall = arg1;
-                                hit_c.set = HIT_OVERWRITE_HITS;
+                                if (sscanf(cmd+1, "%i %i", &arg1, &arg2) == 2) {
+                                    // set hits_to_fall and after_fall values message
+                                    hit_c.hits_to_fall = arg1;
+                                    hit_c.after_fall = arg2;
+                                    hit_c.set = HIT_OVERWRITE_FALL;
+                                }
                             } else {
-                                // get hit_to_fall value request
-                                hit_c.set = HIT_GET_HITS;
+                                // get hits_to_fall value request
+                                hit_c.set = HIT_GET_FALL;
                             }
                             break;
                     }
                     // put calibration data in message
-                    printf("changing hit calibration: %i %i %i %i %i\n", hit_c.lower, hit_c.upper, hit_c.burst, hit_c.hit_to_fall, hit_c.set);
                     nla_put(msg, HIT_A_MSG, sizeof(struct hit_calibration), &hit_c);
                     break;
                 case NL_C_ACCESSORY:
-                    arg1 = cmd[1] == ' ' ? 2 : 3; // next letter location in the command (ignore up to one space)
+                    arg1 = cmd[1] == ' ' ? 2 : 1; // next letter location in the command (ignore up to one space)
                     arg2 = arg1 + 3; // start of arguments
                     // find the type of accessory
                     memset(&acc_c, 0, sizeof(struct accessory_conf));
@@ -538,9 +602,11 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     }
 
                     // grab as many pieces as we can get (always in same order for all accessory types)
-                    unsigned int req = 0, onn = 0, one = 0, onh = 0, onk = 0, ont = 0, oft = 0, std = 0, rpd = 0, rpt = 0, ex1 = 0, ex2 = 0, ex3 = 0; // placeholders as we can't take address of bit-field for sscanf
+                    unsigned int req = 1, onn = 0, one = 0, onh = 0, onk = 0, ont = 0, oft = 0, std = 0, rpd = 0, rpt = 0, ex1 = 0, ex2 = 0, ex3 = 0; // placeholders as we can't take address of bit-field for sscanf
 //                    req = onn =  one = onh = onk = std = rpd = ex1 = ex2 = ex3 = 0; // zero by default
-                    sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i", &req, &onn, &one, &onh, &onk, &ont, &oft, &std, &rpd, &rpt, &ex1, &ex2, &ex3);
+                    if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &onn, &one, &onh, &onk, &ont, &oft, &std, &rpd, &rpt, &ex1, &ex2, &ex3) > 0) {
+                        req = 0;
+                    }
                     acc_c.request = req;
                     acc_c.exists = 0;
                     acc_c.on_now = onn;
@@ -556,7 +622,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     acc_c.ex_data2 = ex2;
                     acc_c.ex_data3 = ex3;
 
-printf("Q X%iX %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c.acc_type, acc_c.exists, acc_c.on_now, acc_c.on_exp, acc_c.on_hit, acc_c.on_kill, acc_c.on_time, acc_c.off_time, acc_c.start_delay, acc_c.repeat_delay, acc_c.repeat, acc_c.ex_data1, acc_c.ex_data2, acc_c.ex_data3);
+//printf("Q X%iX %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c.acc_type, acc_c.exists, acc_c.on_now, acc_c.on_exp, acc_c.on_hit, acc_c.on_kill, acc_c.on_time, acc_c.off_time, acc_c.start_delay, acc_c.repeat_delay, acc_c.repeat, acc_c.ex_data1, acc_c.ex_data2, acc_c.ex_data3);
 
                     // put configuration data in message
                     nla_put(msg, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c);
@@ -746,7 +812,7 @@ printf("%i", b);
                     rsize = read(client, client_buf+b, CLIENT_BUFFER-b); // read into buffer at appropriate place, at most to end of buffer
 printf(":%i\n", rsize);
                     // parse buffer and send any netlink messages needed
-                    if (rsize == 0 || telnet_client(handle, client_buf) != 0) {
+                    if (rsize == 0 || telnet_client(handle, client_buf, client) != 0) {
 printf("sk %i closing\n", client);
                         close_nicely = 1; // exit loop
                     }
