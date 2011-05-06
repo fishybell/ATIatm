@@ -14,7 +14,7 @@
 
 #define BIT_DOUBLE_IN_MSECONDS		2000
 #define BIT_READ_IN_MSECONDS		50
-#define BIT_CANCEL_IN_MSECONDS		5000
+#define BIT_CANCEL_IN_MSECONDS		2500
 #define MOVE_WAIT_IN_MSECONDS		2000
 
 #define BLINK_ON_IN_MSECONDS		1000
@@ -273,7 +273,8 @@ irqreturn_t rev_button_int(int irq, void *dev_id, struct pt_regs *regs)
 //---------------------------------------------------------------------------
 static void move_timeout_fire(unsigned long data)
     {
-    int bit_value, fwd_value, rev_value;
+    // int bit_value;
+    int fwd_value, rev_value;
     // if we're not a mover, don't bother
    delay_printk("%s - %s\n",TARGET_NAME, __func__);
     if (!mover)
