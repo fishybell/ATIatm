@@ -55,22 +55,25 @@ static struct nla_policy generic_int8_policy[GEN_INT8_A_MAX + 1] = {
 
 /* specific policy for hit sensor calibration */
 typedef struct hit_calibration {
-    u16 lower __attribute__ ((packed)); /* lower calibration value */
-    u16 upper __attribute__ ((packed)); /* upper calibration value */
-    u16 burst __attribute__ ((packed)); /* burst seperation value (0 for NCHS, 1 for single) */
-    u8  hit_to_fall;                    /* number of hits required to fall (0 for infinity) */
-    u8  set;                            /* explained below */
+    u32 seperation __attribute__ ((packed));   /* seperation calibration value (in milliseconds) */
+    u32 sensitivity __attribute__ ((packed));  /* sensitivity calibration value (lower value for less sensitive) */
+    u16 blank_time __attribute__ ((packed));   /* blank time from start of exposure (in milliseconds) */
+    u8 hits_to_fall:6;                         /* number of hits required to fall (0 for infinity) */
+    u8 after_fall:2;                           /* after fall: 0 stay down, 1 bob, 2 bob/stop, 3 stop */
+    u8 type:2;                                 /* 0 for mechanical, 1 for NCHS, 2 for MILES */
+    u8 invert:2;                               /* invert hit sensor input: 0 for no, 1 for yes, 2 for auto (not implimented) */
+    u8 set:4;                                  /* explained below */
 } hit_calibration_t;
 enum {
     HIT_OVERWRITE_NONE,  /* overwrite nothing (gets reply with current values) */
     HIT_OVERWRITE_ALL,   /* overwrites every value */
-    HIT_OVERWRITE_CAL,   /* overwrites calibration values (upper, lower) */
-    HIT_OVERWRITE_OTHER, /* overwrites non-calibration values (burst, etc.) */
-    HIT_OVERWRITE_BURST, /* overwrites burst value only */
-    HIT_OVERWRITE_HITS,  /* overwrites hit_to_fall value only */
+    HIT_OVERWRITE_CAL,   /* overwrites calibration values (sensitivity, seperation, blank_time) */
+    HIT_OVERWRITE_OTHER, /* overwrites non-calibration values (type, etc.) */
+    HIT_OVERWRITE_TYPE,  /* overwrites type and invert values */
+    HIT_OVERWRITE_FALL,  /* overwrites hits_to_fall and after_fall values */
     HIT_GET_CAL,         /* overwrites nothing (gets calibration values) */
-    HIT_GET_BURST,       /* overwrites nothing (gets burst value) */
-    HIT_GET_HITS,        /* overwrites nothing (gets hit_to_fall value) */
+    HIT_GET_TYPE,        /* overwrites nothing (gets type and invert values) */
+    HIT_GET_FALL,        /* overwrites nothing (gets hits_to_fall and after_fall value) */
 };
 enum {
     HIT_A_UNSPEC,
@@ -190,7 +193,8 @@ enum {
     NL_C_MOVE,		/* move as mph (command/reply) (generic 8-bit int) */
     NL_C_POSITION,	/* position in feet from home (request/reply) (generic 16-bit int) */
     NL_C_STOP,		/* stop (command/reply) (generic 8-bit int) */
-    NL_C_HITS,		/* hit log (request/reply) (generic 8-bit int) */
+    NL_C_HITS,		/* hit count (request/reply) (generic 8-bit int) */
+    NL_C_HIT_LOG,	/* hit count (request/reply) (generic string) */
     NL_C_HIT_CAL,	/* calibrate hit sensor (command/reply) (hit calibrate structure) */
     NL_C_BIT,		/* bit button event (broadcast) (bit event structure) */
     NL_C_ACCESSORY,	/* configure accesories (command/reply) (accessory structure) */
