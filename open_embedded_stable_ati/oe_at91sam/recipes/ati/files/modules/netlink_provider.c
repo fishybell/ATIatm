@@ -363,6 +363,13 @@ struct genl_ops provider_gnl_ops_stop = {
 struct genl_ops provider_gnl_ops_hits = {
     .cmd = NL_C_HITS,
     .flags = 0,
+    .policy = generic_int8_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
+struct genl_ops provider_gnl_ops_hit_log = {
+    .cmd = NL_C_HIT_LOG,
+    .flags = 0,
     .policy = generic_string_policy,
     .doit = provider_command_handler,
     .dumpit = NULL,
@@ -405,6 +412,7 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_POSITION */		&provider_gnl_ops_position,
     /* NL_C_STOP */			&provider_gnl_ops_stop,
     /* NL_C_HITS */			&provider_gnl_ops_hits,
+    /* NL_C_HIT_LOG */		&provider_gnl_ops_hit_log,
     /* NL_C_HIT_CAL */		&provider_gnl_ops_hits_cal,
     /* NL_C_BIT */			&provider_gnl_ops_bit,
     /* NL_C_ACCESSORY */	&provider_gnl_ops_accessory,
