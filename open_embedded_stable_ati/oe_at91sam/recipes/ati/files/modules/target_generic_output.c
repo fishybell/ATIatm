@@ -9,7 +9,7 @@
 #include "target_generic_output.h"
 #include "netlink_kernel.h"
 
-#define TESTING_ON_EVAL
+//#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
     #undef OUTPUT_MUZZLE_FLASH
     #define OUTPUT_MUZZLE_FLASH    	AT91_PIN_PB8
@@ -134,8 +134,54 @@ struct generic_output output_table[] = {
         OUTPUT_MUZZLE_FLASH_ACTIVE_STATE,	// gpio active high/low
         RW_LOCK_UNLOCKED,		// lock
     },
+    // PHI
+    {
+        ACC_NES_PHI,			// type
+        1,						// number
+        0,						// exists
+        DISABLED,				// enabled
+        S_DISABLED,				// state
+        S_DISABLED,				// next_state
+        0,						// active_on
+        CONSTANT_ON,			// mode
+        0,						// initial delay
+        0,						// repeat delay
+        0,						// on time
+        0,						// off time
+        0,						// repeat count
+        0,						// repeat at
+        0,						// on/off repeat count
+        0,						// on/off repeat at
+        TIMER_INITIALIZER(state_run, 0, 2), // state function, no expire, index 2
+        OUTPUT_HIT_INDICATOR,	// gpio pin
+        OUTPUT_MUZZLE_FLASH_ACTIVE_STATE,	// gpio active high/low
+        RW_LOCK_UNLOCKED,		// lock
+    },
+    // Moon Glow
+    {
+        ACC_NES_MOON_GLOW,		// type
+        1,						// number
+        0,						// exists
+        DISABLED,				// enabled
+        S_DISABLED,				// state
+        S_DISABLED,				// next_state
+        0,						// active_on
+        CONSTANT_ON,			// mode
+        0,						// initial delay
+        0,						// repeat delay
+        0,						// on time
+        0,						// off time
+        0,						// repeat count
+        0,						// repeat at
+        0,						// on/off repeat count
+        0,						// on/off repeat at
+        TIMER_INITIALIZER(state_run, 0, 3), // state function, no expire, index 3
+        OUTPUT_NIGHT_LIGHT,		// gpio pin
+        OUTPUT_MUZZLE_FLASH_ACTIVE_STATE,	// gpio active high/low
+        RW_LOCK_UNLOCKED,		// lock
+    },
 };
-#define TABLE_SIZE 1 /* size of output_table */
+#define TABLE_SIZE 4 /* size of output_table */
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to store the burst count.
@@ -220,6 +266,12 @@ GO_enable_t generic_output_get_enable(int type, int num) {
 EXPORT_SYMBOL(generic_output_get_enable);
 
 void generic_output_set_enable(int type, int num, GO_enable_t value) {
+    // check to see if we should stop the device first
+    if (value == DISABLED) {
+        generic_output_set_state(type, num, OFF_IMMEDIATE); // turn off now
+    }
+
+    // set enabled value
     SET_GO_VALUE(enabled, value);
 }
 EXPORT_SYMBOL(generic_output_set_enable);
@@ -672,9 +724,10 @@ static void state_run(unsigned long index) {
     struct generic_output *this = &output_table[index];
     int add_delay = 0; // additional delay to add to timer
 
-//delay_printk("%s(): %i\n",__func__, index);
+delay_printk("%s(): %i\n",__func__, index);
     // lock as read/write
     write_lock(&this->lock);
+// delay_printk("i %i\ns %i\nn %i\nm %i\n", index, this->state, this->next_state, this->mode);
 
     // change current state to next state
     this->state = this->next_state;
@@ -715,7 +768,11 @@ static void state_run(unsigned long index) {
             switch (this->mode) {
                 case CONSTANT_ON: // goes on, stays on (no repeating)
                     // change next state
-                    this->next_state = S_WAITING; // is on, next off
+                    if (this->state == S_STOP_ON) {
+                        this->next_state = S_WAITING; // is on, next off
+                    } else {
+                        this->next_state = S_FIRE_ON; // is on, stays on
+                    }
 
                     // no timer change (stays on)
                     break;
@@ -826,7 +883,9 @@ delay_printk("repeating %i\n", this->repeat_at);
                 case S_FIRE_OFF:
                 case S_STOP_ON:
                 case S_STOP_OFF:
-                    schedule_timer(index, (this->off_time+add_delay)); // next state after "off time" and additional delay together
+                    if (this->off_time+add_delay > 0) {
+                        schedule_timer(index, (this->off_time+add_delay)); // next state after "off time" and additional delay together
+                    }
                     break;
             }
             break;
