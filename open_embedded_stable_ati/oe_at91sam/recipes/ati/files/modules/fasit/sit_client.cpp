@@ -24,10 +24,13 @@ FUNCTION_START("::SIT_Client(int fd, int tnum) : Connection(fd)")
 
       // TODO -- MILES SDH
 
-      lastHitCal.lower = 15;
-      lastHitCal.upper = 250;
-      lastHitCal.burst = 1; // single shot mode
-      lastHitCal.hit_to_fall = 1; // TODO -- reaction (bob, kill, stop, etc)
+      lastHitCal.seperation = 250;
+      lastHitCal.sensitivity = 15;
+      lastHitCal.blank_time = 500; // half a second blanking
+      lastHitCal.hits_to_fall = 1; // fall on first hit
+      lastHitCal.after_fall = 0; // 0 for stay down
+      lastHitCal.type = 0; // mechanical sensor
+      lastHitCal.invert = 0; // don't invert sensor input line
       nl_conn->doHitCal(lastHitCal); // tell kernel
 
       hits = 0;
@@ -70,21 +73,15 @@ FUNCTION_START("::fillStatus(FASIT_2102 *msg)")
    // hit record
    msg->body.hit = htons(hits);
    msg->body.hit_conf.on = 1; // TODO -- handle off, on/off at position
-   msg->body.hit_conf.react = 0; // TODO -- handle kill, stop, bob
-   msg->body.hit_conf.tokill = htons(lastHitCal.hit_to_fall);
-   msg->body.hit_conf.sens = htons(1); // TODO -- convert upper/lower into 1-15 value
-   switch (lastHitCal.burst) {
-      case 0:
-         msg->body.hit_conf.mode = 0; // NCHS
-         msg->body.hit_conf.burst = htons(0);
-         break;
-      case 1:
+   msg->body.hit_conf.react = 0; // TODO -- handle kill, stop, bob from after_fall value
+   msg->body.hit_conf.tokill = htons(lastHitCal.hits_to_fall);
+   msg->body.hit_conf.sens = htons(1); // TODO -- convert sensitivity into 1-15 value
+   if (lastHitCal.seperation < 500) { // TODO -- valid seperation point for single/burst
          msg->body.hit_conf.mode = 1; // single
-         msg->body.hit_conf.burst = htons(0);
-         break;
-      default:
+         msg->body.hit_conf.burst = htons(250); // TODO -- max burst seperation
+   } else {
          msg->body.hit_conf.mode = 2; // burst
-         msg->body.hit_conf.burst = htons(lastHitCal.burst); // burst seperation
+         msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
    }
 
 FUNCTION_END("::fillStatus(FASIT_2102 *msg)")
@@ -604,20 +601,25 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
                      break;
                   case HIT_OVERWRITE_CAL:
                   case HIT_GET_CAL:
-                     lastHitCal.lower = hit_c->lower;
-                     lastHitCal.upper = hit_c->upper;
+                     lastHitCal.seperation = hit_c->seperation;
+                     lastHitCal.sensitivity = hit_c->sensitivity;
+                     lastHitCal.blank_time = hit_c->blank_time;
                      break;
                   case HIT_OVERWRITE_OTHER:
-                     lastHitCal.burst = hit_c->burst;
-                     lastHitCal.hit_to_fall = hit_c->hit_to_fall;
+                     lastHitCal.type = hit_c->type;
+                     lastHitCal.invert = hit_c->invert;
+                     lastHitCal.hits_to_fall = hit_c->hits_to_fall;
+                     lastHitCal.after_fall = hit_c->after_fall;
                      break;
-                  case HIT_OVERWRITE_BURST:
-                  case HIT_GET_BURST:
-                     lastHitCal.burst = hit_c->burst;
+                  case HIT_OVERWRITE_TYPE:
+                  case HIT_GET_TYPE:
+                     lastHitCal.type = hit_c->type;
+                     lastHitCal.invert = hit_c->invert;
                      break;
-                  case HIT_OVERWRITE_HITS:
-                  case HIT_GET_HITS:
-                     lastHitCal.hit_to_fall = hit_c->hit_to_fall;
+                  case HIT_OVERWRITE_FALL:
+                  case HIT_GET_FALL:
+                     lastHitCal.hits_to_fall = hit_c->hits_to_fall;
+                     lastHitCal.after_fall = hit_c->after_fall;
                      break;
                }
                sit_client->didHitCal(lastHitCal); // tell client
