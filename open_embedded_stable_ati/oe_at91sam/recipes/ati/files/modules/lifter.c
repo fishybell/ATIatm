@@ -51,6 +51,31 @@ atomic_t toggle_last = ATOMIC_INIT(CONCEAL); // assume conceal last to expose fi
 atomic_t driver_id = ATOMIC_INIT(-1);
 
 //---------------------------------------------------------------------------
+// hit log variables
+//---------------------------------------------------------------------------
+typedef struct hit_item {
+    int line; // which hit sensor detected the hit
+    struct timespec time; // time hit occurred according to current_kernel_time()
+    struct hit_item *next; // link to next log item
+} hit_item_t;
+static spinlock_t hit_lock = SPIN_LOCK_UNLOCKED;
+static hit_item_t *hit_chain = NULL; // head of hit log chain
+static struct timespec hit_start; // time the hit log was started
+
+//---------------------------------------------------------------------------
+// lifter state variables
+//---------------------------------------------------------------------------
+atomic_t hits_to_fall = ATOMIC_INIT(0); // infinite hits to fall
+atomic_t fall_counter = ATOMIC_INIT(-1); // invalid hit count for hits_to_fall
+atomic_t hit_type = ATOMIC_INIT(0); // mechanical
+atomic_t after_fall = ATOMIC_INIT(0); // stay down on fall
+static struct timer_list fall_timer; // TODO -- stay down for a little while?
+atomic_t blank_time = ATOMIC_INIT(0); // no blanking time
+static void blank_off(unsigned long data); // forward declaration
+static struct timer_list blank_timer = TIMER_INITIALIZER(blank_off, 0, 0);
+atomic_t at_conceal = ATOMIC_INIT(0); // do nothing when conceald
+
+//---------------------------------------------------------------------------
 // netlink command handler for expose commands
 //---------------------------------------------------------------------------
 int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
@@ -131,11 +156,11 @@ delay_printk("Lifter: received value: %i\n", value);
         if (rc == 0) {
             rc = HANDLE_SUCCESS;
         } else {
-           delay_printk("Lifter: could not create return message\n");
+            delay_printk("Lifter: could not create return message\n");
             rc = HANDLE_FAILURE;
         }
     } else {
-       delay_printk("Lifter: could not get attribute\n");
+        delay_printk("Lifter: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
 delay_printk("Lifter: returning rc: %i\n", rc);
@@ -145,11 +170,12 @@ delay_printk("Lifter: returning rc: %i\n", rc);
 }
 
 //---------------------------------------------------------------------------
-// netlink command handler for hit log commands
+// netlink command handler for hit count commands
 //---------------------------------------------------------------------------
 int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
     int rc, value = 0;
+    struct hit_item *this;
 delay_printk("Lifter: handling hits command\n");
     
     // get attribute from message
@@ -159,19 +185,101 @@ delay_printk("Lifter: handling hits command\n");
         value = nla_get_u8(na);
 delay_printk("Lifter: received value: %i\n", value);
 
+        // reset hit log?
+        if (value != HIT_REQ) {
+            spin_lock(hit_lock);
+            this = hit_chain;
+            while (this != NULL) {
+                hit_chain = this; // remember this
+                kfree(hit_chain); // free it
+                this = this->next; // move on to next link
+            }
+            hit_chain = NULL;
+            spin_unlock(hit_lock);
+            hit_start = current_kernel_time(); // reset hit log start time
+        }
+
+        // get data from log
+        rc = 0;
+        spin_lock(hit_lock);
+        this = hit_chain;
+        while (this != NULL) {
+            rc++; // count hit (doesn't matter which line)
+            this = this->next; // next link in chain
+        }
+        spin_unlock(hit_lock);
+        
         // prepare response
-        rc = 0; // TODO -- redesign the hit sensor .ko file to accomodate sending data here
         rc = nla_put_u8(skb, GEN_INT8_A_MSG, rc); // rc is number of hits
 
         // message creation success?
         if (rc == 0) {
             rc = HANDLE_SUCCESS;
         } else {
-           delay_printk("Lifter: could not create return message\n");
+            delay_printk("Lifter: could not create return message\n");
             rc = HANDLE_FAILURE;
         }
     } else {
-       delay_printk("Lifter: could not get attribute\n");
+        delay_printk("Lifter: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("Lifter: returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for hit count commands
+//---------------------------------------------------------------------------
+int nl_hit_log_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value = 0;
+    struct hit_item *this;
+    char *wbuf;
+delay_printk("Lifter: handling hits command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_STRING_A_MSG]; // generic string message
+    if (na) {
+        // get count from log
+        rc = 0;
+        spin_lock(hit_lock);
+        this = hit_chain;
+        while (this != NULL) {
+            rc++; // count hit (doesn't matter which line)
+            this = this->next; // next link in chain
+        }
+        spin_unlock(hit_lock);
+
+        // allocate memory for log
+        value = 20+rc*50;
+        wbuf = kmalloc(value, GFP_KERNEL);
+
+        // build human-readable/machine-readable log
+        snprintf(wbuf, 20, "line,time_s,time_n\n");
+        rc = strnlen(wbuf, value);
+        spin_lock(hit_lock);
+        this = hit_chain;
+        while (this != NULL) {
+            rc = strnlen(wbuf, value-rc);
+            snprintf(wbuf+rc, value-rc, "%i,%li,%li\n", this->line, this->time.tv_sec, this->time.tv_nsec);
+            this = this->next; // next link in chain
+        }
+        spin_unlock(hit_lock);
+
+        // prepare response
+        rc = nla_put_string(skb, GEN_STRING_A_MSG, wbuf);
+
+        // message creation success?
+        if (rc == 0) {
+            rc = HANDLE_SUCCESS;
+        } else {
+            delay_printk("Lifter: could not create return message\n");
+            rc = HANDLE_FAILURE;
+        }
+    } else {
+        delay_printk("Lifter: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
 delay_printk("Lifter: returning rc: %i\n", rc);
@@ -210,11 +318,11 @@ delay_printk("Lifter: received value: %i\n", value);
         if (rc == 0) {
             rc = HANDLE_SUCCESS;
         } else {
-           delay_printk("Lifter: could not create return message\n");
+            delay_printk("Lifter: could not create return message\n");
             rc = HANDLE_FAILURE;
         }
     } else {
-       delay_printk("Lifter: could not get attribute\n");
+        delay_printk("Lifter: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
 delay_printk("Lifter: returning rc: %i\n", rc);
@@ -242,7 +350,7 @@ delay_printk("Lifter: handling accessory command\n");
             // prepare mode and active mode value for later
             int a_mode = 0, mode = CONSTANT_ON; // may be overwritten depending on accessory type
             int i, num = 0;
-delay_printk("Q X%iX %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c->acc_type, acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
+//delay_printk("Q X%iX %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c->acc_type, acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
             switch (acc_c->on_exp) {
                 case 1: a_mode |= ACTIVE_UP | UNACTIVE_LOWER; break; // active when fully exposed only
                 case 2: a_mode |= ACTIVE_RAISE | UNACTIVE_LOWER; break; // active when partially and fully expose
@@ -427,8 +535,6 @@ delay_printk("MFS not bursting\n");
 //---------------------------------------------------------------------------
 // netlink command handler for accessory commands
 //---------------------------------------------------------------------------
-atomic_t hit_to_fall = ATOMIC_INIT(0); // infinite hits to fall
-atomic_t burst_seperation = ATOMIC_INIT(1); // single hit mode
 int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
     int rc = HANDLE_SUCCESS_NO_REPLY; // by default this is a command with no response
@@ -442,34 +548,48 @@ delay_printk("Lifter: handling hit-calibration command\n");
         hit_c = (struct hit_calibration*)nla_data(na);
         if (hit_c != NULL) {
             switch (hit_c->set) {
-                case HIT_GET_CAL:         /* overwrites nothing (gets calibration values) */
-                case HIT_GET_BURST:       /* overwrites nothing (gets burst value) */
-                case HIT_GET_HITS:        /* overwrites nothing (gets hit_to_fall value) */
-                case HIT_OVERWRITE_NONE:  /* overwrite nothing (gets reply with current values) */
+                case HIT_GET_CAL:        /* overwrites nothing (gets calibration values) */
+                case HIT_GET_TYPE:       /* overwrites nothing (gets type value) */
+                case HIT_GET_FALL:       /* overwrites nothing (gets hits_to_fall value) */
+                case HIT_OVERWRITE_NONE: /* overwrite nothing (gets reply with current values) */
                     // fill in all data, the unused portions will be ignored
-                    get_hit_calibration(&hit_c->lower, &hit_c->upper); // use existing hit_c structure
-                    hit_c->hit_to_fall = atomic_read(&hit_to_fall);
-                    hit_c->burst = atomic_read(&burst_seperation);
+                    get_hit_calibration(&hit_c->seperation, &hit_c->sensitivity); // use existing hit_c structure
+                    hit_c->blank_time = atomic_read(&blank_time);
+                    hit_c->hits_to_fall = atomic_read(&hits_to_fall);
+                    hit_c->after_fall = atomic_read(&after_fall);
+                    hit_c->type = atomic_read(&hit_type);
+                    hit_c->invert = get_hit_invert();
                     nla_put(skb, HIT_A_MSG, sizeof(struct hit_calibration), hit_c);
                     rc = HANDLE_SUCCESS; // with return message
                     break;
                 case HIT_OVERWRITE_ALL:   /* overwrites every value */
-                    set_hit_calibration(hit_c->lower, hit_c->upper);
-                    atomic_set(&hit_to_fall, hit_c->hit_to_fall);
-                    atomic_set(&burst_seperation, hit_c->burst);
+                    set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
+                    atomic_set(&hits_to_fall, hit_c->hits_to_fall);
+                    atomic_set(&after_fall, hit_c->after_fall);
+                    atomic_set(&hit_type, hit_c->type);
+                    set_hit_invert(hit_c->invert);
+                    atomic_set(&blank_time, hit_c->blank_time);
+                    atomic_set(&fall_counter, hit_c->hits_to_fall); // reset fall counter
                     break;
-                case HIT_OVERWRITE_CAL:   /* overwrites calibration values (upper, lower) */
-                    set_hit_calibration(hit_c->lower, hit_c->upper);
+                case HIT_OVERWRITE_CAL:   /* overwrites calibration values (sensitivity, seperation) */
+                    set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
+                    atomic_set(&blank_time, hit_c->blank_time);
                     break;
-                case HIT_OVERWRITE_OTHER: /* overwrites non-calibration values (burst, etc.) */
-                    atomic_set(&hit_to_fall, hit_c->hit_to_fall);
-                    atomic_set(&burst_seperation, hit_c->burst);
+                case HIT_OVERWRITE_OTHER: /* overwrites non-calibration values (type, etc.) */
+                    atomic_set(&hits_to_fall, hit_c->hits_to_fall);
+                    atomic_set(&after_fall, hit_c->after_fall);
+                    atomic_set(&hit_type, hit_c->type);
+                    set_hit_invert(hit_c->invert);
+                    atomic_set(&fall_counter, hit_c->hits_to_fall); // reset fall counter
                     break;
-                case HIT_OVERWRITE_BURST: /* overwrites burst value only */
-                    atomic_set(&burst_seperation, hit_c->burst);
+                case HIT_OVERWRITE_TYPE: /* overwrites type value only */
+                    atomic_set(&hit_type, hit_c->type);
+                    set_hit_invert(hit_c->invert);
                     break;
-                case HIT_OVERWRITE_HITS:  /* overwrites hit_to_fall value only */
-                    atomic_set(&hit_to_fall, hit_c->hit_to_fall);
+                case HIT_OVERWRITE_FALL:  /* overwrites hits_to_fall value only */
+                    atomic_set(&hits_to_fall, hit_c->hits_to_fall);
+                    atomic_set(&after_fall, hit_c->after_fall);
+                    atomic_set(&fall_counter, hit_c->hits_to_fall); // reset fall counter
                     break;
             }
         }
@@ -479,25 +599,135 @@ delay_printk("Lifter: handling hit-calibration command\n");
     return rc;
 }
 
+//---------------------------------------------------------------------------
+// Turn blank timer off
+//---------------------------------------------------------------------------
+static void blank_off(unsigned long data) {
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+
+    // turn off hit blanking
+    hit_blanking_off();
+}
 
 //---------------------------------------------------------------------------
-// init handler for the module
+// event handler for lifts
 //---------------------------------------------------------------------------
-void hit_event() {
-    delay_printk("hit_event()\n");
+void lift_event(int etype) {
+    delay_printk("lift_event(%i)\n", etype);
+
+    // create event for outputs
+    generic_output_event(etype);
+
+    // disable or enable hit sensor on raise and lower events
+    switch (etype) {
+        case EVENT_LOWER:
+            // TODO -- make this optional?
+            hit_blanking_on();
+            break;
+        case EVENT_RAISE:
+            if (atomic_read(&blank_time) == 0) { // no blanking time
+                hit_blanking_off();
+            } else {
+                mod_timer(&blank_timer, jiffies+((atomic_read(&blank_time)*HZ)/1000)); // blank for X milliseconds
+            }
+    }
+
+    // reset fall counter on start of raise
+    if (etype == EVENT_RAISE) {
+        atomic_set(&fall_counter, atomic_read(&hits_to_fall)); // reset fall counter
+    }
+
+    // do bob?
+    if (atomic_read(&at_conceal) == 1) {
+        switch (etype) {
+            case EVENT_HIT:
+            case EVENT_KILL:
+            case EVENT_LOWER:
+                // ignore
+                break;
+            case EVENT_DOWN:
+                // bob after we went down
+                atomic_set(&at_conceal, 0); // reset to do nothing
+                lifter_position_set(LIFTER_POSITION_UP); // expose now
+                break;
+            default:
+                // everything else implies something went wrong
+                atomic_set(&at_conceal, 0); // reset to do nothing
+                break;
+        }
+    }
+}
+
+//---------------------------------------------------------------------------
+// event handler for hits
+//---------------------------------------------------------------------------
+void hit_event(int line) {
+    struct hit_item *new_hit;
+    int stay_up = 1;
+    delay_printk("hit_event(%i)\n", line);
+
+    // create event for outputs
+    generic_output_event(EVENT_HIT);
+
+    // log event
+    new_hit = kmalloc(sizeof(struct hit_item), GFP_KERNEL);
+    memset(new_hit, 0, sizeof(struct hit_item));
+    if (new_hit != NULL) {
+        // change change around
+        spin_lock(hit_lock);
+        new_hit->next = hit_chain;
+        hit_chain = new_hit;
+        spin_unlock(hit_lock);
+
+        // set values in new hit item
+        new_hit->time = timespec_sub(current_kernel_time(), hit_start); // time since start
+        new_hit->line = line;
+    }
+
+    // go down if we need to go down
+    if (atomic_read(&hits_to_fall) > 0) {
+        stay_up = !atomic_dec_and_test(&fall_counter);
+    }
+    if (!stay_up) {
+        // put down
+        atomic_set(&fall_counter, atomic_read(&hits_to_fall)); // reset fall counter
+        lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+
+        // create events for outputs
+        generic_output_event(EVENT_KILL); // TODO -- tell mover
+        
+        // bob if we need to bob
+        switch (atomic_read(&after_fall)) {
+            case 0: /* stay down */
+                // do nothing
+                break;
+            case 1: /* bob */
+                atomic_set(&at_conceal, 1); // when we get a CONCEAL event, go back up
+                break;
+            case 2: /* bob/stop */
+                // TODO -- send stop movement message to mover
+                break;
+            case 3: /* stop */
+                // TODO -- send stop movement message to mover
+                break;
+        }
+    }
 }
 
 
 //---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
-static int __init Lifter_init(void)
-    {
-	int retval = 0, d_id;
+static int __init Lifter_init(void) {
+    int retval = 0, d_id;
     struct driver_command commands[] = {
         {NL_C_EXPOSE,    nl_expose_handler},
         {NL_C_STOP,      nl_stop_handler},
         {NL_C_HITS,      nl_hits_handler},
+        {NL_C_HIT_LOG,   nl_hit_log_handler},
         {NL_C_ACCESSORY, nl_accessory_handler},
         {NL_C_HIT_CAL,   nl_hit_cal_handler},
     };
@@ -508,21 +738,24 @@ static int __init Lifter_init(void)
 delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     atomic_set(&driver_id, d_id);
 
+    // reset hit log start time
+    hit_start = current_kernel_time();
+
     // set callback handlers
     set_hit_callback(hit_event);
+    set_lift_callback(lift_event);
 
-	// signal that we are fully initialized
-	atomic_set(&full_init, TRUE);
-	return retval;
+    // signal that we are fully initialized
+    atomic_set(&full_init, TRUE);
+    return retval;
     }
 
 //---------------------------------------------------------------------------
 // exit handler for the module
 //---------------------------------------------------------------------------
-static void __exit Lifter_exit(void)
-    {
+static void __exit Lifter_exit(void) {
     uninstall_nl_driver(atomic_read(&driver_id));
-    }
+}
 
 
 //---------------------------------------------------------------------------
