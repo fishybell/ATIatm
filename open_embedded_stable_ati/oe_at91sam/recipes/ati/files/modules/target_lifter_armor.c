@@ -9,7 +9,7 @@
 #include "target_lifter_armor.h"
 #include "target_lifter_infantry.h" // shared constants and function definitions
 
-#include "target_generic_output.h"
+#include "target_generic_output.h" /* for EVENT_### definitions */
 
 #include "netlink_kernel.h"
 //---------------------------------------------------------------------------
@@ -88,6 +88,25 @@ static const char * lifter_position[] =
     };
 
 //---------------------------------------------------------------------------
+// Callback for lift events
+//---------------------------------------------------------------------------
+static lift_event_callback lift_callback = NULL;
+void set_lift_callback(lift_event_callback handler) {
+    // only allow setting the callback once
+    if (handler != NULL && lift_callback == NULL) {
+        lift_callback = handler;
+        delay_printk("ARMOR LIFTER: Registered callback function for lift events\n");
+    }
+}
+EXPORT_SYMBOL(set_lift_callback);
+
+static void do_event(int etype) {
+    if (lift_callback != NULL) {
+        lift_callback(etype);
+    }
+}
+
+//---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
 static int hardware_motor_on(int direction)
@@ -125,9 +144,9 @@ static int hardware_motor_on(int direction)
 
     // when not locking, signal an event
     if (direction == LIFTER_POSITION_UP) {
-        generic_output_event(EVENT_RAISE); // start of raise
+        do_event(EVENT_RAISE); // start of raise
     } else if (direction == LIFTER_POSITION_DOWN) {
-        generic_output_event(EVENT_LOWER); // start of lower
+        do_event(EVENT_LOWER); // start of lower
     }
     return 0;
     }
@@ -184,7 +203,7 @@ static void timeout_fire(unsigned long data)
     hardware_motor_off();
 
     // signal an event
-    generic_output_event(EVENT_ERROR); // error
+    do_event(EVENT_ERROR); // error
 
     // signal that the operation has finished
     atomic_set(&operating_atomic, FALSE);
@@ -217,7 +236,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         hardware_motor_off();
 
         // signal an event
-        generic_output_event(EVENT_DOWN); // finished lowering
+        do_event(EVENT_DOWN); // finished lowering
 
         // signal that the operation has finished
         atomic_set(&operating_atomic, FALSE);
@@ -257,7 +276,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         hardware_motor_off();
 
         // signal an event
-        generic_output_event(EVENT_UP); // finished raising
+        do_event(EVENT_UP); // finished raising
 
         // signal that the operation has finished
     	atomic_set(&operating_atomic, FALSE);
@@ -346,18 +365,19 @@ static int hardware_exit(void)
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
-int lifter_position_set(int position)
-    {
-    // signal that an operation is in progress
-    atomic_set(&operating_atomic, TRUE);
+int lifter_position_set(int position) {
+    if (lifter_position_get() != position) {
+        // signal that an operation is in progress
+        atomic_set(&operating_atomic, TRUE);
 
-    // turn the motor on to the correct position
-    hardware_motor_on(position);
+        // turn the motor on to the correct position
+        hardware_motor_on(position);
 
-    timeout_timer_start();
+        timeout_timer_start();
 
-    return 0;
+        return 0;
     }
+}
 EXPORT_SYMBOL(lifter_position_set);
 
 //---------------------------------------------------------------------------

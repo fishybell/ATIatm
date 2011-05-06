@@ -14,4 +14,8 @@ extern int lifter_position_get(void);
 // set current position
 extern int lifter_position_set(int position);
 
+// register a callback for the lift event
+typedef void (*lift_event_callback)(int); // called on finished, starting, and error (passing and EVENT_### value)
+extern void set_lift_callback(lift_event_callback handler);
+
 #endif // __TARGET_LIFTER_INFANTRY_H__
