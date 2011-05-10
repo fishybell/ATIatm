@@ -9,6 +9,11 @@ using namespace std;
 #include "common.h"
 #include "timers.h"
 
+
+// setup calibration table
+const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,1};
+
+
 /***********************************************************
 *                     SIT_Client Class                     *
 ***********************************************************/
@@ -20,12 +25,15 @@ FUNCTION_START("::SIT_Client(int fd, int tnum) : Connection(fd)")
       deleteLater();
    } else {
       // initialize default settings
-      // TODO -- MFS
+
+      // initial MFS settings
+      doMFS(1, 1, 0, 2); // on when fully exposed, burst, no delay, 2 seconds between bursts
 
       // TODO -- MILES SDH
 
+      // initial hit calibration settings
       lastHitCal.seperation = 250;
-      lastHitCal.sensitivity = 15;
+      lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
       lastHitCal.blank_time = 500; // half a second blanking
       lastHitCal.hits_to_fall = 1; // fall on first hit
       lastHitCal.after_fall = 0; // 0 for stay down
@@ -73,9 +81,25 @@ FUNCTION_START("::fillStatus(FASIT_2102 *msg)")
    // hit record
    msg->body.hit = htons(hits);
    msg->body.hit_conf.on = 1; // TODO -- handle off, on/off at position
-   msg->body.hit_conf.react = 0; // TODO -- handle kill, stop, bob from after_fall value
+   switch (lastHitCal.after_fall) {
+       case 0: // stay down
+           msg->body.hit_conf.react = 0; // fall
+           break;
+       case 1: // bob
+       case 2: // bob/stop
+           msg->body.hit_conf.react = 4; // bob
+           break;
+       case 3: // stop
+           msg->body.hit_conf.react = 3; // fall and stop
+           break;
+   }
    msg->body.hit_conf.tokill = htons(lastHitCal.hits_to_fall);
-   msg->body.hit_conf.sens = htons(1); // TODO -- convert sensitivity into 1-15 value
+   for (int i=15; i>=0; i++) { // count backwards from most sensitive to least
+      if (lastHitCal.sensitivity <= cal_table[i]) { // map our cal value to theirs
+         msg->body.hit_conf.sens = htons(15); // found sensitivity value
+         break; // done looking
+      }
+   }
    if (lastHitCal.seperation < 500) { // TODO -- valid seperation point for single/burst
          msg->body.hit_conf.mode = 1; // single
          msg->body.hit_conf.burst = htons(250); // TODO -- max burst seperation
@@ -441,11 +465,16 @@ FUNCTION_END("::doHits(int num)")
 void SIT_Client::didHits(int num) {
 FUNCTION_START("::didHits(int num)")
 
-   // remember value
-   hits = num;
+   // are we different than our remember value?
+   if (hits != num) {
+      // remember new value
+      hits = num;
 
-   // send status message to FASIT server
-   sendStatus();
+      // if we have a hit count, send it
+      if (hits != 0) {
+         sendStatus(); // send status message to FASIT server
+      }
+   }
 
 FUNCTION_END("::didHits(int num)")
 }
@@ -576,7 +605,7 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
          genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
 
          if (attrs[GEN_INT8_A_MSG]) {
-            // received change in exposure
+            // received change in battery value
             int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
             sit_client->didBattery(value); // tell client
          }
@@ -630,10 +659,10 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
       case NL_C_HITS:
          genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_string_policy);
 
-         // TODO -- hit log needs decodable data
-         if (attrs[GEN_STRING_A_MSG]) {
-            char *data = nla_get_string(attrs[GEN_STRING_A_MSG]);
-            IMSG("hit log attribute: %s\n", data)
+         if (attrs[GEN_INT8_A_MSG]) {
+            // received hit count
+            int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+            sit_client->didHits(value); // tell client
          }
 
          break;
@@ -736,7 +765,12 @@ FUNCTION_END("::doHitCal(struct hit_calibration hit_c)")
 void SIT_Conn::doHits(int num) {
 FUNCTION_START("::doHits(int num)")
 
-   // TODO -- interface for resetting hit count
+    // reset or retrieve hit count
+    if (num == -1) {
+        queueMsgU8(NL_C_HITS, HIT_REQ); // request hit count
+    } else {
+        queueMsgU8(NL_C_HITS, 0); // reset to 0 (ignore num's value; we always want zero here)
+    }
 
 FUNCTION_END("::doHits(int num)")
 }
@@ -776,6 +810,7 @@ FUNCTION_START("::doMFS(int on, int mode, int idelay, int rdelay)")
       acc_c.on_time = 50; // on 50 milliseconds
       acc_c.off_time = 100; // off 100 milliseconds
       acc_c.repeat_delay = 2 * rdelay; // when burst, burst every rdelay*2 half-seconds
+      acc_c.repeat = 63; // infinite repeat
    } else {
       acc_c.on_time = 75; // on 75 milliseconds
    }

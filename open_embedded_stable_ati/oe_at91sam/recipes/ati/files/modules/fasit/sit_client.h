@@ -81,6 +81,9 @@ private:
    struct hit_calibration lastHitCal;
    int exposure;
    int hits;
+
+   // hit calibration table (ours to theirs and back)
+   static const u32 cal_table[16];
 };
 
 // for handling the kernel connection for the SIT
