@@ -111,7 +111,6 @@ FUNCTION_START("::fillStatus(FASIT_2102 *msg)")
 FUNCTION_END("::fillStatus(FASIT_2102 *msg)")
 }
 
-
 // create and send a status messsage to the FASIT server
 void SIT_Client::sendStatus() {
 FUNCTION_START("::sendStatus()")
@@ -154,9 +153,14 @@ FUNCTION_START("::handle_100(int start, int end)")
    msg.response.rseq = hdr->seq;
 
    // fill message
-   msg.body.devid = getDevID();
+   msg.body.devid = getDevID();	// MAC address
    msg.body.flags = PD_MUZZLE; // TODO -- find actual capabilities from command line
-
+//BDR   fasit_conn  has the command line option -S  that instaniates a
+//SIT handler.   It probably has to handle a bunch of possibilitys and
+//this part of code has to do the right thing
+// Nate said he was writing a MIT_client that handles moving targets
+// so that code would be elsewhere
+   
    // send
    queueMsg(&rhdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2111));
@@ -211,27 +215,133 @@ FUNCTION_START("::handle_2100(int start, int end)")
    // do handling of message
    IMSG("Handling 2100 in SIT\n");
 
-FUNCTION_INT("::handle_2100(int start, int end)", 0)
-   return 0;
+   // map header and body for both message and response
+   FASIT_header rhdr;
+   FASIT_2101 rmsg;
+   
+   FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+   FASIT_2100 *msg = (FASIT_2100*)(rbuf + start + sizeof(FASIT_header));
+
+   // build the response - some CID's just reply 2101 with 'S' for received and complied 
+   // and 'F' for Received and Cannot comply
+   // other Command ID's send other messages
+   
+   defHeader(2101, &rhdr); // sets the sequence number and other data
+   rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2101));
+
+   // set response
+   rmsg.response.rnum = htons(2100);
+   rmsg.response.rseq = hdr->seq;
+
+   // do the event that was requested
+
+   switch (msg->cid) {
+	  case CID_No_Event:
+		 // send 2101 ack
+		 rmsg.body.resp = 'S';	// The actual response code 'S'=can do, 'F'=Can't do
+		 queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
+		 queueMsg(&rmsg, sizeof(FASIT_2101));
+
+		 break;
+
+	  case CID_Reserved01:
+		 // send 2101 ack
+		 rmsg.body.resp = 'F';	// The actual response code 'S'=can do, 'F'=Can't do
+		 queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
+		 queueMsg(&rmsg, sizeof(FASIT_2101));
+
+		 break;
+
+	  case CID_Status_Request:
+		 // send 2102 status
+		 sendStatus();	// sends a 2102   not sure it gets the response number and sequence number right
+		 // AND/OR? send 2115 MILES shootback status if supported
+		 // AND/OR? send 2112 Muzzle Flash status if supported	 
+
+		 break;
+
+	  case CID_Expose_Request:
+		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
+		 rmsg.body.resp = 'S';	// The actual response code 'S'=can do, 'F'=Can't do
+		 queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
+		 queueMsg(&rmsg, sizeof(FASIT_2101));
+
+		 switch (msg->exp) {
+			case 0:
+			   doConceal();
+			   break;
+			case 0x2D:
+			   break;
+			case 0x5A:
+			   doExpose();
+			   break;
+		 }
+		 break;
+
+	  case CID_Reset_Device:
+		 // send 2101 ack
+		 rmsg.body.resp = 'S';	// The actual response code 'S'=can do, 'F'=Can't do
+		 queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
+		 queueMsg(&rmsg, sizeof(FASIT_2101));
+		 // also supposed to reset all values to the 'initial exercise step value'
+		 //  which I am not sure if it is different than ordinary inital values 
+		 lastHitCal.seperation = 250;
+		 lastHitCal.sensitivity = 15;
+		 lastHitCal.blank_time = 500; // half a second blanking
+		 lastHitCal.hits_to_fall = 1; // fall on first hit
+		 lastHitCal.after_fall = 0; // 0 for stay down
+		 lastHitCal.type = 0; // mechanical sensor
+		 lastHitCal.invert = 0; // don't invert sensor input line
+		 doHitCal(lastHitCal); // tell kernel
+
+		 break;
+
+	  case CID_Move_Request:
+		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
+		 break;
+
+	  case CID_Config_Hit_Sensor:
+		 // send 2102 status - after doing what was commanded
+		 // which is setting the values in the hit_calibration structure
+		 // uses the lastHitCal so what we set is recorded
+		 // there are fields that don't match up
+		 lastHitCal.seperation = msg->burst;
+		 lastHitCal.sensitivity = msg->sens;
+//		 lastHitCal.blank_time = 500; // half a second blanking
+		 lastHitCal.hits_to_fall = msg->tokill; 
+		 lastHitCal.after_fall = msg->react;	// 0 for stay down
+		 lastHitCal.type = msg->mode;			// mechanical sensor
+//		 lastHitCal.invert = 0; // don't invert sensor input line
+		 doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
+	 
+		 break;
+
+	  case CID_GPS_Location_Request:
+		 // send 2113 GPS Location
+		 break;
+   }
+
+   FUNCTION_INT("::handle_2100(int start, int end)", 0)
+		 return 0;
 }
 
 int SIT_Client::handle_2101(int start, int end) {
-FUNCTION_START("::handle_2101(int start, int end)")
+   FUNCTION_START("::handle_2101(int start, int end)")
 
    // do handling of message
-   IMSG("Handling 2101 in SIT\n");
+		 IMSG("Handling 2101 in SIT\n");
 
-FUNCTION_INT("::handle_2101(int start, int end)", 0)
-   return 0;
+   FUNCTION_INT("::handle_2101(int start, int end)", 0)
+		 return 0;
 }
 
 int SIT_Client::handle_2111(int start, int end) {
-FUNCTION_START("::handle_2111(int start, int end)")
+   FUNCTION_START("::handle_2111(int start, int end)")
 
    // do handling of message
-   IMSG("Handling 2111 in SIT\n");
+		 IMSG("Handling 2111 in SIT\n");
 
-FUNCTION_INT("::handle_2111(int start, int end)", 0)
+   FUNCTION_INT("::handle_2111(int start, int end)", 0)
    return 0;
 }
 

@@ -181,7 +181,7 @@ static struct nla_policy gps_conf_policy[GPS_A_MAX + 1] = {
 #define NL_A_MAX GPS_A_MAX
 
 /* commands: enumeration of all commands (functions), 
- * used by userspace application to identify command to be ececuted
+ * used by userspace application to identify command to be executed
  * used by kernel modules to determine command handler
  * comment format: description (type) (policy)
  */

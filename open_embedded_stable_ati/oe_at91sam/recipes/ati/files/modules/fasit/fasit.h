@@ -121,19 +121,35 @@ typedef struct FASIT_2006z {
 /********************************************/
 typedef struct FASIT_2100 {
    __uint8_t  cid;
+   // this group is refered to as 'Exposure record'
    __uint8_t  exp;
    __int16_t  asp PCKD;
    __uint16_t dir PCKD;
    __uint8_t  move;
    float      speed PCKD;
-   __uint8_t  on;
-   __uint16_t hit PCKD;
-   __uint8_t  react;
-   __uint16_t tokill PCKD;
-   __uint16_t sens PCKD;
-   __uint8_t  mode;
-   __uint16_t burst PCKD;
+   // past this is refered to as 'Sensor Record'
+   __uint8_t  on;			// enum
+   __uint16_t hit PCKD;		// hit count
+   __uint8_t  react;		// reaction/after_fall, enum 
+   __uint16_t tokill PCKD;	// hits to kill/fall
+   __uint16_t sens PCKD;	// sensitivity
+   __uint8_t  mode;			// mode
+   __uint16_t burst PCKD;	// burst seperation
 } FASIT_2100;
+
+// the Command ID values
+enum {
+   CID_No_Event,
+   CID_Reserved01,
+   CID_Status_Request,
+   CID_Expose_Request,
+   CID_Reset_Device,
+   CID_Move_Request,
+   CID_Config_Hit_Sensor,
+   CID_GPS_Location_Request,
+};
+
+
 
 /********************************************/
 /* 2101 - Event Command Acknowledge         */
