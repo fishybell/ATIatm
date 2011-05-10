@@ -39,7 +39,7 @@ void handle_bit_move(struct nl_handle *handle, int type) {
     // move button pressed? send the correct command back to the kernel
     struct nl_msg *msg;
     msg = nlmsg_alloc();
-    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, type==BIT_MOVE_STOP?NL_C_STOP:NL_C_MOVE, 1);
+    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_MOVE, 1);
 
     // fill with the correct movement data
     switch (type) {
@@ -53,7 +53,7 @@ printf("BIT: sending REV\n");
             break;
         case BIT_MOVE_STOP:
 printf("BIT: sending STOP\n");
-            nla_put_u8(msg, GEN_INT8_A_MSG, 1); // stop = true
+            nla_put_u8(msg, GEN_INT8_A_MSG, VELOCITY_STOP); // stop
             break;
     }
 

@@ -211,4 +211,7 @@ enum {
 
 #define HIT_REQ 255
 
+#define VELOCITY_STOP 128
+#define VELOCITY_REQ 0
+
 #endif

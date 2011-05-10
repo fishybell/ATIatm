@@ -445,14 +445,14 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     break;
                 case NL_C_MOVE:
                     if (cmd[1] == '\0') {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, 0); // stop request
+                        nla_put_u8(msg, GEN_INT8_A_MSG, VELOCITY_REQ); // velocity request
                     } else if (sscanf(cmd+1, "%i", &arg1) == 1) {
                         if (arg1 > 126 || arg1 < -127) {
                             arg1 = 0; // stay away from the edge conditions
                         }
                         nla_put_u8(msg, GEN_INT8_A_MSG, 128+arg1); // move request (add 128 as we're not signed)
                     } else {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, 128); // velocity request (same as requesting 0 mph)
+                        nla_put_u8(msg, GEN_INT8_A_MSG, VELOCITY_STOP); // stop
                     }
                     break;
                 case NL_C_POSITION:
