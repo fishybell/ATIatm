@@ -18,10 +18,10 @@ public :
 
 private :
 
+protected:
    // server instance
    FASIT_TCP *server;
 
-protected:
    // individual message handlers, all return -1 if the connection needs to be
    //   deleted afterwards
    // the message data itself is in the read buffer from start to end

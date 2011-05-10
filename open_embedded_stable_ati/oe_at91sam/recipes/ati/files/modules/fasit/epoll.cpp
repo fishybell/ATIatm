@@ -18,6 +18,7 @@ using namespace std;
 #include "timers.h"
 #include "timeout.h"
 #include "sit_client.h"
+#include "mit_client.h"
 
 // rough idea of how many connections we'll deal with and the max we'll deal with in a single loop
 #define MAX_CONNECTIONS 2048
@@ -151,11 +152,13 @@ PROG_START
    int base = 0;
    const char *defIP = "192.168.0.1";
    bool startSIT = false;
+   bool startMIT = false;
 const char *usage = "Usage: %s [options]\n\
 \t-l X   -- listen on port X rather than the default \n\
 \t-p X   -- connect to port X rather than the default \n\
 \t-i X   -- connect to IP address X\n\
-\t-S X   -- instatiate a SIT handler\n\
+\t-S     -- instatiate a SIT handler\n\
+\t-M     -- instatiate a SIT handler\n\
 \t-h     -- print out usage information\n";
    for (int i = 1; i < argc; i++) {
       if (argv[i][0] != '-') {
@@ -165,6 +168,9 @@ const char *usage = "Usage: %s [options]\n\
       switch (argv[i][1]) {
          case 'S' :
             startSIT = true;
+            break;
+         case 'M' :
+            startMIT = true;
             break;
          case 'l' :
             if (sscanf(argv[++i], "%i", &sport) != 1) {
@@ -255,8 +261,12 @@ const char *usage = "Usage: %s [options]\n\
 
    // start any handlers here
    SIT_Client *sit_client = NULL;
+   MIT_Client *mit_client = NULL;
    if (startSIT) {
       sit_client = factory->newConn <SIT_Client> ();
+   }
+   if (startMIT) {
+      mit_client = factory->newConn <MIT_Client> ();
    }
 
    while(!close_nicely) {
@@ -287,7 +297,19 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
                continue;
             }
             setnonblocking(client);
-            FASIT_TCP *fasit_tcp = new FASIT_TCP(client);
+            FASIT_TCP *fasit_tcp;
+            // attach client to MIT?
+            if (mit_client != NULL && !mit_client->hasSIT()) {
+               fasit_tcp = mit_client->addSIT(client);
+               if (fasit_tcp == NULL) {
+                  continue;
+               }
+               IMSG("Attached SIT to MIT\n")
+            } else {
+               // connect new client as proxy
+               fasit_tcp = new FASIT_TCP(client);
+            }
+            // connect new client and add to epoll
             ev.events = EPOLLIN;
             ev.data.ptr = (void*)fasit_tcp;
             if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, client, &ev) < 0) {
@@ -308,6 +330,9 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
    // properly stop any handlers here
    if (sit_client != NULL) {
       delete sit_client;
+   }
+   if (mit_client != NULL) {
+      delete mit_client;
    }
 
    return 0;

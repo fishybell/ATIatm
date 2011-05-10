@@ -8,6 +8,7 @@ using namespace std;
 
 // for explicit declarations of template function
 #include "sit_client.h"
+#include "mit_client.h"
 
 
 NL_Conn::NL_Conn(struct nl_handle *handle, TCP_Client *client, int family) : Connection(nl_socket_get_fd(handle)) {
@@ -240,5 +241,6 @@ FUNCTION_HEX("::newConn(C_Client *client)", conn)
 
 // explicit declarations of newConn() template function
 template SIT_Conn *NL_Conn::newConn<SIT_Conn, SIT_Client>(SIT_Client *client);
+template MIT_Conn *NL_Conn::newConn<MIT_Conn, MIT_Client>(MIT_Client *client);
 
 

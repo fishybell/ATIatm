@@ -12,6 +12,7 @@ using namespace std;
 // for explicit declarations of template function
 #include "tcp_client.h"
 #include "sit_client.h"
+#include "mit_client.h"
 
 #define MAX_CONN 1200
 
@@ -108,4 +109,5 @@ FUNCTION_HEX("::newConn()", tcp)
 // explicit declarations of newConn() template function
 template TCP_Client *FASIT_TCP_Factory::newConn<TCP_Client>();
 template SIT_Client *FASIT_TCP_Factory::newConn<SIT_Client>();
+template MIT_Client *FASIT_TCP_Factory::newConn<MIT_Client>();
 

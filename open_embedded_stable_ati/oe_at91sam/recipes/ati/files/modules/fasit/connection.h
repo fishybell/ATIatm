@@ -20,7 +20,7 @@ public:
    static Connection *findByUUID(__uint64_t uuid); // returns null if not found
    static Connection *findByRnum(__uint32_t rnum); // returns null if not found
    static Connection *findByTnum(__uint16_t tnum); // returns null if not found
-   void queueMsg(const char *msg, int size);
+   virtual void queueMsg(const char *msg, int size);
    void queueMsg(const void *msg, int size) {queueMsg((const char*)msg, size);} // auto-cast for various data pointers
    __uint64_t getUUID() {return uuid;};
    __uint32_t getRnum() {return rnum;};

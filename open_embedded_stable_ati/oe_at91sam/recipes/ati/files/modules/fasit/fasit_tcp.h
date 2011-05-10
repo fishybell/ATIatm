@@ -35,10 +35,10 @@ private :
    static FASIT_TCP *flink; // link to first
    void initChain(); // initialize place in linked list
 
+protected:
    // the correspsonding client connection for this server instance
    class TCP_Client *client;
 
-protected:
    // individual message handlers, all return -1 if the connectionneeds to be
    //   deleted afterwards
    // the message data itself is in the read buffer from start to end
