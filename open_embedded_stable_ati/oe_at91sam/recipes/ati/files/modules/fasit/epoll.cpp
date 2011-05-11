@@ -153,13 +153,17 @@ PROG_START
    const char *defIP = "192.168.0.1";
    bool startSIT = false;
    bool startMIT = false;
+   
 const char *usage = "Usage: %s [options]\n\
 \t-l X   -- listen on port X rather than the default \n\
 \t-p X   -- connect to port X rather than the default \n\
 \t-i X   -- connect to IP address X\n\
 \t-S     -- instatiate a SIT handler\n\
 \t-M     -- instatiate a MIT handler\n\
+\t-F     -- Has the Muzzle Flash option\n\
 \t-h     -- print out usage information\n";
+
+
    for (int i = 1; i < argc; i++) {
       if (argv[i][0] != '-') {
          IERROR("invalid argument (%i)\n", i)
@@ -172,6 +176,9 @@ const char *usage = "Usage: %s [options]\n\
          case 'M' :
             startMIT = true;
             break;
+	 case 'F' :
+	    //startSIT = true;
+	    break;
          case 'l' :
             if (sscanf(argv[++i], "%i", &sport) != 1) {
                IERROR("invalid argument (%i)\n", i)

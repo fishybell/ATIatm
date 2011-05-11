@@ -32,6 +32,7 @@ public :
    void doHitCal(struct hit_calibration hit_c); // change hit calibration data
    void didHitCal(struct hit_calibration hit_c); // current hit calibration data
    void getHitCal(struct hit_calibration *hit_c); // get last remembered hit calibration data
+   void getAcc_C(struct accessory_conf *acc_c); // get last remembered hit calibration data
    void doHits(int num); // change received hits to "num" (usually to 0 for reset)
    void didHits(int num); // received "num" hits
    void doMSDH(int code, int ammo, int player, int delay); // change MSDH data
@@ -40,6 +41,8 @@ public :
    void didMFS(int on, int mode, int idelay, int rdelay); // current MFS data
    void doGPS(); // retrieve gps data
    void didGPS(struct gps_conf gpc_c); // current gps data
+
+
 
 protected:
    virtual bool hasPair() { return nl_conn != NULL;};
@@ -79,6 +82,7 @@ private:
 
    // remember data to send back over and over again
    struct hit_calibration lastHitCal;
+   struct accessory_conf acc_conf;
    int exposure;
    int hits;
 
@@ -104,6 +108,8 @@ public:
    void doMSDH(int code, int ammo, int player, int delay); // change MSDH data
    void doMFS(int on, int mode, int idelay, int rdelay); // change MFS data
    void doGPS(); // retrieve gps dataprotected:
+
+
 private:
    SIT_Client *sit_client;
 };

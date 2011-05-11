@@ -154,7 +154,7 @@ FUNCTION_START("::handle_100(int start, int end)")
 
    // fill message
    msg.body.devid = getDevID();	// MAC address
-   msg.body.flags = PD_MUZZLE; // TODO -- find actual capabilities from command line
+   msg.body.flags = 0/*PD_MUZZLE*/; // TODO -- find actual capabilities from command line
 //BDR   fasit_conn  has the command line option -S  that instaniates a
 //SIT handler.   It probably has to handle a bunch of possibilitys and
 //this part of code has to do the right thing
@@ -256,6 +256,9 @@ FUNCTION_START("::handle_2100(int start, int end)")
 		 // send 2102 status
 		 sendStatus();	// sends a 2102   not sure it gets the response number and sequence number right
 		 // AND/OR? send 2115 MILES shootback status if supported
+		 if (acc_conf.acc_type == ACC_NES_MFS){
+		    HERE;
+		 }
 		 // AND/OR? send 2112 Muzzle Flash status if supported	 
 
 		 break;
@@ -559,6 +562,14 @@ FUNCTION_START("::getHitCal(struct hit_calibration *hit_c)")
    // give the previous hit calibration data
    *hit_c = lastHitCal;
 FUNCTION_END("::getHitCal(struct hit_calibration *hit_c)")
+}
+
+// get last remembered accessory config
+void SIT_Client::getAcc_C(struct accessory_conf *acc_c) {
+   FUNCTION_START("::getAcc_C((struct accessory_conf *acc_c)")
+   // give the previous accessory config data
+	 *acc_c = acc_conf;
+   FUNCTION_END("::getAcc_C((struct accessory_conf *acc_c)")
 }
 
 // change received hits to "num" (usually to 0 for reset)
@@ -909,9 +920,12 @@ FUNCTION_END("::doMSDH(int code, int ammo, int player, int delay)")
 void SIT_Conn::doMFS(int on, int mode, int idelay, int rdelay) {
 FUNCTION_START("::doMFS(int on, int mode, int idelay, int rdelay)")
 
+struct accessory_conf acc_c;
+
    // Create attribute
-   struct accessory_conf acc_c;
-   memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out
+   memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out\
+   sit_client->getAccC(&acc_c);
+
    acc_c.acc_type = ACC_NES_MFS;
    acc_c.on_exp = on;
    if (mode == 1) {
@@ -925,10 +939,11 @@ FUNCTION_START("::doMFS(int on, int mode, int idelay, int rdelay)")
       acc_c.on_time = 75; // on 75 milliseconds
    }
    acc_c.start_delay = 2 * idelay; // start after idelay*2 half-seconds
-
+   
    // Queue command
    queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // MFS is an accessory
 
+   
 FUNCTION_END("::doMFS(int on, int mode, int idelay, int rdelay)")
 }
 
