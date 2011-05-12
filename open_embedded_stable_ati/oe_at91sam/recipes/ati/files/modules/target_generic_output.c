@@ -7,7 +7,7 @@
 
 #include "target.h"
 #include "target_generic_output.h"
-#include "netlink_kernel.h"
+#include "netlink_kernel.h" /* for constant definitions */
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
