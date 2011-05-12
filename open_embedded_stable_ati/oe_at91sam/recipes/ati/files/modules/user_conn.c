@@ -246,6 +246,16 @@ printf("NL_C_HIT_CAL\n");
             }
             break;
 
+        case NL_C_EVENT:
+            genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+
+            if (attrs[GEN_INT8_A_MSG]) {
+                // a mover/lifter event happened
+                int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+                snprintf(wbuf, 1024, "V %i\n", value);
+            }
+            break;
+
         case NL_C_FAILURE:
             genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_string_policy);
 
@@ -347,6 +357,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                 break;
             case 'T': case 't':
                 nl_cmd = NL_C_EXPOSE;
+                break;
+            case 'V': case 'v':
+                nl_cmd = NL_C_EVENT;
                 break;
             case 'Y': case 'y':
                 nl_cmd = NL_C_HIT_CAL;
@@ -634,6 +647,11 @@ printf("unrecognized command '%c'\n", cmd[0]);
 
                     // put gps request data in message
                     nla_put(msg, GPS_A_MSG, sizeof(struct gps_conf), &gps_c);
+                    break;
+                case NL_C_EVENT:
+                    if (sscanf(cmd+1, "%i", &arg1) == 1) {
+                        nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // create event X
+                    }
                     break;
             }
 
