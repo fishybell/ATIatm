@@ -10,8 +10,6 @@
 
 #include "target_generic_output.h" /* for EVENT_### definitions */
 
-#include "netlink_kernel.h"
-
 //---------------------------------------------------------------------------
 
 #define TARGET_NAME		"infantry lifter"
@@ -389,8 +387,9 @@ int lifter_position_set(int position) {
 
         timeout_timer_start();
 
-        return 0;
+        return 1;
     }
+    return 0;
 }
 EXPORT_SYMBOL(lifter_position_set);
 
@@ -532,33 +531,15 @@ static void position_default(struct work_struct * work)
     }
 
 //---------------------------------------------------------------------------
-// Message filler handler for expose functions
-//---------------------------------------------------------------------------
-int pos_mfh(struct sk_buff *skb, void *pos_data) {
-    // the pos_data argument is a pre-made pos_event structure
-    return nla_put_u8(skb, GEN_INT8_A_MSG, *((int*)pos_data));
-}
-
-//---------------------------------------------------------------------------
 // Work item to notify the user-space about a position change or error
 //---------------------------------------------------------------------------
 static void position_change(struct work_struct * work)
 	{
-    int pos_data;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
     }
     
-    // notify netlink userspace
-    switch (lifter_position_get()) { // map internal to external values
-        case LIFTER_POSITION_DOWN: pos_data = CONCEAL; break;
-        case LIFTER_POSITION_UP: pos_data = EXPOSE; break;
-        case LIFTER_POSITION_MOVING: pos_data = LIFTING; break;
-        default: pos_data = EXPOSURE_REQ; break; //error
-    }
-    send_nl_message_multi(&pos_data, pos_mfh, NL_C_EXPOSE);
-
     // notify sysfs userspace
 	target_sysfs_notify(&target_device_lifter_infantry, "position");
 	}
