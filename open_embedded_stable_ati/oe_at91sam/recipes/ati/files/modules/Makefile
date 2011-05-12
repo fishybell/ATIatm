@@ -13,6 +13,7 @@ obj-m := 	target.o \
 			netlink_provider.o \
 			delay_printk.o \
 			lifter.o \
+			mover.o \
 			target_generic_output.o \
 			target_hit_poll.o \
 
