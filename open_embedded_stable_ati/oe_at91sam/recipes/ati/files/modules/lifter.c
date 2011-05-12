@@ -51,6 +51,12 @@ atomic_t toggle_last = ATOMIC_INIT(CONCEAL); // assume conceal last to expose fi
 atomic_t driver_id = ATOMIC_INIT(-1);
 
 //---------------------------------------------------------------------------
+// This delayed work queue item is used to notify user-space of a position
+// change or error detected by the IRQs or the timeout timer.
+//---------------------------------------------------------------------------
+static struct work_struct position_work;
+
+//---------------------------------------------------------------------------
 // hit log variables
 //---------------------------------------------------------------------------
 typedef struct hit_item {
@@ -613,6 +619,34 @@ static void blank_off(unsigned long data) {
 }
 
 //---------------------------------------------------------------------------
+// Message filler handler for expose functions
+//---------------------------------------------------------------------------
+int pos_mfh(struct sk_buff *skb, void *pos_data) {
+    // the pos_data argument is a pre-made u8 structure
+    return nla_put_u8(skb, GEN_INT8_A_MSG, *((int*)pos_data));
+}
+
+//---------------------------------------------------------------------------
+// Work item to notify the user-space about a position change or error
+//---------------------------------------------------------------------------
+static void position_change(struct work_struct * work) {
+    u8 pos_data;
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
+    // notify netlink userspace
+    switch (lifter_position_get()) { // map internal to external values
+        case LIFTER_POSITION_DOWN: pos_data = CONCEAL; break;
+        case LIFTER_POSITION_UP: pos_data = EXPOSE; break;
+        case LIFTER_POSITION_MOVING: pos_data = LIFTING; break;
+        default: pos_data = EXPOSURE_REQ; break; //error
+    }
+    send_nl_message_multi(&pos_data, pos_mfh, NL_C_EXPOSE);
+}
+
+//---------------------------------------------------------------------------
 // event handler for lifts
 //---------------------------------------------------------------------------
 void lift_event(int etype) {
@@ -620,6 +654,17 @@ void lift_event(int etype) {
 
     // create event for outputs
     generic_output_event(etype);
+
+    // notify user-space
+    switch (etype) {
+        case EVENT_RAISE:
+        case EVENT_LOWER:
+        case EVENT_UP:
+        case EVENT_DOWN:
+        case EVENT_ERROR:
+            schedule_work(&position_work);
+            break;
+    }
 
     // disable or enable hit sensor on raise and lower events
     switch (etype) {
@@ -717,6 +762,38 @@ void hit_event(int line) {
     }
 }
 
+//---------------------------------------------------------------------------
+// netlink command handler for event commands
+//---------------------------------------------------------------------------
+int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value = 0;
+delay_printk("Lifter: handling event command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    if (na) {
+        // grab value from attribute
+        value = nla_get_u8(na); // value is ignored
+delay_printk("Lifter: received value: %i\n", value);
+
+        // handle event
+        if (value == EVENT_HIT) {
+            hit_event(0);
+        }
+        lift_event(value);
+
+        rc = HANDLE_SUCCESS_NO_REPLY;
+    } else {
+        delay_printk("Lifter: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("Lifter: returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
+}
+
 
 //---------------------------------------------------------------------------
 // init handler for the module
@@ -730,6 +807,7 @@ static int __init Lifter_init(void) {
         {NL_C_HIT_LOG,   nl_hit_log_handler},
         {NL_C_ACCESSORY, nl_accessory_handler},
         {NL_C_HIT_CAL,   nl_hit_cal_handler},
+        {NL_C_EVENT,     nl_event_handler},
     };
     struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 
@@ -745,6 +823,8 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     set_hit_callback(hit_event);
     set_lift_callback(lift_event);
 
+    INIT_WORK(&position_work, position_change);
+
     // signal that we are fully initialized
     atomic_set(&full_init, TRUE);
     return retval;
@@ -754,7 +834,9 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
 // exit handler for the module
 //---------------------------------------------------------------------------
 static void __exit Lifter_exit(void) {
+    atomic_set(&full_init, FALSE);
     uninstall_nl_driver(atomic_read(&driver_id));
+    ati_flush_work(&position_work); // close any open work queue items
 }
 
 
