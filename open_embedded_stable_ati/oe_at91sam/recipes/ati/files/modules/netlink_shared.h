@@ -199,6 +199,7 @@ enum {
     NL_C_BIT,		/* bit button event (broadcast) (bit event structure) */
     NL_C_ACCESSORY,	/* configure accesories (command/reply) (accessory structure) */
     NL_C_GPS,		/* gps status (request/reply) (gps structure) */
+    NL_C_EVENT,		/* mover/lifter event (command/reply) (generic 8-bit int) */
     __NL_C_MAX,
 };
 #define NL_C_MAX (__NL_C_MAX - 1)
@@ -211,7 +212,8 @@ enum {
 
 #define HIT_REQ 255
 
-#define VELOCITY_STOP 128
+#define VELOCITY_STOP 255
+#define VELOCITY_COAST 128
 #define VELOCITY_REQ 0
 
 #endif
