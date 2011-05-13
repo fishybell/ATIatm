@@ -375,8 +375,9 @@ int lifter_position_set(int position) {
 
         timeout_timer_start();
 
-        return 0;
+        return 1;
     }
+    return 0;
 }
 EXPORT_SYMBOL(lifter_position_set);
 
