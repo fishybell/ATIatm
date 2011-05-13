@@ -23,17 +23,8 @@ public :
 
    static void clearSubscribers(); // clears out all tcp connections on non-base station units
 
-   static FASIT_TCP *getFirst() { return flink; }
-   FASIT_TCP *getNext() { return link; }
-
    // the client has been lost, kill this server instance
    void clientLost() { client = NULL; deleteLater(); };
-
-private :
-   // for linked list
-   FASIT_TCP *link; // link to next
-   static FASIT_TCP *flink; // link to first
-   void initChain(); // initialize place in linked list
 
 protected:
    // the correspsonding client connection for this server instance

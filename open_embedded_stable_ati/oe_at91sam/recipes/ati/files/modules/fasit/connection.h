@@ -27,7 +27,7 @@ public:
    __uint16_t getTnum() {return tnum;};
    void setUUID(__uint64_t uuid); // if none is already set, this will set the uuid and add it to the map
    void setTnum(__uint16_t tnum); // if none is already set, this will set the tnum and add it to the map
-   static void Init(class FASIT_TCP_Factory *factory, int efd); // initialize with the global factory and event fd
+   static void Init(class TCP_Factory *factory, int efd); // initialize with the global factory and event fd
    int handleReady(const epoll_event *ev); // called when either ready to read or write; returns -1 if needs to be deleted afterwards
    int getFD() { return fd; }; // retrieve the file descriptor for use in epoll or select or similar
    void deleteLater(); // cause this tcp to be deleted at a later point in time
@@ -35,12 +35,21 @@ public:
 
    static bool addToEPoll(int fd, void *ptr); // add a file descriptor to the epoll
 
+   static Connection *getFirst() { return flink; }
+   Connection *getNext() { return link; }
+
+private :
+   // for linked list
+   Connection *link; // link to next
+   static Connection *flink; // link to first
+   void initChain(); // initialize place in linked list
+
 protected:
    virtual int handleWrite(const epoll_event *ev); // could be overwritten
    virtual int handleRead(const epoll_event *ev); // could be overwritten
    virtual int parseData(int rsize, const char *rbuf) = 0; // must be defined in the final message handler
 
-   static class FASIT_TCP_Factory *factory; // global factory
+   static class TCP_Factory *factory; // global factory
    static int efd; // global event fd
    static map<__uint64_t,Connection *> uuidMap; // map for finding my unique id
    static map<__uint32_t,Connection *> rnumMap; // map for finding my unique random number

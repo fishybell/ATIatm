@@ -10,13 +10,9 @@ using namespace std;
 #include "timers.h"
 #include "tcp_factory.h"
 
-// initialize static members
-FASIT_TCP *FASIT_TCP::flink = NULL;
-
 FASIT_TCP::FASIT_TCP(int fd) : Connection(fd) {
 FUNCTION_START("::FASIT_TCP(int fd) : Connection(fd)")
    seq = 0;
-   initChain();
 
    // initialize the client connection later
    client = NULL;
@@ -34,26 +30,6 @@ FUNCTION_START("::FASIT_TCP(int fd) : Connection(fd)")
 FUNCTION_END("::FASIT_TCP(int fd) : Connection(fd)")
 }
 
-// initialize place in linked list
-void FASIT_TCP::initChain() {
-FUNCTION_START("::initChain()")
-   link = NULL;
-   if (flink == NULL) {
-      // we're first
-DMSG("first tcp link in chain 0x%08x\n", this);
-      flink = this;
-   } else {
-      // we're last (find old last and link from there)
-      FASIT_TCP *tlink = flink;
-      while(tlink->link != NULL) {
-         tlink = tlink->link;
-      }
-      tlink->link = this;
-DMSG("last tcp link in chain 0x%08x\n", this);
-   }
-FUNCTION_END("::initChain()")
-}
-
 FASIT_TCP::~FASIT_TCP() {
 FUNCTION_START("::~FASIT_TCP()")
    // free client and close its connection
@@ -61,29 +37,6 @@ FUNCTION_START("::~FASIT_TCP()")
       client->server = NULL;
       delete client;
       client = NULL;
-   }
-
-   // am I the sole FASIT_TCP?
-   if (link == NULL && flink == this) {
-      flink = NULL;
-   }
-
-   // remove from linked list
-   FASIT_TCP *tlink = flink;
-   FASIT_TCP *llink = NULL;
-   while (tlink != NULL) {
-      if (tlink == this) {
-         if (llink == NULL) {
-            flink = tlink->link; // was head of chain, move head to next link
-         } else {
-            llink->link = this->link; // connect last link to next link in chain (if last, this drops this link off chain)
-         }
-         break;
-      } else {
-         llink = tlink; // remember last item
-         tlink = tlink->link; // move on to next item
-      }
-HERE
    }
 
 FUNCTION_END("::~FASIT_TCP()")
@@ -265,13 +218,13 @@ FUNCTION_INT("::validMessage(int *start, int *end)", 0)
 void FASIT_TCP::clearSubscribers() {
 FUNCTION_START("::clearSubscribers()")
    // the base station shouldn't get this message anyway, but best to be sure
-   FASIT_TCP *tcp = (FASIT_TCP*)findByTnum(UNASSIGNED);
+   Connection *tcp = findByTnum(UNASSIGNED);
    if (tcp != NULL) {
       return;
    }
 
    // delete all tcp connetions
-   tcp = FASIT_TCP::getFirst();
+   tcp = Connection::getFirst();
    while (tcp != NULL) {
       tcp->deleteLater();
       tcp = tcp->getNext();

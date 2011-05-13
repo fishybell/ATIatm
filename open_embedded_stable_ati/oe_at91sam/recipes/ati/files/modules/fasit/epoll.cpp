@@ -140,7 +140,7 @@ PROG_START
    socklen_t addrlen;
    struct sockaddr_in serveraddr, local;
    struct sched_param sp;
-   FASIT_TCP_Factory *factory;
+   TCP_Factory *factory;
 
    // install signal handlers
    signal(SIGINT, quitproc);
@@ -253,9 +253,9 @@ const char *usage = "Usage: %s [options]\n\
 
    /* start the factory */
    if (base != 0) {
-      factory = new FASIT_TCP_Factory(argv[base], cport); // parameter based IP address
+      factory = new TCP_Factory(argv[base], cport); // parameter based IP address
    } else {
-      factory = new FASIT_TCP_Factory(defIP, cport); // default IP address according to FASIT spec
+      factory = new TCP_Factory(defIP, cport); // default IP address according to FASIT spec
    }
    Connection::Init(factory, kdpfd);
 

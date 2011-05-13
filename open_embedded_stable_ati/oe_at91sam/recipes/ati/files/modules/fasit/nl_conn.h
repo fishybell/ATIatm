@@ -13,7 +13,7 @@ using namespace std;
 // generic base class for handling asynchronous i/o for a given file descriptor
 class NL_Conn : public Connection {
 public:
-   NL_Conn(struct nl_handle *handle, class TCP_Client *client, int family); // don't call directly, call via newConn
+   NL_Conn(struct nl_handle *handle, class Connection *client, int family); // don't call directly, call via newConn
    virtual ~NL_Conn(); // closes, cleans up, etc.
    template <class C_Conn, class C_Client> static C_Conn *newConn(C_Client *client); // creates a new NL_Conn object (of the given class type)
 
@@ -29,7 +29,7 @@ protected:
    virtual int parseData(struct nl_msg *msg) = 0; // must be defined in the final message handler
 
    struct nl_handle *handle; // the handle to the netlink connection (more than just an fd)
-   class TCP_Client *client; // calls various functions of client on handleRead()
+   class Connection *client; // calls various functions of client on handleRead()
    int family; // the family ID we talk to (ATI family)
    
 private:

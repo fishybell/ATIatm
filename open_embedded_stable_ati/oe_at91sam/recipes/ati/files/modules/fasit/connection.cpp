@@ -12,15 +12,18 @@ using namespace std;
 #include "tcp_factory.h"
 
 // define static members
-FASIT_TCP_Factory *Connection::factory; // global factory
+TCP_Factory *Connection::factory; // global factory
 int Connection::efd; // global event fd
 map<__uint64_t,Connection *> Connection::uuidMap; // map for finding my unique id
 map<__uint32_t,Connection *> Connection::rnumMap; // map for finding my unique random number
 map<__uint16_t,Connection *> Connection::tnumMap; // map for finding my unique target number
+Connection *Connection::flink = NULL;
+
 
 
 Connection::Connection(int fd) {
 FUNCTION_START("::Connection(int fd)")
+   initChain();
    // create random number and map this to it
    rnum = rand();
    this->fd = fd;
@@ -71,11 +74,55 @@ FUNCTION_START("::~Connection()")
       delete [] lwbuf;
    }
 
+   // am I the sole Connection?
+   if (link == NULL && flink == this) {
+      flink = NULL;
+   }
+
+   // remove from linked list
+   Connection *tlink = flink;
+   Connection *llink = NULL;
+   while (tlink != NULL) {
+      if (tlink == this) {
+         if (llink == NULL) {
+            flink = tlink->link; // was head of chain, move head to next link
+         } else {
+            llink->link = this->link; // connect last link to next link in chain (if last, this drops this link off chain)
+         }
+         break;
+      } else {
+         llink = tlink; // remember last item
+         tlink = tlink->link; // move on to next item
+      }
+HERE
+   }
+
    IMSG("Closed connection %i\n", fd)
 FUNCTION_END("::~Connection()")
 }
 
-void Connection::Init(FASIT_TCP_Factory *factory, int efd) {
+// initialize place in linked list
+void Connection::initChain() {
+FUNCTION_START("::initChain()")
+   link = NULL;
+   if (flink == NULL) {
+      // we're first
+DMSG("first tcp link in chain 0x%08x\n", this);
+      flink = this;
+   } else {
+      // we're last (find old last and link from there)
+      Connection *tlink = flink;
+      while(tlink->link != NULL) {
+         tlink = tlink->link;
+      }
+      tlink->link = this;
+DMSG("last tcp link in chain 0x%08x\n", this);
+   }
+FUNCTION_END("::initChain()")
+}
+
+
+void Connection::Init(TCP_Factory *factory, int efd) {
 FUNCTION_START("::Init(int efd)")
    // initialize global values
    Connection::factory = factory;

@@ -10,9 +10,9 @@ all: fasit_conn
 
 fasit_conn: ${C_FILES} ${H_FILES}
     ifeq ($(CURD),fasit)
-		arm-angstrom-linux-gnueabi-g++ ${CFLAGS} ${LDFLAGS} -I../ ${CU_FLAGS} -g -lnl ${C_FILES} -o fasit_conn
+		arm-angstrom-linux-gnueabi-g++ -DFASIT_CONN ${CFLAGS} ${LDFLAGS} -I../ ${CU_FLAGS} -g -lnl ${C_FILES} -o fasit_conn
     else
-		${CXX} ${CFLAGS} ${LDFLAGS} -I../ -g -lnl ${C_FILES} -o fasit_conn
+		${CXX} ${CFLAGS} ${LDFLAGS} -DFASIT_CONN -I../ -g -lnl ${C_FILES} -o fasit_conn
     endif
 
 clean:

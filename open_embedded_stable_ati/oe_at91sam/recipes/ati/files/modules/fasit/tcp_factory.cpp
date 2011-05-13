@@ -10,14 +10,16 @@ using namespace std;
 #include "common.h"
 
 // for explicit declarations of template function
-#include "tcp_client.h"
-#include "sit_client.h"
-#include "mit_client.h"
+#ifdef FASIT_CONN
+   #include "tcp_client.h"
+   #include "sit_client.h"
+   #include "mit_client.h"
+#endif
 
 #define MAX_CONN 1200
 
-FASIT_TCP_Factory::FASIT_TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF) { // always invalid fd will close with an error, but do so silently
-FUNCTION_START("::FASIT_TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF)")
+TCP_Factory::TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF) { // always invalid fd will close with an error, but do so silently
+FUNCTION_START("::TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF)")
    memset(&server, 0, sizeof(server));
    server.sin_family = AF_INET;
    inet_aton(destIP, &server.sin_addr);
@@ -26,20 +28,20 @@ DMSG("Created addr with ip %s, (%08x) port %i\n", inet_ntoa(server.sin_addr), se
 
    setTnum(UNASSIGNED); // so unassigned tnums point to this as the source
 
-FUNCTION_END("::FASIT_TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF)")
+FUNCTION_END("::TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF)")
 }
 
-FASIT_TCP_Factory::~FASIT_TCP_Factory() {
-FUNCTION_START("::~FASIT_TCP_Factory()")
-FUNCTION_END("::~FASIT_TCP_Factory()")
+TCP_Factory::~TCP_Factory() {
+FUNCTION_START("::~TCP_Factory()")
+FUNCTION_END("::~TCP_Factory()")
 }
 
 // look for the lowest available tnum
-int FASIT_TCP_Factory::findNextTnum() {
+int TCP_Factory::findNextTnum() {
 FUNCTION_START("::findNextTnum()")
    // loop through all known tcp connections finding the lowest unused tnum
    __uint16_t lowTnum = 0;
-   FASIT_TCP *tcp = TCP_Client::getFirst();
+   Connection *tcp = TCP_Client::getFirst();
    while (tcp != NULL) {
       lowTnum = max(lowTnum, tcp->getTnum());
       tcp = tcp->getNext();
@@ -56,7 +58,7 @@ FUNCTION_INT("::findNextTnum()", lowTnum)
 }
 
 template <class TCP_Class>
-TCP_Class *FASIT_TCP_Factory::newConn() {
+TCP_Class *TCP_Factory::newConn() {
 FUNCTION_START("::newConn()")
    int sock;
 
@@ -107,7 +109,9 @@ FUNCTION_HEX("::newConn()", tcp)
 }
 
 // explicit declarations of newConn() template function
-template TCP_Client *FASIT_TCP_Factory::newConn<TCP_Client>();
-template SIT_Client *FASIT_TCP_Factory::newConn<SIT_Client>();
-template MIT_Client *FASIT_TCP_Factory::newConn<MIT_Client>();
+#ifdef FASIT_CONN
+   template TCP_Client *TCP_Factory::newConn<TCP_Client>();
+   template SIT_Client *TCP_Factory::newConn<SIT_Client>();
+   template MIT_Client *TCP_Factory::newConn<MIT_Client>();
+#endif
 

@@ -11,8 +11,8 @@ using namespace std;
 #include "mit_client.h"
 
 
-NL_Conn::NL_Conn(struct nl_handle *handle, TCP_Client *client, int family) : Connection(nl_socket_get_fd(handle)) {
-FUNCTION_START("::NL_Conn(struct nl_handle *handle, TCP_Client *client)")
+NL_Conn::NL_Conn(struct nl_handle *handle, Connection *client, int family) : Connection(nl_socket_get_fd(handle)) {
+FUNCTION_START("::NL_Conn(struct nl_handle *handle, Connection *client)")
 
    this->handle = handle;
    this->client = client;
@@ -31,7 +31,7 @@ FUNCTION_START("::NL_Conn(struct nl_handle *handle, TCP_Client *client)")
     nl_socket_modify_cb(this->handle, NL_CB_SEQ_CHECK, NL_CB_CUSTOM, ignore_cb, (void*)"SEQ_CHECK");
     nl_socket_modify_cb(this->handle, NL_CB_SEND_ACK, NL_CB_CUSTOM, ignore_cb, (void*)"SEND_ACK");
 
-FUNCTION_END("::NL_Conn(struct nl_handle *handle, TCP_Client *client)")
+FUNCTION_END("::NL_Conn(struct nl_handle *handle, Connection *client)")
 }
 
 NL_Conn::~NL_Conn() {
