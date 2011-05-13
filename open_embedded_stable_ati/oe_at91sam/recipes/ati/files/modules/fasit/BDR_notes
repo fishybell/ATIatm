@@ -1,0 +1,108 @@
+In fasit.h there are the structures:
+
+//  from ICD.FASIT.SYS 2.1
+/* 100 - Device Definition Request          */
+  FASIT_100
+FC 
+  a PD    responds with 2111 
+  a PYRO  will respond with 2005 (not done)
+  other devices respond with thier capabilities, if implimented 
+
+SR sends this when a PD first makes a connection 
+
+//  from ICD.FASIT.PYRO 2.1
+/* 2000 - Pyro Event Command                */
+ FASIT_2000;
+FC does not support yet
+SR does not support yet
+
+/* 2004 - Pyro Event Command Acknowledge    */
+ FASIT_2004;
+FC does not support yet
+SR does not support yet
+
+/* 2005 - Pyro Device ID & Capabilities     */
+ FASIT_2005;
+FC does not support yet
+SR does not support yet
+
+/* 2006 - Pyro Device Status                */
+ FASIT_2006;
+FC does not support yet
+SR does not support yet
+
+// from ICD.FASIT.PD 1.1
+/* 2100 - Event Command                     */
+ FASIT_2100  received from SR
+FC 
+  Brynn is now implimenting the handling of this command in the FC,
+and responds with the proper response which might be a 2101, a 2102,
+or even a 2112, 2115, or 2113 depending.
+
+SR sends a 2100 message, but FC is not replying
+SR  there are many options to this command and they all need to be tested
+
+/* 2101 - Event Command Acknowledge         */
+ FASIT_2101  Sent to SR
+FC 
+   Now sending 2101 acknowledgements.   I think in all the proper spots
+SR has code to handle this response from a 2100,  and it looks like it works.
+
+/* 2102 - Presentation Device Status   */
+ FASIT_2102  Sent to SR
+FC never recievesthis message, only transmits
+FC has this implimented, at least for buttons on the dev board
+   there are a few other times that this gets sent, and I have added some of them.
+SR has code to receive this, I am pretty sure it doesn't entirely work.
+
+/* 2110 - Configure Muzzle Flash Command    */
+ FASIT_2110  Received from SR
+FC responds with either a 2112 status
+   or a 2101 negative Ack
+SR does not support yet
+
+/* 2111 - PD Device ID & Capabilities          */
+ FASIT_2111   Send to SR
+FC never receives this, but it transmits it
+  in response to a 100
+  defheader does not have a case for 2111 - if needed
+FC sends the 2111 response.
+FC  Should also respond with a 
+
+SR has code to handle this, unknown what state it is in.
+
+/* 2112 - Muzzle Flash Simulation Status    */
+ FASIT_2112   sent to SR
+FC does not support yet
+   needs to send this in response to a 2110,
+   or in response to a 2100 CID_Status_request
+SR does not support yet
+
+/* 2113 - GPS Location                      */
+ FASIT_2113
+FC does not support yet
+SR does not support yet
+BDR my understanding is Action Target doesn't do this.
+
+
+/* 2114 - Configure MILES Shootback Command */
+ FASIT_2114;
+FC does not support yet
+SR does not support yet
+BDR my understanding is Action Target doesn't do this.
+
+/* 2115 - MILES Shootback Status            */
+ FASIT_2115;
+FC Seems to be code to generate a 2115 response to a 2114,
+   but I don't think the 2114 is handled yet
+SR does not support yet
+BDR my understanding is Action Target doesn't do this.
+
+
+////////////////////////////////////////
+// from ICD.FASIT.PD 2.0
+//
+//   includes 3000 series messages
+//    not implimented
+///////
+
