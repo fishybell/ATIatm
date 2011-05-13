@@ -158,8 +158,8 @@ const char *usage = "Usage: %s [options]\n\
 \t-l X   -- listen on port X rather than the default \n\
 \t-p X   -- connect to port X rather than the default \n\
 \t-i X   -- connect to IP address X\n\
-\t-S     -- instatiate a SIT handler\n\
-\t-M     -- instatiate a MIT handler\n\
+\t-S     -- instantiate a SIT handler\n\
+\t-M     -- instantiate a MIT handler\n\
 \t-F     -- Has the Muzzle Flash option\n\
 \t-h     -- print out usage information\n";
 
