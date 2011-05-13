@@ -60,8 +60,8 @@ private:
    class attached_SIT_Client *att_SIT;
 
    // helper functions for filling out a 2102 status message
-   void fillStatus(FASIT_2102 *msg);
-   void sendStatus();
+   void fillStatus2102(FASIT_2102 *msg);
+   void sendStatus2102();
 
    // remember the last command we received for responses back
    int resp_num;

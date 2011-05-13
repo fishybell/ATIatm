@@ -44,18 +44,18 @@ FUNCTION_END("::~MIT_Client()")
 }
 
 // fill out 2102 status message
-void MIT_Client::fillStatus(FASIT_2102 *msg) {
-FUNCTION_START("::fillStatus(FASIT_2102 *msg)")
+void MIT_Client::fillStatus2102(FASIT_2102 *msg) {
+FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
 
    // TODO -- fill with MIT status and lastSITstatus
 
-FUNCTION_END("::fillStatus(FASIT_2102 *msg)")
+FUNCTION_END("::fillStatus2102(FASIT_2102 *msg)")
 }
 
 
 // create and send a status messsage to the FASIT server
-void MIT_Client::sendStatus() {
-FUNCTION_START("::sendStatus()")
+void MIT_Client::sendStatus2102() {
+FUNCTION_START("::sendStatus2102()")
 
    FASIT_header hdr;
    FASIT_2102 msg;
@@ -63,13 +63,13 @@ FUNCTION_START("::sendStatus()")
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2102));
 
    // fill message
-   fillStatus(&msg); // fills in status values with current values
+   fillStatus2102(&msg); // fills in status values with current values
 
    // send
    queueMsg(&hdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2102));
 
-FUNCTION_END("::sendStatus()")
+FUNCTION_END("::sendStatus2102()")
 }
 
 // returns true when a FASIT_TCP object has been successfully attached as a SIT
@@ -136,7 +136,7 @@ FUNCTION_START("::handle_2102(FASIT_2102 *msg)")
    lastSITstatus = *msg;
 
    // pass on to range computer
-   sendStatus();
+   sendStatus2102();
 
 FUNCTION_END("::handle_2102(FASIT_2102 *msg)")
 }
@@ -204,7 +204,7 @@ FUNCTION_START("::didFailure(int type)")
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2102));
 
    // fill message
-   fillStatus(&msg); // fills in status values with current values
+   fillStatus2102(&msg); // fills in status values with current values
 
    // set fault
    msg.body.fault = htons(type);

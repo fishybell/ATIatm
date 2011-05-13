@@ -15,21 +15,25 @@ SR sends this when a PD first makes a connection
  FASIT_2000;
 FC does not support yet
 SR does not support yet
+BDR my understanding is Action Target doesn't do this.
 
 /* 2004 - Pyro Event Command Acknowledge    */
  FASIT_2004;
 FC does not support yet
 SR does not support yet
+BDR my understanding is Action Target doesn't do this.
 
 /* 2005 - Pyro Device ID & Capabilities     */
  FASIT_2005;
 FC does not support yet
 SR does not support yet
+BDR my understanding is Action Target doesn't do this.
 
 /* 2006 - Pyro Device Status                */
  FASIT_2006;
 FC does not support yet
 SR does not support yet
+BDR my understanding is Action Target doesn't do this.
 
 // from ICD.FASIT.PD 1.1
 /* 2100 - Event Command                     */

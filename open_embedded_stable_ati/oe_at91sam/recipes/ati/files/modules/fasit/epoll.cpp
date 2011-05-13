@@ -11,13 +11,17 @@
 
 using namespace std;
 
+
+
 #include "connection.h"
 #include "fasit_tcp.h"
 #include "tcp_factory.h"
 #include "common.h"
 #include "timers.h"
 #include "timeout.h"
+#define extern 
 #include "sit_client.h"
+#undef extern
 #include "mit_client.h"
 
 // rough idea of how many connections we'll deal with and the max we'll deal with in a single loop
@@ -163,6 +167,7 @@ const char *usage = "Usage: %s [options]\n\
 \t-F     -- Has the Muzzle Flash option\n\
 \t-h     -- print out usage information\n";
 
+   start_config = 0;	//BDR  kludge to get MFS configuration into SIT_client
 
    for (int i = 1; i < argc; i++) {
       if (argv[i][0] != '-') {
@@ -177,7 +182,7 @@ const char *usage = "Usage: %s [options]\n\
             startMIT = true;
             break;
 	 case 'F' :
-	    //startSIT = true;
+	    start_config |= PD_MUZZLE;
 	    break;
          case 'l' :
             if (sscanf(argv[++i], "%i", &sport) != 1) {

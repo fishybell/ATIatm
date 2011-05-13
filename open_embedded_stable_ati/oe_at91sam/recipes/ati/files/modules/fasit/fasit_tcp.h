@@ -35,17 +35,17 @@ protected:
    // the message data itself is in the read buffer from start to end
    virtual int handle_100(int start, int end);
    virtual int handle_2000(int start, int end);
-   virtual int handle_2004(int start, int end);
-   virtual int handle_2005(int start, int end);
-   virtual int handle_2006(int start, int end);
+//   virtual int handle_2004(int start, int end);
+//   virtual int handle_2005(int start, int end);
+//   virtual int handle_2006(int start, int end);
    virtual int handle_2100(int start, int end);
    virtual int handle_2101(int start, int end);
-   virtual int handle_2111(int start, int end);
-   virtual int handle_2102(int start, int end);
+//   virtual int handle_2111(int start, int end);
+//   virtual int handle_2102(int start, int end);
    virtual int handle_2114(int start, int end);
-   virtual int handle_2115(int start, int end);
+//   virtual int handle_2115(int start, int end);
    virtual int handle_2110(int start, int end);
-   virtual int handle_2112(int start, int end);
+//   virtual int handle_2112(int start, int end);
    virtual int handle_2113(int start, int end);
 
    // the correspsonding client connection for this server instance
