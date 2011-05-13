@@ -16,6 +16,10 @@ using namespace std;
    #include "mit_client.h"
 #endif
 
+#ifdef EVENT_CONN
+   #include "kernel_tcp.h"
+#endif
+
 #define MAX_CONN 1200
 
 TCP_Factory::TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF) { // always invalid fd will close with an error, but do so silently
@@ -115,3 +119,6 @@ FUNCTION_HEX("::newConn()", tcp)
    template MIT_Client *TCP_Factory::newConn<MIT_Client>();
 #endif
 
+#ifdef EVENT_CONN
+   template Kernel_TCP *TCP_Factory::newConn<Kernel_TCP>();
+#endif
