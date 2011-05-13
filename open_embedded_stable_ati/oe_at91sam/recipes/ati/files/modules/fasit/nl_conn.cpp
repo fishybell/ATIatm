@@ -7,9 +7,14 @@ using namespace std;
 #include "timers.h"
 
 // for explicit declarations of template function
-#include "sit_client.h"
-#include "mit_client.h"
+#ifdef FASIT_CONN
+   #include "sit_client.h"
+   #include "mit_client.h"
+#endif
 
+#ifdef EVENT_CONN
+   #include "kernel_tcp.h"
+#endif
 
 NL_Conn::NL_Conn(struct nl_handle *handle, Connection *client, int family) : Connection(nl_socket_get_fd(handle)) {
 FUNCTION_START("::NL_Conn(struct nl_handle *handle, Connection *client)")
@@ -240,7 +245,12 @@ FUNCTION_HEX("::newConn(C_Client *client)", conn)
 }
 
 // explicit declarations of newConn() template function
-template SIT_Conn *NL_Conn::newConn<SIT_Conn, SIT_Client>(SIT_Client *client);
-template MIT_Conn *NL_Conn::newConn<MIT_Conn, MIT_Client>(MIT_Client *client);
+#ifdef FASIT_CONN
+   template SIT_Conn *NL_Conn::newConn<SIT_Conn, SIT_Client>(SIT_Client *client);
+   template MIT_Conn *NL_Conn::newConn<MIT_Conn, MIT_Client>(MIT_Client *client);
+#endif
 
+#ifdef EVENT_CONN
+   template Kern_Conn *NL_Conn::newConn<Kern_Conn, Kernel_TCP>(Kernel_TCP *client);
+#endif
 
