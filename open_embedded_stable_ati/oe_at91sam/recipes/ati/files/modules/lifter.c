@@ -761,10 +761,10 @@ void hit_event_internal(int line, bool upload) {
         generic_output_event(EVENT_KILL);
 
         // send kill upstream?
-        if (upload || etype != EVENT_KILL) {
+//        if (upload || etype != EVENT_KILL) {
             u8 kdata = EVENT_KILL; // cast to 8-bits
             queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
-        }
+//        }
         
         // bob if we need to bob
         switch (atomic_read(&after_fall)) {
