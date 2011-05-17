@@ -48,7 +48,7 @@ static struct timer_list moved_timer = TIMER_INITIALIZER(move_change, 0, 0);
 //---------------------------------------------------------------------------
 // Message filler handler for expose functions
 //---------------------------------------------------------------------------
-int pos_mfh(struct sk_buff *skb, void *pos_data) {
+static int pos_mfh(struct sk_buff *skb, void *pos_data) {
     // the pos_data argument is a pre-made u16 structure
     return nla_put_u16(skb, GEN_INT16_A_MSG, *((u16*)pos_data));
 }
@@ -94,8 +94,25 @@ static void move_change(unsigned long data) {
 //---------------------------------------------------------------------------
 // event handler for moves
 //---------------------------------------------------------------------------
-void move_event(int etype) {
+static void move_event_internal(int etype, bool upload); // forward declaration
+static void move_event(int etype) {
+   move_event_internal(etype, true); // send event upstream
+}
+
+static void move_event_internal(int etype, bool upload) {
     delay_printk("move_event(%i)\n", etype);
+
+    // send event upstream?
+    if (upload) {
+        u8 data = etype; // cast to 8-bits
+        queue_nl_multi(NL_C_EVENT, &data, sizeof(data));
+    }
+
+    // event causes change in motion?
+    if (etype == EVENT_KILL) {
+        // TODO -- programmable coast vs. stop vs. ignore
+        mover_speed_stop();
+    }
 
     // create event for outputs
     generic_output_event(etype);
@@ -104,10 +121,10 @@ void move_event(int etype) {
     switch (etype) {
         case EVENT_MOVE:
         case EVENT_MOVING:
-            mod_timer(&moved_timer, jiffies+((MOVED_DELAY*HZ)/1000)); // blank for X milliseconds
+            mod_timer(&moved_timer, jiffies+((MOVED_DELAY*HZ)/1000)); // wait for X milliseconds for sensor to settle
             break;
         case EVENT_STOPPED:
-            mod_timer(&moved_timer, jiffies+((MOVED_DELAY*HZ)/1000)); // blank for X milliseconds
+            mod_timer(&moved_timer, jiffies+((MOVED_DELAY*HZ)/1000)); // wait for X milliseconds for sensor to settle
             schedule_work(&position_work);
             break;
     }
@@ -261,7 +278,7 @@ delay_printk("Mover: handling event command\n");
 delay_printk("Mover: received value: %i\n", value);
 
         // handle event
-        move_event(value);
+        move_event_internal(value, false); // don't repropogate
 
         rc = HANDLE_SUCCESS_NO_REPLY;
     } else {

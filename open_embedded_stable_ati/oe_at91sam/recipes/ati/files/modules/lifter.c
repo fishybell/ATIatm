@@ -649,8 +649,19 @@ static void position_change(struct work_struct * work) {
 //---------------------------------------------------------------------------
 // event handler for lifts
 //---------------------------------------------------------------------------
+void lift_event_internal(int etype, bool upload); // forward declaration
 void lift_event(int etype) {
+    lift_event_internal(etype, true); // send event upstream
+}
+
+void lift_event_internal(int etype, bool upload) {
     delay_printk("lift_event(%i)\n", etype);
+
+    // send event upstream?
+    if (upload) {
+        u8 data = etype; // cast to 8-bits
+        queue_nl_multi(NL_C_EVENT, &data, sizeof(data));
+    }
 
     // create event for outputs
     generic_output_event(etype);
@@ -709,13 +720,18 @@ void lift_event(int etype) {
 //---------------------------------------------------------------------------
 // event handler for hits
 //---------------------------------------------------------------------------
+void hit_event_internal(int line, bool upload); // forward declaration
 void hit_event(int line) {
+   hit_event_internal(line, true); // send hit upstream
+}
+
+void hit_event_internal(int line, bool upload) {
     struct hit_item *new_hit;
     int stay_up = 1;
     delay_printk("hit_event(%i)\n", line);
 
-    // create event for outputs
-    generic_output_event(EVENT_HIT);
+    // create event
+    lift_event_internal(EVENT_HIT, upload);
 
     // log event
     new_hit = kmalloc(sizeof(struct hit_item), GFP_KERNEL);
@@ -742,7 +758,13 @@ void hit_event(int line) {
         lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
 
         // create events for outputs
-        generic_output_event(EVENT_KILL); // TODO -- tell mover
+        generic_output_event(EVENT_KILL);
+
+        // send kill upstream?
+        if (upload || etype != EVENT_KILL) {
+            u8 kdata = EVENT_KILL; // cast to 8-bits
+            queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
+        }
         
         // bob if we need to bob
         switch (atomic_read(&after_fall)) {
@@ -779,9 +801,10 @@ delay_printk("Lifter: received value: %i\n", value);
 
         // handle event
         if (value == EVENT_HIT) {
-            hit_event(0);
+            hit_event_internal(0, false); // don't repropogate
+        } else {
+            lift_event_internal(value, false); // don't repropogate
         }
-        lift_event(value);
 
         rc = HANDLE_SUCCESS_NO_REPLY;
     } else {
