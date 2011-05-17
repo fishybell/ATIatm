@@ -8,6 +8,29 @@
 
 #include "netlink_kernel.h"
 
+// small netlink multicast queue buffer
+#define MAX_NL_Q_MSG 200
+
+// netlink multicast queue
+typedef struct nl_q_buffer {
+    char message[MAX_NL_Q_MSG];
+    size_t size;
+    int command;
+    struct nl_q_buffer *next;
+} nl_q_buffer_t;
+struct nl_q_buffer *start = NULL; // start of queue
+struct nl_q_buffer *end = NULL; // end of queue
+
+//---------------------------------------------------------------------------
+// Global queue lock
+//---------------------------------------------------------------------------
+static spinlock_t q_lock = SPIN_LOCK_UNLOCKED;
+
+//---------------------------------------------------------------------------
+// This work queue item is used for the netlink multicast queue
+//---------------------------------------------------------------------------
+static struct work_struct nl_q_work;
+
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are fully initialized
 //---------------------------------------------------------------------------
@@ -555,6 +578,115 @@ void uninstall_nl_driver(int driver_id) {
 EXPORT_SYMBOL(uninstall_nl_driver);
 
 //---------------------------------------------------------------------------
+// Message filler handler for queued multicast messages
+//---------------------------------------------------------------------------
+static int nl_q_mfh(struct sk_buff *skb, void *data) {
+   struct nl_q_buffer *msg = (struct nl_q_buffer*)data;
+   return nla_put(skb, 1, msg->size, msg->message);
+}
+
+//---------------------------------------------------------------------------
+// Work item to do the actual sending of a queued multicast call
+//---------------------------------------------------------------------------
+static void nl_q_do_work(struct work_struct * work) {
+    struct nl_q_buffer top; // not a pointer
+
+delay_printk("%s()\n",__func__);
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
+    // lock
+    spin_lock(&q_lock);
+
+    // do we have a full queue?
+    if (start == NULL) {
+        // no, so don't do anything
+        spin_unlock(&q_lock);
+delay_printk("empty queue\n");
+        return;
+    }
+
+    // make a copy of the top queue item
+    top = *start;
+
+    // free allocated memory
+    kfree(start);
+
+    // rearrange the queue
+    start = top.next; // new start
+    if (top.next == NULL) {
+        end = NULL; // no ending
+    }
+    
+    // do we still have items on the queue?
+    if (start != NULL) {
+        // schedule more work
+        schedule_work(&nl_q_work);
+    }
+
+    // unlock
+    spin_unlock(&q_lock);
+
+    // do the actual sending outside the lock
+delay_printk("sending queued command %i\n", top.command);
+    send_nl_message_multi(&top, nl_q_mfh, top.command);
+}
+
+//---------------------------------------------------------------------------
+// Work item to run through final initialization step
+//---------------------------------------------------------------------------
+void queue_nl_multi(int command, void *data, size_t size) {
+    signed int result=1;
+    struct nl_q_buffer *msg = NULL;
+delay_printk("%s(): %i : %i\n",__func__, command, size);
+
+    // allocate message buffer
+    // use GFP_ATOMIC as it's quicker than GFP_KERNEL
+    msg = kmalloc(sizeof(struct nl_q_buffer), GFP_ATOMIC);
+    if (msg == NULL) {
+        // out of memory
+        return;
+    }
+
+    // fill the message data
+    memset(msg, 0, sizeof(struct nl_q_buffer));
+    if (size > MAX_NL_Q_MSG) {
+       size = MAX_NL_Q_MSG;
+    }
+    memcpy(msg->message, data, size);
+    msg->size = size;
+    msg->command = command;
+
+    // Put at the end of the message queue
+    if (result > 0) {
+        // lock
+        spin_lock(&q_lock);
+
+        // add to end of queue
+        msg->next = NULL;
+        if (end == NULL) {
+            // also the start
+            start = msg;
+        } else {
+            // move end back
+            end->next = msg;
+        }
+        end = msg; // new is always the end
+
+        // unlock
+        spin_unlock(&q_lock);
+
+        // schedule work
+        schedule_work(&nl_q_work);
+    }
+
+    return;
+}
+EXPORT_SYMBOL(queue_nl_multi);
+
+//---------------------------------------------------------------------------
 // Work item to run through final initialization step
 //---------------------------------------------------------------------------
 static void init_final(struct work_struct * work) {
@@ -608,15 +740,17 @@ static int __init gnKernel_init(void) {
             goto failure;
         }
     }
+    INIT_WORK(&nl_q_work, nl_q_do_work);
 
     // do some of the initialization after init has been called
     INIT_WORK(&init_work, init_final);
     schedule_work(&init_work);
 
+    atomic_set(&full_init, TRUE);
     return 0;
 
   failure:
-   delay_printk("NL ERROR: an error occured while inserting the generic netlink example module\n");
+   delay_printk("NL ERROR: an error occured while inserting the netlink provider module\n");
     return -1;
 
 
@@ -628,6 +762,7 @@ static void __exit gnKernel_exit(void) {
     struct command_handler *last;
     atomic_set(&full_init, FALSE);
     ati_flush_work(&init_work); // close any open work queue items
+    ati_flush_work(&nl_q_work); // close any open work queue items
    delay_printk("EXIT GENERIC NETLINK PROVIDER MODULE\n");
 
     /* clear heartbeat callback */

@@ -61,4 +61,16 @@ typedef int (*message_filler_handler)(struct sk_buff*, void*);
 extern int send_nl_message_uni(void*, message_filler_handler, int, int);
 extern int send_nl_message_multi(void*, message_filler_handler, int);
 
+/* when a driver needs to send multiple multicast messages in a
+   short period of time (ie. NL_C_EVENT messages) this interface
+   provides a queue similar in speed to calling delay_printk().
+   normally a module should use work queues and timers and call
+   send_nl_message_multi directly as it takes less memory and
+   allows for failure handling.
+   returns: nothing (not guaranteed to pass or fail)
+   arg1: command id number
+   arg2: arbitrary message data (will be put in as 1st attribute)
+   arg3: size of data */
+extern void queue_nl_multi(int,void*,size_t);
+
 #endif
