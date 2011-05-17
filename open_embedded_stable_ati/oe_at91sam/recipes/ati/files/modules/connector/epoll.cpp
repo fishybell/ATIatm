@@ -87,11 +87,15 @@ PROG_START
    int sport = PORT;
    int base = 0;
    const char *defIP = "192.168.0.1";
+   bool startClient = false;
    
 const char *usage = "Usage: %s [options]\n\
 \t-l X   -- listen on port X rather than the default \n\
 \t-p X   -- connect to port X rather than the default \n\
 \t-i X   -- connect to IP address X\n\
+\t-a     -- connect automatic IP address\n\
+\t-b     -- broadcast automatic IP address\n\
+\t-C     -- initiate a client connection\n\
 \t-h     -- print out usage information\n";
 
 
@@ -101,6 +105,9 @@ const char *usage = "Usage: %s [options]\n\
          return 1;
       }
       switch (argv[i][1]) {
+         case 'C' :
+            startClient = true;
+            break;
          case 'l' :
             if (sscanf(argv[++i], "%i", &sport) != 1) {
                IERROR("invalid argument (%i)\n", i)
@@ -188,6 +195,12 @@ const char *usage = "Usage: %s [options]\n\
    sched_setscheduler(getpid(), SCHED_FIFO, &sp);
 #endif
 
+   // start any clients here
+   Kernel_TCP *kern_client = NULL;
+   if (startClient) {
+      kern_client = factory->newConn <Kernel_TCP> ();
+   }
+
    while(!close_nicely) {
       // epoll_wait() blocks until we timeout or one of the file descriptors is ready
       int msec_t = Timeout::timeoutVal();
@@ -233,6 +246,11 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
             }
          }
       }
+   }
+
+   // properly any clients here
+   if (kern_client != NULL) {
+      delete kern_client;
    }
 
    return 0;
