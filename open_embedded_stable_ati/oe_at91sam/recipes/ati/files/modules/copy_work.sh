@@ -1,1 +1,5 @@
-scp *.ko root@157.185.52.59:/home/root
+./copy_work
+cd fasit
+./copy_work
+cd ../connector
+./copy_work
