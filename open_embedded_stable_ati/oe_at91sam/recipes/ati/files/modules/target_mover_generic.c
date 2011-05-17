@@ -1709,6 +1709,138 @@ static ssize_t clock_store(struct device *dev, struct device_attribute *attr, co
 }
 
 //---------------------------------------------------------------------------
+// Handles reads to the ra attribute through sysfs (for debugging only)
+//---------------------------------------------------------------------------
+static ssize_t hz_show(struct device *dev, struct device_attribute *attr, char *buf)
+    {
+    // find clock
+    int rc = atomic_read(&tc_clock);
+    switch (rc) {
+       case 1: rc = 66500000; break;
+       case 2: rc = 16625000; break;
+       case 3: rc = 4156250; break;
+       case 4: rc = 1039062; break;
+       default: rc = 1; break;
+    }
+    rc = rc / __raw_readl(tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RC)); // convert to hz
+    return sprintf(buf, "%d\n", rc);
+    }
+
+//---------------------------------------------------------------------------
+// Handles writes to the ra attribute through sysfs (for debugging only)
+//---------------------------------------------------------------------------
+static ssize_t hz_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size) {
+    long value;
+    ssize_t status;
+    int ra, rc=1, nc, p; // ra, rc and new clock
+
+delay_printk("Attempting to change hz\n");
+
+    status = strict_strtol(buf, 0, &value);
+    if (status == 0) {
+        if (rc > 2000) { return 0;}
+        if (rc < 200) { return 0;}
+
+        nc = atomic_read(&tc_clock);
+delay_printk("changing hz to %i\n", value);
+
+     // find correct clock multiplier
+     while (nc>0 && nc<5) {
+       switch (nc) {
+           case 1: rc = 66500000; break;
+           case 2: rc = 16625000; break;
+           case 3: rc = 4156250; break;
+           case 4: rc = 1039062; break;
+       }
+
+       if (rc / value > 0xffff) {
+           nc--; // clock too high for frequency
+           // keep going
+       } else if (rc / value < 1000) {
+           nc++; // clock too low for frequency
+           // keep going
+       } else {
+           break;
+       }
+     }
+delay_printk("changing clock to %i\n", nc);
+
+     switch (nc) {
+         case 1: nc = ATMEL_TC_TIMER_CLOCK1; break;
+         case 2: nc = ATMEL_TC_TIMER_CLOCK2; break;
+         case 3: nc = ATMEL_TC_TIMER_CLOCK3; break;
+         case 4: nc = ATMEL_TC_TIMER_CLOCK4; break;
+         default :  // too big or too small
+            return 0;
+            break;
+     }
+     atomic_set(&tc_clock, nc); // set new clock value
+
+
+     // find new ra value that is the same percentage as the old value
+     ra = __raw_readl(tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
+     p = __raw_readl(tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RC));
+     ra = (p*1000) / ra; // get higher precision with 1000 multiplier
+
+     // find and set new rc value
+     rc = rc / value;
+     MOTOR_PWM_RC[mover_type] = rc;
+     MOTOR_PWM_END[mover_type] = rc;
+     __raw_writel(MOTOR_PWM_RC[mover_type], tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RC));
+     ra = (rc*1000) / ra; // get higher precision with 1000 multiplier
+     __raw_writel(ra, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
+
+     // set new clock value
+     switch (mover_type)
+        {
+        case 0:
+        // initialize infantry clock
+        __raw_writel(nc			// new clock
+                    | ATMEL_TC_WAVE					// output mode
+                    | ATMEL_TC_ACPA_CLEAR			// set TIOA low when counter reaches "A"
+                    | ATMEL_TC_ACPC_SET				// set TIOA high when counter reaches "C"
+                    | ATMEL_TC_BCPB_CLEAR			// set TIOB low when counter reaches "B"
+                    | ATMEL_TC_BCPC_SET				// set TIOB high when counter reaches "C"
+                    | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
+                    | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
+                    tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
+        break;
+
+        case 1:
+        // initialize armor clock
+        __raw_writel(nc			// new clock
+                    | ATMEL_TC_WAVE					// output mode
+                    | ATMEL_TC_ACPA_SET				// set TIOA high when counter reaches "A"
+                    | ATMEL_TC_ACPC_CLEAR			// set TIOA low when counter reaches "C"
+                    | ATMEL_TC_BCPB_SET				// set TIOB high when counter reaches "B"
+                    | ATMEL_TC_BCPC_CLEAR			// set TIOB low when counter reaches "C"
+                    | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
+                    | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
+                    tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
+        break;
+        case 2:
+        // initialize infantry/h-bridge clock
+        __raw_writel(nc			// new clock
+                    | ATMEL_TC_WAVE					// output mode
+                    | ATMEL_TC_ACPA_SET				// set TIOA low when counter reaches "A"
+                    | ATMEL_TC_ACPC_CLEAR			// set TIOA high when counter reaches "C"
+                    | ATMEL_TC_BCPB_SET				// set TIOB low when counter reaches "B"
+                    | ATMEL_TC_BCPC_CLEAR			// set TIOB high when counter reaches "C"
+                    | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
+                    | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
+                    tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
+        break;
+
+delay_printk("done\n");
+        default: return -EINVAL; break;
+        }
+
+    }
+delay_printk("failed with %i\n", status);
+    return status;
+}
+
+//---------------------------------------------------------------------------
 // Handles writes to the speed attribute through sysfs
 //---------------------------------------------------------------------------
 static ssize_t speed_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
@@ -1742,6 +1874,7 @@ static DEVICE_ATTR(speed, 0644, speed_show, speed_store);
 static DEVICE_ATTR(ra, 0644, ra_show, ra_store);
 static DEVICE_ATTR(rc, 0644, rc_show, rc_store);
 static DEVICE_ATTR(clock, 0644, clock_show, clock_store);
+static DEVICE_ATTR(hz, 0644, hz_show, hz_store);
 static DEVICE_ATTR(position, 0444, position_show, NULL);
 static DEVICE_ATTR(velocity, 0444, velocity_show, NULL);
 static DEVICE_ATTR(rpm, 0444, rpm_show, NULL);
@@ -1760,6 +1893,7 @@ static const struct attribute * generic_mover_attrs[] =
     &dev_attr_ra.attr,
     &dev_attr_rc.attr,
     &dev_attr_clock.attr,
+    &dev_attr_hz.attr,
     &dev_attr_position.attr,
     &dev_attr_velocity.attr,
     &dev_attr_rpm.attr,
