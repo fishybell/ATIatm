@@ -116,14 +116,18 @@ __uint64_t getDevID () {
 // utility function to properly configure a client TCP connection
 void setnonblocking(int sock) {
 FUNCTION_START("setnonblocking(int sock)")
-   int opts;
+   int opts, yes=1;
 
-   opts = fcntl(sock, F_GETFL);
+   if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int) < 0)) { // set keepalive so we disconnect on link failure or timeout
+      perror("setsockopt(SO_REUSEADDR)");
+      exit(EXIT_FAILURE);
+   }
+   opts = fcntl(sock, F_GETFL); // grab existing flags
    if (opts < 0) {
       perror("fcntl(F_GETFL)");
       exit(EXIT_FAILURE);
    }
-   opts = (opts | O_NONBLOCK);
+   opts = (opts | O_NONBLOCK); // add in nonblock to existing flags
    if (fcntl(sock, F_SETFL, opts) < 0) {
       perror("fcntl(F_SETFL)");
       exit(EXIT_FAILURE);
@@ -333,7 +337,10 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
             Connection *conn = (Connection*)events[n].data.ptr;
             int ret = conn->handleReady(&events[n]);
             if (ret == -1) {
-               delete conn;
+               // attempt reconnection
+               if (!conn->reconnect()) {
+                  delete conn;
+               }
             }
          }
       }

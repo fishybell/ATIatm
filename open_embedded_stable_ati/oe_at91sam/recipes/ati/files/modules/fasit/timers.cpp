@@ -20,6 +20,7 @@ FUNCTION_START("::handleTimeout()")
    server->newClient();
 FUNCTION_END("::handleTimeout()")
 }
+
 /********************************************
  * NLTimer timer                          *
  *******************************************/
@@ -36,6 +37,25 @@ FUNCTION_END("::NLTimer(int msec)")
 void NLTimer::handleTimeout() {
 FUNCTION_START("::handleTimeout()")
    conn->makeWritable(true);
+FUNCTION_END("::handleTimeout()")
+}
+
+/********************************************
+ * ReconTimer timer                          *
+ *******************************************/
+ReconTimer::ReconTimer(TCP_Client *client, int msec) : TimeoutTimer(msec) {
+FUNCTION_START("::ReconTimer(int msec)")
+   // set the client
+   this->client = client;
+   // set the type and push to the main timer class
+   type = recon_timer;
+   push();
+FUNCTION_END("::ReconTimer(int msec)")
+}
+
+void ReconTimer::handleTimeout() {
+FUNCTION_START("::handleTimeout()")
+   client->handleReconnect();
 FUNCTION_END("::handleTimeout()")
 }
 

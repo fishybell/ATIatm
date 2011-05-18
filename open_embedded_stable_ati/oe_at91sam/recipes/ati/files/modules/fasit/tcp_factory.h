@@ -13,6 +13,8 @@ public :
    template <class TCP_Class> // class needs to be similar to or inherit TCP_Client
       TCP_Class *newConn(); // creates a new connection to the IP and port given in the constructor
 
+   int newClientSock(); // returns a connected and ready socket file descriptor for use in a client
+
 protected :
    // we don't actually have a valid file descriptor, so we'll just overwrite these to do nothing
    int handleWrite(const epoll_event *ev) { return 0; };

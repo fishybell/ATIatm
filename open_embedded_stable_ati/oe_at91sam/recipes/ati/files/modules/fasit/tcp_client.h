@@ -8,7 +8,7 @@ using namespace std;
 #include "common.h"
 #include "fasit_tcp.h"
 
-// class for FASIT client
+// class for FASIT client (auto reconnects)
 // parses TCP messages
 class TCP_Client : public FASIT_TCP {
 public :
@@ -16,31 +16,17 @@ public :
    virtual ~TCP_Client();
    friend class FASIT_TCP;
 
+   // cause a reconnect attempt in 10 seconds
+   virtual bool reconnect();
+
+   // delayed reconnect handler
+   void handleReconnect();
+
 private :
 
 protected:
    // server instance
    FASIT_TCP *server;
-
-   // individual message handlers, all return -1 if the connection needs to be
-   //   deleted afterwards
-   // the message data itself is in the read buffer from start to end
-/*   int handle_100(int start, int end);
-   int handle_2000(int start, int end);
-   int handle_2004(int start, int end);
-   int handle_2005(int start, int end);
-   int handle_2006(int start, int end);
-   int handle_2100(int start, int end);
-   int handle_2101(int start, int end);
-   int handle_2111(int start, int end);
-   int handle_2102(int start, int end);
-   int handle_2114(int start, int end);
-   int handle_2115(int start, int end);
-   int handle_2110(int start, int end);
-   int handle_2112(int start, int end);
-   int handle_2113(int start, int end);*/
-
-   // server instance
    virtual bool hasPair() { return server != NULL;};
    virtual Connection *pair() { return (Connection*)server; }
 };

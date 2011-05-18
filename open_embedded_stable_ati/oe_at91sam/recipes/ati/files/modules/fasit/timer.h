@@ -7,6 +7,7 @@
 enum timerTypes {
 #ifdef FASIT_CONN
    conn_timer,
+   recon_timer,
 #endif
    nl_timer,
 };

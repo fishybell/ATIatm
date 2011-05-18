@@ -61,15 +61,15 @@ FUNCTION_INT("::findNextTnum()", lowTnum)
    return lowTnum;
 }
 
-template <class TCP_Class>
-TCP_Class *TCP_Factory::newConn() {
-FUNCTION_START("::newConn()")
+// returns a connected and ready socket file descriptor for use in a client
+int TCP_Factory::newClientSock() {
+FUNCTION_START("::newClientSock()")
    int sock;
 
    // create the TCP socket
    if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-FUNCTION_HEX("::newConn()", NULL)
-      return NULL;
+FUNCTION_INT("::newClientSock()", -1)
+      return -1;
    }
    IMSG("Created new TCP socket: %i\n", sock)
 
@@ -93,10 +93,25 @@ FUNCTION_HEX("::newConn()", NULL)
          case ENOTSOCK : IERROR("errno: ENOTSOCK\n") break;
          case ETIMEDOUT : IERROR("errno: ETIMEDOUT\n") break;
       }
+FUNCTION_INT("::newClientSock()", -1)
+      return -1;
+   }
+   setnonblocking(sock);
+
+FUNCTION_INT("::newClientSock", sock)
+   return sock;
+}
+
+template <class TCP_Class>
+TCP_Class *TCP_Factory::newConn() {
+FUNCTION_START("::newConn()")
+
+   // grab new socket file descriptor
+   int sock = newClientSock();
+   if (sock == -1) {
 FUNCTION_HEX("::newConn()", NULL)
       return NULL;
    }
-   setnonblocking(sock);
 
    // create new TCP_Class (with predefined tnum) and to our epoll list
    TCP_Class *tcp = new TCP_Class(sock, findNextTnum());
