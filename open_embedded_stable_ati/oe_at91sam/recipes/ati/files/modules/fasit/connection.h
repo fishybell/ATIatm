@@ -38,6 +38,8 @@ public:
    static Connection *getFirst() { return flink; }
    Connection *getNext() { return link; }
 
+   virtual bool reconnect() { return false; }; // by default, no reconnect attempt is made
+
 private :
    // for linked list
    Connection *link; // link to next
