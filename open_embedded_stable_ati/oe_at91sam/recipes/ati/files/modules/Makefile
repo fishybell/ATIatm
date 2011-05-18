@@ -17,30 +17,43 @@ obj-m := 	target.o \
 			target_generic_output.o \
 			target_hit_poll.o \
 
-PWD := $(shell pwd)
 CURD := $(shell basename `pwd`)
-#EXTRA_CFLAGS += -mfloat-abi=softfp -mfpu=vfp
-CU_FLAGS :=-I/usr/local/var/oe/tmp/work/at91sam9g20ek_2mmc-angstrom-linux-gnueabi/linux-2.6.30-r1/linux-2.6.30/include
+ifeq (${CURD},modules)
+  include files.mk
+endif
 
-default: bit_button user_conn
-#	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
-	make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- -C $(KDIR) SUBDIRS=$(PWD)  modules
+BFILES :=bit_button user_conn fasit_conn event_conn bcast_server bcast_client
+default: ${BFILES}
+	make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- -C ${KDIR} SUBDIRS=${PWD}  modules
 	
-#export	EXTRA_CFLAGS
-
 user_conn: user_conn.c netlink_shared.h netlink_user.h
-    ifeq ($(CURD),modules)
+    ifeq (${CURD},modules)
 		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -g -lnl user_conn.c -o user_conn
     else
 		${CC} ${CFLAGS} ${LDFLAGS} -lnl user_conn.c -o user_conn
     endif
 
 bit_button: bit_button.c netlink_shared.h netlink_user.h
-    ifeq ($(CURD),modules)
+    ifeq (${CURD},modules)
 		arm-angstrom-linux-gnueabi-gcc ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -g -lnl bit_button.c -o bit_button
     else
 		${CC} ${CFLAGS} ${LDFLAGS} -lnl bit_button.c -o bit_button
     endif
 
+fasit_conn: ${FC_C_FILES} ${FC_H_FILES}
+	${CXX} ${CFLAGS} ${LDFLAGS} -DFASIT_CONN ${CI_FLAGS} ${CU_FLAGS} -lnl ${FC_C_FILES} -o fasit_conn
+
+event_conn: ${EC_C_FILES} ${EC_H_FILES}
+	${CXX} ${CFLAGS} ${LDFLAGS} -DEVENT_CONN ${CI_FLAGS} ${CU_FLAGS} -lnl ${EC_C_FILES} -o event_conn
+
+bcast_client: ${EC_DIR}/bcast_client.c ${EC_DIR}/bcast.h
+	${CC} ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -I${EC_DIR} ${EC_DIR}/bcast_client.c -o bcast_client
+
+bcast_server: ${EC_DIR}/bcast_server.c ${EC_DIR}/bcast.h
+	${CC} ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -I${EC_DIR} ${EC_DIR}/bcast_server.c -o bcast_server
+
+
+
 clean:
-	$(RM) .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers user_conn bit_button
+	${RM} .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers ${BFILES}
+
