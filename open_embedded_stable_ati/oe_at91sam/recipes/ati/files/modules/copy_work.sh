@@ -1,5 +1,5 @@
-./copy_work
+./copy_work $1
 cd fasit
-./copy_work
+./copy_work $1
 cd ../connector
-./copy_work
+./copy_work $1
