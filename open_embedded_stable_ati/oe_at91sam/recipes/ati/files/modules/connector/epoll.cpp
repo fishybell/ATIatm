@@ -93,8 +93,6 @@ const char *usage = "Usage: %s [options]\n\
 \t-l X   -- listen on port X rather than the default \n\
 \t-p X   -- connect to port X rather than the default \n\
 \t-i X   -- connect to IP address X\n\
-\t-a     -- connect automatic IP address\n\
-\t-b     -- broadcast automatic IP address\n\
 \t-C     -- initiate a client connection\n\
 \t-h     -- print out usage information\n";
 
