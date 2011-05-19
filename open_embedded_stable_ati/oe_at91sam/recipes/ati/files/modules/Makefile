@@ -56,4 +56,6 @@ bcast_server: ${EC_DIR}/bcast_server.c ${EC_DIR}/bcast.h
 
 clean:
 	${RM} .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers ${BFILES}
+	${MAKE} -C fasit clean
+	${MAKE} -C connector clean
 
