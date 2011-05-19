@@ -94,7 +94,6 @@ FUNCTION_START("::~Connection()")
          llink = tlink; // remember last item
          tlink = tlink->link; // move on to next item
       }
-HERE
    }
 
    IMSG("Closed connection %i\n", fd)
@@ -292,6 +291,7 @@ FUNCTION_START("::handleReady(const epoll_event *ev)")
 
    // have we been marked for deletion?
    if (needDelete) {
+FUNCTION_INT("::handleReady(const epoll_event *ev)", -1)
       return -1; // -1 represents a "delete me" flag
    }
 
