@@ -80,11 +80,11 @@ const char *usage = "Usage: %s [options]\n\
    /* send packet every X seconds */
    while (!close_nicely)
    {
-       /* send packet */
-       if (sendto(sender, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr, sizeof(serveraddr)) == -1)
+       /* send packet on avahi address first (it's the most likely to fail) */
+       if (sendto(sender, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr_avahi, sizeof(serveraddr_avahi)) == -1)
        {
-           /* try to send on avahi address */
-           if (errno != ENETUNREACH || sendto(sender, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr_avahi, sizeof(serveraddr_avahi)) == -1) {
+           /* try to send on normal address (both exist on a wifi MIT/MAT) */
+           if (errno != ENETUNREACH || sendto(sender, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr, sizeof(serveraddr)) == -1) {
               perror("Server-sendto() error");
            }
        }
