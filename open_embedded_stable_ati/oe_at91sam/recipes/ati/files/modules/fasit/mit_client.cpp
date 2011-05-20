@@ -260,10 +260,10 @@ FUNCTION_START("::handle_2100(int start, int end)")
                doMove(0, 0);
                break;
             case 1:
-               doMove(ceil(ntohf(msg->speed)), 1);
+               doMove(ntohf(msg->speed), 1);
                break;
             case 2:
-               doMove(ceil(ntohf(msg->speed)), -1);
+               doMove(ntohf(msg->speed), -1);
                break;
          }
          break;
