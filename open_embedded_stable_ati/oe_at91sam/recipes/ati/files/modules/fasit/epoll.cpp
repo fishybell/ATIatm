@@ -118,10 +118,10 @@ void setnonblocking(int sock) {
 FUNCTION_START("setnonblocking(int sock)")
    int opts, yes=1;
 
-   if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int) < 0)) { // set keepalive so we disconnect on link failure or timeout
-      perror("setsockopt(SO_REUSEADDR)");
-      exit(EXIT_FAILURE);
-   }
+//   if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int) < 0)) { // set keepalive so we disconnect on link failure or timeout
+//      perror("setsockopt(SO_KEEPALIVE)");
+//      exit(EXIT_FAILURE);
+//   }
    opts = fcntl(sock, F_GETFL); // grab existing flags
    if (opts < 0) {
       perror("fcntl(F_GETFL)");
@@ -254,7 +254,7 @@ const char *usage = "Usage: %s [options]\n\
    memset(&ev, 0, sizeof(ev));
    ev.events = EPOLLIN;
    // listen to the listener
-   ev.data.ptr = NULL; // indicates listener fd
+   ev.data.fd = listener; // indicates listener fd
    if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, listener, &ev) < 0) {
       IERROR("epoll listener insertion error: fd=%d\n", listener)
       return 1;
@@ -304,11 +304,12 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
       }
 
       for(n = 0; n < nfds; ++n) {
-         if(events[n].data.ptr == NULL) { // NULL inidicates the listener fd
+         if(events[n].data.fd == listener) { // listener looks at fd, not ptr
             addrlen = sizeof(local);
             client = accept(listener, (struct sockaddr *) &local,
                         &addrlen);
-            if(client < 0){
+            IMSG("Accepted new client %i\n", client)
+            if(client <= 0){
                perror("accept");
                continue;
             }
@@ -332,8 +333,7 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
                IERROR("epoll set insertion error: fd=%d\n", client)
                return 1;
             }
-            IMSG("Accepted new client %i\n", client)
-         } else {
+         } else if (events[n].data.ptr != NULL) {
             Connection *conn = (Connection*)events[n].data.ptr;
             int ret = conn->handleReady(&events[n]);
             if (ret == -1) {
@@ -342,6 +342,8 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
                   delete conn;
                }
             }
+         } else {
+            perror("ERROR: epoll null:");
          }
       }
    }
