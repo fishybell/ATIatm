@@ -121,10 +121,10 @@ static void move_event_internal(int etype, bool upload) {
     switch (etype) {
         case EVENT_MOVE:
         case EVENT_MOVING:
-            mod_timer(&moved_timer, jiffies+((MOVED_DELAY*HZ)/1000)); // wait for X milliseconds for sensor to settle
+            mod_timer(&moved_timer, jiffies+(((MOVED_DELAY/2)*HZ)/1000)); // wait for X milliseconds for sensor to settle
             break;
         case EVENT_STOPPED:
-            mod_timer(&moved_timer, jiffies+((MOVED_DELAY*HZ)/1000)); // wait for X milliseconds for sensor to settle
+            mod_timer(&moved_timer, jiffies+(((MOVED_DELAY*4)*HZ)/1000)); // wait for X milliseconds for sensor to settle
             schedule_work(&position_work);
             break;
         case EVENT_POSITION:
