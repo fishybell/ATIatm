@@ -728,7 +728,7 @@ void hit_event(int line) {
 void hit_event_internal(int line, bool upload) {
     struct hit_item *new_hit;
     int stay_up = 1;
-    u8 hits = 0;
+    u8 hits = 0, kdata;
     delay_printk("hit_event(%i)\n", line);
 
     // create event
@@ -775,7 +775,7 @@ void hit_event_internal(int line, bool upload) {
         generic_output_event(EVENT_KILL);
 
         // send kill upstream (always, no matter what the upload value is)
-        u8 kdata = EVENT_KILL; // cast to 8-bits
+        kdata = EVENT_KILL; // cast to 8-bits
         queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
         
         // bob if we need to bob
