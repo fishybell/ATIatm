@@ -20,6 +20,7 @@ public :
    // SIT attachment commands
    bool hasSIT(); // returns true when a FASIT_TCP object has been successfully attached as a SIT
    FASIT_TCP *addSIT(int fd); // attempt to attach a socket as a SIT
+   void delSIT(); // the SIT disconnected
 
    // individual commands
    void didFailure(int type); // experienced failure "type"
@@ -90,6 +91,7 @@ public :
 
    // for when a SIT isn't really connected this will not queue anything
    virtual void queueMsg(const char *msg, int size);
+   void queueMsg(const void *msg, int size) {queueMsg((const char*)msg, size);} // auto-cast for various data pointers
 
 protected:
    // individual fasit message handlers, all return -1 if the connection needs to be
@@ -130,7 +132,7 @@ public:
    void didStop(); // received immediate stop response
 
 private:
-   MIT_Client *sit_client;
+   MIT_Client *mit_client;
 };
 
 #endif

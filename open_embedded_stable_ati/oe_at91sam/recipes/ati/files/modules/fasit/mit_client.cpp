@@ -2,6 +2,7 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <math.h>
 
 using namespace std;
 
@@ -47,7 +48,34 @@ FUNCTION_END("::~MIT_Client()")
 void MIT_Client::fillStatus2102(FASIT_2102 *msg) {
 FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
 
-   // TODO -- fill with MIT status and lastSITstatus
+   // start with zeroes
+   memset(msg, 0, sizeof(FASIT_2102));
+
+   // fill out as response
+   msg->response.rnum = resp_num;
+   msg->response.rseq = resp_seq;
+   resp_num = resp_seq = 0; // the next one will be unsolicited
+
+   // exposure
+   msg->body.exp = lastSITstatus.body.exp;
+   msg->body.asp = lastSITstatus.body.asp;
+   
+   // movement
+   msg->body.dir = 0; // not a trackless design, never facing any direction
+   switch (lastDirection) {
+      case 0: msg->body.move = 0; break; // stopped
+      case 1: msg->body.move = 1; break; // forward
+      case -1: msg->body.move = 2; break; // reverse
+   }
+   msg->body.speed = htonf((float)lastSpeed);
+   msg->body.pos = htons(feetToMeters(lastPosition));
+
+   // device type
+   msg->body.type = 2; // MIT. TODO -- MIT vs. MAT
+
+   // hit record
+   msg->body.hit = lastSITstatus.body.hit;
+   msg->body.hit_conf = lastSITstatus.body.hit_conf;
 
 FUNCTION_END("::fillStatus2102(FASIT_2102 *msg)")
 }
@@ -106,10 +134,24 @@ FUNCTION_START("::addSIT(int fd)")
    hdr.length = htons(sizeof(FASIT_header));
 
    // send
-   queueMsg(&hdr, sizeof(FASIT_header));
+   att_SIT->queueMsg(&hdr, sizeof(FASIT_header));
 
 FUNCTION_HEX("::addSIT(int fd)", att_SIT)
    return (FASIT_TCP*)att_SIT;
+}
+
+// the SIT has become disconnected
+void MIT_Client::delSIT() {
+FUNCTION_START("::delSIT()")
+
+   // delete SIT connection points
+   // TODO -- clear lastSIT* ?
+
+   // create a new dummy SIT 
+   att_SIT = new attached_SIT_Client(NULL, 0, -1); // invalid tnum
+   server = att_SIT;
+
+FUNCTION_END("::delSIT()")
 }
 
 
@@ -124,7 +166,26 @@ FUNCTION_START("::handle_2111(FASIT_2111 *msg)")
    // remember 2111 values
    lastSITdevcaps = *msg;
 
-   // TODO -- disconnect from range computer and reconnect
+   // disconnect from range computer and reconnect
+   //reconnect(); // this will force the server to re-request the 2111 message, but now it will be filled in
+
+   // send unsolicited 2111 with updated data -- TODO -- see how badly this violates the spec
+   FASIT_header rhdr;
+   FASIT_2111 rmsg;
+   defHeader(2111, &rhdr); // sets the sequence number and other data
+   rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2111));
+   
+   // set response (unsolicited)
+   rmsg.response.rnum = 0;
+   rmsg.response.rseq = 0;
+
+   // fill message
+   rmsg.body.devid = getDevID();
+   rmsg.body.flags = lastSITdevcaps.body.flags; // the MIT has no flags of its own -- TODO -- unless we have GPS
+
+   // send
+   queueMsg(&rhdr, sizeof(FASIT_header));
+   queueMsg(&rmsg, sizeof(FASIT_2111));
 
 FUNCTION_END("::handle_2111(FASIT_2111 *msg)")
 }
@@ -162,7 +223,7 @@ FUNCTION_START("::handle_100(int start, int end)")
 
    // fill message
    msg.body.devid = getDevID();
-   // TODO -- fill with lastSITdevcaps
+   msg.body.flags = lastSITdevcaps.body.flags; // the MIT has no flags of its own -- TODO -- unless we have GPS
 
    // grab current values from kernel
    if (lastPosition == 0 && lastDirection == 0 && lastSpeed == 0) {
@@ -184,8 +245,36 @@ FUNCTION_START("::handle_2100(int start, int end)")
    // do handling of message
    IMSG("Handling 2100 in MIT\n");
 
-   // TODO -- handle move commands here
-   // TODO -- pass lift commands to SIT
+   // map header and body for both message and response
+   FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+   FASIT_2100 *msg = (FASIT_2100*)(rbuf + start + sizeof(FASIT_header));
+
+   // TODO -- handle other commands here
+   switch (msg->cid) {
+      case CID_Move_Request:
+		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
+	     send_2101_ACK(hdr,'S');
+         
+         switch (msg->move) {
+            case 0:
+               doMove(0, 0);
+               break;
+            case 1:
+               doMove(ceil(ntohf(msg->speed)), 1);
+               break;
+            case 2:
+               doMove(ceil(ntohf(msg->speed)), -1);
+               break;
+         }
+         break;
+   }
+
+   // pass lift commands to SIT
+   if (hasSIT()) {
+DMSG("Passing command to SIT\n");
+      att_SIT->queueMsg(hdr, sizeof(FASIT_header));
+      att_SIT->queueMsg(msg, sizeof(FASIT_2100));
+   }
 
 FUNCTION_INT("::handle_2100(int start, int end)", 0)
    return 0;
@@ -257,7 +346,11 @@ FUNCTION_END("::doPosition()")
 void MIT_Client::didPosition(int pos) {
 FUNCTION_START("::didPosition(int pos)")
 
-   // TODO -- remember position value, send status if changed
+   // remember position value, send status if changed
+   if (pos != lastPosition) {
+      lastPosition = pos;
+      sendStatus2102();
+   }
 
 FUNCTION_END("::didPosition(int pos)")
 }
@@ -265,6 +358,7 @@ FUNCTION_END("::didPosition(int pos)")
 // start movement or change movement
 void MIT_Client::doMove(int speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
 FUNCTION_START("::doMove(int speed, int direction)")
+   DMSG("Moving %i %i\n", speed, direction);
    // pass directly to kernel for actual action
    if (nl_conn != NULL) {
       nl_conn->doMove(speed, direction);
@@ -286,7 +380,12 @@ FUNCTION_END("::doMove()")
 void MIT_Client::didMove(int speed, int direction) {
 FUNCTION_START("::didMove(int direction)")
 
-   // TODO -- remember speed/direction values, send status if changed
+   // remember speed/direction values, send status if changed
+   if (speed != lastSpeed || direction != lastDirection) {
+      lastSpeed = speed;
+      lastDirection = direction;
+      sendStatus2102();
+   }
 
 FUNCTION_END("::didMove(int direction)")
 }
@@ -323,6 +422,11 @@ FUNCTION_END("::attached_SIT_Client(MIT_Client *mit, int fd, int tnum)  : FASIT_
 
 attached_SIT_Client::~attached_SIT_Client() {
 FUNCTION_START("::~attached_SIT_Client()")
+   // tell MIT we've been lost
+   if (mit_client != NULL) {
+      mit_client->delSIT();
+      client = NULL; // so we don't propogate our delete
+   }
 FUNCTION_END("::~attached_SIT_Client()")
 }
 
@@ -378,7 +482,7 @@ FUNCTION_INT("::handle_2102(int start, int end)", 0)
 MIT_Conn::MIT_Conn(struct nl_handle *handle, MIT_Client *client, int family) : NL_Conn(handle, client, family) {
 FUNCTION_START("::MIT_Conn(struct nl_handle *handle, TCP_Client *client, int family) : NL_Conn(handle, client, family)")
 
-   sit_client = client;
+   mit_client = client;
 
 FUNCTION_END("::MIT_Conn(struct nl_handle *handle, TCP_Client *client, int family) : NL_Conn(handle, client, family)")
 }
@@ -407,18 +511,48 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
          }
 
          break;
+
+      case NL_C_MOVE :
+         genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+
+         if (attrs[GEN_INT8_A_MSG]) {
+            // moving at # mph
+            int value = nla_get_u8(attrs[GEN_INT8_A_MSG]) - 128; // message was unsigned, fix it
+            // convert to absolute speed and a direction
+            if (value < 0) {
+               mit_client->didMove(-1*value, -1);
+            } else if (value > 0) {
+               mit_client->didMove(value, 1);
+            } else {
+               mit_client->didMove(0, 0);
+            }
+         }
+         break;
+
+      case NL_C_POSITION :
+         genlmsg_parse(nlh, 0, attrs, GEN_INT16_A_MAX, generic_int16_policy);
+
+         if (attrs[GEN_INT16_A_MSG]) {
+            // # feet from home
+            int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
+            mit_client->didPosition(value);
+         }
+
+         break;
+
       case NL_C_BATTERY:
          genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
 
          if (attrs[GEN_INT8_A_MSG]) {
             // received change in battery value
             int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-            sit_client->didBattery(value); // tell client
+            mit_client->didBattery(value); // tell client
          }
          break;
+
       case NL_C_STOP:
          // received emergency stop response
-         sit_client->didStop(); // tell client
+         mit_client->didStop(); // tell client
          break;
    }
  
