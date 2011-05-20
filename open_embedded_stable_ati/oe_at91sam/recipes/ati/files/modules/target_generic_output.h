@@ -92,6 +92,7 @@ typedef enum {
     EVENT_DOWN,		// finished lowering
     EVENT_MOVE,		// start of move
     EVENT_MOVING,	// reached target speed
+    EVENT_POSITION,	// changed position
     EVENT_COAST,	// started coast
     EVENT_STOP,		// started stopping
     EVENT_STOPPED,	// finished stopping

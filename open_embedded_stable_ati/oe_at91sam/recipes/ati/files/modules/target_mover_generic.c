@@ -1942,6 +1942,7 @@ static void do_position(struct work_struct * work)
         if (abs(atomic_read(&position_old) - atomic_read(&position)) > (TICKS_PER_LEG[mover_type]/TICKS_DIV/2))
             {
             atomic_set(&position_old, atomic_read(&position)); 
+            do_event(EVENT_POSITION); // notify mover driver
             target_sysfs_notify(&target_device_mover_generic, "position");
             }
         }

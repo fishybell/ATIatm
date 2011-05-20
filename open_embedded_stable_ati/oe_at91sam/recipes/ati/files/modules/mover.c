@@ -127,6 +127,9 @@ static void move_event_internal(int etype, bool upload) {
             mod_timer(&moved_timer, jiffies+((MOVED_DELAY*HZ)/1000)); // wait for X milliseconds for sensor to settle
             schedule_work(&position_work);
             break;
+        case EVENT_POSITION:
+            schedule_work(&position_work);
+            break;
     }
 }
 
