@@ -214,8 +214,6 @@ FUNCTION_INT("::handle_2000(int start, int end)", 0)
    return 0;
 }
 
-// should never be recieved, only sent
-#if 0
 int SIT_Client::handle_2004(int start, int end) {
 FUNCTION_START("::handle_2004(int start, int end)")
 
@@ -225,10 +223,7 @@ FUNCTION_START("::handle_2004(int start, int end)")
 FUNCTION_INT("::handle_2004(int start, int end)", 0)
    return 0;
 }
-#endif
 
-// should never be recieved, only sent
-#if 0
 int SIT_Client::handle_2005(int start, int end) {
 FUNCTION_START("::handle_2005(int start, int end)")
 
@@ -238,11 +233,8 @@ FUNCTION_START("::handle_2005(int start, int end)")
 FUNCTION_INT("::handle_2005(int start, int end)", 0)
    return 0;
 }
-#endif
 
 
-// should never be recieved, only sent
-#if 0
 int SIT_Client::handle_2006(int start, int end) {
 FUNCTION_START("::handle_2006(int start, int end)")
 
@@ -251,38 +243,6 @@ FUNCTION_START("::handle_2006(int start, int end)")
 
 FUNCTION_INT("::handle_2006(int start, int end)", 0)
    return 0;
-}
-#endif
-
-//
-//   Command Acknowledge
-//
-//   Since we seem to ack from a bunch of places, better to have a funciton
-//
-int SIT_Client::send_2101_ACK(FASIT_header *hdr,int response) {
-   FUNCTION_START("::send_2101_ACK(FASIT_header *hdr,int response)")
-
-   // do handling of message
-	 IMSG("sending 2101 ACK in SIT\n");
-   FASIT_header rhdr;
-   FASIT_2101 rmsg;
-   // build the response - some CID's just reply 2101 with 'S' for received and complied 
-   // and 'F' for Received and Cannot comply
-   // other Command ID's send other messages
-
-   defHeader(2101, &rhdr); // sets the sequence number and other data
-   rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2101));
-
-   // set response
-   rmsg.response.rnum = htons(hdr->num);	//  pulls the message number from the header
-   rmsg.response.rseq = hdr->seq;		
-
-   rmsg.body.resp = response;	// The actual response code 'S'=can do, 'F'=Can't do
-   queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
-   queueMsg(&rmsg, sizeof(FASIT_2101));
-
-   FUNCTION_INT("::send_2101_ACK(FASIT_header *hdr,int response)",0);
-	 return 0;
 }
 
 //
@@ -402,8 +362,6 @@ int SIT_Client::handle_2101(int start, int end) {
 }
 
 
-// should never be recieved, only sent
-#if 0
 int SIT_Client::handle_2102(int start, int end) {
 FUNCTION_START("::handle_2102(int start, int end)")
 
@@ -413,7 +371,6 @@ FUNCTION_START("::handle_2102(int start, int end)")
 FUNCTION_INT("::handle_2102(int start, int end)", 0)
    return 0;
 }
-#endif
 
 //
 //  Configure Muzzle Flash
@@ -459,8 +416,6 @@ FUNCTION_INT("::handle_2110(int start, int end)", 0)
    return 0;
 }
 
-// should never be recieved, only sent
-#if 0
 int SIT_Client::handle_2111(int start, int end) {
    FUNCTION_START("::handle_2111(int start, int end)")
 
@@ -470,11 +425,8 @@ int SIT_Client::handle_2111(int start, int end) {
    FUNCTION_INT("::handle_2111(int start, int end)", 0)
 	 return 0;
 }
-#endif
 
 
-// should never be recieved, only sent
-#if 0
 int SIT_Client::handle_2112(int start, int end) {
 FUNCTION_START("::handle_2112(int start, int end)")
 
@@ -484,7 +436,6 @@ FUNCTION_START("::handle_2112(int start, int end)")
 FUNCTION_INT("::handle_2112(int start, int end)", 0)
    return 0;
 }
-#endif
 
 int SIT_Client::handle_2113(int start, int end) {
 FUNCTION_START("::handle_2113(int start, int end)")
@@ -506,8 +457,6 @@ int SIT_Client::handle_2114(int start, int end) {
 	 return 0;
 }
 
-// should never be recieved, only sent
-#if 0
 int SIT_Client::handle_2115(int start, int end) {
    FUNCTION_START("::handle_2115(int start, int end)")
 
@@ -517,7 +466,6 @@ int SIT_Client::handle_2115(int start, int end) {
    FUNCTION_INT("::handle_2115(int start, int end)", 0)
 	 return 0;
 }
-#endif
 
 
 /***********************************************************
