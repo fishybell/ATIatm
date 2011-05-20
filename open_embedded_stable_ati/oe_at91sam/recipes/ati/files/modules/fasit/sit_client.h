@@ -68,8 +68,6 @@ protected:
    int handle_2112(int start, int end);
    int handle_2113(int start, int end);
    
-   int send_2101_ACK(FASIT_header *hdr, int response);
-   
 private:
    class SIT_Conn *nl_conn;
 
