@@ -153,6 +153,21 @@ inline float ntohf(const float &f) {
 
 #define htonf(f) (ntohf(f))
 
+// helper function to convert feet to meters
+inline int feetToMeters(const int &feet) {
+   // fixed point feet/3.28
+   int meters = feet * 100;
+   meters /= 328;
+   return meters;
+}
+
+// helper function to convert meters to feet
+inline int metersToFeet(const int &meters) {
+   // fixed point meters*3.28
+   int feet = meters * 328;
+   feet /= 100;
+   return feet;
+}
 
 #endif
 
