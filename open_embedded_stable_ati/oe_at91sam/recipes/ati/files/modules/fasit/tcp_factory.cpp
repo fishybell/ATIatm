@@ -108,18 +108,21 @@ FUNCTION_START("::newConn()")
 
    // grab new socket file descriptor
    int sock = newClientSock();
-   if (sock == -1) {
-FUNCTION_HEX("::newConn()", NULL)
-      return NULL;
-   }
 
-   // create new TCP_Class (with predefined tnum) and to our epoll list
+   // create new TCP_Class (with predefined tnum)
    TCP_Class *tcp = new TCP_Class(sock, findNextTnum());
 DMSG("Created new connection %i with tnum %i\n", tcp->getFD(), tcp->getTnum())
-   if (!addToEPoll(tcp->getFD(), tcp)) {
-      delete tcp;
+
+   // check to see if it connected and attempt adding to epoll
+   if (sock == -1 || !addToEPoll(tcp->getFD(), tcp)) {
+      // can this call reconnect?
+      if (!tcp->reconnect()) {
+         // no, delete now and return NULL
+         delete tcp;
 FUNCTION_HEX("::newConn()", NULL)
-      return NULL;
+         return NULL;
+      }
+      // yes, it will do so at its own pace
    }
 
    // return the result
