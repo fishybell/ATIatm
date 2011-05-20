@@ -728,6 +728,7 @@ void hit_event(int line) {
 void hit_event_internal(int line, bool upload) {
     struct hit_item *new_hit;
     int stay_up = 1;
+    u8 hits = 0;
     delay_printk("hit_event(%i)\n", line);
 
     // create event
@@ -748,6 +749,19 @@ void hit_event_internal(int line, bool upload) {
         new_hit->line = line;
     }
 
+    // create netlink message for userspace (always, no matter what the upload value is)
+    // get data from log
+    spin_lock(hit_lock);
+    new_hit = hit_chain;
+    while (new_hit != NULL) {
+        hits++; // count hit (doesn't matter which line)
+        new_hit = new_hit->next; // next link in chain
+    }
+    spin_unlock(hit_lock);
+        
+    // send hits upstream
+    queue_nl_multi(NL_C_HITS, &hits, sizeof(hits));
+
     // go down if we need to go down
     if (atomic_read(&hits_to_fall) > 0) {
         stay_up = !atomic_dec_and_test(&fall_counter);
@@ -760,11 +774,9 @@ void hit_event_internal(int line, bool upload) {
         // create events for outputs
         generic_output_event(EVENT_KILL);
 
-        // send kill upstream?
-//        if (upload || etype != EVENT_KILL) {
-            u8 kdata = EVENT_KILL; // cast to 8-bits
-            queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
-//        }
+        // send kill upstream (always, no matter what the upload value is)
+        u8 kdata = EVENT_KILL; // cast to 8-bits
+        queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
         
         // bob if we need to bob
         switch (atomic_read(&after_fall)) {
