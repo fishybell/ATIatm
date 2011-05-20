@@ -411,7 +411,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Toggle target\nFormat: T\n");
                         break;
                     case 'V': case 'v':
-                        snprintf(wbuf, 1024, "Send event to kernel\nFormat: V (0-255)event\nCurrently defined events 0-11:\n0: Start of raise\n1: finished raising\n2: start of lower\n3: finished lowering\n4: start of move\n5: reached target speed\n6: started coast\n7: started stopping\n8: finished stopping\n9: hit\n10: kill\n 11: error\n");
+                        snprintf(wbuf, 1024, "Send event to kernel\nFormat: V (0-255)event\nCurrently defined events 0-11:\n0: Start of raise\n1: finished raising\n2: start of lower\n3: finished lowering\n4: start of move\n5: reached target speed\n6: Changed position\n7: started coast\n8: started stopping\n9: finished stopping\n10: hit\n11: kill\n 12: error\n");
                         break;
                     case 'Y': case 'y':
                         snprintf(wbuf, 1024, "Request hit sensor type\nFormat: Y\nChange hit sensor type\nFormat: Y (0|1|2)mechanical_or_nchs_or_miles (0|1)invert_input_line\n");
