@@ -30,6 +30,7 @@ FUNCTION_START("::reconnect()")
 
    // were we really in need of deletion?
    if (needDelete) {
+FUNCTION_INT("::reconnect()", false)
       return false; // don't reconnect
    }
 
@@ -65,7 +66,7 @@ FUNCTION_START("::handleReconnect()")
    int sock = factory->newClientSock();
    if (sock == -1) {
       // queue another reconnect for 10 seconds from now
-      new ReconTimer(this, RECONNECTION);
+      reconnect();
       return; // we'll be back
    }
 
@@ -74,8 +75,8 @@ FUNCTION_START("::handleReconnect()")
 
    // add back in to epoll
    if (!addToEPoll(sock, this)) {
-      // failure this far along = failure always
-      deleteLater();
+      // queue another reconnect for 10 seconds from now
+      reconnect();
    }
 
 FUNCTION_END("::handleReconnect()")
