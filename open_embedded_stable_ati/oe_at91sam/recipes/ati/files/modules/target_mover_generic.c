@@ -743,7 +743,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
     else
         {
         // Pin A did not go high
-        if ( atomic_read(&o_count) > MAX_OVER )
+        if ( atomic_read(&o_count) >= MAX_OVER )
             {
             atomic_set(&velocity, 0);
             if (atomic_read(&doing_vel) == FALSE)
