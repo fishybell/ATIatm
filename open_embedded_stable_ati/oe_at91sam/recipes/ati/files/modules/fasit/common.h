@@ -46,6 +46,26 @@
 #define TMSG(...)
 #endif
 
+//  colors for the DCMSG  
+#define black	0
+#define red	1
+#define green	2
+#define yellow	3
+#define blue	4
+#define magenta 5
+#define cyan	6
+#define gray	7
+
+//  these are the 'bold/bright' colors
+#define BLACK	8
+#define RED	9
+#define GREEN	10
+#define YELLOW	11
+#define BLUE	12
+#define MAGENTA 13
+#define CYAN	14
+#define GRAY	15
+
 // for run time debugging of application
 #ifdef DEBUG
 #define PRINT_HEXB(data, size) DEBUG && ({ \
@@ -59,11 +79,23 @@
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
 #define BLIP DEBUG && printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); DEBUG && fflush(stdout);
 #define DMSG(...) DEBUG && printf("DEBUG: " __VA_ARGS__); DEBUG && fflush(stdout);
+#define DCMSG(SC, FMT, ...) DEBUG && printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); DEBUG && fflush(stdout);
+#define DCCMSG(SC, EC, FMT, ...) DEBUG && printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); DEBUG && fflush(stdout);
+#define DCOLOR(SC) DEBUG && printf("\x1B[3%d;%dm",SC&7,(SC>>3)&1); DEBUG && fflush(stdout);
+   
+//  here are two usage examples of DCMSG
+//DCMSG(RED,"example of DCMSG macro  with arguments  enum = %d  biff=0x%x",ghdr->cmd,biff) ;
+//DCMSG(blue,"example of DCMSG macro with no args") ;   
+//   I always like to include the trailing ';' so my editor can indent automatically
+
 #else
 #define PRINT_HEXB(data, size)
 #define PRINT_HEX(arg)
 #define BLIP
 #define DMSG(...)
+#define DCMSG(SC, FMT, ...)
+#define DCCMSG(SC, EC, FMT, ...)
+#define DCOLOR(SC)   
 #endif
 
 // for run time information viewing of application

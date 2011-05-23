@@ -98,10 +98,10 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
 
    doHits(-1);	// request the hit count
    
-   IMSG("\x1B[33;1m setting hits to  0x%X \x1B[30;0m \n",hits) ; 
+   DCMSG(YELLOW,"setting hits to  0x%X",hits) ; 
 
    // hit record
-   msg->body.hit = htons(hits);
+   msg->body.hit = htons(hits);		
    msg->body.hit_conf.on = 1; // TODO -- handle off, on/off at position
    switch (lastHitCal.after_fall) {
        case 0: // stay down
@@ -124,12 +124,14 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
    }
    if (lastHitCal.seperation < 500) { // TODO -- valid seperation point for single/burst
          msg->body.hit_conf.mode = 1; // single
-         msg->body.hit_conf.burst = htons(250); // TODO -- max burst seperation
+	 msg->body.hit_conf.burst = htons(250); // TODO -- max burst DCMSGseperation
+	 DCMSG(YELLOW,"set seperation to htons 250=0x%X",msg->body.hit_conf.burst) ;
    } else {
          msg->body.hit_conf.mode = 2; // burst
          msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
+	 DCMSG(YELLOW,"set seperation to  htons LHC=0x%X",msg->body.hit_conf.burst) ;
    }
-   IMSG("\x1B[33;1m set seperation to   LHC=0x%X \x1B[30;0m \n",lastHitCal.seperation) ;
+
    
 FUNCTION_END("::fillStatus2102(FASIT_2102 *msg)")
 }
@@ -143,12 +145,8 @@ FUNCTION_START("::sendStatus2102()")
    defHeader(2102, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2102));
 
-
-   IMSG("\x1B[36;1m    before fillStatus \n") ;
    // fill message
    fillStatus2102(&msg); // fills in status values with current values
-   IMSG("\x1B[30;0m    fillStatus done \n") ;
-
 
    // send
    queueMsg(&hdr, sizeof(FASIT_header));
@@ -263,7 +261,6 @@ FUNCTION_START("::handle_2100(int start, int end)")
 
    // do handling of message
    IMSG("Handling 2100 in SIT\n");
-   TMSG("\x1B[34;1m checking colors to 0x%X \x1B[30;0m \n",0x9876) ; 
 
    // map header and body for both message and response
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
@@ -340,17 +337,19 @@ FUNCTION_START("::handle_2100(int start, int end)")
 		 // which is setting the values in the hit_calibration structure
 		 // uses the lastHitCal so what we set is recorded
 		 // there are fields that don't match up
-	     lastHitCal.seperation = msg->burst;
-	     TMSG("\x1B[34;1m setting lasthitcal.seperation to 0x%X \x1B[30;0m \n", msg->burst) ; 
-		 lastHitCal.sensitivity = msg->sens;
+
+	     // TODO I believe a 2100 config hit sensor is supposed to set the hit count
+	     lastHitCal.seperation = htons(msg->burst);
+	     DCMSG(BLUE,"setting lasthitcal.seperation to 0x%X", htons(msg->burst)) ; 
+	     lastHitCal.sensitivity = htons(msg->sens);
 //		 lastHitCal.blank_time = 500; // half a second blanking
-		 lastHitCal.hits_to_fall = msg->tokill; 
-		 lastHitCal.after_fall = msg->react;	// 0 for stay down
-		 lastHitCal.type = msg->mode;			// mechanical sensor
+	     lastHitCal.hits_to_fall = htons(msg->tokill); 
+	     lastHitCal.after_fall = msg->react;	// 0 for stay down
+	     lastHitCal.type = msg->mode;			// mechanical sensor
 //		 lastHitCal.invert = 0; // don't invert sensor input line
-		 doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
+	     doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
 	 
-		 break;
+	     break;
 
 	  case CID_GPS_Location_Request:
 	     send_2101_ACK(hdr,'F');
@@ -646,19 +645,20 @@ void SIT_Client::getAcc_C(struct accessory_conf *acc_c) {
 
 // change received hits to "num" (usually to 0 for reset)
 void SIT_Client::doHits(int num) {
-   IMSG("\x1B[36;1m") ; // change color
+
+   DCOLOR(CYAN) ; // change color
 FUNCTION_START("SIT_Client::doHits(int num)")
    // pass directly to kernel for actual action
    if (hasPair()) {
       nl_conn->doHits(num);
    }
    FUNCTION_END("SIT_Client::doHits(int num)") ;
-   IMSG("\x1B[30;0m") ; // change color
+   DCOLOR(black) ; // change color
 }
 
 // received "num" hits
 void SIT_Client::didHits(int num) {
-   IMSG("\x1B[36;1m") ; // change color
+   DCOLOR(CYAN) ; // change color
 FUNCTION_START("SIT_Client::didHits(int num)")
 
 
@@ -674,7 +674,8 @@ FUNCTION_START("SIT_Client::didHits(int num)")
    }
 
 FUNCTION_END("SIT_Client::didHits(int num)")
-IMSG("\x1B[30;0m \n") ; // chang color to black
+DCOLOR(black) ; // change color
+
 }
 
 // change MSDH data
@@ -769,14 +770,12 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
    struct nlmsghdr *nlh = nlmsg_hdr(msg);
    struct genlmsghdr *ghdr = static_cast<genlmsghdr*>(nlmsg_data(nlh));
 
-   IMSG("\x1B[31;1m  parseData switch on netlink command enum of %d \x1B[30;0m\n",ghdr->cmd) ;
-   
+   DCMSG(GREEN,"parseData switch on netlink command enum of %d",ghdr->cmd) ;
    // parse message and call individual commands as needed
    switch (ghdr->cmd) {
       case NL_C_FAILURE:
          genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_string_policy);
-
-	 IMSG("\x1B[31;1m  parseData case NL_C_EXPOSE: attrs = %d \x1B[30;0m\n",attrs[GEN_STRING_A_MSG]) ;
+	 DCMSG(RED,"parseData case NL_C_FAILURE: attrs = 0x%x",attrs[GEN_STRING_A_MSG]) ;
 
          // TODO -- failure messages need decodable data
          if (attrs[GEN_STRING_A_MSG]) {
@@ -787,8 +786,7 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
          break;
       case NL_C_EXPOSE:
          genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
-
-	 IMSG("\x1B[31;1m  parseData case NL_C_EXPOSE: attrs = %d \x1B[30;0m\n",attrs[GEN_INT8_A_MSG]) ;
+	 DCMSG(green,"parseData case NL_C_EXPOSE: attrs = 0x%x",attrs[GEN_INT8_A_MSG]) ;
 	 
          if (attrs[GEN_INT8_A_MSG]) {
             // received change in exposure
@@ -808,7 +806,7 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
          break;
       case NL_C_BATTERY:
          genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
-	 IMSG("\x1B[31;1m  parseData case NL_C_BATTERY: attrs = %d \x1B[30;0m\n",attrs[GEN_INT8_A_MSG]) ;
+	 DCMSG(BLUE,"parseData case NL_C_BATTERY: attrs = 0x%x",attrs[GEN_INT8_A_MSG]) ;
 
          if (attrs[GEN_INT8_A_MSG]) {
             // received change in battery value
@@ -817,15 +815,14 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
          }
          break;
       case NL_C_STOP:
-	 IMSG("\x1B[31;1m  parseData case NL_C_STOP: \x1B[30;0m\n") ;
+	 DCMSG(magenta,"parseData case NL_C_STOP: ") ;
 	 
          // received emergency stop response
          sit_client->didStop(); // tell client
          break;
       case NL_C_HIT_CAL:
 	 genlmsg_parse(nlh, 0, attrs, HIT_A_MAX, hit_calibration_policy);
-	 
-	 IMSG("\x1B[31;1m  parseData case NL_C_HIT_CAL: attrs = %d \x1B[30;0m\n",attrs[HIT_A_MSG]) ;
+	 DCMSG(CYAN,"parseData case NL_C_HIT_CAL: attrs = 0x%x",attrs[HIT_A_MSG]) ;
 	 
          if (attrs[HIT_A_MSG]) {
             // received calibration data
@@ -840,7 +837,8 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
                      break;
                   case HIT_OVERWRITE_CAL:
                   case HIT_GET_CAL:
-                     lastHitCal.seperation = hit_c->seperation;
+		     lastHitCal.seperation = hit_c->seperation;
+		     DCMSG(BLUE,"setting lasthitcal.seperation to 0x%X",hit_c->seperation) ; 		     
                      lastHitCal.sensitivity = hit_c->sensitivity;
                      lastHitCal.blank_time = hit_c->blank_time;
                      break;
@@ -867,20 +865,20 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
          
          break;
       case NL_C_HITS:
-         genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_string_policy);
-	 IMSG("\x1B[31;1m  parseData case NL_C_HITS: attrs = %d \x1B[30;0m\n",attrs[GEN_INT8_A_MSG]) ;
+	 genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+	 DCMSG(RED,"parseData case NL_C_HITS: attrs = 0x%x ",attrs[GEN_INT8_A_MSG]) ;
          if (attrs[GEN_INT8_A_MSG]) {
             // received hit count
 	    int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
 	    
-	    IMSG("\x1B[31;1m  parseData got a HIT COUNT of %d \x1B[30;0m\n",value) ;
+	    DCMSG(RED,"parseData got a HIT COUNT of %d",value) ;
             sit_client->didHits(value); // tell client
          }
 
          break;
       case NL_C_ACCESSORY:
          genlmsg_parse(nlh, 0, attrs, ACC_A_MAX, accessory_conf_policy);
-	 IMSG("\x1B[31;1m  parseData case NL_C_ACCESSORY: attrs = %d \x1B[30;0m\n",attrs[ACC_A_MSG]) ;
+	 DCMSG(MAGENTA,"parseData case NL_C_ACCESSORY: attrs = 0x%x ",attrs[ACC_A_MSG]) ;
 
          if (attrs[ACC_A_MSG]) {
             // received calibration data
@@ -892,7 +890,7 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
                case ACC_SMOKE:
                case ACC_THERMAL:
                case ACC_SES:
-                  DMSG("Unsupported accesory message: %i\n", acc_c->acc_type)
+                  DCMSG(RED,"Unsupported accesory message: %i\n", acc_c->acc_type)
                   break;
                case ACC_NES_MFS:
 		  // MFS on when activate on exposure is set (flash type/burst mode in ex_data1)

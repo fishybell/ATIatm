@@ -342,7 +342,7 @@ FUNCTION_END("::makeWritable(bool writable)")
 //   preempted, the caller may call this function multiple times to create a complete
 //   message and be sure that the entire message is sent
 void Connection::queueMsg(const char *msg, int size) {
-FUNCTION_START("::queueMsg(char *msg, int size)")
+FUNCTION_START("Connection::queueMsg(char *msg, int size)")
 DMSG("df %i queued %i bytes:\n", fd, size)
 PRINT_HEXB(msg, size)
    if (wsize > 0) {
@@ -362,7 +362,7 @@ PRINT_HEXB(msg, size)
 
    // set this connection to watch for writability
    makeWritable(true);
-FUNCTION_END("::queueMsg(char *msg, int size)")
+FUNCTION_END("Connection::queueMsg(char *msg, int size)")
 }
 
 bool Connection::addToEPoll(int fd, void *ptr) {

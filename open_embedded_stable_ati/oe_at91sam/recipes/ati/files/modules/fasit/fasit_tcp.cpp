@@ -486,7 +486,7 @@ int FASIT_TCP::send_2101_ACK(FASIT_header *hdr,int response) {
    rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2101));
 
    // set response
-   rmsg.response.rnum = htons(hdr->num);	//  pulls the message number from the header
+   rmsg.response.rnum = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
    rmsg.response.rseq = hdr->seq;		
 
    rmsg.body.resp = response;	// The actual response code 'S'=can do, 'F'=Can't do
