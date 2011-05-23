@@ -66,30 +66,30 @@ FUNCTION_END("::~NL_Conn()")
 
 // the file descriptor is ready to give us data, read as much as possible (max of BUF_SIZE)
 int NL_Conn::handleRead(const epoll_event *ev) {
-FUNCTION_START("::handleRead(const epoll_event *ev)")
+FUNCTION_START("NL_Conn::handleRead(const epoll_event *ev)")
 
    // call the callback functions for this message now (if full message received)
    nl_recvmsgs_default(handle);
 
-FUNCTION_INT("::handleRead(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleRead(const epoll_event *ev)", 0)
    return 0;
 }
 
 // the file descriptor is ready to receive the data, send it on through
 int NL_Conn::handleWrite(const epoll_event *ev) {
-FUNCTION_START("::handleWrite(const epoll_event *ev)")
+FUNCTION_START("NL_Conn::handleWrite(const epoll_event *ev)")
 
    // are we ready for message sending?
    if (handle == NULL || client == NULL) {
       makeWritable(false);
-FUNCTION_INT("::handleWrite(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
       return 0;
    }
 
    // do we have anything to write?
    if (outq.empty()) {
       makeWritable(false);
-FUNCTION_INT("::handleWrite(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
       return 0;
    }
 
@@ -104,11 +104,11 @@ FUNCTION_INT("::handleWrite(const epoll_event *ev)", 0)
       makeWritable(false); // hold off until the timer times out
       
       // leave at front of queue
-FUNCTION_INT("::handleWrite(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
       return 0;
    } else if (retval < 0) {
       // our netlink connection is broken, kill it
-FUNCTION_INT("::handleWrite(const epoll_event *ev)", -1)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", -1)
       return -1;
    }
 
@@ -118,7 +118,7 @@ FUNCTION_INT("::handleWrite(const epoll_event *ev)", -1)
    // delete the front queue item
    outq.pop_front();
 
-FUNCTION_INT("::handleWrite(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
    return 0;
 }
 
@@ -127,10 +127,10 @@ FUNCTION_INT("::handleWrite(const epoll_event *ev)", 0)
 //   preempted, the caller may call this function multiple times to create a complete
 //   message and be sure that the entire message is sent
 void NL_Conn::queueMsg(struct nl_msg *msg) {
-FUNCTION_START("::queueMsg(struct nl_msg *msg)")
+FUNCTION_START("NL_Conn::queueMsg(struct nl_msg *msg)")
    // don't queue a non message
    if (msg == NULL) {
-FUNCTION_END("::queueMsg(struct nl_msg *msg)")
+FUNCTION_END("NL_Conn::queueMsg(struct nl_msg *msg)")
       return;
    }
 
@@ -140,12 +140,12 @@ FUNCTION_END("::queueMsg(struct nl_msg *msg)")
    // send the message later
    makeWritable(true);
 
-FUNCTION_END("::queueMsg(struct nl_msg *msg)")
+FUNCTION_END("NL_Conn::queueMsg(struct nl_msg *msg)")
 }
 
 // helper for queueing message with arbitrary attribute
 void NL_Conn::queueMsg(int cmd, int att_c, size_t att_t, void *attr) {
-FUNCTION_START("::queueMsg(int cmd, int att_c, size_t att_t, void *attr)")
+FUNCTION_START("NL_Conn::queueMsg(int cmd, int att_c, size_t att_t, void *attr)")
 
    // Create a new netlink message
    struct nl_msg *msg;
@@ -158,12 +158,12 @@ FUNCTION_START("::queueMsg(int cmd, int att_c, size_t att_t, void *attr)")
    // queue message for sending later
    queueMsg(msg);
 
-FUNCTION_END("::queueMsg(int cmd, int att_c, size_t att_t, void *attr)")
+FUNCTION_END("NL_Conn::queueMsg(int cmd, int att_c, size_t att_t, void *attr)")
 }
 
 // helper for queueing message with u8 attribute 
 void NL_Conn::queueMsgU8(int cmd, int attr) {
-FUNCTION_START("::queueMsgU8(int cmd, int attr)")
+FUNCTION_START("NL_Conn::queueMsgU8(int cmd, int attr)")
 
    // Create a new netlink message
    struct nl_msg *msg;
@@ -176,12 +176,12 @@ FUNCTION_START("::queueMsgU8(int cmd, int attr)")
    // queue message for sending later
    queueMsg(msg);
 
-FUNCTION_END("::queueMsgU8(int cmd, int attr)")
+FUNCTION_END("NL_Conn::queueMsgU8(int cmd, int attr)")
 }
 
 // helper for queueing message with u16 attribute 
 void NL_Conn::queueMsgU16(int cmd, int attr) {
-FUNCTION_START("::queueMsgU16(int cmd, int attr)")
+FUNCTION_START("NL_Conn::queueMsgU16(int cmd, int attr)")
 
    // Create a new netlink message
    struct nl_msg *msg;
@@ -194,7 +194,7 @@ FUNCTION_START("::queueMsgU16(int cmd, int attr)")
    // queue message for sending later
    queueMsg(msg);
 
-FUNCTION_END("::queueMsgU16(int cmd, int attr)")
+FUNCTION_END("NL_Conn::queueMsgU16(int cmd, int attr)")
 }
 
 
