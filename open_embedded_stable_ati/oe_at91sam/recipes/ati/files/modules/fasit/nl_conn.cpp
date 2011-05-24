@@ -93,6 +93,7 @@ FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
       return 0;
    }
 
+   DCMSG( MAGENTA,"NL_Conn::handleWrite    is sending a NL message\n");
    // only send the first message in the queue
    struct nl_msg *msg = outq.front();
    int retval = nl_send_auto_complete(handle, msg); // send the message over the netlink handle
