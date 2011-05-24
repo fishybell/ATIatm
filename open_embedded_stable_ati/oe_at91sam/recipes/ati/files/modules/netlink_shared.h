@@ -10,6 +10,8 @@ typedef unsigned short u16;
 typedef unsigned char u8;
 #endif
 
+#define ATI_GROUP 599
+
 /* generic policy with a single string attribute */
 enum {
     GEN_STRING_A_UNSPEC,

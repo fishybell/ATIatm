@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
     handle = nl_handle_alloc();
 
     // join ATI group (for multicast messages)
-    nl_join_groups(handle, 1);
+    nl_join_groups(handle, ATI_GROUP);
 
     // Connect to generic netlink handle on kernel side
     genl_connect(handle);

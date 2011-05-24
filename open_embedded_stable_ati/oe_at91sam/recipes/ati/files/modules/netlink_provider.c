@@ -51,7 +51,7 @@ static struct genl_family provider_gnl_family = {
 
 /* multicast group definition */
 static struct genl_multicast_group nl_event_mcgrp = {
-    .id = 1,
+    .id = ATI_GROUP,
     .name = "ATI",
 };
 
@@ -727,6 +727,7 @@ static int __init gnKernel_init(void) {
         genl_unregister_family(&provider_gnl_family);
         goto failure;
     }
+delay_printk("NL GROUP ID: %i\n", nl_event_mcgrp.id);
     /* register functions (commands) of the new family */
     for (i=NL_C_UNSPEC+1; i<=NL_C_MAX; i++) {
         rc = genl_register_ops(&provider_gnl_family, command_op_map[i]);

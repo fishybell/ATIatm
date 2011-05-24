@@ -211,7 +211,7 @@ FUNCTION_HEX("::newConn(C_Client *client)", NULL)
    }
 
    // set handle to join ATI group (for multicast messages)
-   nl_join_groups(handle, 1); // group 1 is the only one in the ATI family
+   nl_join_groups(handle, ATI_GROUP);
 
    // Connect to generic netlink handle on kernel side
    if (genl_connect(handle) < 0) {
