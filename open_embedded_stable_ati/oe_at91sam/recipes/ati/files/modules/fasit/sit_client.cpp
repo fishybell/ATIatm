@@ -865,8 +865,8 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
          
          break;
       case NL_C_HITS:
-	 genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
-	 DCMSG(RED,"parseData case NL_C_HITS: attrs = 0x%x ",attrs[GEN_INT8_A_MSG]) ;
+         genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+         DCMSG(RED,"parseData case NL_C_HITS: attrs = 0x%x ",attrs[GEN_INT8_A_MSG]) ;
          if (attrs[GEN_INT8_A_MSG]) {
             // received hit count
 	    int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
