@@ -270,23 +270,26 @@ FUNCTION_START("::handle_2100(int start, int end)")
    // do the event that was requested
 
    switch (msg->cid) {
-	  case CID_No_Event:
+      case CID_No_Event:
+	 DCMSG(BLUE,"CID_No_Event  send 'S'uccess ack") ; 
 	     // send 2101 ack
 	     send_2101_ACK(hdr,'S');
-
 		 break;
 
 	  case CID_Reserved01:
 		 // send 2101 ack
+	     DCMSG(BLUE,"CID_Reserved01  send 'F'ailure ack") ;
 	     send_2101_ACK(hdr,'F');
 
 		 break;
 
 	  case CID_Status_Request:
 		 // send 2102 status
+	     DCMSG(BLUE,"CID_Status_Request   send 2102 status") ; 
 		 sendStatus2102();	// sends a 2102   not sure it gets the response number and sequence number right
 		 // AND/OR? send 2115 MILES shootback status if supported
 		 if (acc_conf.acc_type == ACC_NES_MFS){
+		    DCMSG(BLUE,"we also seem to have a MFS Muzzle Flash Simulator - TODO send 2112 status eventually") ; 
 		    HERE;
 		 }
 		 // AND/OR? send 2112 Muzzle Flash status if supported	 
@@ -294,6 +297,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
 		 break;
 
 	  case CID_Expose_Request:
+	     DCMSG(BLUE,"CID_Expose_Request  send 'S'uccess ack.   msg->exp=%d",msg->exp) ; 	     
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
 	     send_2101_ACK(hdr,'S');
 
@@ -311,6 +315,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
 
 	  case CID_Reset_Device:
 		 // send 2101 ack
+	     DCMSG(BLUE,"CID_Reset_Device  send 'S'uccess ack.   set lastHitCal.* to defaults") ;
 	     send_2101_ACK(hdr,'S');
 		 // also supposed to reset all values to the 'initial exercise step value'
 		 //  which I am not sure if it is different than ordinary inital values 
@@ -327,10 +332,12 @@ FUNCTION_START("::handle_2100(int start, int end)")
 
 	  case CID_Move_Request:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
+	     DCMSG(BLUE,"CID_Move_Request  send 'S'uccess ack.   TODO send the move to the kernel?") ;	     
 	     send_2101_ACK(hdr,'S');
 		 break;
 
 	  case CID_Config_Hit_Sensor:
+	     DCMSG(BLUE,"CID_Config_Hit_Sensor  send 'S'uccess ack.   TODO add sending a 2102?") ;	     	     
 	     send_2101_ACK(hdr,'S');
 	     
 		 // send 2102 status - after doing what was commanded
@@ -348,10 +355,12 @@ FUNCTION_START("::handle_2100(int start, int end)")
 	     lastHitCal.type = msg->mode;			// mechanical sensor
 //		 lastHitCal.invert = 0; // don't invert sensor input line
 	     doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
+	     DCMSG(BLUE,"after doHitCal(lastHitCal)   Does that generate a 2102 automagically?") ;	     	     
 	 
 	     break;
 
 	  case CID_GPS_Location_Request:
+	     DCMSG(BLUE,"CID_GPS_Location_Request  send 'F'ailure ack  - because we don't support it") ;
 	     send_2101_ACK(hdr,'F');
 
 		 // send 2113 GPS Location
