@@ -4,7 +4,7 @@
 #define DELAY 3
 
 int main(int argc, char *argv[]) {
-   int sender; // file descriptor
+   int sender1, sender2; // file descriptors
    struct sockaddr_in serveraddr;
    struct sockaddr_in serveraddr_avahi; // address for non-dhcp driven networks 
    int i, yes=1;
@@ -50,16 +50,36 @@ const char *usage = "Usage: %s [options]\n\
    }
 
    /* get the sender */
-   if ((sender = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-      perror("Server-socket() error");
+   if ((sender1 = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+      perror("Server-socket(1) error");
+
+      /*just exit  */
+      return 1;
+   }
+   if ((sender2 = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+      perror("Server-socket(2) error");
 
       /*just exit  */
       return 1;
    }
 
    /* "address already in use" error message */
-   if (setsockopt(sender, SOL_SOCKET, SO_BROADCAST|SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-      perror("Server-setsockopt() error");
+   if (setsockopt(sender1, SOL_SOCKET, SO_BROADCAST|SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+      perror("Server-setsockopt(1) error");
+      return 1;
+   }
+   if (setsockopt(sender2, SOL_SOCKET, SO_BROADCAST|SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+      perror("Server-setsockopt(2) error");
+      return 1;
+   }
+
+   /* use only the local ethernet link, not wifi, etc. */
+   if (setsockopt(sender1, SOL_SOCKET, SO_BINDTODEVICE, "eth0", 5) == -1) {
+      perror("Server-setsockopt(1) BINDTO error");
+      return 1;
+   }
+   if (setsockopt(sender2, SOL_SOCKET, SO_BINDTODEVICE, "eth0", 5) == -1) {
+      perror("Server-setsockopt(2) BINDTO error");
       return 1;
    }
 
@@ -80,14 +100,14 @@ const char *usage = "Usage: %s [options]\n\
    /* send packet every X seconds */
    while (!close_nicely)
    {
-       /* send packet on avahi address first (it's the most likely to fail) */
-       if (sendto(sender, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr_avahi, sizeof(serveraddr_avahi)) == -1)
-       {
-           /* try to send on normal address (both exist on a wifi MIT/MAT) */
-           if (errno != ENETUNREACH || sendto(sender, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr, sizeof(serveraddr)) == -1) {
-              perror("Server-sendto() error");
-           }
+       /* send packet on both address, ignoring failures */
+       if (sendto(sender1, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0) {
+           perror("1:");
        }
+       if (sendto(sender2, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr_avahi, sizeof(serveraddr_avahi)) < 0) {
+           perror("2:");
+       }
+
        /* wait to send again */
        sleep(DELAY);
    }
