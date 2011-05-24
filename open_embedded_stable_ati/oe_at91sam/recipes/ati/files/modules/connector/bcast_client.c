@@ -116,16 +116,12 @@ const char *usage = "Usage: %s [options]\n\
    memset(&(serveraddr_avahi.sin_zero), '\0', 8);
 
    /* bind either connection */
-   if (bind(listener1, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) == -1 && 
-       bind(listener2, (struct sockaddr *)&serveraddr_avahi, sizeof(serveraddr_avahi)) == -1) {
-      perror("Client-bind() error");
-      return 1;
-   }
+   bind(listener1, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+   bind(listener2, (struct sockaddr *)&serveraddr_avahi, sizeof(serveraddr_avahi));
 
    /* ready sockets for polling (either one) */
-   if (setnonblocking(listener1) == -1 && setnonblocking(listener2) == -1) {
-      return 1;
-   }
+   setnonblocking(listener1);
+   setnonblocking(listener2);
 
    /* set up polling */
    kdpfd = epoll_create(MAX_CONNECTIONS);
@@ -136,11 +132,8 @@ const char *usage = "Usage: %s [options]\n\
    ev2.events = EPOLLIN;
    ev1.data.fd = listener1;
    ev2.data.fd = listener2;
-   if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, listener1, &ev1) < 0 &&
-       epoll_ctl(kdpfd, EPOLL_CTL_ADD, listener2, &ev2) < 0) {
-      perror("Client-epoll_ctl() error");
-      return 1;
-   }
+   epoll_ctl(kdpfd, EPOLL_CTL_ADD, listener1, &ev1);
+   epoll_ctl(kdpfd, EPOLL_CTL_ADD, listener2, &ev2);
 
    /* poll once */
    while(!close_nicely) {
