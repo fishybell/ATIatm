@@ -472,10 +472,11 @@ FUNCTION_INT("::handle_2113(int start, int end)", 0)
 //   Since we seem to ack from a bunch of places, better to have a funciton
 //
 int FASIT_TCP::send_2101_ACK(FASIT_header *hdr,int response) {
-   FUNCTION_START("::send_2101_ACK(FASIT_header *hdr,int response)")
+   FUNCTION_START("::send_2101_ACK(FASIT_header *hdr,int response)");
 
    // do handling of message
-	 IMSG("sending 2101 ACK\n");
+
+   DCMSG( MAGENTA,"sending 2101 ACK\n");
    FASIT_header rhdr;
    FASIT_2101 rmsg;
    // build the response - some CID's just reply 2101 with 'S' for received and complied 
@@ -492,9 +493,11 @@ int FASIT_TCP::send_2101_ACK(FASIT_header *hdr,int response) {
    rmsg.body.resp = response;	// The actual response code 'S'=can do, 'F'=Can't do
    queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
    queueMsg(&rmsg, sizeof(FASIT_2101));
-
+   handleWrite(0);	// fluse the buffer I think
+   
+   DCMSG( MAGENTA,"2101 ACK  all queued up - someplace to go? \n");
    FUNCTION_INT("::send_2101_ACK(FASIT_header *hdr,int response)",0);
-	 return 0;
+   return 0;
 }
 
 

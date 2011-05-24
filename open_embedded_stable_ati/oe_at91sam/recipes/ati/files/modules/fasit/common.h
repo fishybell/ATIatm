@@ -76,6 +76,14 @@
         } \
         printf(" in %s at line %i\n", __FILE__, __LINE__); \
         }); DEBUG && fflush(stdout);
+#define CPRINT_HEXB(SC,data, size)  { \
+    DEBUG && ({ \
+       printf("DEBUG:\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
+       char *_data = (char*)data; \
+       for (int _i=0; _i<size; _i++) printf("%02x", (__uint8_t)_data[_i]); \
+       printf(" in %s at line %i\n", __FILE__, __LINE__); \
+}); DEBUG && fflush(stdout); }
+   
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
 #define BLIP DEBUG && printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); DEBUG && fflush(stdout);
 #define DMSG(...) DEBUG && printf("DEBUG: " __VA_ARGS__); DEBUG && fflush(stdout);
@@ -109,7 +117,7 @@
 
 // for run time viewing of application errors
 #ifdef ERRORS
-#define IERROR(...) ERRORS && fprintf(stderr, "ERROR at %s %i:\n", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fflush(stderr);
+#define IERROR(...) ERRORS && fprintf(stderr, "\x1B[31;1mERROR at %s %i: \x1B[30;0m\n", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fflush(stderr);
 #else
 #define IERROR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr);
 #endif

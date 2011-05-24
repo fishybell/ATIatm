@@ -198,35 +198,38 @@ FUNCTION_END("::setTnum(__uint16_t tnum)")
 
 // the file descriptor is ready to give us data, read as much as possible (max of BUF_SIZE)
 int Connection::handleRead(const epoll_event *ev) {
-FUNCTION_START("Connection::handleRead(const epoll_event *ev)")
+FUNCTION_START("Connection::handleRead(const epoll_event *ev)");
    char buf[BUF_SIZE+1];
    int rsize=0;
    rsize = read(fd, buf, BUF_SIZE);
-DMSG("fd %i read %i bytes:\n", fd, rsize)
-PRINT_HEXB(buf, rsize)
+
+DCMSG(GREEN,"fd %i read %i bytes:\n", fd, rsize);
+PRINT_HEXB(buf, rsize);
+
+   DCOLOR(black) ;
    if (rsize == -1) {
       IERROR("Read error: %s\n", strerror(errno))
    }
    if (rsize > 0) {
       int ret = parseData(rsize, buf);
-FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", ret)
+FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", ret);
       return ret;
    } else if (rsize != -1 || (rsize == -1 && errno != EAGAIN)) {
       // the client has closed this connection, schedule the deletion by returning -1
-FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", -1)
+FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", -1);
       return -1;
    }
-FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", 0)
+FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", 0);
    return 0;
 }
 
 // the file descriptor is ready to receive the data, send it on through
 int Connection::handleWrite(const epoll_event *ev) {
-FUNCTION_START("Connection::handleWrite(const epoll_event *ev)")
+FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
    if (wsize <= 0) {
       // we only send data, or listen for writability, if we have something to write
       makeWritable(false);
-FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0)
+      FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0);
       return 0;
    }
 
@@ -236,15 +239,17 @@ FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0)
    // did it fail?
    if (s == -1) {
       if (errno == EAGAIN) {
-FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0)
-         return 0;
+	 FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0);
+	 return 0;
       } else {
-FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", -1)
-         return -1;
+	 FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", -1);
+	 return -1;
       }
    }
-DMSG("%i wrote %i bytes:\n", fd, s)
-PRINT_HEXB(wbuf, s)
+
+   DCMSG(BLUE,"fd %i wrote %i bytes with 'write(fd, wbuf, wsize)': ", fd, s);
+   CPRINT_HEXB(BLUE,wbuf, s);
+   DCOLOR(black);
 
    // copy what we did write to the "last write buffer"
    if (lwbuf != NULL) { delete [] lwbuf; } // clear out old buffer
@@ -342,9 +347,11 @@ FUNCTION_END("::makeWritable(bool writable)")
 //   preempted, the caller may call this function multiple times to create a complete
 //   message and be sure that the entire message is sent
 void Connection::queueMsg(const char *msg, int size) {
-FUNCTION_START("Connection::queueMsg(char *msg, int size)")
-DMSG("df %i queued %i bytes:\n", fd, size)
-PRINT_HEXB(msg, size)
+   DCOLOR(BLUE);
+   FUNCTION_START("Connection::queueMsg(char *msg, int size)");
+   DMSG("fd %i queued %i bytes:\n", fd, size);
+   PRINT_HEXB(msg, size);
+
    if (wsize > 0) {
       // append
       char *tbuf = new char[size + wsize];
@@ -362,7 +369,8 @@ PRINT_HEXB(msg, size)
 
    // set this connection to watch for writability
    makeWritable(true);
-FUNCTION_END("Connection::queueMsg(char *msg, int size)")
+   FUNCTION_END("Connection::queueMsg(char *msg, int size)");
+   DCOLOR(black);
 }
 
 bool Connection::addToEPoll(int fd, void *ptr) {
