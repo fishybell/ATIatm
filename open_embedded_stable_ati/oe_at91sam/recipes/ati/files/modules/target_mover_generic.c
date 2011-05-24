@@ -925,7 +925,7 @@ static int hardware_pwm_init(void)
 
     // setup encoder irq
 printk("going to request irq: %i\n", tc->irq[ENCODER_PWM_CHANNEL]);
-    status = request_irq(tc->irq[ENCODER_PWM_CHANNEL], (void*)quad_encoder_int, 0, "quad_encoder_int", NULL);
+    status = request_irq(tc->irq[ENCODER_PWM_CHANNEL], (void*)quad_encoder_int, IRQF_DISABLED, "quad_encoder_int", NULL);
 printk("requested irq: %i\n", status);
     if (status != 0)
         {
@@ -1105,7 +1105,11 @@ static int hardware_init(void)
 
     // Configure leg sensor gpios for input and deglitch for interrupts
     at91_set_gpio_input(INPUT_MOVER_TRACK_SENSOR_2, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE); // other leg sensor is also an input, just no irq
-    at91_set_deglitch(INPUT_MOVER_TRACK_SENSOR_1, INPUT_MOVER_TRACK_SENSOR_DEGLITCH_STATE); // reset deglitch state of sensor 1
+
+    // install leg sensor interrupts
+    if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_SENSOR_1, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE, leg_sensor_int, "leg_sensor_int") == FALSE)) {
+        return FALSE;
+    }
 
     return status;
     }
