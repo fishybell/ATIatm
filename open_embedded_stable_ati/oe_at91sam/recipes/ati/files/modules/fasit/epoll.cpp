@@ -69,6 +69,12 @@ __uint64_t getDevID () {
       // find mac by looking at the network interfaces
       sock = socket(AF_INET, SOCK_DGRAM, 0); // need a valid socket to look at interfaces
       if (sock == -1) {
+         perror("getDevID-socket() SOCK_DGRAM error");
+         return 0;
+      }
+      // only look at the first ethernet device
+      if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, "eth0", 5) == -1) {
+         perror("getDevID-setsockopt() BINDTO error");
          return 0;
       }
 
