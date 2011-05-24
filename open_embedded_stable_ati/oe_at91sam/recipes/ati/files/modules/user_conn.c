@@ -17,6 +17,12 @@
 // size of client buffer
 #define CLIENT_BUFFER 1024
 
+
+// global connection junk
+static int efd, nl_fd; // epoll file descriptor and netlink file descriptor
+static struct nl_handle *g_handle;
+static struct nl_handle *handlecreate_nl_handle(int client, int group);
+
 // kill switch to program
 static int close_nicely = 0;
 static void quitproc() {
@@ -367,6 +373,13 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             case 'X': case 'x':
                 nl_cmd = NL_C_STOP;
                 break;
+            case '#':
+                if (sscanf(cmd+1, "%i", &arg1) == 1) {
+                   epoll_ctl(efd, EPOLL_CTL_DEL, nl_fd, NULL);
+                   nl_handle_destroy(handle);
+                   g_handle = handlecreate_nl_handle(client, arg1);
+                }
+                break;
             case '?':
                 // help command
                 arg1 = cmd[1] == ' ' ? 2 : 1; // next letter location in the command (ignore up to one space)
@@ -672,8 +685,47 @@ printf("unrecognized command '%c'\n", cmd[0]);
 #define MAX_CONNECTIONS 2
 #define MAX_EVENTS 4
 
+static struct nl_handle *handlecreate_nl_handle(int client, int group) {
+    // Allocate a new netlink handle
+    struct epoll_event ev;
+    struct nl_handle *handle = nl_handle_alloc();
+
+    // join ATI group (for multicast messages)
+    nl_join_groups(handle, group);
+
+    // Connect to generic netlink handle on kernel side
+    genl_connect(handle);
+
+    // add netlink socket to epoll
+    nl_fd = nl_socket_get_fd(handle); // netlink socket file descriptor
+    memset(&ev, 0, sizeof(ev));
+    ev.events = EPOLLIN;
+    ev.data.fd = nl_fd;
+    if (epoll_ctl(efd, EPOLL_CTL_ADD, nl_fd, &ev) < 0) {
+        fprintf(stderr, "epoll insertion error: nl_fd\n");
+        return NULL;
+    }
+
+    // Ask kernel to resolve family name to family id
+    family = genl_ctrl_resolve(handle, "ATI");
+
+    // Prepare handle to receive the answer by specifying the callback
+    // function to be called for valid messages.
+    nl_socket_modify_cb(handle, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, (void*)client); // pass client file descriptor
+    nl_socket_modify_cb(handle, NL_CB_FINISH, NL_CB_CUSTOM, ignore_cb, (void*)"FINISH");
+    nl_socket_modify_cb(handle, NL_CB_OVERRUN, NL_CB_CUSTOM, ignore_cb, (void*)"OVERRUN");
+    nl_socket_modify_cb(handle, NL_CB_SKIPPED, NL_CB_CUSTOM, ignore_cb, (void*)"SKIPPED");
+    nl_socket_modify_cb(handle, NL_CB_ACK, NL_CB_CUSTOM, ignore_cb, (void*)"ACK");
+    nl_socket_modify_cb(handle, NL_CB_MSG_IN, NL_CB_CUSTOM, ignore_cb, (void*)"MSG_IN");
+    nl_socket_modify_cb(handle, NL_CB_MSG_OUT, NL_CB_CUSTOM, ignore_cb, (void*)"MSG_OUT");
+    nl_socket_modify_cb(handle, NL_CB_INVALID, NL_CB_CUSTOM, ignore_cb, (void*)"INVALID");
+    nl_socket_modify_cb(handle, NL_CB_SEQ_CHECK, NL_CB_CUSTOM, ignore_cb, (void*)"SEQ_CHECK");
+    nl_socket_modify_cb(handle, NL_CB_SEND_ACK, NL_CB_CUSTOM, ignore_cb, (void*)"SEND_ACK");
+
+    return handle;
+}
+
 int main(int argc, char **argv) {
-    struct nl_handle *handle;
     int retval, yes=1;
     int client, listener; // socket file descriptors
     socklen_t addrlen;
@@ -740,18 +792,8 @@ printf("forked child\n");
     }
 printf("is child\n");
 
-    // Allocate a new netlink handle
-    handle = nl_handle_alloc();
-
-    // join ATI group (for multicast messages)
-    nl_join_groups(handle, 1);
-
-    // Connect to generic netlink handle on kernel side
-    genl_connect(handle);
-
     // set up epoll
     struct epoll_event ev, events[MAX_EVENTS];
-    int efd; // epoll file descriptor
     struct timeval tv;
     int nfds; // number of file descriptors (returned in a single epoll_wait call)
     efd = epoll_create(MAX_CONNECTIONS);
@@ -768,31 +810,7 @@ printf("is child\n");
         return -1;
     }
 
-    // add netlink socket to epoll
-    int nl_fd = nl_socket_get_fd(handle); // netlink socket file descriptor
-    memset(&ev, 0, sizeof(ev));
-    ev.events = EPOLLIN;
-    ev.data.fd = nl_fd;
-    if (epoll_ctl(efd, EPOLL_CTL_ADD, nl_fd, &ev) < 0) {
-        fprintf(stderr, "epoll insertion error: nl_fd\n");
-        return -1;
-    }
-
-    // Ask kernel to resolve family name to family id
-    family = genl_ctrl_resolve(handle, "ATI");
-
-    // Prepare handle to receive the answer by specifying the callback
-    // function to be called for valid messages.
-    retval = nl_socket_modify_cb(handle, NL_CB_VALID, NL_CB_CUSTOM, parse_cb, (void*)client); // pass client file descriptor
-    retval |= nl_socket_modify_cb(handle, NL_CB_FINISH, NL_CB_CUSTOM, ignore_cb, (void*)"FINISH");
-    retval |= nl_socket_modify_cb(handle, NL_CB_OVERRUN, NL_CB_CUSTOM, ignore_cb, (void*)"OVERRUN");
-    retval |= nl_socket_modify_cb(handle, NL_CB_SKIPPED, NL_CB_CUSTOM, ignore_cb, (void*)"SKIPPED");
-    retval |= nl_socket_modify_cb(handle, NL_CB_ACK, NL_CB_CUSTOM, ignore_cb, (void*)"ACK");
-    retval |= nl_socket_modify_cb(handle, NL_CB_MSG_IN, NL_CB_CUSTOM, ignore_cb, (void*)"MSG_IN");
-    retval |= nl_socket_modify_cb(handle, NL_CB_MSG_OUT, NL_CB_CUSTOM, ignore_cb, (void*)"MSG_OUT");
-    retval |= nl_socket_modify_cb(handle, NL_CB_INVALID, NL_CB_CUSTOM, ignore_cb, (void*)"INVALID");
-    retval |= nl_socket_modify_cb(handle, NL_CB_SEQ_CHECK, NL_CB_CUSTOM, ignore_cb, (void*)"SEQ_CHECK");
-    retval |= nl_socket_modify_cb(handle, NL_CB_SEND_ACK, NL_CB_CUSTOM, ignore_cb, (void*)"SEND_ACK");
+    g_handle = handlecreate_nl_handle(client, ATI_GROUP);
 
     // wait for netlink and socket messages
     while(!close_nicely) {
@@ -819,7 +837,7 @@ printf("is child\n");
                 if (events[i].data.fd == nl_fd) {
                     // netlink talking 
 printf("nl\n");
-                    nl_recvmsgs_default(handle); // will call callback functions
+                    nl_recvmsgs_default(g_handle); // will call callback functions
                 } else if (events[i].data.fd == client) {
                     // client talking
 printf("sk %i:", client);
@@ -833,7 +851,7 @@ printf("%i", b);
                     rsize = read(client, client_buf+b, CLIENT_BUFFER-b); // read into buffer at appropriate place, at most to end of buffer
 printf(":%i\n", rsize);
                     // parse buffer and send any netlink messages needed
-                    if (rsize == 0 || telnet_client(handle, client_buf, client) != 0) {
+                    if (rsize == 0 || telnet_client(g_handle, client_buf, client) != 0) {
 printf("sk %i closing\n", client);
                         close_nicely = 1; // exit loop
                     }
@@ -846,7 +864,7 @@ printf("sk %i closing\n", client);
     free(client_buf); // free buffer
 
     // destroy netlink handle
-    nl_handle_destroy(handle);
+    nl_handle_destroy(g_handle);
 
     return 0;
 }
