@@ -188,6 +188,7 @@ inline float ntohf(const float &f) {
            ((holder & 0x00ff0000) >> 8) | \
            ((holder & 0xff000000) >> 24);
 
+   DCMSG(BLUE, "Float changed from %f (0x%08X) to %f (0x%08X)\n", f, holder, *(float*)(&after), after);
    return *(float*)(&after);
 }
 
