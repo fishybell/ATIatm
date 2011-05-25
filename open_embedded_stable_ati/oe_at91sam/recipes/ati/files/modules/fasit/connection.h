@@ -5,6 +5,7 @@
 #include <bits/types.h>
 #include <termios.h>
 #include <map>
+#include <list>
 
 
 // max amount of data we'll read per fd in a single loop
@@ -22,6 +23,7 @@ public:
    static Connection *findByTnum(__uint16_t tnum); // returns null if not found
    virtual void queueMsg(const char *msg, int size);
    void queueMsg(const void *msg, int size) {queueMsg((const char*)msg, size);} // auto-cast for various data pointers
+   void finishMsg() {newMsg = true;}; // make the currently queued message a singular message (good for packet sending)
    __uint64_t getUUID() {return uuid;};
    __uint32_t getRnum() {return rnum;};
    __uint16_t getTnum() {return tnum;};
@@ -60,8 +62,9 @@ protected:
    __uint32_t rnum; // random number to find this connection by
    __uint64_t uuid; // mac address to find this connection by
    __uint16_t tnum; // random assigned number to find this connection by
-   char *wbuf; // write buffer
-   int wsize; // write buffer size
+   list <char*> wbuf; // write buffer list (for handling multiple messages)
+   list <int> wsize; // write buffer size list (for handling multiple messages)
+   bool newMsg; // will the next queueMsg call create a new item in the list?
    char *lwbuf; // last write buffer (in case a resend is required)
    int lwsize; // last write buffer size (in case a resend is required)
    int needDelete; // for delayed disconnection

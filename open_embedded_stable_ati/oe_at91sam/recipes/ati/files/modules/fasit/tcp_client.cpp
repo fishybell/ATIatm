@@ -39,18 +39,22 @@ FUNCTION_INT("::reconnect()", false)
    close(fd);
 
    // clear buffers
-   if (wbuf) {			// clear write buffer
-      delete [] wbuf;
-      wbuf = NULL;
+   list<char*>::iterator it; // iterator for write buffer
+   for (it = wbuf.begin(); it != wbuf.end(); it++) {
+      delete [] *it; // clear write buffer item
    }
+   wbuf.clear(); // clear write buffer
+   wsize.clear();
    if (lwbuf) {			// clear last write buffer
       delete [] lwbuf;
       lwbuf = NULL;
    }
+   lwsize=0;
    if (rbuf) {			// clear read buffer
       delete [] rbuf;
       rbuf = NULL;
    }
+   rsize=0;
 
    // queue the reconnect for 10 seconds from now
    new ReconTimer(this, RECONNECTION);

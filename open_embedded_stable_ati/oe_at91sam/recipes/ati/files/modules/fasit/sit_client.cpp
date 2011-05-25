@@ -151,6 +151,7 @@ FUNCTION_START("::sendStatus2102()")
    // send
    queueMsg(&hdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2102));
+   finishMsg();
 
 
 FUNCTION_END("::sendStatus2102()")
@@ -199,6 +200,7 @@ FUNCTION_START("::handle_100(int start, int end)")
    // send
    queueMsg(&rhdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2111));
+   finishMsg();
 
    // if the msg.body.flags include PD_MUZZLE then we must also generate and send a 2112, at least I thought so for a
    // while but I can't find that in the spec
@@ -427,6 +429,7 @@ FUNCTION_START("::handle_2110(int start, int end)")
 //      didMFS(&rmsg.body.on,&rmsg.body.mode,&rmsg.body.idelay,&rmsg.body.rdelay);
       queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
       queueMsg(&rmsg, sizeof(FASIT_2112));
+      finishMsg();
 
    } else {
       send_2101_ACK(hdr,'F');	// no muzzle flash capability, so send a negative ack
@@ -509,6 +512,7 @@ FUNCTION_START("::didFailure(int type)")
    // send
    queueMsg(&hdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2102));
+   finishMsg();
 
 FUNCTION_END("::didFailure(int type)")
 }
@@ -718,6 +722,7 @@ FUNCTION_START("::didMSDH(int code, int ammo, int player, int delay)")
    // send
    queueMsg(&hdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2115));
+   finishMsg();
 
 FUNCTION_END("::didMSDH(int code, int ammo, int player, int delay)")
 }

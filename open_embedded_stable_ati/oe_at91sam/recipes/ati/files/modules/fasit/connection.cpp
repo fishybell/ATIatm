@@ -28,8 +28,7 @@ FUNCTION_START("::Connection(int fd)")
    rnum = rand();
    this->fd = fd;
    rnumMap[rnum] = this;
-   wbuf = NULL;
-   wsize = 0;
+   newMsg = false;
    lwbuf = NULL;
    lwsize = 0;
    uuid = 0;
@@ -65,9 +64,11 @@ FUNCTION_START("::~Connection()")
    close(fd);
 
    // free the write buffer
-   if (wbuf) {
-      delete [] wbuf;
+   list<char*>::iterator it; // iterator for write buffer
+   for (it = wbuf.begin(); it != wbuf.end(); it++) {
+      delete [] *it; // clear write buffer item
    }
+   wbuf.clear(); // clear write buffer
 
    // free the last write buffer
    if (lwbuf) {
@@ -226,49 +227,65 @@ FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", 0);
 // the file descriptor is ready to receive the data, send it on through
 int Connection::handleWrite(const epoll_event *ev) {
 FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
-   if (wsize <= 0) {
+   if (wbuf.empty()) {
       // we only send data, or listen for writability, if we have something to write
       makeWritable(false);
       FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0);
       return 0;
    }
 
+   // grab first items from write buffer lists
+   char *fwbuf = wbuf.front();
+   int fwsize = wsize.front();
+   DCMSG(RED,"fd %i attempting to write %i bytes with 'write(fd, fwbuf, fwsize)': ", fd, fwsize);
+   CPRINT_HEXB(RED,fwbuf, fwsize);
+   DCOLOR(black);
+
+   // assume they're gone until proven otherwise
+   wbuf.pop_front();
+   wsize.pop_front();
+
    // write all the data we can
-   int s = write(fd, wbuf, wsize);
+   int s = write(fd, fwbuf, fwsize);
 
    // did it fail?
    if (s == -1) {
+      // failed, push back onto front of list
+      wbuf.push_front(fwbuf);
+      wsize.push_front(fwsize);
       if (errno == EAGAIN) {
-	 FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0);
-	 return 0;
+         FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0);
+         return 0;
       } else {
-	 FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", -1);
-	 return -1;
+         FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", -1);
+         return -1;
       }
    }
 
-   DCMSG(BLUE,"fd %i wrote %i bytes with 'write(fd, wbuf, wsize)': ", fd, s);
-   CPRINT_HEXB(BLUE,wbuf, s);
+   DCMSG(BLUE,"fd %i wrote %i bytes with 'write(fd, fwbuf, fwsize)': ", fd, s);
+   CPRINT_HEXB(BLUE,fwbuf, s);
    DCOLOR(black);
 
    // copy what we did write to the "last write buffer"
    if (lwbuf != NULL) { delete [] lwbuf; } // clear out old buffer
    lwsize = s;
    lwbuf = new char[lwsize];
-   memcpy(lwbuf, wbuf, lwsize);
+   memcpy(lwbuf, fwbuf, lwsize);
 
-   if (s < wsize) {
+   if (s < fwsize) {
       // create a new, smaller write buffer if we didn't write everything
-      char *tbuf = new char[(wsize - s)];
-      memcpy(tbuf, wbuf + (sizeof(char) * s), wsize - s);
-      delete [] wbuf;
-      wbuf = tbuf;
-      wsize -= s;
+      char *tbuf = new char[(fwsize - s)];
+      memcpy(tbuf, fwbuf + (sizeof(char) * s), fwsize - s);
+      delete [] fwbuf;
+      fwbuf = tbuf;
+      fwsize -= s;
+      // push remainder to front of list
+      wbuf.push_front(fwbuf);
+      wsize.push_front(fwsize);
    } else {
       // everything was written, clear write buffer
-      wsize = 0;
-      delete [] wbuf;
-      wbuf = NULL;
+      fwsize = 0;
+      delete [] fwbuf;
    }
 
    // success
@@ -352,19 +369,37 @@ void Connection::queueMsg(const char *msg, int size) {
    DMSG("fd %i queued %i bytes:\n", fd, size);
    PRINT_HEXB(msg, size);
 
-   if (wsize > 0) {
-      // append
-      char *tbuf = new char[size + wsize];
-      memcpy(tbuf, wbuf, wsize);
-      memcpy(tbuf + (sizeof(char) * wsize), msg, size);
-      wsize += size;
-      delete [] wbuf;
-      wbuf = tbuf;
+   // check for need to create new write buffer based on newMsg and existing write buffer
+   if (newMsg || wbuf.empty()) { // create new if requested or no existing write buffer
+      // create new message
+      DMSG("Creating new message\n");
+      char *fwbuf = new char[size];
+      memcpy(fwbuf, msg, size);
+
+      // push data to front of lists
+      wbuf.push_front(fwbuf);
+      wsize.push_front(size);
+
+      // we're no longer requesting a new message
+      newMsg = false;
    } else {
-      // copy
-      wbuf = new char[size];
-      memcpy(wbuf, msg, size);
-      wsize = size;
+      // append to existing message
+      DMSG("Appending to message\n");
+      char *fwbuf = wbuf.front();
+      int fwsize = wsize.front();
+      char *tbuf = new char[size + fwsize];
+      memcpy(tbuf, fwbuf, fwsize);
+      memcpy(tbuf + (sizeof(char) * fwsize), msg, size);
+      fwsize += size;
+
+      // clear out old front
+      delete [] fwbuf;
+      wbuf.pop_front();
+      wsize.pop_front();
+      
+      // push new front
+      wbuf.push_front(tbuf);
+      wsize.push_front(fwsize);
    }
 
    // set this connection to watch for writability

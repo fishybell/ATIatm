@@ -96,6 +96,7 @@ FUNCTION_START("::sendStatus2102()")
    // send
    queueMsg(&hdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2102));
+   finishMsg();
 
 FUNCTION_END("::sendStatus2102()")
 }
@@ -135,6 +136,7 @@ FUNCTION_START("::addSIT(int fd)")
 
    // send
    att_SIT->queueMsg(&hdr, sizeof(FASIT_header));
+   att_SIT->finishMsg();
 
 FUNCTION_HEX("::addSIT(int fd)", att_SIT)
    return (FASIT_TCP*)att_SIT;
@@ -186,6 +188,7 @@ FUNCTION_START("::handle_2111(FASIT_2111 *msg)")
    // send
    queueMsg(&rhdr, sizeof(FASIT_header));
    queueMsg(&rmsg, sizeof(FASIT_2111));
+   finishMsg();
 
 FUNCTION_END("::handle_2111(FASIT_2111 *msg)")
 }
@@ -234,6 +237,7 @@ FUNCTION_START("::handle_100(int start, int end)")
    // send
    queueMsg(&rhdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2111));
+   finishMsg();
 
 FUNCTION_INT("::handle_100(int start, int end)", 0)
    return 0;
@@ -274,6 +278,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
 DMSG("Passing command to SIT\n");
       att_SIT->queueMsg(hdr, sizeof(FASIT_header));
       att_SIT->queueMsg(msg, sizeof(FASIT_2100));
+      att_SIT->finishMsg();
    }
 
 FUNCTION_INT("::handle_2100(int start, int end)", 0)
@@ -301,6 +306,7 @@ FUNCTION_START("::didFailure(int type)")
    // send
    queueMsg(&hdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2102));
+   finishMsg();
 
 FUNCTION_END("::didFailure(int type)")
 }
