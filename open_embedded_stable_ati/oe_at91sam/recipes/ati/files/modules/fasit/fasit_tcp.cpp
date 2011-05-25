@@ -507,7 +507,7 @@ int FASIT_TCP::send_2101_ACK(FASIT_header *hdr,int response) {
    rmsg.body.resp = response;	// The actual response code 'S'=can do, 'F'=Can't do
    queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
    queueMsg(&rmsg, sizeof(FASIT_2101));
-   pair()->finishMsg();
+   finishMsg();
    
    DCMSG( MAGENTA,"2101 ACK  all queued up - someplace to go? \n");
    FUNCTION_INT("::send_2101_ACK(FASIT_header *hdr,int response)",0);
