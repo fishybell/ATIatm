@@ -1,0 +1,4 @@
+echo -n "Enter new listen port number: "
+read port
+size=$(echo $port | wc -c)
+echo -n $port | /usr/bin/eeprom_rw write -addr 0x200 -size $size -blank 0x40

@@ -2,23 +2,52 @@
 #
 # manage startup of drivers and python code
 
-# set keepalive timeouts
-sysctl -w \
- net.ipv4.tcp_keepalive_time=20 \
- net.ipv4.tcp_keepalive_intvl=10 \
- net.ipv4.tcp_keepalive_probes=3
 
-is_board=$(/usr/bin/is_board)
+# load board info
+board=$(/usr/bin/is_board)
+if [ -f /usr/bin/$board ] ; then
+   source /usr/bin/$board
+else
+   echo "Error: invalid board \$is_board\""
+   exit 1
+fi
+
+# create default start routine
+if ! type start | grep -q "is a shell function" ; then
+    start () {
+        # load network
+        source /usr/bin/load_network
+
+        # load modules
+        load_modules "target_user_interface.ko mover=0" \
+                     "target_battery.ko minvoltval=12"
+
+        # start fasit proxy
+        fasit_conn -l $lport -p $cport -i $ip
+    }
+fi
+
+# create default stop routine
+if ! type stop | grep -q "is a shell function" ; then
+    stop () {
+        # kill fasit client
+        killall -q -9 fasit_conn
+
+        # unload modules and other programs
+        unload
+    }
+fi
 
 case "$1" in
     start)
-        /usr/bin/$is_board start &
+        start
         ;;
     stop)
-        /usr/bin/$is_board stop &
+        stop
         ;;
     force-reload|restart)
-        /usr/bin/$is_board restart &
+        stop
+        start
         ;;
     *)
         echo "Usage: /etc/init.d/start_up {start|stop|restart|force-reload}"

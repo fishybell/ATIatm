@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# load default modules
+cd /home/root/
+insmod delay_printk.ko
+insmod target.ko
+insmod netlink_provider.ko
+
+# load other modules (with potential parameters)
+while [ -n "$1" ] ; do     
+   insmod $1
+   shift
+done
+

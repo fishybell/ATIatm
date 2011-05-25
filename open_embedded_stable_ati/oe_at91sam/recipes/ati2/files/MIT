@@ -1,52 +1,19 @@
-cd /home/root
+#!/bin/sh
 
-rmmod *.ko 2>/dev/null
-rmmod *.ko 2>/dev/null
+# overwrite start routine...
+start () {
+   # load network
+   source /usr/bin/load_network
 
-insmod target.ko
-insmod target_battery.ko minvoltval=24 charge=1
-insmod target_user_interface.ko mover=1
-insmod target_mover_infantry.ko
-insmod target_mover_position.ko
-insmod target_hit_mechanical.ko
+   # load modules
+   load_modules "target_user_interface.ko mover=1" \
+                "target_battery.ko minvoltval=24" \
+                "target_mover_generic.ko mover_type=2 reverse=0" \
+                "target_generic_output.ko" \
+                "mover.ko"
 
-SERVER_START="radio_conv -s /dev/ttyS1"
-FASIT_START="python fasit_client_main.py -t MIT"
-SERVER_STOP="killall radio_conv"
-FASIT_STOP="killall python"
-network=$(/usr/bin/is_comm)
-if [ "$network" = "network" ] ; then
-    ip_address=$(/usr/bin/is_ip)
-    SERVER_START="echo -n"
-    FASIT_START="python fasit_client_main.py -t MIT -s $ip_address"
-    killall ping
-    ping -q $ip_address &
-fi
+   # start fasit client
+   fasit_conn -M -l $lport -p $cport -i $ip &
+}
 
-if [ -n "$1" ] ; then
-    case "$1" in
-    start)
-        $SERVER_START &
-        cd /home/root/fasit
-        $FASIT_START &
-        ;;
-    stop)
-        $SERVER_STOP
-        $FASIT_STOP
-        ;;
-    force-reload|restart)
-        $SERVER_STOP
-        $FASIT_STOP
-        $SERVER_START &
-        cd /home/root/fasit
-        $FASIT_START &
-        ;;
-    *)
-        echo "bad command"
-        ;;
-    esac
-else
-    $SERVER_STOP
-    $FASIT_STOP
-fi
-
+# leave default stop routine

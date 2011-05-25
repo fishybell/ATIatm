@@ -1,0 +1,116 @@
+#!/bin/sh
+
+# grab eeprom values
+lport=`is_lport`
+cport=`is_cport`
+ip=`is_ip`
+comm=`is_comm`
+board=`is_board`
+
+# set keepalive timeouts
+sysctl -w \
+ net.ipv4.tcp_keepalive_time=20 \
+ net.ipv4.tcp_keepalive_intvl=10 \
+ net.ipv4.tcp_keepalive_probes=3
+
+# restart wlan0 if necessary
+wlan=wlan0
+wlan=$(ifconfig $wlan | grep wlan | cut -d' ' -f1)
+if [ -n "$wlan" ] ; then
+   # found wifi device, does it have a network address?
+   if [ -z "$(ifconfig $wlan | grep inet)" ] ; then
+      # no network address, refresh
+      ifdown $wlan
+      sleep 1
+      ifup $wlan
+   fi
+fi
+
+# find default ports
+if [ -z "$lport" -o "$lport" == "none" ] ; then
+   lport=4000
+fi
+if [ -z "$cport" -o "$cport" == "none" ] ; then
+   cport=4000
+fi
+
+# find default ip address (to connect to)
+if [ -z "$ip" -o "$ip" == "none" ] ; then
+   case $board in
+      TTMT|MAT|MIT)
+         case $comm in
+            local|network|wimax|wifi)
+               ip="192.168.1.1"
+               ;;
+            radio)
+               ip="127.0.0.1"
+               ;;
+            *)
+               ip="192.168.1.1"
+               ;;
+         esac
+         ;;
+      EIM|HHC|BASE|SES|SIT|LSAT|HSAT|SAT)
+         ip="auto"
+         ;;
+      RELAY)
+         ip="127.0.0.1"
+         ;;
+      *)
+         ip="auto"
+         ;;
+   esac
+fi
+
+# start auto ip server
+case $board in
+   TTMT|MAT|MIT)
+      if [ "$comm" != "network" ] ; then
+         bcast_server &
+         # start ping if we're on a wimax network
+         if [ "$comm" == "wimax" ] ; then
+            ping -q $ip &
+         fi
+      fi
+      ;;
+esac
+
+# find auto ip
+if [ "$ip" == "auto" ] ; then
+   ip=`bcast_client`
+fi
+
+# start the radio convertor
+BASE=""
+case $board in
+   HHC|BASE)
+      BASE="-b $ip"
+      ;;
+   RELAY)
+      BASE="-s /dev/ttyS2 -r"
+      ;;
+esac
+if [ "$comm" == "radio" ] ; then
+   # listen or connect on the "connect-to" port
+   radio_conv -p $cport -s /dev/ttyS1 $BASE &
+   ip="127.0.0.1"
+fi
+
+# start the default programs
+bit_button &
+user_conn &
+case $board in
+   TTMT|MIT|MAT)
+      # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
+      event_conn &
+      ;;
+   EIM|SES|SIT|LSAT|HSAT|SAT)
+      if [ "$comm" == "local" ] ; then
+         # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
+         event_conn -i $ip -C &
+      fi
+      ;;
+esac
+
+# return the results
+echo "$ip $lport $cport"

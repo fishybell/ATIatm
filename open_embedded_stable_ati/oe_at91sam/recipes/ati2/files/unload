@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# kill userspace programs (will ignore ones not running)
+killall -q -9 bcast_server
+killall -q -9 radio_conv
+killall -q -9 fasit_conn
+killall -q -9 event_conn
+killall -q -9 bit_button
+killall -q -9 user_conn
+killall -q -9 ping
+
+# recursive unload function
+unmod () {
+  # check if loaded
+  loaded=$(lsmod | grep "$1 ")
+  if [ -n "$loaded" ] ; then
+     # find dependencies
+     deps=$(lsmod | grep "$1 " | sed -e "s: *: :g" | cut -d' ' -f 5)
+     if [ -n "$deps" ] ; then
+        # unload dependencies
+        for i in $(echo $deps | sed -e "s:,: :g") ; do
+           # unload recursively
+           unmod $i
+        done
+     fi
+     # unload
+     rmmod $1.ko
+  fi
+}
+
+# unload kernel modules
+cd /home/root
+ls *.ko | while read i ; do
+  mod=$(basename $i .ko)
+  unmod $mod
+done

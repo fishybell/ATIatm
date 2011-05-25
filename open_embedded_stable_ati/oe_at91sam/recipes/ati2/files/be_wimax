@@ -1,0 +1,2 @@
+# for devices directly attached to the wimax transceiver
+echo -n "wimax" | /usr/bin/eeprom_rw write -addr 0x80 -size 6 -blank 0x40
