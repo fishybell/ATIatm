@@ -103,12 +103,14 @@ FUNCTION_END("::sendStatus2102()")
 
 // returns true when a FASIT_TCP object has been successfully attached as a SIT
 bool MIT_Client::hasSIT() {
-FUNCTION_START("::hasSIT()")
+   FUNCTION_START("::hasSIT()");
    // is the attached SIT object fake or real?
    if (hasPair()) {
-      return att_SIT->attached();
+      bool ret = att_SIT->attached();
+      FUNCTION_INT("::hasSIT()", ret);
+      return ret;
    }
-FUNCTION_INT("::hasSIT()", false)
+   FUNCTION_INT("::hasSIT()", false);
    return false;
 }
 
@@ -254,6 +256,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
    FASIT_2100 *msg = (FASIT_2100*)(rbuf + start + sizeof(FASIT_header));
 
    // TODO -- handle other commands here
+   bool needPass = true;
    switch (msg->cid) {
       case CID_Move_Request:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
@@ -270,12 +273,13 @@ FUNCTION_START("::handle_2100(int start, int end)")
                doMove(ntohf(msg->speed), -1);
                break;
          }
+         needPass = false; // don't pass this message to the attached SIT
          break;
    }
 
    // pass lift commands to SIT
-   if (hasSIT()) {
-DMSG("Passing command to SIT\n");
+   if (needPass && hasSIT()) {
+      DMSG("Passing command to SIT\n");
       att_SIT->queueMsg(hdr, sizeof(FASIT_header));
       att_SIT->queueMsg(msg, sizeof(FASIT_2100));
       att_SIT->finishMsg();
