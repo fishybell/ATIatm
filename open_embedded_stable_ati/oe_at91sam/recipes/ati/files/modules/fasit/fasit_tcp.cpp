@@ -244,6 +244,7 @@ FUNCTION_START("::handle_100(int start, int end)");
    // send via client
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_100(int start, int end)", 0);
@@ -260,6 +261,7 @@ FUNCTION_START("::handle_2000(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2000));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2000(int start, int end)", 0);
@@ -276,6 +278,7 @@ FUNCTION_START("::handle_2004(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2004));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2004(int start, int end)", 0);
@@ -292,6 +295,7 @@ FUNCTION_START("::handle_2005(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2005));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2005(int start, int end)", 0);
@@ -315,6 +319,7 @@ FUNCTION_START("::handle_2006(int start, int end)");
       while (znum--) {
          pair()->queueMsg(zone++, sizeof(FASIT_2006z));
       }
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2006(int start, int end)", 0);
@@ -332,6 +337,7 @@ FUNCTION_START("::handle_2100(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2100));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2100(int start, int end)", 0);
@@ -348,6 +354,7 @@ FUNCTION_START("::handle_2101(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2101));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2101(int start, int end)", 0);
@@ -364,6 +371,7 @@ FUNCTION_START("::handle_2111(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2111));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2111(int start, int end)", 0);
@@ -380,6 +388,7 @@ FUNCTION_START("::handle_2102(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2102));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2102(int start, int end)", 0);
@@ -396,6 +405,7 @@ FUNCTION_START("::handle_2114(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2114));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2114(int start, int end)", 0);
@@ -412,6 +422,7 @@ FUNCTION_START("::handle_2115(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2115));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2115(int start, int end)", 0);
@@ -428,6 +439,7 @@ FUNCTION_START("::handle_2110(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2110));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2110(int start, int end)", 0);
@@ -444,6 +456,7 @@ FUNCTION_START("::handle_2112(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2112));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2112(int start, int end)", 0);
@@ -460,6 +473,7 @@ FUNCTION_START("::handle_2113(int start, int end)");
    if (hasPair()) {
       pair()->queueMsg(hdr, sizeof(FASIT_header));
       pair()->queueMsg(msg, sizeof(FASIT_2113));
+      pair()->finishMsg();
    }
 
 FUNCTION_INT("::handle_2113(int start, int end)", 0);
@@ -493,6 +507,7 @@ int FASIT_TCP::send_2101_ACK(FASIT_header *hdr,int response) {
    rmsg.body.resp = response;	// The actual response code 'S'=can do, 'F'=Can't do
    queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
    queueMsg(&rmsg, sizeof(FASIT_2101));
+   pair()->finishMsg();
    
    DCMSG( MAGENTA,"2101 ACK  all queued up - someplace to go? \n");
    FUNCTION_INT("::send_2101_ACK(FASIT_header *hdr,int response)",0);
