@@ -235,24 +235,24 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
    }
 
    // grab first items from write buffer lists
-   char *fwbuf = wbuf.front();
-   int fwsize = wsize.front();
+   char *fwbuf = wbuf.back();
+   int fwsize = wsize.back();
    DCMSG(RED,"fd %i attempting to write %i bytes with 'write(fd, fwbuf, fwsize)': ", fd, fwsize);
    CPRINT_HEXB(RED,fwbuf, fwsize);
    DCOLOR(black);
 
    // assume they're gone until proven otherwise
-   wbuf.pop_front();
-   wsize.pop_front();
+   wbuf.pop_back();
+   wsize.pop_back();
 
    // write all the data we can
    int s = write(fd, fwbuf, fwsize);
 
    // did it fail?
    if (s == -1) {
-      // failed, push back onto front of list
-      wbuf.push_front(fwbuf);
-      wsize.push_front(fwsize);
+      // failed, push back onto back of list
+      wbuf.push_back(fwbuf);
+      wsize.push_back(fwsize);
       if (errno == EAGAIN) {
          FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0);
          return 0;
@@ -279,9 +279,9 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
       delete [] fwbuf;
       fwbuf = tbuf;
       fwsize -= s;
-      // push remainder to front of list
-      wbuf.push_front(fwbuf);
-      wsize.push_front(fwsize);
+      // push remainder to back of list
+      wbuf.push_back(fwbuf);
+      wsize.push_back(fwsize);
    } else {
       // everything was written, clear write buffer
       fwsize = 0;
@@ -376,7 +376,7 @@ void Connection::queueMsg(const char *msg, int size) {
       char *fwbuf = new char[size];
       memcpy(fwbuf, msg, size);
 
-      // push data to front of lists
+      // push data to back of lists
       wbuf.push_front(fwbuf);
       wsize.push_front(size);
 
