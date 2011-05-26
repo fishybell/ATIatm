@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <linux/if.h>
+#include <netinet/tcp.h>
 
 using namespace std;
 
@@ -130,14 +131,23 @@ FUNCTION_START("setnonblocking(int sock)")
 //   }
    opts = fcntl(sock, F_GETFL); // grab existing flags
    if (opts < 0) {
+      IERROR("Could not get socket flags\n");
       perror("fcntl(F_GETFL)");
       exit(EXIT_FAILURE);
    }
    opts = (opts | O_NONBLOCK); // add in nonblock to existing flags
    if (fcntl(sock, F_SETFL, opts) < 0) {
+      IERROR("Could not set socket to non-blocking\n");
       perror("fcntl(F_SETFL)");
       exit(EXIT_FAILURE);
    }
+
+   // disable Nagle's algorithm so we send messages as discrete packets
+   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(int)) == -1) {
+      IERROR("Could not disable Naggle's algorithm\n");
+      perror("setcokopt(TCP_NODELAY");
+   }
+
 FUNCTION_END("setnonblocking(int sock)")
 }
 
