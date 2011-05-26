@@ -202,13 +202,13 @@ static void adc_read_fire(unsigned long data)
 		{
 		// Read the conversion
 		adc_val = __raw_readl(adc_base + ADC_CDR);
-		delay_printk("ADC = %i (%s)\n", adc_val, adc_val < minvoltval ? "low" : "normal");
 
 		// has the value changed?
 		old_adc_val = atomic_read(&adc_atomic);
 		if (adc_val != old_adc_val)
 			{
 			atomic_set(&adc_atomic, adc_val);
+		    delay_printk("ADC = %i (%s)\n", adc_val, adc_val < minvoltval ? "low" : "normal");
 
 			// notify user-space
 			schedule_work(&level_work);
