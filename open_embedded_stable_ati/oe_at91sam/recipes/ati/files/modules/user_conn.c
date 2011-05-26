@@ -406,7 +406,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Request GPS data\nFormat: G\n");
                         break;
                     case 'H': case 'h':
-                        snprintf(wbuf, 1024, "Request hit data\nFormat: H\nReset Hit data\nFormat: H 0");
+                        snprintf(wbuf, 1024, "Request hit data\nFormat: H\nReset Hit data\nFormat: H 0\n");
                         break;
                     case 'L': case 'l':
                         snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose\n");
