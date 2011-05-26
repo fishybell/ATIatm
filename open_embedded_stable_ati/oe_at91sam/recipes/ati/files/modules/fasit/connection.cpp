@@ -234,7 +234,7 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
       return 0;
    }
 
-   // grab first items from write buffer lists
+   // grab first items from write buffer lists (in the back, to treat it as a queue)
    char *fwbuf = wbuf.back();
    int fwsize = wsize.back();
    DCMSG(RED,"fd %i attempting to write %i bytes with 'write(fd, fwbuf, fwsize)': ", fd, fwsize);
@@ -249,11 +249,12 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
    int s = write(fd, fwbuf, fwsize);
 
    // did it fail?
-   if (s == -1) {
+   if (s <= 0) {
       // failed, push back onto back of list
       wbuf.push_back(fwbuf);
       wsize.push_back(fwsize);
-      if (errno == EAGAIN) {
+      newMsg = true; // set this message as a discrete message
+      if (s == 0 || errno == EAGAIN) {
          FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0);
          return 0;
       } else {
@@ -282,6 +283,7 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
       // push remainder to back of list
       wbuf.push_back(fwbuf);
       wsize.push_back(fwsize);
+      newMsg = true; // set the remainder as a discrete message
    } else {
       // everything was written, clear write buffer
       fwsize = 0;
