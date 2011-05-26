@@ -292,7 +292,6 @@ FUNCTION_START("::handle_2100(int start, int end)")
 		 // AND/OR? send 2115 MILES shootback status if supported
 		 if (acc_conf.acc_type == ACC_NES_MFS){
 		    DCMSG(BLUE,"we also seem to have a MFS Muzzle Flash Simulator - TODO send 2112 status eventually") ; 
-		    HERE;
 		 }
 		 // AND/OR? send 2112 Muzzle Flash status if supported	 
 
@@ -329,7 +328,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
 		 lastHitCal.type = 0; // mechanical sensor
 		 lastHitCal.invert = 0; // don't invert sensor input line
 		 doHitCal(lastHitCal); // tell kernel
-
+		 doHits(0);	// set hit count to zero
 		 break;
 
 	  case CID_Move_Request:
@@ -348,16 +347,17 @@ FUNCTION_START("::handle_2100(int start, int end)")
 		 // there are fields that don't match up
 
 	     // TODO I believe a 2100 config hit sensor is supposed to set the hit count
-	     lastHitCal.seperation = htons(msg->burst);
-	     DCMSG(BLUE,"setting lasthitcal.seperation to 0x%X", htons(msg->burst)) ; 
-	     lastHitCal.sensitivity = htons(msg->sens);
-//		 lastHitCal.blank_time = 500; // half a second blanking
-	     lastHitCal.hits_to_fall = htons(msg->tokill); 
-	     lastHitCal.after_fall = msg->react;	// 0 for stay down
-	     lastHitCal.type = msg->mode;			// mechanical sensor
+	     if (htons(msg->burst)) lastHitCal.seperation = htons(msg->burst);		// spec says we only set if non-Zero
+	     if (htons(msg->sens))  lastHitCal.sensitivity = htons(msg->sens);
+//		 lastHitCal.blank_time = 500; // half a second blanking  
+	     if (htons(msg->tokill))  lastHitCal.hits_to_fall = htons(msg->tokill); 
+	     if (msg->react)  lastHitCal.after_fall = msg->react;	// 0 for stay down
+	     if (msg->mode)   lastHitCal.type = msg->mode;			// mechanical sensor
 //		 lastHitCal.invert = 0; // don't invert sensor input line
 	     doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
-	     DCMSG(BLUE,"after doHitCal(lastHitCal)   Does that generate a 2102 automagically?") ;	     	     
+	     DCMSG(BLUE,"calling doHitCal after setting values") ;	     
+	     if (htons(msg->hit)) doHits(htons(msg->hit));	// set hit count to something other than zero
+	     DCMSG(BLUE,"after doHits(%d) Does that generate a 2102 automagically?",htons(msg->hit)) ;
 	 
 	     break;
 
