@@ -37,6 +37,8 @@ public :
    void handle_2111(FASIT_2111 *msg); // called from attached_SIT_Client object
    void handle_2102(FASIT_2102 *msg); // called from attached_SIT_Client object
 
+   // overwrite so we can stop the mover on disconnect
+   virtual bool reconnect();
 protected:
    // individual fasit message handlers, all return -1 if the connection needs to be
    //   deleted afterwards

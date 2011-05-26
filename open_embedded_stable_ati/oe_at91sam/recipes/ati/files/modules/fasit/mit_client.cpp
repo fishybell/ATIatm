@@ -485,6 +485,19 @@ FUNCTION_INT("::handle_2102(int start, int end)", 0)
    return 0;
 }
 
+// stop the mover on disconnect
+bool MIT_Client::reconnect() {
+   FUNCTION_START("::reconnect()");
+
+   // first off, handle the real reconnect
+   bool retval = TCP_Client::reconnect();
+
+   // second, stop the MIT
+   doMove(0, 0);
+
+   FUNCTION_INT("::reconnect()", retval);
+   return retval;
+}
 
 /***********************************************************
 *                      MIT_Conn Class                      *
