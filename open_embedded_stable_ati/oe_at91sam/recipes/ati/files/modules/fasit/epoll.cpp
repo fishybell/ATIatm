@@ -125,10 +125,10 @@ void setnonblocking(int sock) {
 FUNCTION_START("setnonblocking(int sock)")
    int opts, yes=1;
 
-//   if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int) < 0)) { // set keepalive so we disconnect on link failure or timeout
-//      perror("setsockopt(SO_KEEPALIVE)");
-//      exit(EXIT_FAILURE);
-//   }
+   if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)) < 0) { // set keepalive so we disconnect on link failure or timeout
+      perror("setsockopt(SO_KEEPALIVE)");
+      exit(EXIT_FAILURE);
+   }
    opts = fcntl(sock, F_GETFL); // grab existing flags
    if (opts < 0) {
       IERROR("Could not get socket flags\n");
