@@ -68,7 +68,7 @@ FUNCTION_START("::handleReconnect()")
 
    // attempt reconnection now
    int sock = factory->newClientSock();
-   if (sock == -1) {
+   if (sock <= 0) {
       // queue another reconnect for 10 seconds from now
       reconnect();
       return; // we'll be back
