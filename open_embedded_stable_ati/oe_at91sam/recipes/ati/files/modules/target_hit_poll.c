@@ -217,6 +217,9 @@ mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return l
 // Calibration methods
 //---------------------------------------------------------------------------
 void set_hit_calibration(int seperation, int sensitivity) { // set seperation and sensitivity hit calibration values
+
+   delay_printk("Lifter: set_hit_calibration(sep/burst=%d  sens=%d) \n", seperation,sensitivity);
+   
     // fix input values
     if (seperation <= 0) { seperation = 1; }
     if (sensitivity <= 0) { sensitivity = 1; }
