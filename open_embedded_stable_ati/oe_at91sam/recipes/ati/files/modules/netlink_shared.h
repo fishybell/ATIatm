@@ -59,13 +59,21 @@ static struct nla_policy generic_int8_policy[GEN_INT8_A_MAX + 1] = {
 typedef struct hit_calibration {
     u32 seperation __attribute__ ((packed));   /* seperation calibration value (in milliseconds) */
     u32 sensitivity __attribute__ ((packed));  /* sensitivity calibration value (lower value for less sensitive) */
-    u16 blank_time __attribute__ ((packed));   /* blank time from start of exposure (in milliseconds) */
+    u16 blank_time:13 __attribute__ ((packed));   /* blank time from start of exposure (in milliseconds) */
+    u16 enable_on:3 __attribute__ ((packed));   /* blank when commanded (enumerated below) */
     u8 hits_to_fall:6;                         /* number of hits required to fall (0 for infinity) */
     u8 after_fall:2;                           /* after fall: 0 stay down, 1 bob, 2 bob/stop, 3 stop */
     u8 type:2;                                 /* 0 for mechanical, 1 for NCHS, 2 for MILES */
     u8 invert:2;                               /* invert hit sensor input: 0 for no, 1 for yes, 2 for auto (not implimented) */
     u8 set:4;                                  /* explained below */
 } hit_calibration_t;
+enum {
+    BLANK_ON_CONCEALED,    /* blank when fully concealed (enabled most of the time) */
+    ENABLE_ALWAYS,       /* enable full-time (even when concealed) */
+    ENABLE_AT_POSITION,  /* enable when reach next position (don't change now) */
+    DISABLE_AT_POSITION, /* disable when reach next position (don't change now) */
+    BLANK_ALWAYS,           /* hit sensor disabled blank */
+};
 enum {
     HIT_OVERWRITE_NONE,  /* overwrite nothing (gets reply with current values) */
     HIT_OVERWRITE_ALL,   /* overwrites every value */

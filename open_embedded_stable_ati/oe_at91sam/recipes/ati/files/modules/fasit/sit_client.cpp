@@ -53,6 +53,7 @@ FUNCTION_START("::SIT_Client(int fd, int tnum) : Connection(fd)")
       lastHitCal.seperation = 250;
       lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
       lastHitCal.blank_time = 500; // half a second blanking
+      lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
       lastHitCal.hits_to_fall = 1; // fall on first hit
       lastHitCal.after_fall = 0; // 0 for stay down
       lastHitCal.type = 0; // mechanical sensor
@@ -102,7 +103,13 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
 
    // hit record
    msg->body.hit = htons(hits);		
-   msg->body.hit_conf.on = 1; // TODO -- handle off, on/off at position
+   switch (lastHitCal.enable_on) {
+       case BLANK_ON_CONCEALED: msg->body.hit_conf.on = 1; break; // on
+       case ENABLE_ALWAYS: msg->body.hit_conf.on = 1; break; // on
+       case ENABLE_AT_POSITION: msg->body.hit_conf.on = 2; break; // on at
+       case DISABLE_AT_POSITION: msg->body.hit_conf.on = 3; break; // off at
+       case BLANK_ALWAYS: msg->body.hit_conf.on = 0; break; // off
+   }
    switch (lastHitCal.after_fall) {
        case 0: // stay down
            msg->body.hit_conf.react = 0; // fall
@@ -387,6 +394,7 @@ FUNCTION_START("::handle_2100(int start, int end)");
 		 lastHitCal.seperation = 250;	//250;
 		 lastHitCal.sensitivity = 15;
 		 lastHitCal.blank_time = 500; // half a second blanking
+         lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
 		 lastHitCal.hits_to_fall = 1; // fall on first hit
 		 lastHitCal.after_fall = 0; // 0 for stay down
 		 lastHitCal.type = 0; // mechanical sensor
@@ -412,6 +420,12 @@ FUNCTION_START("::handle_2100(int start, int end)");
 		 // there are fields that don't match up
 
 	     // TODO I believe a 2100 config hit sensor is supposed to set the hit count
+         switch (msg->on) {
+            case 0: lastHitCal.enable_on = BLANK_ALWAYS; break; // hit sensor Off
+            case 1: lastHitCal.enable_on = BLANK_ON_CONCEALED; break; // hit sensor On Immediately
+            case 2: lastHitCal.enable_on = ENABLE_AT_POSITION; break; // hit sensor On at Position
+            case 3: lastHitCal.enable_on = DISABLE_AT_POSITION; break; // hit sensor Off at Position
+         }
 	     if (htons(msg->burst)) lastHitCal.seperation = htons(msg->burst);		// spec says we only set if non-Zero
 	     if (htons(msg->sens))  lastHitCal.sensitivity = htons(msg->sens);
 //		 lastHitCal.blank_time = 500; // half a second blanking  
@@ -929,6 +943,7 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
 		     DCMSG(BLUE,"setting lasthitcal.seperation to 0x%X",hit_c->seperation) ; 		     
                      lastHitCal.sensitivity = hit_c->sensitivity;
                      lastHitCal.blank_time = hit_c->blank_time;
+                     lastHitCal.enable_on = hit_c->enable_on;
                      break;
                   case HIT_OVERWRITE_OTHER:
                      lastHitCal.type = hit_c->type;

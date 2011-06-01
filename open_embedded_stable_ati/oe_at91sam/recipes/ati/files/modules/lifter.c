@@ -57,6 +57,11 @@ atomic_t driver_id = ATOMIC_INIT(-1);
 static struct work_struct position_work;
 
 //---------------------------------------------------------------------------
+// This delayed work queue item is used to correct the hit sensor enabled value
+//---------------------------------------------------------------------------
+static struct work_struct hit_enable_work;
+
+//---------------------------------------------------------------------------
 // hit log variables
 //---------------------------------------------------------------------------
 typedef struct hit_item {
@@ -77,6 +82,8 @@ atomic_t hit_type = ATOMIC_INIT(0); // mechanical
 atomic_t after_fall = ATOMIC_INIT(0); // stay down on fall
 static struct timer_list fall_timer; // TODO -- stay down for a little while?
 atomic_t blank_time = ATOMIC_INIT(0); // no blanking time
+atomic_t enable_on = ATOMIC_INIT(BLANK_ON_CONCEALED); // blank when fully concealed
+atomic_t enable_doing = ATOMIC_INIT(0); // hit sensor enabling nothing
 static void blank_off(unsigned long data); // forward declaration
 static struct timer_list blank_timer = TIMER_INITIALIZER(blank_off, 0, 0);
 atomic_t at_conceal = ATOMIC_INIT(0); // do nothing when conceald
@@ -129,6 +136,8 @@ delay_printk("Lifter: received value: %i\n", value);
                     rc = -1; // we'll be going later
                 } else {
                     rc = EXPOSE; // we're already there
+                    atomic_set(&enable_doing, 1); // an action, not a calibration is changing the sensor
+                    schedule_work(&hit_enable_work); // we "reached" a "new" position; change hit sensor enabled state
                 }
                 break;
 
@@ -139,6 +148,8 @@ delay_printk("Lifter: received value: %i\n", value);
                     rc = -1; // we'll be going later
                 } else {
                     rc = CONCEAL; // we're already there
+                    atomic_set(&enable_doing, 1); // an action, not a calibration is changing the sensor
+                    schedule_work(&hit_enable_work); // we "reached" a "new" position; change hit sensor enabled state
                 }
                 break;
 
@@ -567,6 +578,7 @@ delay_printk("Lifter: handling hit-calibration command\n");
                     // fill in all data, the unused portions will be ignored
                     get_hit_calibration(&hit_c->seperation, &hit_c->sensitivity); // use existing hit_c structure
                     hit_c->blank_time = atomic_read(&blank_time);
+                    hit_c->enable_on = atomic_read(&enable_on);
                     hit_c->hits_to_fall = atomic_read(&hits_to_fall);
                     hit_c->after_fall = atomic_read(&after_fall);
                     hit_c->type = atomic_read(&hit_type);
@@ -581,11 +593,17 @@ delay_printk("Lifter: handling hit-calibration command\n");
                     atomic_set(&hit_type, hit_c->type);
                     set_hit_invert(hit_c->invert);
                     atomic_set(&blank_time, hit_c->blank_time);
+                    atomic_set(&enable_on, hit_c->enable_on);
+                    atomic_set(&enable_doing, 2); // a calibration, not an action is changing the sensor
+                    schedule_work(&hit_enable_work); // fix the hit sensor enabling soon
                     atomic_set(&fall_counter, hit_c->hits_to_fall); // reset fall counter
                     break;
                 case HIT_OVERWRITE_CAL:   /* overwrites calibration values (sensitivity, seperation) */
                     set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
                     atomic_set(&blank_time, hit_c->blank_time);
+                    atomic_set(&enable_on, hit_c->enable_on);
+                    atomic_set(&enable_doing, 2); // a calibration, not an action is changing the sensor
+                    schedule_work(&hit_enable_work); // fix the hit sensor enabling soon
                     break;
                 case HIT_OVERWRITE_OTHER: /* overwrites non-calibration values (type, etc.) */
                     atomic_set(&hits_to_fall, hit_c->hits_to_fall);
@@ -633,6 +651,66 @@ int pos_mfh(struct sk_buff *skb, void *pos_data) {
 }
 
 //---------------------------------------------------------------------------
+// Work item to adjust hit sensor enabledness
+//---------------------------------------------------------------------------
+static void hit_enable_change(struct work_struct * work) {
+    int enable_at;
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+
+    enable_at = atomic_read(&enable_on);
+    switch (atomic_read(&enable_doing)) {
+        case 1:
+            // new action
+            switch (enable_at) {
+                case BLANK_ON_CONCEALED:
+                case ENABLE_ALWAYS:
+                case BLANK_ALWAYS:
+                    // nothing
+                    break;
+                case ENABLE_AT_POSITION:
+                    // we're at position, blanking off == sensor enabled
+                    hit_blanking_off();
+                    break;
+                case DISABLE_AT_POSITION:
+                    // we're at position, blanking on == sensor disabled
+                    hit_blanking_on();
+                    break;
+            }
+            break;
+        case 2:
+            // new calibration
+            switch (enable_at) {
+                case BLANK_ON_CONCEALED:
+                    if (lifter_position_get() == LIFTER_POSITION_DOWN) {
+                        // down, so blank
+                        hit_blanking_on();
+                    } else {
+                        // not down, don't blank
+                        hit_blanking_off();
+                    }
+                    break;
+                case ENABLE_ALWAYS:
+                    // blanking off == sensor enabled
+                    hit_blanking_off();
+                    break;
+                case BLANK_ALWAYS:
+                    // blank always == blank now
+                    hit_blanking_on();
+                    break;
+                case ENABLE_AT_POSITION:
+                case DISABLE_AT_POSITION:
+                    // nothing
+                    break;
+            }
+            break;
+    }
+    atomic_set(&enable_doing, 0);
+}
+
+//---------------------------------------------------------------------------
 // Work item to notify the user-space about a position change or error
 //---------------------------------------------------------------------------
 static void position_change(struct work_struct * work) {
@@ -661,6 +739,7 @@ void lift_event(int etype) {
 }
 
 void lift_event_internal(int etype, bool upload) {
+    int enable_at = atomic_read(&enable_on);
     delay_printk("lift_event(%i)\n", etype);
 
     // send event upstream?
@@ -685,16 +764,41 @@ void lift_event_internal(int etype, bool upload) {
 
     // disable or enable hit sensor on raise and lower events
     switch (etype) {
-        case EVENT_LOWER:
-            // TODO -- make this optional?
-            hit_blanking_on();
+        case EVENT_UP:
+        case EVENT_DOWN:
+            switch (enable_at) {
+                case ENABLE_ALWAYS:
+                    // we never blank
+                    hit_blanking_off();
+                    break;
+                case ENABLE_AT_POSITION:
+                case DISABLE_AT_POSITION:
+                    // we reached a new position; change hit sensor enabled state
+                    atomic_set(&enable_doing, 1); // an action, not a calibration is changing the sensor
+                    schedule_work(&hit_enable_work);
+                    break;
+                case BLANK_ALWAYS:
+                    // we always blank
+                    hit_blanking_on();
+                    break;
+                case BLANK_ON_CONCEALED:
+                    if (etype == EVENT_DOWN) {
+                        // we're down; blank
+                        hit_blanking_on();
+                    }
+                    break;
+            }
             break;
         case EVENT_RAISE:
-            if (atomic_read(&blank_time) == 0) { // no blanking time
-                hit_blanking_off();
-            } else {
-                mod_timer(&blank_timer, jiffies+((atomic_read(&blank_time)*HZ)/1000)); // blank for X milliseconds
+            if (enable_at == BLANK_ON_CONCEALED) {
+               // we're not concealed, blank a little longer, or stop blanking now
+               if (atomic_read(&blank_time) == 0) { // no blanking time
+                  hit_blanking_off();
+               } else {
+                  mod_timer(&blank_timer, jiffies+((atomic_read(&blank_time)*HZ)/1000)); // blank for X milliseconds
+               }
             }
+            break;
     }
 
     // reset fall counter on start of raise
@@ -865,6 +969,7 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     set_lift_callback(lift_event);
 
     INIT_WORK(&position_work, position_change);
+    INIT_WORK(&hit_enable_work, hit_enable_change);
 
     // signal that we are fully initialized
     atomic_set(&full_init, TRUE);
@@ -878,6 +983,7 @@ static void __exit Lifter_exit(void) {
     atomic_set(&full_init, FALSE);
     uninstall_nl_driver(atomic_read(&driver_id));
     ati_flush_work(&position_work); // close any open work queue items
+    ati_flush_work(&hit_enable_work); // close any open work queue items
 }
 
 

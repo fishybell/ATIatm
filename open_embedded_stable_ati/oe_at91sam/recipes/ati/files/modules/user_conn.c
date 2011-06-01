@@ -151,7 +151,7 @@ printf("NL_C_HIT_CAL\n");
                         case HIT_OVERWRITE_NONE:
                         case HIT_OVERWRITE_ALL:
                             // all calibration data
-                            snprintf(wbuf, 1024, "L %i %i %i\nY %i %i\nF %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->type, hit_c->invert, hit_c->hits_to_fall, hit_c->after_fall);
+                            snprintf(wbuf, 1024, "L %i %i %i %i\nY %i %i\nF %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->enable_on, hit_c->type, hit_c->invert, hit_c->hits_to_fall, hit_c->after_fall);
                             break;
                         case HIT_OVERWRITE_OTHER:
                             // type and hits_to_fall
@@ -160,7 +160,7 @@ printf("NL_C_HIT_CAL\n");
                         case HIT_GET_CAL:
                         case HIT_OVERWRITE_CAL:
                             // sensitivity and seperation
-                            snprintf(wbuf, 1024, "L %i %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time);
+                            snprintf(wbuf, 1024, "L %i %i %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->enable_on);
                             break;
                         case HIT_GET_TYPE:
                         case HIT_OVERWRITE_TYPE:
@@ -292,7 +292,7 @@ int family;
 int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     char wbuf[1024];
     wbuf[0] = '\0';
-    int arg1, arg2, arg3;
+    int arg1, arg2, arg3, arg4;
     // read as many commands out of the buffer as possible
     while (1) {
         // read line from client buffer
@@ -409,7 +409,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Request hit data\nFormat: H\nReset Hit data\nFormat: H 0\n");
                         break;
                     case 'L': case 'l':
-                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose\n");
+                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-5)enable_on_value\n");
                         break;
                     case 'M': case 'm':
                         snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-127 to 126)speed_in_mph\n");
@@ -516,10 +516,11 @@ printf("unrecognized command '%c'\n", cmd[0]);
                         case 'L': case 'l':
                             if (arg2 == 1) {
                                 // set calibration message
-                                if (sscanf(cmd+1, "%i %i %i", &arg1, &arg2, &arg3) == 3) {
+                                if (sscanf(cmd+1, "%i %i %i %i", &arg1, &arg2, &arg3, &arg4) == 3) {
                                     hit_c.seperation = arg1;
                                     hit_c.sensitivity = arg2;
                                     hit_c.blank_time = arg3;
+                                    hit_c.enable_on = arg4;
                                     hit_c.set = HIT_OVERWRITE_CAL;
                                 }
                             } else {
@@ -532,7 +533,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                                 if (sscanf(cmd+1, "%i %i", &arg1, &arg2) == 2) {
                                     // set type and invert values message
                                     hit_c.type = arg1;
-                                    hit_c.invert = arg3;
+                                    hit_c.invert = arg2;
                                     hit_c.set = HIT_OVERWRITE_TYPE;
                                 }
                             } else {
