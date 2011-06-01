@@ -63,7 +63,7 @@ typedef struct hit_calibration {
     u16 enable_on:3 __attribute__ ((packed));   /* blank when commanded (enumerated below) */
     u8 hits_to_fall:6;                         /* number of hits required to fall (0 for infinity) */
     u8 after_fall:2;                           /* after fall: 0 stay down, 1 bob, 2 bob/stop, 3 stop */
-    u8 type:2;                                 /* 0 for mechanical, 1 for NCHS, 2 for MILES */
+    u8 type:2;                                 /* 0 for NCHS, 1 for mechanical (single-fire), 2 for mechanical (burst-fire), 3 for MILES */
     u8 invert:2;                               /* invert hit sensor input: 0 for no, 1 for yes, 2 for auto (not implimented) */
     u8 set:4;                                  /* explained below */
 } hit_calibration_t;

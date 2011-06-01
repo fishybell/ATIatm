@@ -78,7 +78,7 @@ static struct timespec hit_start; // time the hit log was started
 //---------------------------------------------------------------------------
 atomic_t hits_to_fall = ATOMIC_INIT(0); // infinite hits to fall
 atomic_t fall_counter = ATOMIC_INIT(-1); // invalid hit count for hits_to_fall
-atomic_t hit_type = ATOMIC_INIT(0); // mechanical
+atomic_t hit_type = ATOMIC_INIT(1); // single-fire mechanical
 atomic_t after_fall = ATOMIC_INIT(0); // stay down on fall
 static struct timer_list fall_timer; // TODO -- stay down for a little while?
 atomic_t blank_time = ATOMIC_INIT(0); // no blanking time
