@@ -56,7 +56,7 @@ FUNCTION_START("::SIT_Client(int fd, int tnum) : Connection(fd)")
       lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
       lastHitCal.hits_to_fall = 1; // fall on first hit
       lastHitCal.after_fall = 0; // 0 for stay down
-      lastHitCal.type = 0; // mechanical sensor
+      lastHitCal.type = 1; // mechanical sensor
       lastHitCal.invert = 0; // don't invert sensor input line
       nl_conn->doHitCal(lastHitCal); // tell kernel
 
@@ -136,17 +136,8 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
    }
 #endif
    msg->body.hit_conf.sens = htons(lastHitCal.sensitivity);
-   
-   if (lastHitCal.seperation < 500) { // TODO -- valid seperation point for single/burst
-         msg->body.hit_conf.mode = 1; // single
-	 msg->body.hit_conf.burst = htons(250); // TODO -- max burst DCMSGseperation
-//	 DCMSG(YELLOW,"set seperation to htons 250=0x%X",msg->body.hit_conf.burst) ;
-   } else {
-         msg->body.hit_conf.mode = 2; // burst
-         msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
-//	 DCMSG(YELLOW,"set seperation to  htons LHC=0x%X",msg->body.hit_conf.burst) ;
-   }
-
+   msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
+   msg->body.hit_conf.mode = lastHitCal.type; // single, etc.
    
 FUNCTION_END("::fillStatus2102(FASIT_2102 *msg)")
 }
@@ -397,7 +388,7 @@ FUNCTION_START("::handle_2100(int start, int end)");
          lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
 		 lastHitCal.hits_to_fall = 1; // fall on first hit
 		 lastHitCal.after_fall = 0; // 0 for stay down
-		 lastHitCal.type = 0; // mechanical sensor
+		 lastHitCal.type = 1; // mechanical sensor
 		 lastHitCal.invert = 0; // don't invert sensor input line
 		 doHitCal(lastHitCal); // tell kernel
 		 doHits(0);	// set hit count to zero
@@ -433,7 +424,6 @@ FUNCTION_START("::handle_2100(int start, int end)");
 	     if (msg->react)  lastHitCal.after_fall = msg->react;	// 0 for stay down
 	     if (msg->mode)   lastHitCal.type = msg->mode;			// mechanical sensor
 //		 lastHitCal.invert = 0; // don't invert sensor input line
-	     lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
 	     doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
 	     DCMSG(RED,"calling doHitCal after setting values") ;	     
 	     if (htons(msg->hit)) doHits(htons(msg->hit));	// set hit count to something other than zero
@@ -716,6 +706,7 @@ void SIT_Client::doHitCal(struct hit_calibration hit_c) {
 FUNCTION_START("::doHitCal(struct hit_calibration hit_c)")
    // pass directly to kernel for actual action
    if (hasPair()) {
+	  lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
       nl_conn->doHitCal(hit_c);
    }
 FUNCTION_END("::doHitCal(struct hit_calibration hit_c)")
