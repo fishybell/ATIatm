@@ -8,7 +8,7 @@ ifeq (${CURD},modules)
   FC_DIR := ${PWD}/fasit
   EC_DIR := ${PWD}/connector
   NL_DIR := ${PWD}
-  CU_FLAGS := ${U_FLAGS}
+  CU_FLAGS := ${U_FLAGS} -O0
   CC := arm-angstrom-linux-gnueabi-gcc
   CXX := arm-angstrom-linux-gnueabi-g++
 else
@@ -16,7 +16,7 @@ else
     FC_DIR := ${PWD}
     EC_DIR := ${PWD}/../connector
     NL_DIR := ${PWD}/..
-    CU_FLAGS := ${U_FLAGS}
+    CU_FLAGS := ${U_FLAGS} -O0
     CC := arm-angstrom-linux-gnueabi-gcc
     CXX := arm-angstrom-linux-gnueabi-g++
   else
@@ -24,14 +24,14 @@ else
       FC_DIR := ${PWD}/../fasit
       EC_DIR := ${PWD}
       NL_DIR := ${PWD}/..
-      CU_FLAGS := ${U_FLAGS}
+      CU_FLAGS := ${U_FLAGS} -O0
       CC := arm-angstrom-linux-gnueabi-gcc
       CXX := arm-angstrom-linux-gnueabi-g++
     else
       FC_DIR := ${PWD}/fasit
       EC_DIR := ${PWD}/connector
       NL_DIR := ${PWD}
-      CU_FLAGS :=
+      CU_FLAGS := -O0
     endif
   endif
 endif
