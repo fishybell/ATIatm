@@ -516,7 +516,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                         case 'L': case 'l':
                             if (arg2 == 1) {
                                 // set calibration message
-                                if (sscanf(cmd+1, "%i %i %i %i", &arg1, &arg2, &arg3, &arg4) == 3) {
+                                if (sscanf(cmd+1, "%i %i %i %i", &arg1, &arg2, &arg3, &arg4) == 4) {
                                     hit_c.seperation = arg1;
                                     hit_c.sensitivity = arg2;
                                     hit_c.blank_time = arg3;
