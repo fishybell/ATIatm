@@ -124,9 +124,8 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0);
    int start, end, mnum;
    
    // read all available valid messages
-HERE
    while ((mnum = validMessage(&start, &end)) != 0) {
-      IMSG("TCP Message : %i\n", mnum);
+      DCMSG(RED,"Recieved FASIT message %d",mnum);
       switch (mnum) {
          HANDLE_FASIT (100);
          HANDLE_FASIT (2000);
@@ -505,6 +504,9 @@ int FASIT_TCP::send_2101_ACK(FASIT_header *hdr,int response) {
    rmsg.response.rseq = hdr->seq;		
 
    rmsg.body.resp = response;	// The actual response code 'S'=can do, 'F'=Can't do
+   DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htons(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
+   DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nR-NUM | R-Seq | Response\n%5d  %6d  '%c'",
+	 htons(rmsg.response.rnum),htons(rmsg.response.rseq),rmsg.body.resp);
    queueMsg(&rhdr, sizeof(FASIT_header));	// send the response
    queueMsg(&rmsg, sizeof(FASIT_2101));
    finishMsg();

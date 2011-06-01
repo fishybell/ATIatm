@@ -237,9 +237,6 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
    // grab first items from write buffer lists (in the back, to treat it as a queue)
    char *fwbuf = wbuf.back();
    int fwsize = wsize.back();
-   DCMSG(RED,"fd %i attempting to write %i bytes with 'write(fd, fwbuf, fwsize)': ", fd, fwsize);
-   CPRINT_HEXB(RED,fwbuf, fwsize);
-   DCOLOR(black);
 
    // assume they're gone until proven otherwise
    wbuf.pop_back();
@@ -296,26 +293,26 @@ FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0)
 }
 
 void Connection::deleteLater() {
-FUNCTION_START("::deleteLater()")
+FUNCTION_START("::deleteLater()");
    // set the delete flag
    needDelete = 1;
    
    // make this connection turn up as ready so it deletes soon
    Connection::makeWritable(true); // bypass overwritten functions
 
-FUNCTION_END("::deleteLater()")
+FUNCTION_END("::deleteLater()");
 }
 
 
 // handles an incoming event (ready for read or ready for write or both), possibly writing the other connections write buffers in the process
 // -1 is returned if this object needs to be deleted afterwards
 int Connection::handleReady(const epoll_event *ev) {
-FUNCTION_START("Connection::handleReady(const epoll_event *ev)")
+FUNCTION_START("Connection::handleReady(const epoll_event *ev)");
    int ret = 0;
 
    // have we been marked for deletion?
    if (needDelete) {
-FUNCTION_INT("Connection::handleReady(const epoll_event *ev)", -1)
+FUNCTION_INT("Connection::handleReady(const epoll_event *ev)", -1);
       return -1; // -1 represents a "delete me" flag
    }
 
@@ -334,13 +331,13 @@ FUNCTION_INT("Connection::handleReady(const epoll_event *ev)", -1)
    if (ev->events & EPOLLERR || ev->events & EPOLLHUP) {
       ret = -1;
    }
-FUNCTION_INT("Connection::handleReady(const epoll_event *ev)", ret)
+FUNCTION_INT("Connection::handleReady(const epoll_event *ev)", ret);
    return ret;
 }
 
 // allows the global event fd to watch for writable status of this connection or not
 void Connection::makeWritable(bool writable) {
-FUNCTION_START("::makeWritable(bool writable)")
+FUNCTION_START("::makeWritable(bool writable)");
    // change the efd and check for errors
    epoll_event ev;
    memset(&ev, 0, sizeof(ev));
@@ -358,7 +355,7 @@ FUNCTION_START("::makeWritable(bool writable)")
          case ENOENT : break; /* no entry: it's already gone or was never there */
       }
    }
-FUNCTION_END("::makeWritable(bool writable)")
+FUNCTION_END("::makeWritable(bool writable)");
 }
 
 // add this message to the write buffer
@@ -366,15 +363,11 @@ FUNCTION_END("::makeWritable(bool writable)")
 //   preempted, the caller may call this function multiple times to create a complete
 //   message and be sure that the entire message is sent
 void Connection::queueMsg(const char *msg, int size) {
-   DCOLOR(BLUE);
    FUNCTION_START("Connection::queueMsg(char *msg, int size)");
-   DMSG("fd %i queued %i bytes:\n", fd, size);
-   PRINT_HEXB(msg, size);
 
    // check for need to create new write buffer based on newMsg and existing write buffer
    if (newMsg || wbuf.empty()) { // create new if requested or no existing write buffer
       // create new message
-      DMSG("Creating new message\n");
       char *fwbuf = new char[size];
       memcpy(fwbuf, msg, size);
 
@@ -386,7 +379,6 @@ void Connection::queueMsg(const char *msg, int size) {
       newMsg = false;
    } else {
       // append to existing message
-      DMSG("Appending to message\n");
       char *fwbuf = wbuf.front();
       int fwsize = wsize.front();
       char *tbuf = new char[size + fwsize];
@@ -407,11 +399,10 @@ void Connection::queueMsg(const char *msg, int size) {
    // set this connection to watch for writability
    makeWritable(true);
    FUNCTION_END("Connection::queueMsg(char *msg, int size)");
-   DCOLOR(black);
 }
 
 bool Connection::addToEPoll(int fd, void *ptr) {
-FUNCTION_START("::addToEPoll(int fd, void *ptr)")
+FUNCTION_START("::addToEPoll(int fd, void *ptr)");
    // create new TCP_Class (with predefined tnum) and to our epoll list
    struct epoll_event ev;
    memset(&ev, 0, sizeof(ev));
@@ -423,7 +414,7 @@ FUNCTION_START("::addToEPoll(int fd, void *ptr)")
       retval = false;
    }
 
-FUNCTION_INT("::addToEPoll(int fd, void *ptr)", retval)
+FUNCTION_INT("::addToEPoll(int fd, void *ptr)", retval);
    return retval;
 }
 

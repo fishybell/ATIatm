@@ -96,9 +96,9 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
    // device type
    msg->body.type = 1; // SIT. TODO -- SIT vs. SAT vs. HSAT
 
+//   DCMSG(YELLOW,"before  doHits(-1)   hits = %d",hits) ;    
    doHits(-1);	// request the hit count
-   
-   DCMSG(YELLOW,"setting hits to  0x%X",hits) ; 
+//   DCMSG(YELLOW,"retrieved hits with doHits(-1) and setting to %d",hits) ; 
 
    // hit record
    msg->body.hit = htons(hits);		
@@ -116,20 +116,28 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
            break;
    }
    msg->body.hit_conf.tokill = htons(lastHitCal.hits_to_fall);
+
+   // I changed it, but I still don't think it is right.
+   // also sesitivity is a uint16 in fasit
+   // just going to comment out the old code for now
+#if 0
    for (int i=15; i>=0; i++) { // count backwards from most sensitive to least
       if (lastHitCal.sensitivity <= cal_table[i]) { // map our cal value to theirs
-         msg->body.hit_conf.sens = htons(15); // found sensitivity value
+	 msg->body.hit_conf.sens = htons(i); // found sensitivity value
          break; // done looking
       }
    }
+#endif
+   msg->body.hit_conf.sens = htons(lastHitCal.sensitivity);
+   
    if (lastHitCal.seperation < 500) { // TODO -- valid seperation point for single/burst
          msg->body.hit_conf.mode = 1; // single
 	 msg->body.hit_conf.burst = htons(250); // TODO -- max burst DCMSGseperation
-	 DCMSG(YELLOW,"set seperation to htons 250=0x%X",msg->body.hit_conf.burst) ;
+//	 DCMSG(YELLOW,"set seperation to htons 250=0x%X",msg->body.hit_conf.burst) ;
    } else {
          msg->body.hit_conf.mode = 2; // burst
          msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
-	 DCMSG(YELLOW,"set seperation to  htons LHC=0x%X",msg->body.hit_conf.burst) ;
+//	 DCMSG(YELLOW,"set seperation to  htons LHC=0x%X",msg->body.hit_conf.burst) ;
    }
 
    
@@ -148,6 +156,13 @@ FUNCTION_START("::sendStatus2102()")
    // fill message
    fillStatus2102(&msg); // fills in status values with current values
 
+   DCMSG(BLUE,"Prepared to send 2102 status packet:");
+   DCMSG(blue,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htons(hdr.seq),htons(hdr.rsrvd),htons(hdr.length));
+   DCMSG(blue,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htons(msg.response.rseq));
+   DCMSG(blue,"\t\t\t\t\t\t\tmessage body\n PSTAT | Fault | Expos | Aspct |  Dir | Move | Speed  | POS | Type | Hits | On/Off | React | ToKill | Sens | Mode | Burst\n%5d  %5d  %6d  %6d  %6d  %5d  %9.2f  %6d  %6d  %6d  %6d  %7d  %6d  %6d  %6d  %6d ",
+	 msg.body.pstatus,msg.body.fault,msg.body.exp,msg.body.asp,msg.body.dir,msg.body.move,msg.body.speed,msg.body.pos,msg.body.type,msg.body.hit,
+	 msg.body.hit_conf.on,msg.body.hit_conf.react,htons(msg.body.hit_conf.tokill),htons(msg.body.hit_conf.sens),msg.body.hit_conf.mode,htons(msg.body.hit_conf.burst));
+   
    // send
    queueMsg(&hdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2102));
@@ -173,6 +188,8 @@ FUNCTION_START("::handle_100(int start, int end)")
    // map header (no body for 100)
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
 
+   DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
+   
    // message 100 is Device Definition Request,
    // a PD sends back a 2111
    // a pyro device sends back a 2005
@@ -190,13 +207,17 @@ FUNCTION_START("::handle_100(int start, int end)")
    //retrieve the PD_MUZZLE flag from the kernel like Nate described -
    //now that I used a kludge to get those options into the device when
    //the sit_client was constructed during startup
-   msg.body.flags = PD_MUZZLE; // TODO -- find actual capabilities from command line
+   msg.body.flags = 0;//PD_MUZZLE; // TODO -- find actual capabilities from command line
 //BDR   fasit_conn  has the command line option -S  that instaniates a
 //SIT handler.   It probably has to handle a bunch of possibilitys and
 //this part of code has to do the right thing
 // Nate said he was writing a MIT_client that handles moving targets
 // so that code would be elsewhere
-   
+
+   DCMSG(BLUE,"Prepared to send 2111 device capabilites message:");
+   DCMSG(blue,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htons(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
+   DCMSG(blue,"\t\t\t\t\t\t\tmessage body\n Device ID (mac address backwards) | flag_bits == GPS=4,Muzzle Flash=2,MILES Shootback=1\n0x%8.8llx           0x%2x",msg.body.devid,msg.body.flags);
+
    // send
    queueMsg(&rhdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2111));
@@ -205,22 +226,20 @@ FUNCTION_START("::handle_100(int start, int end)")
    // if the msg.body.flags include PD_MUZZLE then we must also generate and send a 2112, at least I thought so for a
    // while but I can't find that in the spec
 
-
    // if it is a Pyro device it responds with a 2005 device ID and
    // capabilities here (instead of or in addition to a 2111????????)
-
    
-FUNCTION_INT("::handle_100(int start, int end)", 0)
+FUNCTION_INT("::handle_100(int start, int end)", 0);
    return 0;
 }
 
 int SIT_Client::handle_2000(int start, int end) {
-FUNCTION_START("::handle_2000(int start, int end)")
+FUNCTION_START("::handle_2000(int start, int end)");
 
    // do handling of message
    IMSG("Handling 2000 in SIT\n");
   
-FUNCTION_INT("::handle_2000(int start, int end)", 0)
+FUNCTION_INT("::handle_2000(int start, int end)", 0);
    return 0;
 }
 
@@ -259,48 +278,88 @@ FUNCTION_INT("::handle_2006(int start, int end)", 0)
 //  Event Command
 //
 int SIT_Client::handle_2100(int start, int end) {
-FUNCTION_START("::handle_2100(int start, int end)")
-
-   // do handling of message
-   IMSG("Handling 2100 in SIT\n");
+FUNCTION_START("::handle_2100(int start, int end)");
 
    // map header and body for both message and response
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2100 *msg = (FASIT_2100*)(rbuf + start + sizeof(FASIT_header));
 
+
+   // save response numbers
+   resp_num = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
+   resp_seq = hdr->seq;
+
+   // Just parse out the command for now and print a pretty message
+   switch (msg->cid) {
+      case CID_No_Event:
+	 DCMSG(RED,"CID_No_Event") ; 
+	 break;
+
+      case CID_Reserved01:
+	 DCMSG(RED,"CID_Reserved01") ;
+	 break;
+
+      case CID_Status_Request:
+	 DCMSG(RED,"CID_Status_Request") ; 
+	 break;
+
+      case CID_Expose_Request:
+	 DCMSG(RED,"CID_Expose_Request:  msg->exp=%d",msg->exp) ;
+	 break;
+
+      case CID_Reset_Device:
+	 DCMSG(RED,"CID_Reset_Device  ") ;
+	 break;
+
+      case CID_Move_Request:
+	 DCMSG(RED,"CID_Move_Request  ") ;	     
+	 break;
+
+      case CID_Config_Hit_Sensor:
+	 DCMSG(RED,"CID_Config_Hit_Sensor") ;	     	     
+	 break;
+
+      case CID_GPS_Location_Request:
+	 DCMSG(RED,"CID_GPS_Location_Request") ;
+	 break;
+   }
+
+   DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
+   DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nC-ID | Expos | Aspct |  Dir | Move |  Speed    | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n%5d  %6d  %6d  %5d  %5d  %9.2f  %7d  %5d  %6d  %7d  %5d  %5d  %6d ",
+	 msg->cid,msg->exp,msg->asp,msg->dir,msg->move,msg->speed,msg->on,htons(msg->hit),msg->react,htons(msg->tokill),htons(msg->sens),msg->mode,htons(msg->burst));
    
    // do the event that was requested
 
    switch (msg->cid) {
       case CID_No_Event:
-	 DCMSG(BLUE,"CID_No_Event  send 'S'uccess ack") ; 
+	 DCMSG(RED,"CID_No_Event  send 'S'uccess ack") ; 
 	     // send 2101 ack
 	     send_2101_ACK(hdr,'S');
 		 break;
 
 	  case CID_Reserved01:
 		 // send 2101 ack
-	     DCMSG(BLUE,"CID_Reserved01  send 'F'ailure ack") ;
+	     DCMSG(RED,"CID_Reserved01  send 'F'ailure ack") ;
 	     send_2101_ACK(hdr,'F');
 
 		 break;
 
 	  case CID_Status_Request:
 		 // send 2102 status
-	     DCMSG(BLUE,"CID_Status_Request   send 2102 status") ; 
+	     DCMSG(RED,"CID_Status_Request   send 2102 status") ; 
 		 sendStatus2102();	// sends a 2102   not sure it gets the response number and sequence number right
 		 // AND/OR? send 2115 MILES shootback status if supported
 		 if (acc_conf.acc_type == ACC_NES_MFS){
-		    DCMSG(BLUE,"we also seem to have a MFS Muzzle Flash Simulator - TODO send 2112 status eventually") ; 
+		    DCMSG(RED,"we also seem to have a MFS Muzzle Flash Simulator - TODO send 2112 status eventually") ; 
 		 }
 		 // AND/OR? send 2112 Muzzle Flash status if supported	 
 
 		 break;
 
 	  case CID_Expose_Request:
-	     DCMSG(BLUE,"CID_Expose_Request  send 'S'uccess ack.   msg->exp=%d",msg->exp) ; 	     
+	     DCMSG(RED,"CID_Expose_Request  send 'S'uccess ack.   msg->exp=%d",msg->exp) ; 	     
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
-	     send_2101_ACK(hdr,'S');
+	     send_2101_ACK(hdr,'S');	// TRACR Cert complains if these are not there
 
 		 switch (msg->exp) {
 			case 0:
@@ -316,7 +375,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
 
 	  case CID_Reset_Device:
 		 // send 2101 ack
-	     DCMSG(BLUE,"CID_Reset_Device  send 'S'uccess ack.   set lastHitCal.* to defaults") ;
+	     DCMSG(RED,"CID_Reset_Device  send 'S'uccess ack.   set lastHitCal.* to defaults") ;
 	     send_2101_ACK(hdr,'S');
 		 // also supposed to reset all values to the 'initial exercise step value'
 		 //  which I am not sure if it is different than ordinary inital values 
@@ -333,13 +392,13 @@ FUNCTION_START("::handle_2100(int start, int end)")
 
 	  case CID_Move_Request:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
-	     DCMSG(BLUE,"CID_Move_Request  send 'S'uccess ack.   TODO send the move to the kernel?") ;	     
+	     DCMSG(RED,"CID_Move_Request  send 'S'uccess ack.   TODO send the move to the kernel?") ;	     
 	     send_2101_ACK(hdr,'S');
 		 break;
 
 	  case CID_Config_Hit_Sensor:
-	     DCMSG(BLUE,"CID_Config_Hit_Sensor  send 'S'uccess ack.   TODO add sending a 2102?") ;	     	     
-	     send_2101_ACK(hdr,'S');
+	     DCMSG(RED,"CID_Config_Hit_Sensor  send 'S'uccess ack.   TODO add sending a 2102?") ;	     	     
+//	     send_2101_ACK(hdr,'S');	// FASIT Cert seems to complain about this ACK
 	     
 		 // send 2102 status - after doing what was commanded
 		 // which is setting the values in the hit_calibration structure
@@ -355,14 +414,18 @@ FUNCTION_START("::handle_2100(int start, int end)")
 	     if (msg->mode)   lastHitCal.type = msg->mode;			// mechanical sensor
 //		 lastHitCal.invert = 0; // don't invert sensor input line
 	     doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
-	     DCMSG(BLUE,"calling doHitCal after setting values") ;	     
+	     DCMSG(RED,"calling doHitCal after setting values") ;	     
 	     if (htons(msg->hit)) doHits(htons(msg->hit));	// set hit count to something other than zero
-	     DCMSG(BLUE,"after doHits(%d) Does that generate a 2102 automagically?",htons(msg->hit)) ;
+	     DCMSG(RED,"after doHits(%d) ",htons(msg->hit)) ;
+			 // send 2102 status
+	     DCMSG(RED,"We will send 2102 status in response to the config hit sensor command") ; 
+	     sendStatus2102();	// sends a 2102   not sure it gets the response number and sequence number right
+
 	 
 	     break;
 
 	  case CID_GPS_Location_Request:
-	     DCMSG(BLUE,"CID_GPS_Location_Request  send 'F'ailure ack  - because we don't support it") ;
+	     DCMSG(RED,"CID_GPS_Location_Request  send 'F'ailure ack  - because we don't support it") ;
 	     send_2101_ACK(hdr,'F');
 
 		 // send 2113 GPS Location
@@ -411,6 +474,10 @@ FUNCTION_START("::handle_2110(int start, int end)")
    FASIT_2112 rmsg;
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2110 *msg = (FASIT_2110*)(rbuf + start + sizeof(FASIT_header));
+
+   DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
+   DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nOn/Off | Mode | I-Delay | R-Delay\n%7d  %5d  %8d  %8d",
+	 msg->on,msg->mode,htons(msg->idelay),htons(msg->rdelay));
    
    // check to see if we have muzzle flash capability -
    if (start_config&PD_MUZZLE){
@@ -916,7 +983,13 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
                   sit_client->didMSDH(acc_c->ex_data2, acc_c->ex_data3, acc_c->ex_data1, acc_c->start_delay/2);
                   break;
             }
-         }
+	 }
+	 break;
+	 
+      case NL_C_EVENT:
+	 genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+	 DCMSG(RED,"parseData case NL_C_EVENT: attrs = 0x%x ",attrs[GEN_INT8_A_MSG]) ;
+	 
          break;
    }
  

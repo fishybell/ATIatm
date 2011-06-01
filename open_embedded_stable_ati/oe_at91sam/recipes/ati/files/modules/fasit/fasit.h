@@ -128,7 +128,7 @@ typedef struct FASIT_2100 {
    __uint8_t  move;
    float      speed PCKD;
    // past this is refered to as 'Sensor Record'
-   __uint8_t  on;			// enum
+   __uint8_t  on;		// enum
    __uint16_t hit PCKD;		// hit count
    __uint8_t  react;		// reaction/after_fall, enum 
    __uint16_t tokill PCKD;	// hits to kill/fall
@@ -148,8 +148,6 @@ enum {
    CID_Config_Hit_Sensor,
    CID_GPS_Location_Request,
 };
-
-
 
 /********************************************/
 /* 2101 - Event Command Acknowledge         */
