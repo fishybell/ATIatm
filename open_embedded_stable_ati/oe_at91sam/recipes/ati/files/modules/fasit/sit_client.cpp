@@ -159,7 +159,9 @@ FUNCTION_START("::sendStatus2102()")
    DCMSG(BLUE,"Prepared to send 2102 status packet:");
    DCMSG(blue,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htons(hdr.seq),htons(hdr.rsrvd),htons(hdr.length));
    DCMSG(blue,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htons(msg.response.rseq));
-   DCMSG(blue,"\t\t\t\t\t\t\tmessage body\n PSTAT | Fault | Expos | Aspct |  Dir | Move | Speed  | POS | Type | Hits | On/Off | React | ToKill | Sens | Mode | Burst\n%5d  %5d  %6d  %6d  %6d  %5d  %9.2f  %6d  %6d  %6d  %6d  %7d  %6d  %6d  %6d  %6d ",
+   DCMSG(blue,"\t\t\t\t\t\t\tmessage body\n "\
+	 "PSTAT | Fault | Expos | Aspct |  Dir | Move |  Speed  | POS | Type | Hits | On/Off | React | ToKill | Sens | Mode | Burst\n"\
+	 "  %3d    %3d     %3d     %3d     %3d    %3d    %6.2f    %3d   %3d    %3d      %3d     %3d      %3d     %3d    %3d    %3d ",
 	 msg.body.pstatus,msg.body.fault,msg.body.exp,msg.body.asp,msg.body.dir,msg.body.move,msg.body.speed,msg.body.pos,msg.body.type,msg.body.hit,
 	 msg.body.hit_conf.on,msg.body.hit_conf.react,htons(msg.body.hit_conf.tokill),htons(msg.body.hit_conf.sens),msg.body.hit_conf.mode,htons(msg.body.hit_conf.burst));
    
@@ -187,7 +189,7 @@ FUNCTION_START("::handle_100(int start, int end)")
 
    // map header (no body for 100)
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
-
+   DCMSG(RED,"************************************** Report Device Capabilities *****************************************************************************************************");
    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
    
    // message 100 is Device Definition Request,
@@ -215,8 +217,9 @@ FUNCTION_START("::handle_100(int start, int end)")
 // so that code would be elsewhere
 
    DCMSG(BLUE,"Prepared to send 2111 device capabilites message:");
-   DCMSG(blue,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htons(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
-   DCMSG(blue,"\t\t\t\t\t\t\tmessage body\n Device ID (mac address backwards) | flag_bits == GPS=4,Muzzle Flash=2,MILES Shootback=1\n0x%8.8llx           0x%2x",msg.body.devid,msg.body.flags);
+   DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n"\
+	               "%4d    %d.%d     %5d    %3d     %3d",htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htons(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
+   DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n Device ID (mac address backwards) | flag_bits == GPS=4,Muzzle Flash=2,MILES Shootback=1\n0x%8.8llx           0x%2x",msg.body.devid,msg.body.flags);
 
    // send
    queueMsg(&rhdr, sizeof(FASIT_header));
@@ -325,7 +328,9 @@ FUNCTION_START("::handle_2100(int start, int end)");
    }
 
    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
-   DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nC-ID | Expos | Aspct |  Dir | Move |  Speed    | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n%5d  %6d  %6d  %5d  %5d  %9.2f  %7d  %5d  %6d  %7d  %5d  %5d  %6d ",
+   DCMSG(RED,"\t\t\t\t\t\t\tmessage body\n"\
+	 "C-ID | Expos | Aspct |  Dir | Move |  Speed | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n"\
+	 "%3d    %3d     %3d     %2d    %3d    %7.2f     %4d     %2d     %3d     %3d     %3d    %3d   %5d ",
 	 msg->cid,msg->exp,msg->asp,msg->dir,msg->move,msg->speed,msg->on,htons(msg->hit),msg->react,htons(msg->tokill),htons(msg->sens),msg->mode,htons(msg->burst));
    
    // do the event that was requested
@@ -397,8 +402,9 @@ FUNCTION_START("::handle_2100(int start, int end)");
 		 break;
 
 	  case CID_Config_Hit_Sensor:
-	     DCMSG(RED,"CID_Config_Hit_Sensor  send 'S'uccess ack.   TODO add sending a 2102?") ;	     	     
-//	     send_2101_ACK(hdr,'S');	// FASIT Cert seems to complain about this ACK
+	     DCMSG(RED,"CID_Config_Hit_Sensor  send 'S'uccess ack.   TODO add sending a 2102?") ;
+//		actually Riptide says that the FASIT spec is wrong and should not send an ACK here	     
+//	        send_2101_ACK(hdr,'S');	// FASIT Cert seems to complain about this ACK
 	     
 		 // send 2102 status - after doing what was commanded
 		 // which is setting the values in the hit_calibration structure
@@ -413,6 +419,7 @@ FUNCTION_START("::handle_2100(int start, int end)");
 	     if (msg->react)  lastHitCal.after_fall = msg->react;	// 0 for stay down
 	     if (msg->mode)   lastHitCal.type = msg->mode;			// mechanical sensor
 //		 lastHitCal.invert = 0; // don't invert sensor input line
+	     lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
 	     doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
 	     DCMSG(RED,"calling doHitCal after setting values") ;	     
 	     if (htons(msg->hit)) doHits(htons(msg->hit));	// set hit count to something other than zero
