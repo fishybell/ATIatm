@@ -119,14 +119,14 @@ delay_printk("Lifter: received value: %i\n", value);
                         atomic_set(&toggle_last, EXPOSE); // remember toggle direction
                     }
                 }
-                rc = LIFTING; // we're always going
+                rc = -1; // we'll be going later
                 break;
 
             case EXPOSE:
                 // do expose
                 if (lifter_position_get() != LIFTER_POSITION_UP) {
                     lifter_position_set(LIFTER_POSITION_UP); // expose now
-                    rc = LIFTING; // we're going
+                    rc = -1; // we'll be going later
                 } else {
                     rc = EXPOSE; // we're already there
                 }
@@ -136,7 +136,7 @@ delay_printk("Lifter: received value: %i\n", value);
                 // do conceal
                 if (lifter_position_get() != LIFTER_POSITION_DOWN) {
                     lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-                    rc = LIFTING; // we're going
+                    rc = -1; // we'll be going later
                 } else {
                     rc = CONCEAL; // we're already there
                 }
@@ -156,11 +156,17 @@ delay_printk("Lifter: received value: %i\n", value);
                 }
                 break;
         }
-        rc = nla_put_u8(skb, GEN_INT8_A_MSG, rc); // rc depends on above
+
+        // are we creating a response?
+        if (rc != -1) {
+            rc = nla_put_u8(skb, GEN_INT8_A_MSG, rc); // rc depends on above
+        }
 
         // message creation success?
         if (rc == 0) {
             rc = HANDLE_SUCCESS;
+        } else if (rc == -1) {
+            rc = HANDLE_SUCCESS_NO_REPLY;
         } else {
             delay_printk("Lifter: could not create return message\n");
             rc = HANDLE_FAILURE;
