@@ -1081,7 +1081,10 @@ FUNCTION_START("SIT_Conn::doHits(int num)")
     if (num == -1) {
         queueMsgU8(NL_C_HITS, HIT_REQ); // request hit count
     } else {
-        queueMsgU8(NL_C_HITS, 0); // reset to 0 (ignore num's value; we always want zero here)
+        if (num >= HIT_REQ) {
+           num = HIT_REQ-1;
+        }
+        queueMsgU8(NL_C_HITS, num); // reset to num
     }
 
 FUNCTION_END("SIT_Conn::doHits(int num)")
