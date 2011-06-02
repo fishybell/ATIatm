@@ -35,6 +35,9 @@ module_param(has_wheelX, int, S_IRUGO);
 static int has_turret = FALSE;				// has turret hit sensor
 module_param(has_turret, bool, S_IRUGO);
 
+void lift_event_internal(int etype, bool upload); // forward declaration
+void hit_event_internal(int line, bool upload); // forward declaration
+
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are fully initialized
 //---------------------------------------------------------------------------
@@ -209,17 +212,18 @@ delay_printk("Lifter: handling hits command\n");
 delay_printk("Lifter: received value: %i\n", value);
 
         // reset hit log?
-        if (value != HIT_REQ) {
+        if (value == 0) {
             spin_lock(hit_lock);
             this = hit_chain;
             while (this != NULL) {
                 hit_chain = this; // remember this
-                kfree(hit_chain); // free it
                 this = this->next; // move on to next link
+                kfree(hit_chain); // free it
             }
             hit_chain = NULL;
             spin_unlock(hit_lock);
             hit_start = current_kernel_time(); // reset hit log start time
+            atomic_set(&fall_counter, atomic_read(&hits_to_fall)); // reset fall counter
         }
 
         // get data from log
@@ -231,6 +235,32 @@ delay_printk("Lifter: received value: %i\n", value);
             this = this->next; // next link in chain
         }
         spin_unlock(hit_lock);
+
+        // fake the hit log data?
+        if (value != HIT_REQ && value != 0) {
+           if (value > rc) {
+               // grow hit log
+               while (value > rc) {
+                   // create a full it event
+                   hit_event_internal(0, true);
+                   rc++; // hit log grew one
+               }
+           } else if (value < rc) {
+               // shrink hit log
+               spin_lock(hit_lock);
+               this = hit_chain; // start removing from end of chain (TODO -- remove from other side?)
+               while (value < rc && this != NULL) {
+delay_printk("SHRANK ONE HIT\n");
+                   hit_chain = this; // remember this
+                   this = this->next; // move on to next link
+                   kfree(hit_chain); // free it
+                   rc--; // hit log shrank one
+               }
+               hit_chain = this;
+               spin_unlock(hit_lock);
+               atomic_set(&fall_counter, atomic_read(&hits_to_fall)-rc); // fix fall counter
+           }
+        }
         
         // prepare response
         rc = nla_put_u8(skb, GEN_INT8_A_MSG, rc); // rc is number of hits
@@ -733,7 +763,6 @@ static void position_change(struct work_struct * work) {
 //---------------------------------------------------------------------------
 // event handler for lifts
 //---------------------------------------------------------------------------
-void lift_event_internal(int etype, bool upload); // forward declaration
 void lift_event(int etype) {
     lift_event_internal(etype, true); // send event upstream
 }
@@ -830,7 +859,6 @@ void lift_event_internal(int etype, bool upload) {
 //---------------------------------------------------------------------------
 // event handler for hits
 //---------------------------------------------------------------------------
-void hit_event_internal(int line, bool upload); // forward declaration
 void hit_event(int line) {
    hit_event_internal(line, true); // send hit upstream
 }
