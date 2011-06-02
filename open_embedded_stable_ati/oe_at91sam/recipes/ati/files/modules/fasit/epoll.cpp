@@ -184,7 +184,10 @@ const char *usage = "Usage: %s [options]\n\
 \t-i X   -- connect to IP address X\n\
 \t-S     -- instantiate a SIT handler\n\
 \t-M     -- instantiate a MIT handler\n\
-\t-F     -- Has the Muzzle Flash option\n\
+\t-v     -- Enable ERROR messages\n\
+\t-vv    -- Enable ERROR, INFO messages\n\
+\t-vvv   -- Enable ERROR, INFO, DEBUG messages\n\
+\t-vvvv  -- Enable ERROR, INFO, DEBUG, TRACE messages\n\
 \t-h     -- print out usage information\n";
 
    start_config = 0;	//BDR  kludge to get MFS configuration into SIT_client
@@ -222,6 +225,18 @@ const char *usage = "Usage: %s [options]\n\
          case 'h' :
             printf(usage, argv[0]);
             return 0;
+            break;
+         case 'v' :
+            C_ERRORS=1; // enable ERROR output
+            if (argv[i][2] == 'v') {
+               C_INFO=1; // enable INFO output
+               if (argv[i][3] == 'v') {
+                  C_DEBUG=1; // enable DEBUG output
+                  if (argv[i][4] == 'v') {
+                     C_TRACE=1; // enable TRACE output
+                  }
+               }
+            }
             break;
          case '-' : // for --help
             if (argv[i][2] == 'h') {

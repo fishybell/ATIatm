@@ -22,6 +22,10 @@
         _x > _y ? _x : _y; })
 
 // comment these out to remove the TRACE, etc. lines from entire program, redefine to 0 to make individual chunks of code turn it off
+static int C_TRACE=0;
+static int C_DEBUG=0;
+static int C_INFO=0;
+static int C_ERRORS=0;
 #define TRACE 1
 #define DEBUG 1
 #define INFO 1
@@ -29,13 +33,13 @@
 
 // for run time tracing of application
 #ifdef TRACE
-#define FUNCTION_START(arg) TRACE && printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); TRACE && fflush(stdout);
-#define FUNCTION_END(arg) TRACE && printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); TRACE && fflush(stdout);
-#define FUNCTION_INT(arg, ret) TRACE && printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); TRACE && fflush(stdout);
-#define FUNCTION_HEX(arg, ret) TRACE && printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); TRACE && fflush(stdout);
-#define FUNCTION_STR(arg, ret) TRACE && printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); TRACE && fflush(stdout);
-#define HERE TRACE && printf("TRACE: Here! %s %i\n", __FILE__, __LINE__); TRACE && fflush(stdout);
-#define TMSG(...) TRACE && printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); TRACE && printf(__VA_ARGS__); TRACE && fflush(stdout);
+#define FUNCTION_START(arg) C_TRACE && printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); C_TRACE && fflush(stdout);
+#define FUNCTION_END(arg) C_TRACE && printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); C_TRACE && fflush(stdout);
+#define FUNCTION_INT(arg, ret) C_TRACE && printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); C_TRACE && fflush(stdout);
+#define FUNCTION_HEX(arg, ret) C_TRACE && printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); C_TRACE && fflush(stdout);
+#define FUNCTION_STR(arg, ret) C_TRACE && printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); C_TRACE && fflush(stdout);
+#define HERE C_TRACE && printf("TRACE: Here! %s %i\n", __FILE__, __LINE__); C_TRACE && fflush(stdout);
+#define TMSG(...) C_TRACE && printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); C_TRACE && printf(__VA_ARGS__); C_TRACE && fflush(stdout);
 #else
 #define FUNCTION_START(arg)
 #define FUNCTION_END(arg)
@@ -68,28 +72,28 @@
 
 // for run time debugging of application
 #ifdef DEBUG
-#define PRINT_HEXB(data, size) DEBUG && ({ \
+#define PRINT_HEXB(data, size) C_DEBUG && ({ \
         printf("DEBUG: 0x"); \
         char *_data = (char*)data; \
         for (int _i=0; _i<size; _i++) { \
            printf("%02x", (__uint8_t)_data[_i]); \
         } \
         printf(" in %s at line %i\n", __FILE__, __LINE__); \
-        }); DEBUG && fflush(stdout);
+        }); C_DEBUG && fflush(stdout);
 #define CPRINT_HEXB(SC,data, size)  { \
-    DEBUG && ({ \
+    C_DEBUG && ({ \
        printf("DEBUG:\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
        char *_data = (char*)data; \
        for (int _i=0; _i<size; _i++) printf("%02x", (__uint8_t)_data[_i]); \
        printf(" in %s at line %i\n", __FILE__, __LINE__); \
-}); DEBUG && fflush(stdout); }
+}); C_DEBUG && fflush(stdout); }
    
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
-#define BLIP DEBUG && printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); DEBUG && fflush(stdout);
-#define DMSG(...) DEBUG && printf("DEBUG: " __VA_ARGS__); DEBUG && fflush(stdout);
-#define DCMSG(SC, FMT, ...) DEBUG && printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); DEBUG && fflush(stdout);
-#define DCCMSG(SC, EC, FMT, ...) DEBUG && printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); DEBUG && fflush(stdout);
-#define DCOLOR(SC) DEBUG && printf("\x1B[3%d;%dm",SC&7,(SC>>3)&1); DEBUG && fflush(stdout);
+#define BLIP C_DEBUG && printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); C_DEBUG && fflush(stdout);
+#define DMSG(...) C_DEBUG && printf("DEBUG: " __VA_ARGS__); C_DEBUG && fflush(stdout);
+#define DCMSG(SC, FMT, ...) C_DEBUG && printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); C_DEBUG && fflush(stdout);
+#define DCCMSG(SC, EC, FMT, ...) C_DEBUG && printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); C_DEBUG && fflush(stdout);
+#define DCOLOR(SC) C_DEBUG && printf("\x1B[3%d;%dm",SC&7,(SC>>3)&1); C_DEBUG && fflush(stdout);
    
 //  here are two usage examples of DCMSG
 //DCMSG(RED,"example of DCMSG macro  with arguments  enum = %d  biff=0x%x",ghdr->cmd,biff) ;
@@ -108,8 +112,8 @@
 
 // for run time information viewing of application
 #ifdef INFO
-#define PROG_START INFO && printf("INFO: Starting in %s, compiled at %s %s MST\n\n", __FILE__, __DATE__, __TIME__);
-#define IMSG(...) INFO && printf("INFO: " __VA_ARGS__);
+#define PROG_START C_INFO && printf("INFO: Starting in %s, compiled at %s %s MST\n\n", __FILE__, __DATE__, __TIME__);
+#define IMSG(...) C_INFO && printf("INFO: " __VA_ARGS__);
 #else
 #define PROG_START
 #define IMSG(...)
@@ -117,7 +121,7 @@
 
 // for run time viewing of application errors
 #ifdef ERRORS
-#define IERROR(...) ERRORS && fprintf(stderr, "\x1B[31;1mERROR at %s %i: \x1B[30;0m\n", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fflush(stderr);
+#define IERROR(...) C_ERRORS && fprintf(stderr, "\x1B[31;1mERROR at %s %i: \x1B[30;0m\n", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fflush(stderr);
 #else
 #define IERROR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr);
 #endif
