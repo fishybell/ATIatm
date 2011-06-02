@@ -151,11 +151,11 @@ printf("NL_C_HIT_CAL\n");
                         case HIT_OVERWRITE_NONE:
                         case HIT_OVERWRITE_ALL:
                             // all calibration data
-                            snprintf(wbuf, 1024, "L %i %i %i %i\nY %i %i\nF %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->enable_on, hit_c->type, hit_c->invert, hit_c->hits_to_fall, hit_c->after_fall);
+                            snprintf(wbuf, 1024, "L %i %i %i %i\nY %i %i\nF %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->enable_on, hit_c->type, hit_c->invert, hit_c->hits_to_kill, hit_c->after_kill);
                             break;
                         case HIT_OVERWRITE_OTHER:
-                            // type and hits_to_fall
-                            snprintf(wbuf, 1024, "Y %i %i\nF %i %i\n", hit_c->type, hit_c->invert, hit_c->hits_to_fall, hit_c->after_fall);
+                            // type and hits_to_kill
+                            snprintf(wbuf, 1024, "Y %i %i\nF %i %i\n", hit_c->type, hit_c->invert, hit_c->hits_to_kill, hit_c->after_kill);
                             break;
                         case HIT_GET_CAL:
                         case HIT_OVERWRITE_CAL:
@@ -167,10 +167,10 @@ printf("NL_C_HIT_CAL\n");
                             // type only
                             snprintf(wbuf, 1024, "Y %i %i\n", hit_c->type, hit_c->invert);
                             break;
-                        case HIT_GET_FALL:
-                        case HIT_OVERWRITE_FALL:
-                            // hits_to_fall only
-                            snprintf(wbuf, 1024, "F %i %i\n", hit_c->hits_to_fall, hit_c->after_fall);
+                        case HIT_GET_KILL:
+                        case HIT_OVERWRITE_KILL:
+                            // hits_to_kill only
+                            snprintf(wbuf, 1024, "F %i %i\n", hit_c->hits_to_kill, hit_c->after_kill);
                             break;
                     }
                 }
@@ -400,7 +400,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Expose\nFormat: E\n");
                         break;
                     case 'F': case 'f':
-                        snprintf(wbuf, 1024, "Request fall parameters\nFormat: F\nChange fall parameters\nFormat: F (0-100)fall_at_x_hits (1|0)bob_after_fall\n");
+                        snprintf(wbuf, 1024, "Request fall parameters\nFormat: F\nChange fall parameters\nFormat: F (0-100)kill_at_x_hits (0|1|2|3|4)at_kill_do_fall_or_kill_or_stop_or_fall_and_stop_or_bob\n");
                         break;
                     case 'G': case 'g':
                         snprintf(wbuf, 1024, "Request GPS data\nFormat: G\n");
@@ -544,14 +544,14 @@ printf("unrecognized command '%c'\n", cmd[0]);
                         case 'F': case 'f':
                             if (arg2 == 1) {
                                 if (sscanf(cmd+1, "%i %i", &arg1, &arg2) == 2) {
-                                    // set hits_to_fall and after_fall values message
-                                    hit_c.hits_to_fall = arg1;
-                                    hit_c.after_fall = arg2;
-                                    hit_c.set = HIT_OVERWRITE_FALL;
+                                    // set hits_to_kill and after_kill values message
+                                    hit_c.hits_to_kill = arg1;
+                                    hit_c.after_kill = arg2;
+                                    hit_c.set = HIT_OVERWRITE_KILL;
                                 }
                             } else {
-                                // get hits_to_fall value request
-                                hit_c.set = HIT_GET_FALL;
+                                // get hits_to_kill value request
+                                hit_c.set = HIT_GET_KILL;
                             }
                             break;
                     }

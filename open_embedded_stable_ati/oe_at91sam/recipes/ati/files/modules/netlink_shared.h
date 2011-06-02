@@ -59,10 +59,10 @@ static struct nla_policy generic_int8_policy[GEN_INT8_A_MAX + 1] = {
 typedef struct hit_calibration {
     u32 seperation __attribute__ ((packed));   /* seperation calibration value (in milliseconds) */
     u32 sensitivity __attribute__ ((packed));  /* sensitivity calibration value (lower value for less sensitive) */
-    u16 blank_time:13 __attribute__ ((packed));   /* blank time from start of exposure (in milliseconds) */
+    u16 blank_time:10 __attribute__ ((packed));   /* blank time from start of exposure (in hudreths of seconds) */
     u16 enable_on:3 __attribute__ ((packed));   /* blank when commanded (enumerated below) */
-    u8 hits_to_fall:6;                         /* number of hits required to fall (0 for infinity) */
-    u8 after_fall:2;                           /* after fall: 0 stay down, 1 bob, 2 bob/stop, 3 stop */
+    u16 after_kill:3 __attribute__ ((packed));  /* after kill: 0 stay down, 1 bob, 2 bob/stop, 3 stop */
+    u8 hits_to_kill;                         /* number of hits required to kill (0 for infinity) */
     u8 type:2;                                 /* 0 for NCHS, 1 for mechanical (single-fire), 2 for mechanical (burst-fire), 3 for MILES */
     u8 invert:2;                               /* invert hit sensor input: 0 for no, 1 for yes, 2 for auto (not implimented) */
     u8 set:4;                                  /* explained below */
@@ -80,10 +80,10 @@ enum {
     HIT_OVERWRITE_CAL,   /* overwrites calibration values (sensitivity, seperation, blank_time) */
     HIT_OVERWRITE_OTHER, /* overwrites non-calibration values (type, etc.) */
     HIT_OVERWRITE_TYPE,  /* overwrites type and invert values */
-    HIT_OVERWRITE_FALL,  /* overwrites hits_to_fall and after_fall values */
+    HIT_OVERWRITE_KILL,  /* overwrites hits_to_kill and after_kill values */
     HIT_GET_CAL,         /* overwrites nothing (gets calibration values) */
     HIT_GET_TYPE,        /* overwrites nothing (gets type and invert values) */
-    HIT_GET_FALL,        /* overwrites nothing (gets hits_to_fall and after_fall value) */
+    HIT_GET_KILL,        /* overwrites nothing (gets hits_to_kill and after_kill value) */
 };
 enum {
     HIT_A_UNSPEC,

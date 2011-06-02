@@ -79,11 +79,11 @@ static struct timespec hit_start; // time the hit log was started
 //---------------------------------------------------------------------------
 // lifter state variables
 //---------------------------------------------------------------------------
-atomic_t hits_to_fall = ATOMIC_INIT(0); // infinite hits to fall
-atomic_t fall_counter = ATOMIC_INIT(-1); // invalid hit count for hits_to_fall
+atomic_t hits_to_kill = ATOMIC_INIT(0); // infinite hits to kill
+atomic_t kill_counter = ATOMIC_INIT(-1); // invalid hit count for hits_to_kill
 atomic_t hit_type = ATOMIC_INIT(1); // single-fire mechanical
-atomic_t after_fall = ATOMIC_INIT(0); // stay down on fall
-static struct timer_list fall_timer; // TODO -- stay down for a little while?
+atomic_t after_kill = ATOMIC_INIT(0); // stay down on kill
+static struct timer_list kill_timer; // TODO -- stay down for a little while?
 atomic_t blank_time = ATOMIC_INIT(0); // no blanking time
 atomic_t enable_on = ATOMIC_INIT(BLANK_ON_CONCEALED); // blank when fully concealed
 atomic_t enable_doing = ATOMIC_INIT(0); // hit sensor enabling nothing
@@ -223,7 +223,7 @@ delay_printk("Lifter: received value: %i\n", value);
             hit_chain = NULL;
             spin_unlock(hit_lock);
             hit_start = current_kernel_time(); // reset hit log start time
-            atomic_set(&fall_counter, atomic_read(&hits_to_fall)); // reset fall counter
+            atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
         }
 
         // get data from log
@@ -258,7 +258,7 @@ delay_printk("SHRANK ONE HIT\n");
                }
                hit_chain = this;
                spin_unlock(hit_lock);
-               atomic_set(&fall_counter, atomic_read(&hits_to_fall)-rc); // fix fall counter
+               atomic_set(&kill_counter, atomic_read(&hits_to_kill)-rc); // fix kill counter
            }
         }
         
@@ -603,14 +603,14 @@ delay_printk("Lifter: handling hit-calibration command\n");
             switch (hit_c->set) {
                 case HIT_GET_CAL:        /* overwrites nothing (gets calibration values) */
                 case HIT_GET_TYPE:       /* overwrites nothing (gets type value) */
-                case HIT_GET_FALL:       /* overwrites nothing (gets hits_to_fall value) */
+                case HIT_GET_KILL:       /* overwrites nothing (gets hits_to_kill value) */
                 case HIT_OVERWRITE_NONE: /* overwrite nothing (gets reply with current values) */
                     // fill in all data, the unused portions will be ignored
                     get_hit_calibration(&hit_c->seperation, &hit_c->sensitivity); // use existing hit_c structure
-                    hit_c->blank_time = atomic_read(&blank_time);
+                    hit_c->blank_time = atomic_read(&blank_time)/10; // convert from milliseconds
                     hit_c->enable_on = atomic_read(&enable_on);
-                    hit_c->hits_to_fall = atomic_read(&hits_to_fall);
-                    hit_c->after_fall = atomic_read(&after_fall);
+                    hit_c->hits_to_kill = atomic_read(&hits_to_kill);
+                    hit_c->after_kill = atomic_read(&after_kill);
                     hit_c->type = atomic_read(&hit_type);
                     hit_c->invert = get_hit_invert();
                     nla_put(skb, HIT_A_MSG, sizeof(struct hit_calibration), hit_c);
@@ -618,38 +618,38 @@ delay_printk("Lifter: handling hit-calibration command\n");
                     break;
                 case HIT_OVERWRITE_ALL:   /* overwrites every value */
                     set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
-                    atomic_set(&hits_to_fall, hit_c->hits_to_fall);
-                    atomic_set(&after_fall, hit_c->after_fall);
+                    atomic_set(&hits_to_kill, hit_c->hits_to_kill);
+                    atomic_set(&after_kill, hit_c->after_kill);
                     atomic_set(&hit_type, hit_c->type);
                     set_hit_invert(hit_c->invert);
-                    atomic_set(&blank_time, hit_c->blank_time);
+                    atomic_set(&blank_time, hit_c->blank_time*10); // convert to milliseconds
                     atomic_set(&enable_on, hit_c->enable_on);
                     atomic_set(&enable_doing, 2); // a calibration, not an action is changing the sensor
                     schedule_work(&hit_enable_work); // fix the hit sensor enabling soon
-                    atomic_set(&fall_counter, hit_c->hits_to_fall); // reset fall counter
+                    atomic_set(&kill_counter, hit_c->hits_to_kill); // reset kill counter
                     break;
                 case HIT_OVERWRITE_CAL:   /* overwrites calibration values (sensitivity, seperation) */
                     set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
-                    atomic_set(&blank_time, hit_c->blank_time);
+                    atomic_set(&blank_time, hit_c->blank_time*10); // convert to milliseconds
                     atomic_set(&enable_on, hit_c->enable_on);
                     atomic_set(&enable_doing, 2); // a calibration, not an action is changing the sensor
                     schedule_work(&hit_enable_work); // fix the hit sensor enabling soon
                     break;
                 case HIT_OVERWRITE_OTHER: /* overwrites non-calibration values (type, etc.) */
-                    atomic_set(&hits_to_fall, hit_c->hits_to_fall);
-                    atomic_set(&after_fall, hit_c->after_fall);
+                    atomic_set(&hits_to_kill, hit_c->hits_to_kill);
+                    atomic_set(&after_kill, hit_c->after_kill);
                     atomic_set(&hit_type, hit_c->type);
                     set_hit_invert(hit_c->invert);
-                    atomic_set(&fall_counter, hit_c->hits_to_fall); // reset fall counter
+                    atomic_set(&kill_counter, hit_c->hits_to_kill); // reset kill counter
                     break;
                 case HIT_OVERWRITE_TYPE: /* overwrites type value only */
                     atomic_set(&hit_type, hit_c->type);
                     set_hit_invert(hit_c->invert);
                     break;
-                case HIT_OVERWRITE_FALL:  /* overwrites hits_to_fall value only */
-                    atomic_set(&hits_to_fall, hit_c->hits_to_fall);
-                    atomic_set(&after_fall, hit_c->after_fall);
-                    atomic_set(&fall_counter, hit_c->hits_to_fall); // reset fall counter
+                case HIT_OVERWRITE_KILL:  /* overwrites hits_to_kill value only */
+                    atomic_set(&hits_to_kill, hit_c->hits_to_kill);
+                    atomic_set(&after_kill, hit_c->after_kill);
+                    atomic_set(&kill_counter, hit_c->hits_to_kill); // reset kill counter
                     break;
             }
         }
@@ -830,9 +830,9 @@ void lift_event_internal(int etype, bool upload) {
             break;
     }
 
-    // reset fall counter on start of raise
+    // reset kill counter on start of raise
     if (etype == EVENT_RAISE) {
-        atomic_set(&fall_counter, atomic_read(&hits_to_fall)); // reset fall counter
+        atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
     }
 
     // do bob?
@@ -901,13 +901,11 @@ void hit_event_internal(int line, bool upload) {
     queue_nl_multi(NL_C_HITS, &hits, sizeof(hits));
 
     // go down if we need to go down
-    if (atomic_read(&hits_to_fall) > 0) {
-        stay_up = !atomic_dec_and_test(&fall_counter);
+    if (atomic_read(&hits_to_kill) > 0) {
+        stay_up = !atomic_dec_and_test(&kill_counter);
     }
     if (!stay_up) {
-        // put down
-        atomic_set(&fall_counter, atomic_read(&hits_to_fall)); // reset fall counter
-        lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+        atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
 
         // create events for outputs
         generic_output_event(EVENT_KILL);
@@ -917,18 +915,24 @@ void hit_event_internal(int line, bool upload) {
         queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
         
         // bob if we need to bob
-        switch (atomic_read(&after_fall)) {
-            case 0: /* stay down */
-                // do nothing
+        switch (atomic_read(&after_kill)) {
+            case 0: /* fall */
+            case 1: /* kill -- TODO -- find out difference between fall and kill */
+                // put down
+                lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
                 break;
-            case 1: /* bob */
+            case 2: /* stop */
+                // TODO -- send stop movement message to mover
+                break;
+            case 3: /* fall/stop */
+                // put down
+                lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+                // TODO -- send stop movement message to mover
+                break;
+            case 4: /* bob */
+                // put down
+                lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
                 atomic_set(&at_conceal, 1); // when we get a CONCEAL event, go back up
-                break;
-            case 2: /* bob/stop */
-                // TODO -- send stop movement message to mover
-                break;
-            case 3: /* stop */
-                // TODO -- send stop movement message to mover
                 break;
         }
     }

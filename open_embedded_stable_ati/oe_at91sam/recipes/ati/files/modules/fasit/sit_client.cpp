@@ -52,10 +52,10 @@ FUNCTION_START("::SIT_Client(int fd, int tnum) : Connection(fd)")
       // initial hit calibration settings
       lastHitCal.seperation = 250;
       lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
-      lastHitCal.blank_time = 500; // half a second blanking
+      lastHitCal.blank_time = 50; // half a second blanking
       lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
-      lastHitCal.hits_to_fall = 1; // fall on first hit
-      lastHitCal.after_fall = 0; // 0 for stay down
+      lastHitCal.hits_to_kill = 1; // kill on first hit
+      lastHitCal.after_kill = 0; // 0 for stay down
       lastHitCal.type = 1; // mechanical sensor
       lastHitCal.invert = 0; // don't invert sensor input line
 	  lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
@@ -111,32 +111,17 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
        case DISABLE_AT_POSITION: msg->body.hit_conf.on = 3; break; // off at
        case BLANK_ALWAYS: msg->body.hit_conf.on = 0; break; // off
    }
-   switch (lastHitCal.after_fall) {
-       case 0: // stay down
-           msg->body.hit_conf.react = 0; // fall
-           break;
-       case 1: // bob
-       case 2: // bob/stop
-           msg->body.hit_conf.react = 4; // bob
-           break;
-       case 3: // stop
-           msg->body.hit_conf.react = 3; // fall and stop
-           break;
-   }
-   msg->body.hit_conf.tokill = htons(lastHitCal.hits_to_fall);
+   msg->body.hit_conf.react = lastHitCal.after_kill;
+   msg->body.hit_conf.tokill = htons(lastHitCal.hits_to_kill);
 
-   // I changed it, but I still don't think it is right.
-   // also sesitivity is a uint16 in fasit
-   // just going to comment out the old code for now
-#if 0
+   // use lookup table, as our sensitivity values don't match up to FASIT's
    for (int i=15; i>=0; i++) { // count backwards from most sensitive to least
       if (lastHitCal.sensitivity <= cal_table[i]) { // map our cal value to theirs
 	 msg->body.hit_conf.sens = htons(i); // found sensitivity value
          break; // done looking
       }
    }
-#endif
-   msg->body.hit_conf.sens = htons(lastHitCal.sensitivity);
+
    msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
    msg->body.hit_conf.mode = lastHitCal.type; // single, etc.
    
@@ -384,11 +369,11 @@ FUNCTION_START("::handle_2100(int start, int end)");
 		 // also supposed to reset all values to the 'initial exercise step value'
 		 //  which I am not sure if it is different than ordinary inital values 
 		 lastHitCal.seperation = 250;	//250;
-		 lastHitCal.sensitivity = 15;
-		 lastHitCal.blank_time = 500; // half a second blanking
+         lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
+		 lastHitCal.blank_time = 50; // half a second blanking
          lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
-		 lastHitCal.hits_to_fall = 1; // fall on first hit
-		 lastHitCal.after_fall = 0; // 0 for stay down
+		 lastHitCal.hits_to_kill = 1; // kill on first hit
+		 lastHitCal.after_kill = 0; // 0 for stay down
 		 lastHitCal.type = 1; // mechanical sensor
 		 lastHitCal.invert = 0; // don't invert sensor input line
 	     lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
@@ -420,12 +405,16 @@ FUNCTION_START("::handle_2100(int start, int end)");
             case 3: lastHitCal.enable_on = DISABLE_AT_POSITION; break; // hit sensor Off at Position
          }
 	     if (htons(msg->burst)) lastHitCal.seperation = htons(msg->burst);		// spec says we only set if non-Zero
-	     if (htons(msg->sens))  lastHitCal.sensitivity = htons(msg->sens);
-//		 lastHitCal.blank_time = 500; // half a second blanking  
-	     if (htons(msg->tokill))  lastHitCal.hits_to_fall = htons(msg->tokill); 
-	     if (msg->react)  lastHitCal.after_fall = msg->react;	// 0 for stay down
+	     if (htons(msg->sens)) {
+            if (htons(msg->sens) > 15) {
+               lastHitCal.sensitivity = cal_table[15];
+            } else {
+               lastHitCal.sensitivity = cal_table[htons(msg->sens)];
+            }
+         }
+	     if (htons(msg->tokill))  lastHitCal.hits_to_kill = htons(msg->tokill); 
+	     if (msg->react)  lastHitCal.after_kill = msg->react;	// 0 for stay down
 	     if (msg->mode)   lastHitCal.type = msg->mode;			// mechanical sensor
-//		 lastHitCal.invert = 0; // don't invert sensor input line
 	     lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
 	     doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
 	     DCMSG(RED,"calling doHitCal after setting values") ;	     
@@ -941,18 +930,18 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
                   case HIT_OVERWRITE_OTHER:
                      lastHitCal.type = hit_c->type;
                      lastHitCal.invert = hit_c->invert;
-                     lastHitCal.hits_to_fall = hit_c->hits_to_fall;
-                     lastHitCal.after_fall = hit_c->after_fall;
+                     lastHitCal.hits_to_kill = hit_c->hits_to_kill;
+                     lastHitCal.after_kill = hit_c->after_kill;
                      break;
                   case HIT_OVERWRITE_TYPE:
                   case HIT_GET_TYPE:
                      lastHitCal.type = hit_c->type;
                      lastHitCal.invert = hit_c->invert;
                      break;
-                  case HIT_OVERWRITE_FALL:
-                  case HIT_GET_FALL:
-                     lastHitCal.hits_to_fall = hit_c->hits_to_fall;
-                     lastHitCal.after_fall = hit_c->after_fall;
+                  case HIT_OVERWRITE_KILL:
+                  case HIT_GET_KILL:
+                     lastHitCal.hits_to_kill = hit_c->hits_to_kill;
+                     lastHitCal.after_kill = hit_c->after_kill;
                      break;
                }
                sit_client->didHitCal(lastHitCal); // tell client
