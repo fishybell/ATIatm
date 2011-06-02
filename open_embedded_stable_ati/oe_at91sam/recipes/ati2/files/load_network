@@ -1,5 +1,61 @@
 #!/bin/sh
 
+# procedure start the default programs
+def_progs() {
+   # start the "early" programs
+   user_conn &
+   bit_button &
+
+   # find auto ip, if necessary
+   if [ "$ip" == "auto" ] ; then
+      ip=`bcast_client`
+   fi
+
+   # connect event_conns together
+   case $board in
+      TTMT|MIT|MAT)
+         # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
+         event_conn | grep -v TRACE &
+         ;;
+      EIM|SES|SIT|LSAT|HSAT|SAT)
+         if [ "$comm" == "local" ] ; then
+            # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
+            event_conn -i $ip -C | grep -v TRACE &
+         fi
+         ;;
+   esac
+
+   # start auto ip server
+   case $board in
+      TTMT|MAT|MIT)
+         if [ "$comm" != "network" ] ; then
+            bcast_server &
+            # start ping if we're on a wimax network
+            if [ "$comm" == "wimax" ] ; then
+               ping -q $ip &
+            fi
+         fi
+         ;;
+   esac
+
+   # start the radio convertor
+   BASE=""
+   case $board in
+      HHC|BASE)
+         BASE="-b $ip"
+         ;;
+      RELAY)
+         BASE="-s /dev/ttyS2 -r"
+         ;;
+   esac
+   if [ "$comm" == "radio" ] ; then
+      # listen or connect on the "connect-to" port
+      radio_conv -p $cport -s /dev/ttyS1 $BASE | grep -v TRACE &
+      ip="127.0.0.1"
+   fi
+   export ip=$ip
+}
+
 # grab eeprom values
 lport=`is_lport`
 cport=`is_cport`
@@ -11,7 +67,10 @@ board=`is_board`
 sysctl -w \
  net.ipv4.tcp_keepalive_time=20 \
  net.ipv4.tcp_keepalive_intvl=10 \
- net.ipv4.tcp_keepalive_probes=3
+ net.ipv4.tcp_keepalive_probes=3 \
+ net.ipv4.tcp_retries1=1 \
+ net.ipv4.tcp_retries2=1 \
+ net.ipv4.tcp_max_syn_backlog=16
 
 # restart wlan0 if necessary
 wlan=wlan0
@@ -61,56 +120,6 @@ if [ -z "$ip" -o "$ip" == "none" ] ; then
          ;;
    esac
 fi
-
-# start auto ip server
-case $board in
-   TTMT|MAT|MIT)
-      if [ "$comm" != "network" ] ; then
-         bcast_server &
-         # start ping if we're on a wimax network
-         if [ "$comm" == "wimax" ] ; then
-            ping -q $ip &
-         fi
-      fi
-      ;;
-esac
-
-# find auto ip
-if [ "$ip" == "auto" ] ; then
-   ip=`bcast_client`
-fi
-
-# start the radio convertor
-BASE=""
-case $board in
-   HHC|BASE)
-      BASE="-b $ip"
-      ;;
-   RELAY)
-      BASE="-s /dev/ttyS2 -r"
-      ;;
-esac
-if [ "$comm" == "radio" ] ; then
-   # listen or connect on the "connect-to" port
-   radio_conv -p $cport -s /dev/ttyS1 $BASE &
-   ip="127.0.0.1"
-fi
-
-# start the default programs
-bit_button &
-user_conn &
-case $board in
-   TTMT|MIT|MAT)
-      # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
-      event_conn &
-      ;;
-   EIM|SES|SIT|LSAT|HSAT|SAT)
-      if [ "$comm" == "local" ] ; then
-         # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
-         event_conn -i $ip -C &
-      fi
-      ;;
-esac
 
 # return the results
 echo "$ip $lport $cport"

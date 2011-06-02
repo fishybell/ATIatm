@@ -13,8 +13,11 @@ start () {
                 "target_lifter_armor.ko" \
                 "lifter.ko"
 
+   # start default programs
+   def_progs
+
    # start fasit client
-   fasit_conn -S -l $lport -p $cport -i $ip &
+   fasit_conn -S -l $lport -p $cport -i $ip | grep -v TRACE &
 }
 
 # leave default stop routine

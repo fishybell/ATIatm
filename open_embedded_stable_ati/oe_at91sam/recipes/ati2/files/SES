@@ -10,8 +10,11 @@ start () {
                 "target_battery.ko minvoltval=12" \
                 "target_ses_interface.ko"
 
+   # start default programs
+   def_progs
+
    # start fasit client
-   fasit_conn -E -l $lport -p $cport -i $ip &
+   fasit_conn -E -l $lport -p $cport -i $ip | grep -v TRACE &
 }
 
 # leave default stop routine

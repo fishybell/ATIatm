@@ -12,8 +12,11 @@ start () {
                 "target_generic_output.ko" \
                 "mover.ko"
 
+   # start default programs
+   def_progs
+
    # start fasit client
-   fasit_conn -M -l $lport -p $cport -i $ip &
+   fasit_conn -M -l $lport -p $cport -i $ip | grep -v TRACE &
 }
 
 # leave default stop routine
