@@ -16,7 +16,7 @@ start () {
    def_progs
 
    # start fasit client
-   fasit_conn -M -l $lport -p $cport -i $ip | grep -v TRACE &
+   fasit_conn -M -l $lport -p $cport -i $ip -vvv &
 }
 
 # leave default stop routine
