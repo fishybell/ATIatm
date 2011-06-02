@@ -496,7 +496,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     if (cmd[1] == '\0') {
                         nla_put_u8(msg, GEN_INT8_A_MSG, HIT_REQ); // request hits message
                     } else if (sscanf(cmd+1, "%i", &arg1) == 1) {
-                        if (arg1 == 0) {
+                        if (arg1 >= 0 && arg1 < HIT_REQ) {
                             nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // reset hits (to X) message
                         } else {
                             nla_put_u8(msg, GEN_INT8_A_MSG, HIT_REQ); // request hits message
