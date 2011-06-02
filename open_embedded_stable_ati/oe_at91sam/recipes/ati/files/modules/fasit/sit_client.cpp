@@ -50,12 +50,13 @@ FUNCTION_START("::SIT_Client(int fd, int tnum) : Connection(fd)")
       // TODO -- MILES SDH
 
       // initial hit calibration settings
+      fake_sens = 1;
       lastHitCal.seperation = 250;
       lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
       lastHitCal.blank_time = 50; // half a second blanking
       lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
       lastHitCal.hits_to_kill = 1; // kill on first hit
-      lastHitCal.after_kill = 0; // 0 for stay down
+      lastHitCal.after_kill = 0; // 0 for fall
       lastHitCal.type = 1; // mechanical sensor
       lastHitCal.invert = 0; // don't invert sensor input line
 	  lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
@@ -115,11 +116,15 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
    msg->body.hit_conf.tokill = htons(lastHitCal.hits_to_kill);
 
    // use lookup table, as our sensitivity values don't match up to FASIT's
-   for (int i=15; i>=0; i++) { // count backwards from most sensitive to least
+   for (int i=15; i>=0; i--) { // count backwards from most sensitive to least
       if (lastHitCal.sensitivity <= cal_table[i]) { // map our cal value to theirs
 	 msg->body.hit_conf.sens = htons(i); // found sensitivity value
          break; // done looking
       }
+   }
+   // use remembered value rather than actual value
+   if (msg->body.hit_conf.sens == htons(15)) {
+      msg->body.hit_conf.sens = htons(fake_sens);
    }
 
    msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
@@ -368,6 +373,7 @@ FUNCTION_START("::handle_2100(int start, int end)");
 	     send_2101_ACK(hdr,'S');
 		 // also supposed to reset all values to the 'initial exercise step value'
 		 //  which I am not sure if it is different than ordinary inital values 
+         fake_sens = 1;
 		 lastHitCal.seperation = 250;	//250;
          lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
 		 lastHitCal.blank_time = 50; // half a second blanking
@@ -411,19 +417,23 @@ FUNCTION_START("::handle_2100(int start, int end)");
             } else {
                lastHitCal.sensitivity = cal_table[htons(msg->sens)];
             }
+            // remember told value for later
+            fake_sens = htons(msg->sens);
          }
 	     if (htons(msg->tokill))  lastHitCal.hits_to_kill = htons(msg->tokill); 
-	     if (msg->react)  lastHitCal.after_kill = msg->react;	// 0 for stay down
-	     if (msg->mode)   lastHitCal.type = msg->mode;			// mechanical sensor
+	     lastHitCal.after_kill = msg->react;	// 0 for stay down
+	     lastHitCal.type = msg->mode;			// mechanical sensor
 	     lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
 	     doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
 	     DCMSG(RED,"calling doHitCal after setting values") ;	     
-	     if (htons(msg->hit)) doHits(htons(msg->hit));	// set hit count to something other than zero
-	     DCMSG(RED,"after doHits(%d) ",htons(msg->hit)) ;
-			 // send 2102 status
-	     DCMSG(RED,"We will send 2102 status in response to the config hit sensor command") ; 
-	     sendStatus2102();	// sends a 2102   not sure it gets the response number and sequence number right
-
+		 // send 2102 status or change the hit count (which will send the 2102 later)
+         if (hits == htons(msg->hit)) {
+            sendStatus2102();	// sends a 2102 as we won't if we didn't change the the hit count
+	        DCMSG(RED,"We will send 2102 status in response to the config hit sensor command"); 
+         } else {
+	        doHits(htons(msg->hit));	// set hit count to something other than zero
+	        DCMSG(RED,"after doHits(%d) ",htons(msg->hit)) ;
+         }
 	 
 	     break;
 
@@ -751,9 +761,7 @@ FUNCTION_START("SIT_Client::didHits(int num)")
       hits = num;
 
       // if we have a hit count, send it
-      if (hits != 0) {
-         sendStatus2102(); // send status message to FASIT server
-      }
+      sendStatus2102(); // send status message to FASIT server
    }
 
 FUNCTION_END("SIT_Client::didHits(int num)")

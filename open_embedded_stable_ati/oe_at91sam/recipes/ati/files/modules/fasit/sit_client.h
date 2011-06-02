@@ -84,6 +84,7 @@ private:
 
    // remember data to send back over and over again
    struct hit_calibration lastHitCal;
+   __uint16_t fake_sens; // to remember their unreasonable sensitivity values
    struct accessory_conf acc_conf;
    int exposure;
    int hits;
