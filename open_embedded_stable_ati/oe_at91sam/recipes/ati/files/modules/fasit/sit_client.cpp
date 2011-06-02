@@ -58,6 +58,7 @@ FUNCTION_START("::SIT_Client(int fd, int tnum) : Connection(fd)")
       lastHitCal.after_fall = 0; // 0 for stay down
       lastHitCal.type = 1; // mechanical sensor
       lastHitCal.invert = 0; // don't invert sensor input line
+	  lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
       nl_conn->doHitCal(lastHitCal); // tell kernel
 
       hits = 0;
@@ -390,6 +391,7 @@ FUNCTION_START("::handle_2100(int start, int end)");
 		 lastHitCal.after_fall = 0; // 0 for stay down
 		 lastHitCal.type = 1; // mechanical sensor
 		 lastHitCal.invert = 0; // don't invert sensor input line
+	     lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
 		 doHitCal(lastHitCal); // tell kernel
 		 doHits(0);	// set hit count to zero
 		 break;
@@ -424,6 +426,7 @@ FUNCTION_START("::handle_2100(int start, int end)");
 	     if (msg->react)  lastHitCal.after_fall = msg->react;	// 0 for stay down
 	     if (msg->mode)   lastHitCal.type = msg->mode;			// mechanical sensor
 //		 lastHitCal.invert = 0; // don't invert sensor input line
+	     lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
 	     doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
 	     DCMSG(RED,"calling doHitCal after setting values") ;	     
 	     if (htons(msg->hit)) doHits(htons(msg->hit));	// set hit count to something other than zero
@@ -706,7 +709,6 @@ void SIT_Client::doHitCal(struct hit_calibration hit_c) {
 FUNCTION_START("::doHitCal(struct hit_calibration hit_c)")
    // pass directly to kernel for actual action
    if (hasPair()) {
-	  lastHitCal.set = HIT_OVERWRITE_ALL;	// nothing will change without this
       nl_conn->doHitCal(hit_c);
    }
 FUNCTION_END("::doHitCal(struct hit_calibration hit_c)")
