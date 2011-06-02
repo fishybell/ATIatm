@@ -213,9 +213,11 @@ delay_printk("Lifter: received value: %i\n", value);
 
         // reset hit log?
         if (value == 0) {
+delay_printk("RESET HITS\n");
             spin_lock(hit_lock);
             this = hit_chain;
             while (this != NULL) {
+delay_printk("SHRANK ONE HIT\n");
                 hit_chain = this; // remember this
                 this = this->next; // move on to next link
                 kfree(hit_chain); // free it
@@ -238,11 +240,13 @@ delay_printk("Lifter: received value: %i\n", value);
 
         // fake the hit log data?
         if (value != HIT_REQ && value != 0) {
+delay_printk("FAKE HITS\n");
            if (value > rc) {
                // grow hit log
                while (value > rc) {
-                   // create a full it event
-                   hit_event_internal(0, true);
+delay_printk("GREW ONE HIT\n");
+                   // create a full hit event ...
+                   hit_event_internal(0, false); // ... except don't send data back upstream
                    rc++; // hit log grew one
                }
            } else if (value < rc) {
@@ -898,7 +902,9 @@ void hit_event_internal(int line, bool upload) {
     spin_unlock(hit_lock);
         
     // send hits upstream
-    queue_nl_multi(NL_C_HITS, &hits, sizeof(hits));
+    if (upload) {
+        queue_nl_multi(NL_C_HITS, &hits, sizeof(hits));
+    }
 
     // go down if we need to go down
     if (atomic_read(&hits_to_kill) > 0) {
