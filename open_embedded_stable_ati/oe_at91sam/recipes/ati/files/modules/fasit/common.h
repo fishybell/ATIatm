@@ -26,29 +26,15 @@ static int C_TRACE=0;
 static int C_DEBUG=0;
 static int C_INFO=0;
 static int C_ERRORS=0;
-#define TRACE 1
-#define DEBUG 1
-#define INFO 1
-#define ERRORS 1
 
 // for run time tracing of application
-#ifdef TRACE
-#define FUNCTION_START(arg) C_TRACE && printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); C_TRACE && fflush(stdout);
-#define FUNCTION_END(arg) C_TRACE && printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); C_TRACE && fflush(stdout);
-#define FUNCTION_INT(arg, ret) C_TRACE && printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); C_TRACE && fflush(stdout);
-#define FUNCTION_HEX(arg, ret) C_TRACE && printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); C_TRACE && fflush(stdout);
-#define FUNCTION_STR(arg, ret) C_TRACE && printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); C_TRACE && fflush(stdout);
-#define HERE C_TRACE && printf("TRACE: Here! %s %i\n", __FILE__, __LINE__); C_TRACE && fflush(stdout);
-#define TMSG(...) C_TRACE && printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); C_TRACE && printf(__VA_ARGS__); C_TRACE && fflush(stdout);
-#else
-#define FUNCTION_START(arg)
-#define FUNCTION_END(arg)
-#define FUNCTION_INT(arg, ret)
-#define FUNCTION_HEX(arg, ret)
-#define FUNCTION_STR(arg, ret)
-#define HERE
-#define TMSG(...)
-#endif
+#define FUNCTION_START(arg) { if (C_TRACE) { printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_END(arg) { if (C_TRACE){ printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_INT(arg, ret) { if (C_TRACE) { printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_HEX(arg, ret) { if (C_TRACE) { printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_STR(arg, ret) { if (C_TRACE) { printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
+#define HERE { if (C_TRACE) { printf("TRACE: Here! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define TMSG(...) { if (C_TRACE) { printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); printf(__VA_ARGS__); fflush(stdout);}}
 
 //  colors for the DCMSG  
 #define black	0
@@ -71,60 +57,40 @@ static int C_ERRORS=0;
 #define GRAY	15
 
 // for run time debugging of application
-#ifdef DEBUG
-#define PRINT_HEXB(data, size) C_DEBUG && ({ \
+#define PRINT_HEXB(data, size) {if (C_DEBUG) {{ \
         printf("DEBUG: 0x"); \
         char *_data = (char*)data; \
         for (int _i=0; _i<size; _i++) { \
            printf("%02x", (__uint8_t)_data[_i]); \
         } \
         printf(" in %s at line %i\n", __FILE__, __LINE__); \
-        }); C_DEBUG && fflush(stdout);
-#define CPRINT_HEXB(SC,data, size)  { \
-    C_DEBUG && ({ \
+        }; fflush(stdout);}}
+#define CPRINT_HEXB(SC,data, size)  { if (C_DEBUG) {{ \
        printf("DEBUG:\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
        char *_data = (char*)data; \
        for (int _i=0; _i<size; _i++) printf("%02x", (__uint8_t)_data[_i]); \
        printf(" in %s at line %i\n", __FILE__, __LINE__); \
-}); C_DEBUG && fflush(stdout); }
+}; fflush(stdout); }}
    
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
-#define BLIP C_DEBUG && printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); C_DEBUG && fflush(stdout);
-#define DMSG(...) C_DEBUG && printf("DEBUG: " __VA_ARGS__); C_DEBUG && fflush(stdout);
-#define DCMSG(SC, FMT, ...) C_DEBUG && printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); C_DEBUG && fflush(stdout);
-#define DCCMSG(SC, EC, FMT, ...) C_DEBUG && printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); C_DEBUG && fflush(stdout);
-#define DCOLOR(SC) C_DEBUG && printf("\x1B[3%d;%dm",SC&7,(SC>>3)&1); C_DEBUG && fflush(stdout);
+#define BLIP { if (C_DEBUG ){ printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define DMSG(...) { if (C_DEBUG) { printf("DEBUG: " __VA_ARGS__); fflush(stdout);}}
+#define DCMSG(SC, FMT, ...) { if (C_DEBUG) { printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
+#define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
+#define DCOLOR(SC) { if (C_DEBUG){ printf("\x1B[3%d;%dm",SC&7,(SC>>3)&1); fflush(stdout);}}
    
 //  here are two usage examples of DCMSG
 //DCMSG(RED,"example of DCMSG macro  with arguments  enum = %d  biff=0x%x",ghdr->cmd,biff) ;
 //DCMSG(blue,"example of DCMSG macro with no args") ;   
 //   I always like to include the trailing ';' so my editor can indent automatically
 
-#else
-#define PRINT_HEXB(data, size)
-#define PRINT_HEX(arg)
-#define BLIP
-#define DMSG(...)
-#define DCMSG(SC, FMT, ...)
-#define DCCMSG(SC, EC, FMT, ...)
-#define DCOLOR(SC)   
-#endif
 
 // for run time information viewing of application
-#ifdef INFO
-#define PROG_START C_INFO && printf("INFO: Starting in %s, compiled at %s %s MST\n\n", __FILE__, __DATE__, __TIME__);
-#define IMSG(...) C_INFO && printf("INFO: " __VA_ARGS__);
-#else
-#define PROG_START
-#define IMSG(...)
-#endif
+#define PROG_START { if (C_INFO) { printf("INFO: Starting in %s, compiled at %s %s MST\n\n", __FILE__, __DATE__, __TIME__);}}
+#define IMSG(...) { if (C_INFO) { printf("INFO: " __VA_ARGS__);}}
 
 // for run time viewing of application errors
-#ifdef ERRORS
-#define IERROR(...) C_ERRORS && fprintf(stderr, "\x1B[31;1mERROR at %s %i: \x1B[30;0m\n", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fflush(stderr);
-#else
-#define IERROR(...) fprintf(stderr, __VA_ARGS__); fflush(stderr);
-#endif
+#define IERROR(...) { if (C_ERRORS) {fprintf(stderr, "\x1B[31;1mERROR at %s %i: \x1B[30;0m\n", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fflush(stderr);}}
 
 // utility function to get Device ID (mac address)
 __uint64_t getDevID();
