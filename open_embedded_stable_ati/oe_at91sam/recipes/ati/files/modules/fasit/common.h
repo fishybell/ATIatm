@@ -90,7 +90,7 @@ static int C_ERRORS=0;
 #define IMSG(...) { if (C_INFO) { printf("INFO: " __VA_ARGS__);}}
 
 // for run time viewing of application errors
-#define IERROR(...) { if (C_ERRORS) {fprintf(stderr, "\x1B[31;1mERROR at %s %i: \x1B[30;0m\n", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fflush(stderr);}}
+#define IERROR(...) { if (C_ERRORS) {fprintf(stderr, "\x1B[31;1mERROR at %s %i: \x1B[30;0m\n", __FILE__, __LINE__);} fprintf(stderr, __VA_ARGS__); fflush(stderr);}
 
 // utility function to get Device ID (mac address)
 __uint64_t getDevID();
