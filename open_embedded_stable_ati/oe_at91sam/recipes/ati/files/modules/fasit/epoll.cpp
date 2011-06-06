@@ -145,7 +145,7 @@ FUNCTION_START("setnonblocking(int sock)")
    // disable Nagle's algorithm so we send messages as discrete packets
    if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(int)) == -1) {
       IERROR("Could not disable Naggle's algorithm\n");
-      perror("setcokopt(TCP_NODELAY");
+      perror("setcokopt(TCP_NODELAY)");
    }
 
 FUNCTION_END("setnonblocking(int sock)")
