@@ -24,7 +24,7 @@ static char* TARGET_NAME[] = {"old infantry mover","armor mover","infantry mover
 static char* MOVER_TYPE[] = {"infantry","armor","infantry","error"};
 
 // continue moving on leg or quad interrupt or neither
-static int CONTINUE_ON[] = {1,3,3,0}; // leg = 1, quad = 2, both = 3, neither = 0
+static int CONTINUE_ON[] = {2,1,3,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
 static int TIMEOUT_IN_MSECONDS[] = {500,12000,500,0};
@@ -125,6 +125,7 @@ module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only 
 static bool PWM_H_BRIDGE[] = {false,false,true,false};
 static bool OUTPUT_H_BRIDGE[] = {false,true,true,false};
 static bool USE_BRAKE[] = {true,false,false,false};
+static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false};
 
 // Non-H-Bridge : map motor controller reverse and forward signals based on the 'reverse' parameter
 #define OUTPUT_MOVER_FORWARD	(reverse ? OUTPUT_MOVER_DIRECTION_REVERSE : OUTPUT_MOVER_DIRECTION_FORWARD)
@@ -135,12 +136,6 @@ static bool USE_BRAKE[] = {true,false,false,false};
 #define OUTPUT_MOVER_REVERSE_POS	(reverse ? OUTPUT_MOVER_MOTOR_FWD_POS : OUTPUT_MOVER_MOTOR_REV_POS)
 #define OUTPUT_MOVER_FORWARD_NEG	(reverse ? OUTPUT_MOVER_MOTOR_REV_NEG : OUTPUT_MOVER_MOTOR_FWD_NEG)
 #define OUTPUT_MOVER_REVERSE_NEG	(reverse ? OUTPUT_MOVER_MOTOR_FWD_NEG : OUTPUT_MOVER_MOTOR_REV_NEG)
-
-//---------------------------------------------------------------------------
-// This lock protects against motor control from simultaneously access from
-// IRQs, timeout timer and user-space.
-//---------------------------------------------------------------------------
-static DEFINE_SPINLOCK(motor_lock);
 
 //---------------------------------------------------------------------------
 // These atomic variables is use to indicate global position changes
@@ -331,14 +326,10 @@ static void do_event(int etype) {
 //---------------------------------------------------------------------------
 static int hardware_motor_on(int direction)
     {
-    unsigned long flags;
-
     // turn on directional lines
     if (OUTPUT_H_BRIDGE[mover_type])
         {
         // H-bridge handling
-        spin_lock_irqsave(&motor_lock, flags);
-
         // de-assert the neg inputs to the h-bridge
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -347,8 +338,6 @@ static int hardware_motor_on(int direction)
         // on at the same time
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-
-        spin_unlock_irqrestore(&motor_lock, flags);
         }
     else
         {
@@ -389,6 +378,8 @@ static int hardware_motor_on(int direction)
         {
         if (PWM_H_BRIDGE[mover_type]) {
             at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        } else if (OUTPUT_H_BRIDGE[mover_type]) {
+            at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
         // assert pwm line
@@ -405,6 +396,8 @@ static int hardware_motor_on(int direction)
         {
         if (PWM_H_BRIDGE[mover_type]) {
             at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        } else if (OUTPUT_H_BRIDGE[mover_type]) {
+            at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
         #if PWM_BLOCK == 0
@@ -435,8 +428,6 @@ static int hardware_motor_on(int direction)
 //---------------------------------------------------------------------------
 static int hardware_motor_off(void)
     {
-    unsigned long flags;
-
    delay_printk("%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // turn off irrelevant timers
@@ -463,16 +454,12 @@ static int hardware_motor_off(void)
     // turn off directional lines
     if (OUTPUT_H_BRIDGE[mover_type])
         {
-        spin_lock_irqsave(&motor_lock, flags);
-
         // de-assert the all inputs to the h-bridge
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    
-        spin_unlock_irqrestore(&motor_lock, flags);
         }
     else
         {
@@ -958,7 +945,7 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
         {
         case 0:
         // initialize infantry clock
-        __raw_writel(ATMEL_TC_TIMER_CLOCK1			// Master clock/4 = 132MHz/4 = 33MHz ?
+        __raw_writel(ATMEL_TC_TIMER_CLOCK1			// Master clock/2 = 132MHz/2 ~ 66MHz
                     | ATMEL_TC_WAVE					// output mode
                     | ATMEL_TC_ACPA_CLEAR			// set TIOA low when counter reaches "A"
                     | ATMEL_TC_ACPC_SET				// set TIOA high when counter reaches "C"
@@ -971,7 +958,7 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
 
         case 1:
         // initialize armor clock
-        __raw_writel(ATMEL_TC_TIMER_CLOCK2			// Master clock/2 = 132MHz/2 = 66MHz
+        __raw_writel(ATMEL_TC_TIMER_CLOCK2			// Master clock/8 = 132MHz/8 ~ 16MHz
                     | ATMEL_TC_WAVE					// output mode
                     | ATMEL_TC_ACPA_SET				// set TIOA high when counter reaches "A"
                     | ATMEL_TC_ACPC_CLEAR			// set TIOA low when counter reaches "C"
@@ -983,7 +970,7 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
         break;
         case 2:
         // initialize infantry/h-bridge  clock
-        __raw_writel(ATMEL_TC_TIMER_CLOCK4			// Master clock/4 = 132MHz/4 = 33MHz ?
+        __raw_writel(ATMEL_TC_TIMER_CLOCK4			// Master clock/128 = 132MHz/128 ~ 1MHz
                     | ATMEL_TC_WAVE					// output mode
                     | ATMEL_TC_ACPA_SET				// set TIOA low when counter reaches "A"
                     | ATMEL_TC_ACPC_CLEAR			// set TIOA high when counter reaches "C"
@@ -1064,8 +1051,7 @@ static int hardware_init(void)
         }
 
     // always put the H-bridge circuitry in the right state from the beginning
-    if (OUTPUT_H_BRIDGE[mover_type])
-        {
+    if (OUTPUT_H_BRIDGE[mover_type]) {
         // de-assert the neg inputs to the h-bridge
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -1073,15 +1059,17 @@ static int hardware_init(void)
         // configure motor gpio for output and set initial output
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-        }
-    else
-        {
+    } else {
         // if we don't use the H-bridge for direction, turn on motor controller
         //  (via h-bridge, so de-assert negatives first, then assert power line)
         at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // motor controller on
+        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        if (MOTOR_CONTROL_H_BRIDGE[mover_type]) {
+            at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // motor controller on
         }
+    }
 
     // de-assert the pwm line
     at91_set_gpio_output(MOTOR_PWM_F, !OUTPUT_MOVER_PWM_SPEED_ACTIVE[mover_type]);
@@ -1126,8 +1114,7 @@ static int hardware_exit(void)
         }
 
     // always put the H-bridge circuitry in the right state on shutdown
-    if (OUTPUT_H_BRIDGE[mover_type])
-        {
+    if (OUTPUT_H_BRIDGE[mover_type]) {
         // de-assert the neg inputs to the h-bridge
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -1135,15 +1122,15 @@ static int hardware_exit(void)
         // configure motor gpio for output and set initial output
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-        }
-    else
-        {
+    } else {
         // if we don't use the H-bridge for direction, turn off motor controller
         //  (via h-bridge, so de-assert negatives first, then de-assert power line)
         at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-        at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // motor controller off
+        if (MOTOR_CONTROL_H_BRIDGE[mover_type]) {
+            at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // motor controller off
         }
+    }
 
     // change pwm back to gpio
     at91_set_gpio_output(MOTOR_PWM_F, !OUTPUT_MOVER_PWM_SPEED_ACTIVE[mover_type]);
