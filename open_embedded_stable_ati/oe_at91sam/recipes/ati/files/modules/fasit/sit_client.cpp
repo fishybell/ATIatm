@@ -79,7 +79,7 @@ FUNCTION_END("::~SIT_Client()")
 
 // fill out 2102 status message
 void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
-FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
+FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)");
 
    // start with zeroes
    memset(msg, 0, sizeof(FASIT_2102));
@@ -130,12 +130,12 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
    msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
    msg->body.hit_conf.mode = lastHitCal.type; // single, etc.
    
-FUNCTION_END("::fillStatus2102(FASIT_2102 *msg)")
+FUNCTION_END("::fillStatus2102(FASIT_2102 *msg)");
 }
 
 // create and send a status messsage to the FASIT server
-void SIT_Client::sendStatus2102() {
-FUNCTION_START("::sendStatus2102()")
+void SIT_Client::sendStatus2102(int force) {
+FUNCTION_START("::sendStatus2102()");
 
    FASIT_header hdr;
    FASIT_2102 msg;
@@ -145,22 +145,28 @@ FUNCTION_START("::sendStatus2102()")
    // fill message
    fillStatus2102(&msg); // fills in status values with current values
 
-   DCMSG(BLUE,"Prepared to send 2102 status packet:");
-   DCMSG(blue,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htons(hdr.seq),htons(hdr.rsrvd),htons(hdr.length));
-   DCMSG(blue,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htons(msg.response.rseq));
-   DCMSG(blue,"\t\t\t\t\t\t\tmessage body\n "\
-	 "PSTAT | Fault | Expos | Aspct |  Dir | Move |  Speed  | POS | Type | Hits | On/Off | React | ToKill | Sens | Mode | Burst\n"\
-	 "  %3d    %3d     %3d     %3d     %3d    %3d    %6.2f    %3d   %3d    %3d      %3d     %3d      %3d     %3d    %3d    %3d ",
-	 msg.body.pstatus,msg.body.fault,msg.body.exp,msg.body.asp,msg.body.dir,msg.body.move,msg.body.speed,msg.body.pos,msg.body.type,msg.body.hit,
-	 msg.body.hit_conf.on,msg.body.hit_conf.react,htons(msg.body.hit_conf.tokill),htons(msg.body.hit_conf.sens),msg.body.hit_conf.mode,htons(msg.body.hit_conf.burst));
-   
-   // send
-   queueMsg(&hdr, sizeof(FASIT_header));
-   queueMsg(&msg, sizeof(FASIT_2102));
-   finishMsg();
+   if (force||(memcmp(&lastMsgBody,&msg.body,sizeof(FASIT_2102b)))){
+      lastMsgBody = msg.body;	// make a copy of the body of the status message for checking for changes
 
+      DCMSG(BLUE,"Prepared to send 2102 status packet:");
+      DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htonl(hdr.seq),htonl(hdr.rsrvd),htons(hdr.length));
+      DCMSG(BLUE,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htonl(msg.response.rseq));
+      DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n "\
+	    "PSTAT | Fault | Expos | Aspct |  Dir | Move |  Speed  | POS | Type | Hits | On/Off | React | ToKill | Sens | Mode | Burst\n"\
+	    "  %3d    %3d     %3d     %3d     %3d    %3d    %6.2f    %3d   %3d    %3d      %3d     %3d      %3d     %3d    %3d    %3d ",
+	    msg.body.pstatus,msg.body.fault,msg.body.exp,msg.body.asp,msg.body.dir,msg.body.move,msg.body.speed,msg.body.pos,msg.body.type,htons(msg.body.hit),
+	    msg.body.hit_conf.on,msg.body.hit_conf.react,htons(msg.body.hit_conf.tokill),htons(msg.body.hit_conf.sens),msg.body.hit_conf.mode,htons(msg.body.hit_conf.burst));
 
-FUNCTION_END("::sendStatus2102()")
+      // send
+      queueMsg(&hdr, sizeof(FASIT_header));
+      queueMsg(&msg, sizeof(FASIT_2102));
+      finishMsg();
+
+   } else {
+      DCMSG(BLUE,"Skipped sending of a duplicate 2102 status packet:");
+   }
+
+FUNCTION_END("::sendStatus2102()");
 }
 
 /***********************************************************
@@ -341,7 +347,7 @@ FUNCTION_START("::handle_2100(int start, int end)");
 	  case CID_Status_Request:
 		 // send 2102 status
 	     DCMSG(RED,"CID_Status_Request   send 2102 status") ; 
-		 sendStatus2102();	// sends a 2102   not sure it gets the response number and sequence number right
+		 sendStatus2102(1);	// forces sending of a 2102
 		 // AND/OR? send 2115 MILES shootback status if supported
 		 if (acc_conf.acc_type == ACC_NES_MFS){
 		    DCMSG(RED,"we also seem to have a MFS Muzzle Flash Simulator - TODO send 2112 status eventually") ; 
@@ -428,7 +434,7 @@ FUNCTION_START("::handle_2100(int start, int end)");
 	     DCMSG(RED,"calling doHitCal after setting values") ;	     
 		 // send 2102 status or change the hit count (which will send the 2102 later)
          if (hits == htons(msg->hit)) {
-            sendStatus2102();	// sends a 2102 as we won't if we didn't change the the hit count
+            sendStatus2102(1);	// sends a 2102 as we won't if we didn't change the the hit count
 	        DCMSG(RED,"We will send 2102 status in response to the config hit sensor command"); 
          } else {
 	        doHits(htons(msg->hit));	// set hit count to something other than zero
@@ -609,66 +615,68 @@ FUNCTION_END("::doConceal()")
 
 // position changed to conceal
 void SIT_Client::didConceal() {
-FUNCTION_START("::didConceal()")
+FUNCTION_START("::didConceal()");
 
    // remember that we are concealed
    exposure = CONCEAL;
 
    // send status message to FASIT server
-   sendStatus2102();
+   DCOLOR(RED) ; // change color
+   sendStatus2102(0);
 
-FUNCTION_END("::didConceal()")
+FUNCTION_END("::didConceal()");
 }
 
 // change position to expose
 void SIT_Client::doExpose() {
-FUNCTION_START("::doExpose()")
+FUNCTION_START("::doExpose()");
    // pass directly to kernel for actual action
    if (hasPair()) {
       nl_conn->doExpose();
    }
-FUNCTION_END("::doExpose()")
+FUNCTION_END("::doExpose()");
 }
 
 // position changed to expose
 void SIT_Client::didExpose() {
-FUNCTION_START("::didExpose()")
+FUNCTION_START("::didExpose()");
 
    // remember that we are exposed
    exposure = EXPOSE;
 
+   DCOLOR(RED) ; // change color
    // send status message to FASIT server
-   sendStatus2102();
+   sendStatus2102(0);
 
-FUNCTION_END("::didExpose()")
+FUNCTION_END("::didExpose()");
 }
 
 // position changed to moving
 void SIT_Client::didMoving() {
-FUNCTION_START("::didMoving()")
+FUNCTION_START("::didMoving()");
 
    // remember that we are moving
    exposure = LIFTING;
 
    // send status message to FASIT server
-   sendStatus2102();
+   sendStatus2102(0);
 
-FUNCTION_END("::didMoving()")
+FUNCTION_END("::didMoving()");
 }
 
 // retrieve battery value
 void SIT_Client::doBattery() {
-FUNCTION_START("::doBattery()")
+FUNCTION_START("::doBattery()");
    // pass directly to kernel for actual action
    if (hasPair()) {
       nl_conn->doBattery();
    }
-FUNCTION_END("::doBattery()")
+FUNCTION_END("::doBattery()");
 }
 
 // current battery value
 void SIT_Client::didBattery(int val) {
-FUNCTION_START("::didBattery(int val)")
+FUNCTION_START("::didBattery(int val)");
 
    // if we're low (and we were low before), we'll need to tell userspace
    if (val <= MIN_BATTERY_VAL && lastBatteryVal <= MIN_BATTERY_VAL) {
@@ -680,27 +688,27 @@ FUNCTION_START("::didBattery(int val)")
    // save the information for the next time
    lastBatteryVal = val;
 
-FUNCTION_END("::didBattery(int val)")
+FUNCTION_END("::didBattery(int val)");
 }
 
 // immediate stop (stops accessories as well)
 void SIT_Client::doStop() {
-FUNCTION_START("::doStop()")
+FUNCTION_START("::doStop()");
    // pass directly to kernel for actual action
    if (hasPair()) {
       nl_conn->doStop();
    }
-FUNCTION_END("::doStop()")
+FUNCTION_END("::doStop()");
 }
 
 // received immediate stop response
 void SIT_Client::didStop() {
-FUNCTION_START("::didStop()")
+FUNCTION_START("::didStop()");
 
    // notify the front-end of the emergency stop
    didFailure(ERR_emergency_stop);
 
-FUNCTION_END("::didStop()")
+FUNCTION_END("::didStop()");
 }
 
 // change hit calibration data
@@ -751,9 +759,7 @@ FUNCTION_START("SIT_Client::doHits(int num)")
 
 // received "num" hits
 void SIT_Client::didHits(int num) {
-   DCOLOR(CYAN) ; // change color
 FUNCTION_START("SIT_Client::didHits(int num)")
-
 
    // are we different than our remember value?
    if (hits != num) {
@@ -761,11 +767,10 @@ FUNCTION_START("SIT_Client::didHits(int num)")
       hits = num;
 
       // if we have a hit count, send it
-      sendStatus2102(); // send status message to FASIT server
+      sendStatus2102(0); // send status message to FASIT server
    }
 
 FUNCTION_END("SIT_Client::didHits(int num)")
-DCOLOR(black) ; // change color
 
 }
 

@@ -11,6 +11,12 @@
 
 using namespace std;
 
+// Sorry Nate, I can't get it to work for me with these as statics declaired in common.h
+volatile int C_TRACE;
+volatile int C_DEBUG;
+volatile int C_INFO;
+volatile int C_ERRORS;
+
 #include "connection.h"
 #include "tcp_factory.h"
 #include "common.h"

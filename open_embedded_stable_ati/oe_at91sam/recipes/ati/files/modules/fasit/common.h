@@ -22,10 +22,10 @@
         _x > _y ? _x : _y; })
 
 // comment these out to remove the TRACE, etc. lines from entire program, redefine to 0 to make individual chunks of code turn it off
-static int C_TRACE=0;
-static int C_DEBUG=0;
-static int C_INFO=0;
-static int C_ERRORS=0;
+extern volatile int C_TRACE;
+extern volatile int C_DEBUG;
+extern volatile int C_INFO;
+extern volatile int C_ERRORS;
 
 // for run time tracing of application
 #define FUNCTION_START(arg) { if (C_TRACE) { printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}

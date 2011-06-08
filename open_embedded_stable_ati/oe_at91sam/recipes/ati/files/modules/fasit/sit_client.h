@@ -73,7 +73,7 @@ private:
 
    // helper functions for filling out a 2102 status message
    void fillStatus2102(FASIT_2102 *msg);
-   void sendStatus2102();
+   void sendStatus2102(int force);
 
    // remember the last command we received for responses back
    int resp_num;
@@ -89,6 +89,9 @@ private:
    int exposure;
    int hits;
 
+   // place to save a copy of the last status message, so we can check for a change
+   struct FASIT_2102b lastMsgBody;
+   
    // hit calibration table (ours to theirs and back)
    static const u32 cal_table[16];
 };
