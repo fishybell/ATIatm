@@ -226,4 +226,7 @@ enum {
 #define VELOCITY_COAST 128
 #define VELOCITY_REQ 0
 
+#define BATTERY_REQUEST 1
+#define BATTERY_SHUTDOWN 0
+
 #endif

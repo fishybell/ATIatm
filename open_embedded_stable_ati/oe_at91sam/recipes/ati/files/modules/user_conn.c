@@ -349,6 +349,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             case 'H': case 'h':
                 nl_cmd = NL_C_HITS;
                 break;
+            case 'K': case 'k':
+                nl_cmd = NL_C_BATTERY;
+                break;
             case 'L': case 'l':
                 nl_cmd = NL_C_HIT_CAL;
                 break;
@@ -408,6 +411,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                     case 'H': case 'h':
                         snprintf(wbuf, 1024, "Request hit data\nFormat: H\nReset Hit data\nFormat: H 0\n");
                         break;
+                    case 'K': case 'k':
+                        snprintf(wbuf, 1024, "Shutdown device\nFormat: K\n");
+                        break;
                     case 'L': case 'l':
                         snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-5)enable_on_value\n");
                         break;
@@ -433,7 +439,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Emergency stop\nFormat: X\n");
                         break;
                     default: // print default help
-                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nL: Hit Calibration\nM: Movement\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nY: Hit Sensor Type\nX: Emergency Stop\n");
+                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nY: Hit Sensor Type\nX: Emergency Stop\n");
                         break;
                 }
                 write(client, wbuf, strnlen(wbuf,1024));
@@ -459,7 +465,11 @@ printf("unrecognized command '%c'\n", cmd[0]);
             switch (nl_cmd) {
                 case NL_C_BATTERY:
                     // request battery message
-                    nla_put_u8(msg, GEN_INT8_A_MSG, 1);
+                    if (cmd[0] == 'K' || cmd[0] == 'k') {
+                       nla_put_u8(msg, GEN_INT8_A_MSG, BATTERY_SHUTDOWN);
+                    } else {
+                       nla_put_u8(msg, GEN_INT8_A_MSG, BATTERY_REQUEST);
+                    }
                     break;
                 case NL_C_EXPOSE:
                     if (cmd[0] == 'E' || cmd[0] == 'e') {

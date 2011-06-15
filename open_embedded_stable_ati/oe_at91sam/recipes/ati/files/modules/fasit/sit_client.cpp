@@ -320,6 +320,10 @@ FUNCTION_START("::handle_2100(int start, int end)");
       case CID_GPS_Location_Request:
 	 DCMSG(RED,"CID_GPS_Location_Request") ;
 	 break;
+
+      case CID_Shutdown:
+	 DCMSG(RED,"CID_Shutdown") ;
+	 break;
    }
 
    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
@@ -448,6 +452,11 @@ FUNCTION_START("::handle_2100(int start, int end)");
 	     send_2101_ACK(hdr,'F');
 
 		 // send 2113 GPS Location
+		 break;
+
+	  case CID_Shutdown:
+	     DCMSG(RED,"CID_Shutdown...shutting down") ; 
+	     doShutdown();
 		 break;
    }
 
@@ -662,6 +671,16 @@ FUNCTION_START("::didMoving()");
    sendStatus2102(0);
 
 FUNCTION_END("::didMoving()");
+}
+
+// shutdown device
+void SIT_Client::doShutdown() {
+FUNCTION_START("::doShutdown()");
+   // pass directly to kernel for actual action
+   if (hasPair()) {
+      nl_conn->doShutdown();
+   }
+FUNCTION_END("::doShutdown()");
 }
 
 // retrieve battery value
@@ -1047,12 +1066,21 @@ FUNCTION_START("::doMoving()")
 FUNCTION_END("::doMoving()")
 }
 
+// shutdown device
+void SIT_Conn::doShutdown() {
+FUNCTION_START("::doShutdown()")
+
+   // Queue command
+   queueMsgU8(NL_C_BATTERY, BATTERY_SHUTDOWN); // shutdown command
+
+FUNCTION_END("::doShutdown()")
+}
 // retrieve battery value
 void SIT_Conn::doBattery() {
 FUNCTION_START("::doBattery()")
 
    // Queue command
-   queueMsgU8(NL_C_BATTERY, 1); // battery status request
+   queueMsgU8(NL_C_BATTERY, BATTERY_REQUEST); // battery status request
 
 FUNCTION_END("::doBattery()")
 }

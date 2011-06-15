@@ -371,6 +371,14 @@ static int hardware_adc_exit(void)
 
 	return 0;
     }
+//---------------------------------------------------------------------------
+// Shutdown the device
+//---------------------------------------------------------------------------
+static void shutdown_device() {
+    // assert this line to trip the power relay
+    // TODO -- do a proper linux shutdown and have linux assert this line?
+    at91_set_gpio_output(OUTPUT_POWER_OFF, ACTIVE_LOW);
+}
 
 //---------------------------------------------------------------------------
 //
@@ -562,6 +570,16 @@ int nl_battery_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
         // grab value from attribute
         value = nla_get_u8(na);
 //delay_printk("received value: %i\n", value);
+        switch (value) {
+            case BATTERY_SHUTDOWN:
+               // shutdown requested, do it now
+               shutdown_device();
+               break;
+            case BATTERY_REQUEST:
+            default:
+               // a request is made, continue below
+               break;
+        }
 
         // prepare response
         rc = nla_put_u8(skb, GEN_INT8_A_MSG, atomic_read(&adc_atomic));

@@ -26,6 +26,7 @@ public :
    void didFailure(int type); // experienced failure "type"
    void doPosition(); // retrieve position value
    void didPosition(int pos); // current position value
+   void doShutdown(); // shutdown the target
    void doMove(int speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
    void didMove(int speed, int direction); // current direction value
@@ -127,6 +128,7 @@ public:
 
    // individual MIT commands to send to kernel
    void doPosition(); // retrieve position value
+   void doShutdown(); // shutdown the target
    void doMove(int speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
    void doBattery(); // retrieve battery value

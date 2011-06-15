@@ -258,6 +258,9 @@ FUNCTION_START("::handle_2100(int start, int end)")
    // TODO -- handle other commands here
    bool needPass = true;
    switch (msg->cid) {
+      case CID_Shutdown:
+         doShutdown();
+         break;
       case CID_Move_Request:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
 	     send_2101_ACK(hdr,'S');
@@ -313,6 +316,16 @@ FUNCTION_START("::didFailure(int type)")
    finishMsg();
 
 FUNCTION_END("::didFailure(int type)")
+}
+
+// retrieve battery value
+void MIT_Client::doShutdown() {
+FUNCTION_START("::doShutdown()")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doShutdown();
+   }
+FUNCTION_END("::doShutdown()")
 }
 
 // retrieve battery value
@@ -631,12 +644,22 @@ FUNCTION_START("::doMove()")
 FUNCTION_END("::doMove()")
 }
 
+// shutdown device
+void MIT_Conn::doShutdown() {
+FUNCTION_START("::doShutdown()")
+
+   // Queue command
+   queueMsgU8(NL_C_BATTERY, BATTERY_SHUTDOWN); // shutdown command
+
+FUNCTION_END("::doShutdown()")
+}
+
 // retrieve battery value
 void MIT_Conn::doBattery() {
 FUNCTION_START("::doBattery()")
 
    // Queue command
-   queueMsgU8(NL_C_BATTERY, 1); // battery status request
+   queueMsgU8(NL_C_BATTERY, BATTERY_REQUEST); // battery status request
 
 FUNCTION_END("::doBattery()")
 }
