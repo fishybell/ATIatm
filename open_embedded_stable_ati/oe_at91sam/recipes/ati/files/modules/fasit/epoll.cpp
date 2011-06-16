@@ -130,6 +130,12 @@ void setnonblocking(int sock) {
 FUNCTION_START("setnonblocking(int sock)")
    int opts, yes=1;
 
+   // disable Nagle's algorithm so we send messages as discrete packets
+   if (setsockopt(sock, SOL_SOCKET, TCP_NODELAY, &yes, sizeof(int)) == -1) {
+      IERROR("Could not disable Nagle's algorithm\n");
+      perror("setsockopt(TCP_NODELAY)");
+   }
+
    if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)) < 0) { // set keepalive so we disconnect on link failure or timeout
       perror("setsockopt(SO_KEEPALIVE)");
       exit(EXIT_FAILURE);
@@ -145,12 +151,6 @@ FUNCTION_START("setnonblocking(int sock)")
       IERROR("Could not set socket to non-blocking\n");
       perror("fcntl(F_SETFL)");
       exit(EXIT_FAILURE);
-   }
-
-   // disable Nagle's algorithm so we send messages as discrete packets
-   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(int)) == -1) {
-      IERROR("Could not disable Naggle's algorithm\n");
-      perror("setcokopt(TCP_NODELAY)");
    }
 
 FUNCTION_END("setnonblocking(int sock)")
