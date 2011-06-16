@@ -109,7 +109,7 @@ public :
 };
 
 // global defines about targets
-#define FAILURE_BATTERY_VAL 1 /* when at 1%, shutdown system */
+#define FAILURE_BATTERY_VAL 5 /* when at 5%, send critical-battery message */
 #define MIN_BATTERY_VAL 25    /* when at 25%, send low-battery message */
 #define MAX_BATTERY_VAL 255   /* a battery way value beyond "good" for resetting battery watchdogs */
 
@@ -147,6 +147,7 @@ enum {
    ERR_bad_checksum,
    ERR_unsupported_command,
    ERR_invalid_exception,
+   ERR_critical_battery=188,
 };
 
 // for some reason we have a ntohs/htons, but no ntohf/htonf

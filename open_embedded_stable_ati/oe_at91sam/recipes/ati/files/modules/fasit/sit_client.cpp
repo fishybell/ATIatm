@@ -697,11 +697,11 @@ FUNCTION_END("::doBattery()");
 void SIT_Client::didBattery(int val) {
 FUNCTION_START("::didBattery(int val)");
 
-   // if we're low (and we were low before), we'll need to tell userspace
-   if (val <= MIN_BATTERY_VAL && lastBatteryVal <= MIN_BATTERY_VAL) {
+   // if we're low we'll need to tell userspace
+   if (val <= FAILURE_BATTERY_VAL) {
+      didFailure(ERR_critical_battery);
+   } else if (val <= MIN_BATTERY_VAL) {
       didFailure(ERR_low_battery);
-      // TODO -- check FAILURE_BATTERY_VAL and do a shutdown when necessary
-      lastBatteryVal = MAX_BATTERY_VAL; // forget last value to prevent immediate resend on next didBattery() call
    }
 
    // save the information for the next time

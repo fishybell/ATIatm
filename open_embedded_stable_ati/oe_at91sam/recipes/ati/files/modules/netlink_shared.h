@@ -228,5 +228,12 @@ enum {
 
 #define BATTERY_REQUEST 1
 #define BATTERY_SHUTDOWN 0
+// defined battery percentage stop-points
+#define BAT_NORMAL	90
+#define BAT_LOW		20
+#define BAT_CRIT	5
+#define BAT_INVALID	1
+#define BAT_HALT	0
+
 
 #endif
