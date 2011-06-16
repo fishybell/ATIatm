@@ -129,7 +129,7 @@ module_param(minvoltval, int, S_IRUGO);
 const int BATTERY_NORMAL[] = {50, 104, 202, 255};	// at or above this value is considered normal
 const int BATTERY_LOW[] = {49, 100, 196, 4};		// at or above this value (and below above) is considered low
 const int BATTERY_CRIT[] = {48, 99, 195, 3};		// at or above this value (and below above) is considered critical
-const int BATTERY_HALT[] = {47, 98, 194, 2};		// at or below this value (and above below) requires immediate halt of device
+const int BATTERY_HALT[] = {45, 94, 188, 2};		// at or below this value (and above below) requires immediate halt of device
 const int BATTERY_WAIT[] = {1, 1, 1, 1};			// at or below this value signifies an invalid battery value...ignore
 
 //---------------------------------------------------------------------------
@@ -188,10 +188,14 @@ static struct work_struct level_work;
 //---------------------------------------------------------------------------
 // Shutdown the device
 //---------------------------------------------------------------------------
-static void shutdown_device() {
+static void shutdown_device(bool lowbat) {
+    // tell the debug port we're shutting down (don't use delay_printk as it won't have time to run)
+    printk("Shutting down due to %s.\n", lowbat ? "low battery" : "user command");
+
     // assert this line to trip the power relay
     // TODO -- do a proper linux shutdown and have linux assert this line?
     at91_set_gpio_output(OUTPUT_POWER_OFF, ACTIVE_LOW);
+    while (true) ; // don't move on, wait for shutdown
 }
 
 //---------------------------------------------------------------------------
@@ -247,14 +251,14 @@ static void adc_read_fire(unsigned long data)
 			atomic_set(&adc_atomic, adc_val);
             switch (bat_from_adc(adc_val)) {
                 case BAT_NORMAL:	delay_printk("ADC = %i (normal)\n", adc_val); break;
-                case BAT_LOW:		delay_printk("ADC = %i (low)\n", adc_val);
-                case BAT_CRIT:		delay_printk("ADC = %i (critical)\n", adc_val);
-                case BAT_INVALID:	delay_printk("ADC = %i (invalid)\n", adc_val);
+                case BAT_LOW:		delay_printk("ADC = %i (low)\n", adc_val); break;
+                case BAT_CRIT:		delay_printk("ADC = %i (critical)\n", adc_val); break;
+                case BAT_INVALID:	delay_printk("ADC = %i (invalid)\n", adc_val); break;
                 case BAT_HALT: 
                    // print out that we would have shutdown and/or shutdown
                    delay_printk("ADC = %i (shutdown)\n", adc_val);
                    if (shutdown) { // only if allowed to shutdown
-                      shutdown_device();
+                      shutdown_device(true);
                    }
                    break;
             }
@@ -630,7 +634,7 @@ int nl_battery_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
         switch (value) {
             case BATTERY_SHUTDOWN:
                // shutdown requested, do it now
-               shutdown_device();
+               shutdown_device(false);
                break;
             case BATTERY_REQUEST:
             default:
