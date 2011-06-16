@@ -120,8 +120,17 @@ struct clk *	adc_clk;
 //---------------------------------------------------------------------------
 static int charge = FALSE;
 module_param(charge, bool, S_IRUGO);
+static int shutdown = TRUE;
+module_param(shutdown, bool, S_IRUGO);
 static int minvoltval = 12;
 module_param(minvoltval, int, S_IRUGO);
+
+// these lists go 12, 24, 48, error
+const int BATTERY_NORMAL[] = {50, 104, 202, 255};	// at or above this value is considered normal
+const int BATTERY_LOW[] = {49, 100, 196, 4};		// at or above this value (and below above) is considered low
+const int BATTERY_CRIT[] = {48, 99, 195, 3};		// at or above this value (and below above) is considered critical
+const int BATTERY_HALT[] = {47, 98, 194, 2};		// at or below this value (and above below) requires immediate halt of device
+const int BATTERY_WAIT[] = {1, 1, 1, 1};			// at or below this value signifies an invalid battery value...ignore
 
 //---------------------------------------------------------------------------
 // Declaration of the functions that gets called when the timers fire.
@@ -177,6 +186,34 @@ atomic_t blink_count = ATOMIC_INIT(0);
 static struct work_struct level_work;
 
 //---------------------------------------------------------------------------
+// Shutdown the device
+//---------------------------------------------------------------------------
+static void shutdown_device() {
+    // assert this line to trip the power relay
+    // TODO -- do a proper linux shutdown and have linux assert this line?
+    at91_set_gpio_output(OUTPUT_POWER_OFF, ACTIVE_LOW);
+}
+
+//---------------------------------------------------------------------------
+// battery percentage from adc value
+//---------------------------------------------------------------------------
+int bat_from_adc(int adc_val) {
+    // turn an adc_val into a percentage
+    if (adc_val >= BATTERY_NORMAL[minvoltval]) {
+        adc_val = BAT_NORMAL; // normal percentage
+    } else if (adc_val >= BATTERY_LOW[minvoltval]) {
+        adc_val = BAT_LOW; // low percentage
+    } else if (adc_val >= BATTERY_CRIT[minvoltval]) {
+        adc_val = BAT_CRIT; // critical percentage
+    } else if (adc_val <= BATTERY_WAIT[minvoltval]) {
+        adc_val = BAT_INVALID; // invalid percentage
+    } else if (adc_val <= BATTERY_HALT[minvoltval]) {
+        adc_val = BAT_HALT; // no battery left
+    }
+    return adc_val;
+}
+
+//---------------------------------------------------------------------------
 // Start the ADC reading
 //---------------------------------------------------------------------------
 static void hardware_adc_read_start(void)
@@ -208,7 +245,19 @@ static void adc_read_fire(unsigned long data)
 		if (adc_val != old_adc_val)
 			{
 			atomic_set(&adc_atomic, adc_val);
-		    delay_printk("ADC = %i (%s)\n", adc_val, adc_val < minvoltval ? "low" : "normal");
+            switch (bat_from_adc(adc_val)) {
+                case BAT_NORMAL:	delay_printk("ADC = %i (normal)\n", adc_val); break;
+                case BAT_LOW:		delay_printk("ADC = %i (low)\n", adc_val);
+                case BAT_CRIT:		delay_printk("ADC = %i (critical)\n", adc_val);
+                case BAT_INVALID:	delay_printk("ADC = %i (invalid)\n", adc_val);
+                case BAT_HALT: 
+                   // print out that we would have shutdown and/or shutdown
+                   delay_printk("ADC = %i (shutdown)\n", adc_val);
+                   if (shutdown) { // only if allowed to shutdown
+                      shutdown_device();
+                   }
+                   break;
+            }
 
 			// notify user-space
 			schedule_work(&level_work);
@@ -371,14 +420,6 @@ static int hardware_adc_exit(void)
 
 	return 0;
     }
-//---------------------------------------------------------------------------
-// Shutdown the device
-//---------------------------------------------------------------------------
-static void shutdown_device() {
-    // assert this line to trip the power relay
-    // TODO -- do a proper linux shutdown and have linux assert this line?
-    at91_set_gpio_output(OUTPUT_POWER_OFF, ACTIVE_LOW);
-}
 
 //---------------------------------------------------------------------------
 //
@@ -389,10 +430,10 @@ static int hardware_init(void)
     // correct voltage variable to minimum adc value
     switch (abs(minvoltval))
         {
-        case 12: minvoltval = 50;  break;
-        case 24: minvoltval = 101; break;
-        case 48: minvoltval = 204; break;
-        default: minvoltval = 255; break;
+        case 12: minvoltval = 0;  break; /* 12v is first index */
+        case 24: minvoltval = 1; break;  /* 24v is second */
+        case 48: minvoltval = 2; break;  /* 48v is third */
+        default: minvoltval = 3; break;  /* error is fourth */
         }
    delay_printk("%s charge: %i, minvoltval: %i\n",__func__,  charge, minvoltval);
 
@@ -545,14 +586,30 @@ struct target_device target_device_battery =
     };
 
 //---------------------------------------------------------------------------
+// Message filler handler for battery values
+//---------------------------------------------------------------------------
+int bat_mfh(struct sk_buff *skb, void *bat_data) {
+    // the bat_data argument is a pre-filled integer
+    return nla_put_u8(skb, GEN_INT8_A_MSG, *((int*)bat_data));
+}
+
+//---------------------------------------------------------------------------
 // Work item to notify the user-space about an adc level change
 //---------------------------------------------------------------------------
 static void level_changed(struct work_struct * work)
 	{
+    int adc_val;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
     }
+    
+    // notify netlink userspace
+	adc_val = atomic_read(&adc_atomic); // grab last value read
+    adc_val = bat_from_adc(adc_val); // convert to percentage
+    send_nl_message_multi(&adc_val, bat_mfh, NL_C_BATTERY);
+
+    // notifiy sysfs userspace
 	target_sysfs_notify(&target_device_battery, "level");
 	}
 
@@ -582,7 +639,7 @@ int nl_battery_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
         }
 
         // prepare response
-        rc = nla_put_u8(skb, GEN_INT8_A_MSG, atomic_read(&adc_atomic));
+        rc = nla_put_u8(skb, GEN_INT8_A_MSG, bat_from_adc(atomic_read(&adc_atomic)));
 
         // huge success
         if (rc == 0) {
