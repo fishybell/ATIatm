@@ -261,6 +261,12 @@ FUNCTION_START("::handle_2100(int start, int end)")
       case CID_Shutdown:
          doShutdown();
          break;
+	  case CID_Sleep:
+	     doSleep();
+		 break;
+	  case CID_Wake:
+	     doWake();
+		 break;
       case CID_Move_Request:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
 	     send_2101_ACK(hdr,'S');
@@ -318,7 +324,7 @@ FUNCTION_START("::didFailure(int type)")
 FUNCTION_END("::didFailure(int type)")
 }
 
-// retrieve battery value
+// shutdown device
 void MIT_Client::doShutdown() {
 FUNCTION_START("::doShutdown()")
    // pass directly to kernel for actual action
@@ -326,6 +332,26 @@ FUNCTION_START("::doShutdown()")
       nl_conn->doShutdown();
    }
 FUNCTION_END("::doShutdown()")
+}
+
+// sleep device
+void MIT_Client::doSleep() {
+FUNCTION_START("::doSleep()")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doSleep();
+   }
+FUNCTION_END("::doSleep()")
+}
+
+// wake device
+void MIT_Client::doWake() {
+FUNCTION_START("::doWake()")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doWake();
+   }
+FUNCTION_END("::doWake()")
 }
 
 // retrieve battery value
@@ -652,6 +678,26 @@ FUNCTION_START("::doShutdown()")
    queueMsgU8(NL_C_BATTERY, BATTERY_SHUTDOWN); // shutdown command
 
 FUNCTION_END("::doShutdown()")
+}
+
+// sleep device
+void MIT_Conn::doSleep() {
+FUNCTION_START("::doSleep()")
+
+   // Queue command
+   queueMsgU8(NL_C_SLEEP, SLEEP_COMMAND); // sleep command
+
+FUNCTION_END("::doSleep()")
+}
+
+// wake device
+void MIT_Conn::doWake() {
+FUNCTION_START("::doWake()")
+
+   // Queue command
+   queueMsgU8(NL_C_SLEEP, WAKE_COMMAND); // wake command
+
+FUNCTION_END("::doWake()")
 }
 
 // retrieve battery value

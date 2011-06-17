@@ -25,6 +25,7 @@
 #define LED_BLINK_OFF_IN_MSECONDS	1500
 #define LED_CHARGING_ON_IN_MSECONDS	500
 #define LED_CHARGING_OFF_IN_MSECONDS	500
+#define SHUTDOWN_IN_MSECONDS		250
 
 #define BATTERY_CHARGING_NO   		0
 #define BATTERY_CHARGING_YES    	1
@@ -139,6 +140,7 @@ static void timeout_fire(unsigned long data);
 static void adc_read_fire(unsigned long data);
 static void led_blink_fire(unsigned long data);
 static void charging_fire(unsigned long data);
+static void shutdown_device(unsigned long data);
 
 //---------------------------------------------------------------------------
 // Kernel timers for the timeout, adc read delay, and various led blinks
@@ -147,6 +149,7 @@ static struct timer_list timeout_timer_list = TIMER_INITIALIZER(timeout_fire, 0,
 static struct timer_list adc_read_timer_list = TIMER_INITIALIZER(adc_read_fire, 0, 0);
 static struct timer_list led_blink_timer_list = TIMER_INITIALIZER(led_blink_fire, 0, 0);
 static struct timer_list charging_timer_list = TIMER_INITIALIZER(charging_fire, 0, 0);
+static struct timer_list shutdown_timer_list = TIMER_INITIALIZER(shutdown_device, 0, 0);
 
 //---------------------------------------------------------------------------
 // Maps the battery charging state to state name.
@@ -188,14 +191,25 @@ static struct work_struct level_work;
 //---------------------------------------------------------------------------
 // Shutdown the device
 //---------------------------------------------------------------------------
-static void shutdown_device(bool lowbat) {
-    // tell the debug port we're shutting down (don't use delay_printk as it won't have time to run)
-    printk("Shutting down due to %s.\n", lowbat ? "low battery" : "user command");
+static void shutdown_soon(bool lowbat) {
+    u8 data = BATTERY_SHUTDOWN;
 
-    // assert this line to trip the power relay
+    // tell the debug port we're shutting down
+    delay_printk("Shutting down due to %s.\n", lowbat ? "low battery" : "user command");
+
+    // let attached devices know that we're shutting down
+    queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
+
+    // shutdown in a short period of time
+    mod_timer(&shutdown_timer_list, jiffies+((SHUTDOWN_IN_MSECONDS*HZ)/1000));
+}
+
+static void shutdown_device(unsigned long data) {
+    // can't use delay_printk anymore, oh well
+    printk("Shutting down now.\n");
     // TODO -- do a proper linux shutdown and have linux assert this line?
+    // assert this line to trip the power relay
     at91_set_gpio_output(OUTPUT_POWER_OFF, ACTIVE_LOW);
-    while (true) ; // don't move on, wait for shutdown
 }
 
 //---------------------------------------------------------------------------
@@ -258,7 +272,7 @@ static void adc_read_fire(unsigned long data)
                    // print out that we would have shutdown and/or shutdown
                    delay_printk("ADC = %i (shutdown)\n", adc_val);
                    if (shutdown) { // only if allowed to shutdown
-                      shutdown_device(true);
+                      shutdown_soon(true);
                    }
                    break;
             }
@@ -634,7 +648,7 @@ int nl_battery_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
         switch (value) {
             case BATTERY_SHUTDOWN:
                // shutdown requested, do it now
-               shutdown_device(false);
+               shutdown_soon(false);
                break;
             case BATTERY_REQUEST:
             default:

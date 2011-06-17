@@ -60,6 +60,11 @@ atomic_t operating_atomic = ATOMIC_INIT(FALSE);
 atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we are awake/asleep
+//---------------------------------------------------------------------------
+atomic_t sleep_atomic = ATOMIC_INIT(0); // not sleeping
+
+//---------------------------------------------------------------------------
 // This atomic variable is use to store the current movement
 // As the infantry motor always spins the same direction, we only stop
 // moving when we hit the correct position (unlike the armor) or timeout
@@ -378,6 +383,9 @@ static int hardware_exit(void)
 //
 //---------------------------------------------------------------------------
 int lifter_position_set(int position) {
+    // check to see if we're sleeping or not
+    if (atomic_read(&sleep_atomic) == 1) { return 0; }
+
     if (lifter_position_get() != position) {
         // signal that an operation is in progress
         atomic_set(&operating_atomic, TRUE);
@@ -417,6 +425,23 @@ int lifter_position_get(void)
     return LIFTER_POSITION_ERROR_NEITHER;
     }
 EXPORT_SYMBOL(lifter_position_get);
+
+//---------------------------------------------------------------------------
+// Sleep the device
+//---------------------------------------------------------------------------
+int lifter_sleep_set(int value) {
+   atomic_set(&sleep_atomic, value);
+   return 1;
+}
+EXPORT_SYMBOL(lifter_sleep_set);
+
+//---------------------------------------------------------------------------
+// Get device sleep state
+//---------------------------------------------------------------------------
+int lifter_sleep_get(void) {
+   return atomic_read(&sleep_atomic);
+}
+EXPORT_SYMBOL(lifter_sleep_get);
 
 //---------------------------------------------------------------------------
 // Handles reads to the type attribute through sysfs

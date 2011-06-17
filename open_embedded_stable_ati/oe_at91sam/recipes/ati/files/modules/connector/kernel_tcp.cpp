@@ -121,6 +121,26 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
          }
 
          break;
+      case NL_C_BATTERY:
+         genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+
+         // handle event from kernel
+         if (attrs[GEN_INT8_A_MSG]) {
+            u8 data = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+            if (data == BATTERY_SHUTDOWN) {
+               // send SHUTDOWN message back down to kernel
+               queueMsgU8(NL_C_BATTERY, BATTERY_SHUTDOWN); // shutdown command
+
+               // send SHUTDOWN message on to other devices
+               // create an event structure and pass to tcp handler for transmission
+               kern_event_t event;
+               event.start = START;
+               event.event = EVENT_SHUTDOWN;
+               event.end = END;
+               kern_tcp->outgoingEvent(&event);
+            }
+         }
+         break;
       case NL_C_EVENT:
          genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
 

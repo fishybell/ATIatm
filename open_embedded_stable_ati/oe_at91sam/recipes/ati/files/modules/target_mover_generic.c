@@ -165,6 +165,11 @@ atomic_t moving_atomic = ATOMIC_INIT(FALSE);
 atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we are awake/asleep
+//---------------------------------------------------------------------------
+atomic_t sleep_atomic = ATOMIC_INIT(0); // not sleeping
+
+//---------------------------------------------------------------------------
 // This atomic variable is use to remember the timeout delay multiplier
 //---------------------------------------------------------------------------
 atomic_t last_mult = ATOMIC_INIT(0);
@@ -1314,6 +1319,9 @@ int mover_speed_get(void) {
 EXPORT_SYMBOL(mover_speed_get);
 
 int mover_speed_set(int speed) {
+   // check to see if we're sleeping or not
+   if (atomic_read(&sleep_atomic) == 1) { return 0; }
+
    // can we go the requested speed?
    if (abs(speed) > NUMBER_OF_SPEEDS[mover_type]) {
       return 0; // nope
@@ -1346,6 +1354,29 @@ extern int mover_position_get() {
     return ((INCHES_PER_TICK[mover_type]*pos)/TICKS_DIV)/12; // inches to feet
 }
 EXPORT_SYMBOL(mover_position_get);
+
+//---------------------------------------------------------------------------
+// Sleep the device
+//---------------------------------------------------------------------------
+int mover_sleep_set(int value) {
+delay_printk("mover_sleep_set(%i)\n", value);
+   if (value == 1) {
+      // start sleeping by stopping
+      mover_speed_stop();
+   }
+   atomic_set(&sleep_atomic, value);
+   return 1;
+}
+EXPORT_SYMBOL(mover_sleep_set);
+
+//---------------------------------------------------------------------------
+// Get device sleep state
+//---------------------------------------------------------------------------
+int mover_sleep_get(void) {
+delay_printk("mover_sleep_get()\n");
+   return atomic_read(&sleep_atomic);
+}
+EXPORT_SYMBOL(mover_sleep_get);
 
 
 //---------------------------------------------------------------------------

@@ -148,6 +148,8 @@ enum {
    CID_Config_Hit_Sensor,
    CID_GPS_Location_Request,
    CID_Shutdown = 177,		/* not a standard FASIT value */
+   CID_Sleep = 178,			/* not a standard FASIT value */
+   CID_Wake = 179,			/* not a standard FASIT value */
 };
 
 /********************************************/

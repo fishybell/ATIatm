@@ -271,6 +271,7 @@ delay_printk("Mover: returning rc: %i\n", rc);
 int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
     int rc, value = 0;
+    u8 data = BATTERY_SHUTDOWN; // in case we need to shutdown
 delay_printk("Mover: handling event command\n");
     
     // get attribute from message
@@ -281,7 +282,15 @@ delay_printk("Mover: handling event command\n");
 delay_printk("Mover: received value: %i\n", value);
 
         // handle event
-        move_event_internal(value, false); // don't repropogate
+        switch (value) {
+            case EVENT_SHUTDOWN:
+                // needs to be converted to NL_C_SHUTDOWN from userspace, so send it back up (and send onwards to other attached devices)
+                queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
+                break;
+            default:
+                move_event_internal(value, false); // don't repropogate
+                break;
+        }
 
         rc = HANDLE_SUCCESS_NO_REPLY;
     } else {
@@ -295,6 +304,49 @@ delay_printk("Mover: returning rc: %i\n", rc);
 }
 
 //---------------------------------------------------------------------------
+// netlink command handler for sleep commands
+//---------------------------------------------------------------------------
+int nl_sleep_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value;
+    u8 data = 0;
+delay_printk("Mover: handling sleep command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    if (na) {
+        // grab value from attribute
+        value = nla_get_u8(na); // value is ignored
+delay_printk("Mover: received value: %i\n", value);
+
+        if (value != SLEEP_REQUEST) {
+           // handle sleep/wake in hw driver
+           mover_sleep_set(value==SLEEP_COMMAND?1:0);
+           data = value==SLEEP_COMMAND?EVENT_SLEEP:EVENT_WAKE; // convert to event
+           queue_nl_multi(NL_C_EVENT, &data, sizeof(data)); // movers propogate message
+           rc = HANDLE_SUCCESS_NO_REPLY;
+        } else {
+           // retrieve sleep status
+           rc = nla_put_u8(skb, GEN_INT8_A_MSG, mover_sleep_get()?SLEEP_COMMAND:WAKE_COMMAND);
+
+           // message creation success?
+           if (rc == 0) {
+              rc = HANDLE_SUCCESS;
+           } else {
+              delay_printk("Mover: could not create return message\n");
+              rc = HANDLE_FAILURE;
+           }
+        }
+    } else {
+        delay_printk("Mover: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("Mover: returning rc: %i\n", rc);
+
+    return rc;
+}
+
+//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init Mover_init(void) {
@@ -304,6 +356,7 @@ static int __init Mover_init(void) {
         {NL_C_MOVE,      nl_move_handler},
         {NL_C_POSITION,  nl_position_handler},
         {NL_C_EVENT,     nl_event_handler},
+        {NL_C_SLEEP,     nl_sleep_handler},
     };
     struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 

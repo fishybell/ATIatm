@@ -458,6 +458,14 @@ FUNCTION_START("::handle_2100(int start, int end)");
 	     DCMSG(RED,"CID_Shutdown...shutting down") ; 
 	     doShutdown();
 		 break;
+	  case CID_Sleep:
+	     DCMSG(RED,"CID_Sleep...shutting down") ; 
+	     doSleep();
+		 break;
+	  case CID_Wake:
+	     DCMSG(RED,"CID_Wake...shutting down") ; 
+	     doWake();
+		 break;
    }
 
    FUNCTION_INT("::handle_2100(int start, int end)", 0)
@@ -681,6 +689,26 @@ FUNCTION_START("::doShutdown()");
       nl_conn->doShutdown();
    }
 FUNCTION_END("::doShutdown()");
+}
+
+// sleep device
+void SIT_Client::doSleep() {
+FUNCTION_START("::doSleep()")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doSleep();
+   }
+FUNCTION_END("::doSleep()")
+}
+
+// wake device
+void SIT_Client::doWake() {
+FUNCTION_START("::doWake()")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doWake();
+   }
+FUNCTION_END("::doWake()")
 }
 
 // retrieve battery value
@@ -1075,6 +1103,27 @@ FUNCTION_START("::doShutdown()")
 
 FUNCTION_END("::doShutdown()")
 }
+
+// sleep device
+void SIT_Conn::doSleep() {
+FUNCTION_START("::doSleep()")
+
+   // Queue command
+   queueMsgU8(NL_C_SLEEP, SLEEP_COMMAND); // sleep command
+
+FUNCTION_END("::doSleep()")
+}
+
+// wake device
+void SIT_Conn::doWake() {
+FUNCTION_START("::doWake()")
+
+   // Queue command
+   queueMsgU8(NL_C_SLEEP, WAKE_COMMAND); // wake command
+
+FUNCTION_END("::doWake()")
+}
+
 // retrieve battery value
 void SIT_Conn::doBattery() {
 FUNCTION_START("::doBattery()")

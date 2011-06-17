@@ -210,6 +210,7 @@ enum {
     NL_C_ACCESSORY,	/* configure accesories (command/reply) (accessory structure) */
     NL_C_GPS,		/* gps status (request/reply) (gps structure) */
     NL_C_EVENT,		/* mover/lifter event (command/reply) (generic 8-bit int) */
+    NL_C_SLEEP,		/* sleep/wake command (command) (generic 8-bit int) */
     __NL_C_MAX,
 };
 #define NL_C_MAX (__NL_C_MAX - 1)
@@ -235,5 +236,8 @@ enum {
 #define BAT_INVALID	1
 #define BAT_HALT	0
 
+#define SLEEP_COMMAND 0
+#define WAKE_COMMAND 1
+#define SLEEP_REQUEST 2
 
 #endif

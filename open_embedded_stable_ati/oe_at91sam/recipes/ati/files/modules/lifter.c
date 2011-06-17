@@ -950,6 +950,7 @@ void hit_event_internal(int line, bool upload) {
 int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
     int rc, value = 0;
+    u8 data = BATTERY_SHUTDOWN; // in case we need to shutdown
 delay_printk("Lifter: handling event command\n");
     
     // get attribute from message
@@ -960,10 +961,25 @@ delay_printk("Lifter: handling event command\n");
 delay_printk("Lifter: received value: %i\n", value);
 
         // handle event
-        if (value == EVENT_HIT) {
-            hit_event_internal(0, false); // don't repropogate
-        } else {
-            lift_event_internal(value, false); // don't repropogate
+        switch (value) {
+            case EVENT_WAKE:
+                // lifters handle as nl command and nl event
+                lifter_sleep_set(0);
+                break;
+            case EVENT_SLEEP:
+                // lifters handle as nl command and nl event
+                lifter_sleep_set(1);
+                break;
+            case EVENT_HIT:
+                hit_event_internal(0, false); // don't repropogate
+                break;
+            case EVENT_SHUTDOWN:
+                // needs to be converted to NL_C_SHUTDOWN from userspace, so send it back up (and send onwards to other attached devices)
+                queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
+                break;
+            default:
+                lift_event_internal(value, false); // don't repropogate
+                break;
         }
 
         rc = HANDLE_SUCCESS_NO_REPLY;
@@ -974,6 +990,49 @@ delay_printk("Lifter: received value: %i\n", value);
 delay_printk("Lifter: returning rc: %i\n", rc);
 
     // return to let provider send message back
+    return rc;
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for sleep commands
+//---------------------------------------------------------------------------
+int nl_sleep_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc;
+    u8 data = 0;
+delay_printk("Mover: handling sleep command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    if (na) {
+        // grab value from attribute
+        data = nla_get_u8(na); // value is ignored
+delay_printk("Mover: received value: %i\n", data);
+
+        if (data != SLEEP_REQUEST) {
+            // handle sleep/wake in hw driver
+            lifter_sleep_set(data==SLEEP_COMMAND?1:0);
+            // lifters don't propogate message
+
+            rc = HANDLE_SUCCESS_NO_REPLY;
+        } else {
+            // retrieve sleep status
+            rc = nla_put_u8(skb, GEN_INT8_A_MSG, lifter_sleep_get()?SLEEP_COMMAND:WAKE_COMMAND);
+
+            // message creation success?
+            if (rc == 0) {
+                rc = HANDLE_SUCCESS;
+            } else {
+                delay_printk("Mover: could not create return message\n");
+                rc = HANDLE_FAILURE;
+            }
+        }
+    } else {
+        delay_printk("Mover: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("Mover: returning rc: %i\n", rc);
+
     return rc;
 }
 
@@ -991,6 +1050,7 @@ static int __init Lifter_init(void) {
         {NL_C_ACCESSORY, nl_accessory_handler},
         {NL_C_HIT_CAL,   nl_hit_cal_handler},
         {NL_C_EVENT,     nl_event_handler},
+        {NL_C_SLEEP,     nl_sleep_handler},
     };
     struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 

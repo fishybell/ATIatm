@@ -28,6 +28,8 @@ public :
    void doMoving(); // get the current position
    void didMoving(); // position changed to moving
    void doShutdown(); // shutdown target
+   void doSleep(); // sleep target
+   void doWake(); // wake target
    void doBattery(); // retrieve battery value
    void didBattery(int val); // current battery value
    void doStop(); // emergency stop (stops accessories as well)
@@ -109,6 +111,8 @@ public:
    void doExpose(); // change position to expose
    void doMoving(); // get the current position
    void doShutdown(); // shutdown target
+   void doSleep(); // sleep target
+   void doWake(); // wake target
    void doBattery(); // retrieve battery value
    void doStop(); // immediate stop (stops accessories as well)
    void doHitCal(struct hit_calibration hit_c); // change hit calibration data

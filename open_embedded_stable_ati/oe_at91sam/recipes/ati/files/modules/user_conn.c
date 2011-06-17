@@ -67,7 +67,11 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
             if (attrs[GEN_INT8_A_MSG]) {
                 // battery value percentage
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-                snprintf(wbuf, 1024, "B %i\n", value);
+                if (value == BATTERY_SHUTDOWN) {
+                    snprintf(wbuf, 1024, "K\n");
+                } else {
+                    snprintf(wbuf, 1024, "B %i\n", value);
+                }
             }
 
             break;
@@ -98,6 +102,15 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
                 snprintf(wbuf, 1024, "M %i\n", value-128);
             }
 
+            break;
+        case NL_C_SLEEP:
+            genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+
+            if (attrs[GEN_INT8_A_MSG]) {
+                // wake/sleep
+                int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+                snprintf(wbuf, 1024, "P %i\n", value);
+            }
             break;
         case NL_C_POSITION:
             genlmsg_parse(nlh, 0, attrs, GEN_INT16_A_MAX, generic_int16_policy);
@@ -358,6 +371,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             case 'M': case 'm':
                 nl_cmd = NL_C_MOVE;
                 break;
+            case 'P': case 'p':
+                nl_cmd = NL_C_SLEEP;
+                break;
             case 'Q': case 'q':
                 nl_cmd = NL_C_ACCESSORY;
                 break;
@@ -420,6 +436,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                     case 'M': case 'm':
                         snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-127 to 126)speed_in_mph\n");
                         break;
+                    case 'P': case 'p':
+                        snprintf(wbuf, 1024, "Sleep command\nFormat: P (0|1|2)sleep_or_wake_or_request\n");
+                        break;
                     case 'Q': case 'q':
                         snprintf(wbuf, 1024, "Types of accessories: MFS, MGL, SES, PHI, MSD, SMK, THM\nRequest accessory paramaters\nFormat: Q accessory_type\nChange accessory parameters\nFormat: Q accessory_type (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
                         break;
@@ -430,7 +449,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Toggle target\nFormat: T\n");
                         break;
                     case 'V': case 'v':
-                        snprintf(wbuf, 1024, "Send event to kernel\nFormat: V (0-255)event\nCurrently defined events 0-11:\n0: Start of raise\n1: finished raising\n2: start of lower\n3: finished lowering\n4: start of move\n5: reached target speed\n6: Changed position\n7: started coast\n8: started stopping\n9: finished stopping\n10: hit\n11: kill\n 12: error\n");
+                        snprintf(wbuf, 1024, "Send event to kernel\nFormat: V (0-255)event\nCurrently defined events 0-11:\n0: Start of raise\n1: finished raising\n2: start of lower\n3: finished lowering\n4: start of move\n5: reached target speed\n6: Changed position\n7: started coast\n8: started stopping\n9: finished stopping\n10: hit\n11: kill\n12: Shutdown\n13: Sleep\n:14: Wake\n15: error\n");
                         break;
                     case 'Y': case 'y':
                         snprintf(wbuf, 1024, "Request hit sensor type\nFormat: Y\nChange hit sensor type\nFormat: Y (0|1|2)mechanical_or_nchs_or_miles (0|1)invert_input_line\n");
@@ -439,7 +458,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Emergency stop\nFormat: X\n");
                         break;
                     default: // print default help
-                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nY: Hit Sensor Type\nX: Emergency Stop\n");
+                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nY: Hit Sensor Type\nX: Emergency Stop\n");
                         break;
                 }
                 write(client, wbuf, strnlen(wbuf,1024));
@@ -492,6 +511,13 @@ printf("unrecognized command '%c'\n", cmd[0]);
                         nla_put_u8(msg, GEN_INT8_A_MSG, 128+arg1); // move request (add 128 as we're not signed)
                     } else {
                         nla_put_u8(msg, GEN_INT8_A_MSG, VELOCITY_STOP); // stop
+                    }
+                    break;
+                case NL_C_SLEEP:
+                    if (sscanf(cmd+1, "%i", &arg1) == 1) {
+                        nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // sleep command
+                    } else {
+                        nla_put_u8(msg, GEN_INT8_A_MSG, SLEEP_REQUEST); // sleep status request
                     }
                     break;
                 case NL_C_POSITION:
