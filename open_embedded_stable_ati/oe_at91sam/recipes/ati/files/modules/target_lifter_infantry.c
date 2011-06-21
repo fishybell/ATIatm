@@ -24,15 +24,15 @@
 	#undef INPUT_LIFTER_POS_DOWN_LIMIT
 	#undef INPUT_LIFTER_POS_UP_LIMIT
 
-	#undef OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE
-	#undef OUTPUT_LIFTER_MOTOR_FWD_POS
+//	#undef OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE
+//	#undef OUTPUT_LIFTER_MOTOR_FWD_POS
 
 	#define INPUT_LIFTER_POS_ACTIVE_STATE   	ACTIVE_LOW
 	#define INPUT_LIFTER_POS_DOWN_LIMIT    		AT91_PIN_PA30   // BP3 on dev. board
 	#define INPUT_LIFTER_POS_UP_LIMIT     		AT91_PIN_PA31   // BP4 on dev. board
 
-	#define OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE    ACTIVE_LOW // PB9 is active high, PB8 active low
-	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PB9 // PB9 is power LED ... PB8 is the user LED
+//	#define OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE    ACTIVE_LOW // PB9 is active high, PB8 active low
+//	#define OUTPUT_LIFTER_MOTOR_FWD_POS    			AT91_PIN_PB9 // PB9 is power LED ... PB8 is the user LED
 #endif // TESTING_ON_EVAL
 
 //#define FIX_FOR_JPY_IO_BOARD
@@ -262,7 +262,9 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         schedule_work(&position_work);
         }
     else
-    	{
+    {
+       // signal an event
+       do_event(EVENT_RAISE); //BDR  It started moving for some reason, so we must report it.
 //	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
     	}
 
@@ -309,6 +311,8 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
     else
     	{
+       // signal an event
+	   do_event(EVENT_LOWER); // BDR   It started moving for some reason, we must report it
 //	delay_printk("%s - %s() - Wrong edge!\n",TARGET_NAME, __func__);
     	}
 
