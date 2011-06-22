@@ -182,6 +182,7 @@ PROG_START
    const char *defIP = "192.168.0.1";
    bool startSIT = false;
    bool startMIT = false;
+   bool startSES = false;
    
 const char *usage = "Usage: %s [options]\n\
 \t-l X   -- listen on port X rather than the default \n\
@@ -189,6 +190,7 @@ const char *usage = "Usage: %s [options]\n\
 \t-i X   -- connect to IP address X\n\
 \t-S     -- instantiate a SIT handler\n\
 \t-M     -- instantiate a MIT handler\n\
+\t-E     -- instantiate an SES handler\n\
 \t-v     -- Enable ERROR messages\n\
 \t-vv    -- Enable ERROR, INFO messages\n\
 \t-vvv   -- Enable ERROR, INFO, DEBUG messages\n\
@@ -203,6 +205,9 @@ const char *usage = "Usage: %s [options]\n\
          return 1;
       }
       switch (argv[i][1]) {
+         case 'E' :
+            startSES = true;
+            break;
          case 'S' :
             startSIT = true;
             break;
@@ -314,6 +319,12 @@ const char *usage = "Usage: %s [options]\n\
    // start any handlers here
    SIT_Client *sit_client = NULL;
    MIT_Client *mit_client = NULL;
+#if 0
+   --- not done yet...but soon...soon
+   if (startSES) {
+      ses_client = factory->newConn <SES_Client> ();
+   }
+#endif
    if (startSIT) {
       sit_client = factory->newConn <SIT_Client> ();
    }
