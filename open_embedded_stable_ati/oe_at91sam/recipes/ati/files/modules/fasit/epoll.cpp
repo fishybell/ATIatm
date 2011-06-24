@@ -127,20 +127,25 @@ __uint64_t getDevID () {
 }
 
 // utility function to properly configure a client TCP connection
-void setnonblocking(int sock) {
+void setnonblocking(int sock, bool socket) {
 FUNCTION_START("setnonblocking(int sock)")
    int opts, yes=1;
 
-   // disable Nagle's algorithm so we send messages as discrete packets
-   if (setsockopt(sock, SOL_SOCKET, TCP_NODELAY, &yes, sizeof(int)) == -1) {
-      IERROR("Could not disable Nagle's algorithm\n");
-      perror("setsockopt(TCP_NODELAY)");
+   // socket specific setup
+   if (socket) {
+      // disable Nagle's algorithm so we send messages as discrete packets
+      if (setsockopt(sock, SOL_SOCKET, TCP_NODELAY, &yes, sizeof(int)) == -1) {
+         IERROR("Could not disable Nagle's algorithm\n");
+         perror("setsockopt(TCP_NODELAY)");
+      }
+
+      if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)) < 0) { // set keepalive so we disconnect on link failure or timeout
+         perror("setsockopt(SO_KEEPALIVE)");
+         exit(EXIT_FAILURE);
+      }
    }
 
-   if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)) < 0) { // set keepalive so we disconnect on link failure or timeout
-      perror("setsockopt(SO_KEEPALIVE)");
-      exit(EXIT_FAILURE);
-   }
+   // generic file descriptor setup
    opts = fcntl(sock, F_GETFL); // grab existing flags
    if (opts < 0) {
       IERROR("Could not get socket flags\n");

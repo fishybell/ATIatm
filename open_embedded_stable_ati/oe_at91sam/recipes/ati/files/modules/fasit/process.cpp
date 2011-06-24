@@ -5,6 +5,9 @@ using namespace std;
 #include "common.h"
 #include "process.h"
 
+// for explicit declarations of template function
+#include "ses_procs.h"
+
 #define CMD_BUFFER_SIZE 1024
 
 /***********************************************************
@@ -23,6 +26,7 @@ Process::~Process() {
 FUNCTION_START("::~Process()")
 
    // calling close instead of pclose should be fine, so let parent class do the work
+   DCMSG(RED, "Closed pipe 0x%08x", pipe);
 
 FUNCTION_END("::~Process()")
 }
@@ -142,6 +146,7 @@ FUNCTION_HEX("::newProc(const char *cmd, bool readonly)", NULL)
    proc = new Proc(pipe);
 
    // add to epoll
+   setnonblocking(fd, false); // not a socket
    if (!addToEPoll(fd, proc)) {
        delete proc;
 FUNCTION_HEX("::newProc(const char *cmd, bool readonly)", NULL)
@@ -199,4 +204,5 @@ FUNCTION_INT("::parseData(int rsize, const char *rbuf)", -1);
 
 // explicit declarations of newProc() template function
 template BackgroundProcess *Process::newProc<BackgroundProcess>(const char *cmd, bool readonly);
+template PlayProcess *Process::newProc<PlayProcess>(const char *cmd, bool readonly);
 

@@ -197,14 +197,16 @@ printf("NL_C_HIT_CAL\n");
                 // bit event data
                 struct bit_event *bit = (struct bit_event*)nla_data(attrs[HIT_A_MSG]);
                 if (bit != NULL) {
-                    char btyp = 'x';
+                    char *btyp = "x";
                     switch (bit->bit_type) {
-                        case BIT_TEST: btyp = 'T'; break;
-                        case BIT_MOVE_FWD: btyp = 'F'; break;
-                        case BIT_MOVE_REV: btyp = 'R'; break;
-                        case BIT_MOVE_STOP: btyp = 'S'; break;
+                        case BIT_TEST: btyp = "TEST"; break;
+                        case BIT_MOVE_FWD: btyp = "FWD"; break;
+                        case BIT_MOVE_REV: btyp = "REV"; break;
+                        case BIT_MOVE_STOP: btyp = "STOP"; break;
+                        case BIT_MODE: btyp = "MODE"; break;
+                        case BIT_KNOB: btyp = "KNOB"; break;
                     }
-                    snprintf(wbuf, 1024, "T %c %i\n", btyp, bit->is_on);
+                    snprintf(wbuf, 1024, "BIT %s %i\n", btyp, bit->is_on);
                 }
             }
             break;
@@ -371,6 +373,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             case 'M': case 'm':
                 nl_cmd = NL_C_MOVE;
                 break;
+            case 'O': case 'o':
+                nl_cmd = NL_C_BIT;
+                break;
             case 'P': case 'p':
                 nl_cmd = NL_C_SLEEP;
                 break;
@@ -386,11 +391,14 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             case 'V': case 'v':
                 nl_cmd = NL_C_EVENT;
                 break;
+            case 'X': case 'x':
+                nl_cmd = NL_C_STOP;
+                break;
             case 'Y': case 'y':
                 nl_cmd = NL_C_HIT_CAL;
                 break;
-            case 'X': case 'x':
-                nl_cmd = NL_C_STOP;
+            case 'Z': case 'z':
+                nl_cmd = NL_C_BIT;
                 break;
             case '#':
                 if (sscanf(cmd+1, "%i", &arg1) == 1) {
@@ -436,6 +444,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                     case 'M': case 'm':
                         snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-127 to 126)speed_in_mph\n");
                         break;
+                    case 'O': case 'o':
+                        snprintf(wbuf, 1024, "Change Mode\nFormat: O (0-3)mode_number\nMode request\nFormat: O\n");
+                        break;
                     case 'P': case 'p':
                         snprintf(wbuf, 1024, "Sleep command\nFormat: P (0|1|2)sleep_or_wake_or_request\n");
                         break;
@@ -451,14 +462,17 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                     case 'V': case 'v':
                         snprintf(wbuf, 1024, "Send event to kernel\nFormat: V (0-255)event\nCurrently defined events 0-11:\n0: Start of raise\n1: finished raising\n2: start of lower\n3: finished lowering\n4: start of move\n5: reached target speed\n6: Changed position\n7: started coast\n8: started stopping\n9: finished stopping\n10: hit\n11: kill\n12: Shutdown\n13: Sleep\n:14: Wake\n15: error\n");
                         break;
-                    case 'Y': case 'y':
-                        snprintf(wbuf, 1024, "Request hit sensor type\nFormat: Y\nChange hit sensor type\nFormat: Y (0|1|2)mechanical_or_nchs_or_miles (0|1)invert_input_line\n");
-                        break;
                     case 'X': case 'x':
                         snprintf(wbuf, 1024, "Emergency stop\nFormat: X\n");
                         break;
+                    case 'Y': case 'y':
+                        snprintf(wbuf, 1024, "Request hit sensor type\nFormat: Y\nChange hit sensor type\nFormat: Y (0|1|2)mechanical_or_nchs_or_miles (0|1)invert_input_line\n");
+                        break;
+                    case 'Z': case 'z':
+                        snprintf(wbuf, 1024, "Request knob value\nFormat: Z\n");
+                        break;
                     default: // print default help
-                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nY: Hit Sensor Type\nX: Emergency Stop\n");
+                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob");
                         break;
                 }
                 write(client, wbuf, strnlen(wbuf,1024));
@@ -477,6 +491,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
             struct hit_calibration hit_c;
             struct accessory_conf acc_c;
             struct gps_conf gps_c;
+            struct bit_event bit_c;
             msg = nlmsg_alloc();
             genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, nl_cmd, 1);
 
@@ -512,6 +527,20 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     } else {
                         nla_put_u8(msg, GEN_INT8_A_MSG, VELOCITY_STOP); // stop
                     }
+                    break;
+                case NL_C_BIT:
+                    if (cmd[0] == 'O' || cmd[0] == 'o') {
+                        bit_c.is_on = 0;
+                        if (sscanf(cmd+1, "%i", &arg1) == 1) {
+                            bit_c.bit_type = BIT_MODE; // change mode
+                            bit_c.is_on = arg1; // mode value
+                        } else {
+                            bit_c.bit_type = BIT_MODE_REQ; // mode value request
+                        }
+                    } else {
+                        bit_c.bit_type = BIT_KNOB_REQ; // knob value request
+                    }
+                    nla_put(msg, BIT_A_MSG, sizeof(struct bit_event), &bit_c);
                     break;
                 case NL_C_SLEEP:
                     if (sscanf(cmd+1, "%i", &arg1) == 1) {

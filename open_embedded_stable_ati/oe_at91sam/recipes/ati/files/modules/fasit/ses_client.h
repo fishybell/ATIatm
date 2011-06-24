@@ -13,6 +13,8 @@ using namespace std;
 extern int start_config;
 
 #define SES_BUFFER_SIZE 512
+#define NO_LOOP 1
+#define INFINITE_LOOP 0xFFFFFFFF
 
 // class for FASIT client
 // parses SES messages
@@ -36,7 +38,7 @@ public :
    void doRecord(); // record over selected track
    void doMode(int mode); // change playback mode
    void doMode(); // get mode from kernel
-   void doLoop(int loop); // set the loop value
+   void doLoop(unsigned int loop); // set the loop value
    void doTrack(const char* track); // select an arbirtrary track
    void doTrack(int track); // select a built-in track
    void doTrack(); // get track from kernel
@@ -78,7 +80,7 @@ private:
    int resp_seq;
 
    // playback values
-   int loop; // loop count
+   unsigned int loop; // loop count
    int mode; // playback mode
    char track[SES_BUFFER_SIZE]; // selected track
    char uri[SES_BUFFER_SIZE]; // selected stream uri

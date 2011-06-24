@@ -108,6 +108,10 @@ enum {
     BIT_MOVE_FWD,   /* move forward */
     BIT_MOVE_REV,   /* move reverse */
     BIT_MOVE_STOP,  /* move stop */
+    BIT_MODE,       /* mode button (is_on contains new mode number) */
+    BIT_KNOB,       /* knob twisted (is_on contains number) */
+    BIT_KNOB_REQ,   /* request knob */
+    BIT_MODE_REQ,   /* request mode */
 };
 enum {
     BIT_A_UNSPEC,

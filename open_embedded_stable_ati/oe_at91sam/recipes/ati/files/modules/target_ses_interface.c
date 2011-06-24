@@ -6,7 +6,9 @@
 #include <mach/gpio.h>
 
 #include "target.h"
+#include "netlink_kernel.h"
 #include "target_ses_interface.h"
+#include "target_generic_output.h" // for EVENT_* defines
 //---------------------------------------------------------------------------
 
 #define TARGET_NAME		"ses interface"
@@ -16,14 +18,6 @@
 
 #define KNOB_TIME_IN_MSECONDS		10
 #define MODE_TIME_IN_MSECONDS		50
-
-#define KNOB_LIVEFIRE		15
-
-#define MODE_MAINTENANCE	0
-#define MODE_TESTING		1
-#define MODE_RECORD		2
-#define MODE_LIVEFIRE		3
-#define MODE_ERROR		4
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -83,6 +77,16 @@ static struct timer_list blink_timeout_timer_list = TIMER_INITIALIZER(blink_time
 // This atomic variable is use to indicate that we are fully initialized
 //---------------------------------------------------------------------------
 atomic_t full_init = ATOMIC_INIT(FALSE);
+
+//---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we are asleep/awake
+//---------------------------------------------------------------------------
+atomic_t sleep_atomic = ATOMIC_INIT(0); // awake
+
+//---------------------------------------------------------------------------
+// This atomic variable is use to hold our driver id from netlink provider
+//---------------------------------------------------------------------------
+atomic_t driver_id = ATOMIC_INIT(-1);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate what the mode is currently at.
@@ -151,7 +155,10 @@ static const int knob_map[16] = {0,1,3,2,7,6,4,5,15,14,12,13,8,9,11,10};
 static void do_mode(void)
     {
     int mode = atomic_read(&mode_value_atomic);
-   delay_printk("%s - %s() : %i\n",TARGET_NAME, __func__, mode);
+    if (atomic_read(&sleep_atomic)) {
+        mode = MODE_STOP;
+    }
+//   delay_printk("%s - %s() : %i\n",TARGET_NAME, __func__, mode);
 
     // turn off all indicator
     del_timer(&blink_timeout_timer_list);
@@ -177,7 +184,7 @@ static void do_mode(void)
             mod_timer(&blink_timeout_timer_list, jiffies+(100*HZ/1000));
             break;
         }
-    }
+    } // error and stop show no lights
 
 //---------------------------------------------------------------------------
 // reads the value of all 4 knob pins at once, returning the computed value
@@ -196,7 +203,7 @@ static int knob_read(void)
 
     spin_unlock_irqrestore(&knob_lock, flags);
 
-   delay_printk("%s - pins : %i %i %i %i\n",TARGET_NAME, pin1, pin2, pin4, pin8);
+//   delay_printk("%s - pins : %i %i %i %i\n",TARGET_NAME, pin1, pin2, pin4, pin8);
 
     return (pin1 * 1) + (pin2 * 2) + (pin4 * 4) + (pin8 * 8);
     }
@@ -206,7 +213,7 @@ static int knob_read(void)
 //---------------------------------------------------------------------------
 static void blink_timeout_fire(unsigned long data)
     {
-   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
+//   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
     if (at91_get_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR) == OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE)
         {
         at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED off
@@ -230,7 +237,7 @@ irqreturn_t mode_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
+//   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     // read the mode in 50 milliseconds
     del_timer(&mode_timeout_timer_list);
@@ -246,14 +253,17 @@ static void mode_timeout_fire(unsigned long data)
     {
     // read value from gpio
     int value;
+    if (atomic_read(&sleep_atomic)) {
+        return; // sleeping, don't change mode
+    }
 
     if (at91_get_gpio_value(INPUT_SES_MODE_BUTTON) != INPUT_SES_MODE_BUTTON_ACTIVE_STATE)
         {
-   delay_printk("%s - %s - skipping\n",TARGET_NAME,__func__);
+//   delay_printk("%s - %s - skipping\n",TARGET_NAME,__func__);
         return;
         }
 
-   delay_printk("%s - %s\n",TARGET_NAME,__func__);
+//   delay_printk("%s - %s\n",TARGET_NAME,__func__);
 
     // change value, if we're allowed
     if (atomic_read(&knob_value_atomic) == KNOB_LIVEFIRE)
@@ -289,7 +299,7 @@ irqreturn_t knob_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
+//   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     // read the knob in 10 milliseconds
     del_timer(&knob_timeout_timer_list);
@@ -308,7 +318,7 @@ static void knob_timeout_fire(unsigned long data)
     ovalue = atomic_read(&knob_value_atomic);
     value = knob_read();
 
-   delay_printk("%s - %s : value %i\n",TARGET_NAME,__func__,value);
+//   delay_printk("%s - %s : value %i\n",TARGET_NAME,__func__,value);
 
     // change value
     if (value == KNOB_LIVEFIRE)
@@ -361,7 +371,7 @@ static int hardware_init(void)
     at91_set_gpio_output(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
 
     // turn amp up to 11
-    at91_set_gpio_output(OUTPUT_SES_MODE_AMPLIFIER_ON, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_SES_AMPLIFIER_ON, OUTPUT_SES_AMPLIFIER_ACTIVE_STATE);
 
     // set initial value of knob/mode
     value = knob_read();
@@ -412,6 +422,8 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
+    // turn off amp
+    at91_set_gpio_value(OUTPUT_SES_AMPLIFIER_ON, !OUTPUT_SES_AMPLIFIER_ACTIVE_STATE);
     del_timer(&knob_timeout_timer_list);
     del_timer(&mode_timeout_timer_list);
     del_timer(&blink_timeout_timer_list);
@@ -427,7 +439,11 @@ static int hardware_exit(void)
 static ssize_t mode_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
 	int status;
-	status = atomic_read(&mode_value_atomic);
+    if (atomic_read(&sleep_atomic)) {
+        status = MODE_STOP; // asleep
+    } else {
+        status = atomic_read(&mode_value_atomic);
+    }
     return sprintf(buf, "%s\n", mode_status[status]);
     }
 
@@ -484,33 +500,266 @@ struct target_device target_device_ses_interface =
     .get_attr_group	= ses_interface_get_attr_group,
     };
 
+//---------------------------------------------------------------------------
+// Message filler handler for bit functions
+//---------------------------------------------------------------------------
+int bit_mfh(struct sk_buff *skb, void *bit_data) {
+    // the bit_data argument is a pre-made bit_event structure
+    return nla_put(skb, BIT_A_MSG, sizeof(struct bit_event), (struct bit_event*)bit_data);
+}
+
 static void knob_twisted(struct work_struct * work)
 	{
+    struct bit_event bit_data;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
     }
     
+    // notify netlink userspace
+    bit_data.bit_type = BIT_KNOB;
+	bit_data.is_on = atomic_read(&knob_value_atomic);
+    send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
+
 	target_sysfs_notify(&target_device_ses_interface, "knob");
 	}
 
 static void mode_changed(struct work_struct * work)
 	{
+    struct bit_event bit_data;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
     }
     
+    // notify netlink userspace
+    bit_data.bit_type = BIT_MODE;
+    if (atomic_read(&sleep_atomic)) {
+        bit_data.is_on = MODE_STOP; // asleep
+    } else {
+	    bit_data.is_on = atomic_read(&mode_value_atomic);
+    }
+    send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
+
 	target_sysfs_notify(&target_device_ses_interface, "mode");
 	}
+
+//---------------------------------------------------------------------------
+// netlink command handler for stop commands
+//---------------------------------------------------------------------------
+int nl_stop_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value = 0;
+    struct bit_event bit_data;
+delay_printk("SES: handling stop command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    if (na) {
+        // grab value from attribute
+        value = nla_get_u8(na); // value is ignored
+delay_printk("SES: received value: %i\n", value);
+
+        // Stop playing (mode = stop)
+        bit_data.bit_type = BIT_MODE;
+        bit_data.is_on = MODE_STOP;
+        send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
+        do_mode();
+
+        // prepare response
+        rc = nla_put_u8(skb, GEN_INT8_A_MSG, 1); // value is ignored
+
+        // message creation success?
+        if (rc == 0) {
+            rc = HANDLE_SUCCESS;
+        } else {
+            delay_printk("SES: could not create return message\n");
+            rc = HANDLE_FAILURE;
+        }
+    } else {
+        delay_printk("SES: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("SES: returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for sleep commands
+//---------------------------------------------------------------------------
+int nl_sleep_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value;
+    struct bit_event bit_data;
+delay_printk("SES: handling sleep command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    if (na) {
+        // grab value from attribute
+        value = nla_get_u8(na); // value is ignored
+delay_printk("SES: received value: %i\n", value);
+
+        if (value != SLEEP_REQUEST) {
+            // handle sleep via an atomic value
+            atomic_set(&sleep_atomic, value==SLEEP_COMMAND?1:0);
+            rc = HANDLE_SUCCESS_NO_REPLY;
+
+            // Stop playing (mode = stop) on sleep
+            if (value == SLEEP_COMMAND) {
+                bit_data.bit_type = BIT_MODE;
+                bit_data.is_on = MODE_STOP;
+                send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
+                // turn off amp
+                at91_set_gpio_value(OUTPUT_SES_AMPLIFIER_ON, !OUTPUT_SES_AMPLIFIER_ACTIVE_STATE);
+            } else {
+                // turn on amp
+                at91_set_gpio_value(OUTPUT_SES_AMPLIFIER_ON, OUTPUT_SES_AMPLIFIER_ACTIVE_STATE);
+            }
+            do_mode();
+
+            // turn on/off amplifier
+        } else {
+            // retrieve sleep status
+            rc = nla_put_u8(skb, GEN_INT8_A_MSG, atomic_read(&sleep_atomic)?SLEEP_COMMAND:WAKE_COMMAND);
+
+            // message creation success?
+            if (rc == 0) {
+                rc = HANDLE_SUCCESS;
+            } else {
+                delay_printk("SES: could not create return message\n");
+                rc = HANDLE_FAILURE;
+            }
+        }
+    } else {
+        delay_printk("SES: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("SES: returning rc: %i\n", rc);
+
+    return rc;
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for event commands
+//---------------------------------------------------------------------------
+int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value = 0;
+    u8 data = BATTERY_SHUTDOWN; // in case we need to shutdown
+delay_printk("SES: handling event command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    if (na) {
+        // grab value from attribute
+        value = nla_get_u8(na); // value is ignored
+delay_printk("SES: received value: %i\n", value);
+
+        // handle only shutdown event -- TODO -- handle raise/lower for start/stop (need method to decide which event to do what on)
+        if (value == EVENT_SHUTDOWN) {
+            // needs to be converted to NL_C_SHUTDOWN from userspace, so send it back up (and send onwards to other attached devices)
+            queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
+        }
+
+        rc = HANDLE_SUCCESS_NO_REPLY;
+    } else {
+        delay_printk("SES: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("SES: returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for bit commands
+//---------------------------------------------------------------------------
+int nl_bit_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc;
+    struct bit_event *bit_data;
+delay_printk("SES: handling bit command\n");
+    
+    // get attribute from message
+    na = info->attrs[BIT_A_MSG]; // generic 8-bit message
+    if (na) {
+        // grab value from attribute
+        bit_data = (struct bit_event*)nla_data(na);
+
+        rc = HANDLE_SUCCESS_NO_REPLY; // by default, no response
+
+        // handle bit data command
+        switch (bit_data->bit_type) {
+           case BIT_KNOB_REQ:
+              // fill out knob request
+              bit_data->bit_type = BIT_KNOB;
+              bit_data->is_on = atomic_read(&knob_value_atomic);
+              rc = nla_put(skb, BIT_A_MSG, sizeof(struct bit_event), bit_data);
+              break;
+           case BIT_MODE:
+              if (bit_data->is_on == MODE_STOP) {
+                  // send stop back all userspaces to stop playing (doesn't actually change mode)
+                  bit_data->bit_type = BIT_MODE;
+                  bit_data->is_on = MODE_STOP;
+                  send_nl_message_multi(bit_data, bit_mfh, NL_C_BIT);
+                  break;
+              } else if (bit_data->is_on < MODE_ERROR) {
+                  atomic_set(&mode_value_atomic, bit_data->is_on);
+                  do_mode();
+                  // fall through to send mode back to userspace (needed to actually change volume)
+              } else {
+                  break; // invalid mode, ignore message
+              }
+              // fall through
+           case BIT_MODE_REQ:
+              // fill out mode request
+              bit_data->bit_type = BIT_MODE;
+              bit_data->is_on = atomic_read(&mode_value_atomic);
+              rc = nla_put(skb, BIT_A_MSG, sizeof(struct bit_event), bit_data);
+              break;
+        } // ignore everything else
+
+        // message creation success?
+        if (rc == HANDLE_SUCCESS_NO_REPLY) {
+            // nothing
+        } else if (rc == 0) {
+            rc = HANDLE_SUCCESS;
+        } else {
+            delay_printk("Mover: could not create return message\n");
+            rc = HANDLE_FAILURE;
+        }
+
+    } else {
+        delay_printk("SES: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("SES: returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
+}
 
 //---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init target_ses_interface_init(void)
     {
-    int retval;
-delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+    int retval = 0, d_id;
+    struct driver_command commands[] = {
+        {NL_C_STOP,      nl_stop_handler},
+        {NL_C_SLEEP,     nl_sleep_handler},
+        {NL_C_EVENT,     nl_event_handler},
+        {NL_C_BIT,       nl_bit_handler},
+    };
+    struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
+    // install driver w/ netlink provider
+    d_id = install_nl_driver(&driver);
+delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
+    atomic_set(&driver_id, d_id);
 
 	hardware_init();
 
@@ -530,6 +779,7 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 static void __exit target_ses_interface_exit(void)
     {
     atomic_set(&full_init, FALSE);
+    uninstall_nl_driver(atomic_read(&driver_id));
     ati_flush_work(&knob_work); // close any open work queue items
     ati_flush_work(&mode_work); // close any open work queue items
 

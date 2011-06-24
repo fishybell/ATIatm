@@ -5,10 +5,10 @@
 
 using namespace std;
 
+#include "ses_procs.h"
 #include "ses_client.h"
 #include "common.h"
 #include "timers.h"
-#include "process.h"
 
 #include "target_ses_interface.h"
 
@@ -492,7 +492,8 @@ FUNCTION_START("::doPlay()");
 
    DCMSG(GREEN, "Playing %s", track) ;
 
-   // TODO -- start play process
+   // start play process
+   PlayProcess::playTrack(track, loop);
 
 FUNCTION_END("::doPlay()");
 }
@@ -522,7 +523,7 @@ FUNCTION_START("::doMode(int mode)");
          BackgroundProcess::newProc("amixer set 'Speaker',0 53"); // 35% of 151
          break;
       case MODE_LIVEFIRE:
-         BackgroundProcess::newProc("amixer set 'Speaker',0 100"); // 100% of 151
+         BackgroundProcess::newProc("amixer set 'Speaker',0 151"); // 100% of 151
          break;
       case MODE_RECORD:
          BackgroundProcess::newProc("amixer set 'Mic',0 32"); // 100% of 32
@@ -532,7 +533,7 @@ FUNCTION_START("::doMode(int mode)");
 FUNCTION_END("::doMode(int mode)");
 }
 
-void SES_Client::doLoop(int loop) {
+void SES_Client::doLoop(unsigned int loop) {
 FUNCTION_START("::doPlayRecord(int loop)");
 
    // set member loop to loop
@@ -676,15 +677,17 @@ FUNCTION_START("SES_Conn::parseData(struct nl_msg *msg)")
          ses_client->didStop(); // tell client
          break;
       case NL_C_BIT:
-	 genlmsg_parse(nlh, 0, attrs, BIT_A_MAX, bit_event_policy);
-	 DCMSG(RED,"parseData case NL_C_EVENT: attrs = 0x%x ",attrs[BIT_A_MSG]) ;
+         genlmsg_parse(nlh, 0, attrs, BIT_A_MAX, bit_event_policy);
+         DCMSG(RED,"parseData case NL_C_EVENT: attrs = 0x%x ",attrs[BIT_A_MSG]) ;
          if (attrs[BIT_A_MSG]) {
             // received BIT from the kernel
             bit_event *bit_c = (struct bit_event*)nla_data(attrs[BIT_A_MSG]);
             switch (bit_c->bit_type) {
                case BIT_TEST:
                   // play or record selected track
-                  ses_client->doPlayRecord();
+                  if (bit_c->is_on) {
+                     ses_client->doPlayRecord();
+                  }
                   break;
                case BIT_KNOB:
                   // change selected track
