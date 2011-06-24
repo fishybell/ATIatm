@@ -398,6 +398,7 @@ FUNCTION_START("::didPosition(int pos)")
    // remember position value, send status if changed
    if (pos != lastPosition) {
       lastPosition = pos;
+      DCMSG(GREEN,"didPosition is forcing a 2102 status") ;      
       sendStatus2102();
    }
 
@@ -433,6 +434,7 @@ FUNCTION_START("::didMove(int direction)")
    if (speed != lastSpeed || direction != lastDirection) {
       lastSpeed = speed;
       lastDirection = direction;
+      DCMSG(GREEN,"didMove is forcing a 2102 status") ;      
       sendStatus2102();
    }
 
