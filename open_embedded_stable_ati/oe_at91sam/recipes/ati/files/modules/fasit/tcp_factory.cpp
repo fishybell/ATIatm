@@ -14,6 +14,7 @@ using namespace std;
    #include "tcp_client.h"
    #include "sit_client.h"
    #include "mit_client.h"
+   #include "ses_client.h"
 #endif
 
 #ifdef EVENT_CONN
@@ -135,6 +136,7 @@ FUNCTION_HEX("::newConn()", tcp)
    template TCP_Client *TCP_Factory::newConn<TCP_Client>();
    template SIT_Client *TCP_Factory::newConn<SIT_Client>();
    template MIT_Client *TCP_Factory::newConn<MIT_Client>();
+   template SES_Client *TCP_Factory::newConn<SES_Client>();
 #endif
 
 #ifdef EVENT_CONN

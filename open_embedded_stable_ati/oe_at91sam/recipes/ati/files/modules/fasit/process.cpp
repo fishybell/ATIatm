@@ -1,8 +1,15 @@
+#include <errno.h>
+
 using namespace std;
 
+#include "common.h"
 #include "process.h"
 
+#define CMD_BUFFER_SIZE 1024
 
+/***********************************************************
+*                       Process Class                      *
+***********************************************************/
 Process::Process(FILE *pipe) : Connection(fileno(pipe)) {
 FUNCTION_START("::Process(FILE *pipe)")
 
@@ -27,8 +34,8 @@ FUNCTION_START("Process::handleRead(const epoll_event *ev)");
    int rsize=0;
    rsize = fread(buf, sizeof(char), BUF_SIZE, pipe);
 
-DCMSG(GREEN,"fd %i read %i bytes:\n", fd, rsize);
-PRINT_HEXB(buf, rsize);
+DCMSG(BLUE,"pipe 0x%08x read %i bytes:\n", pipe, rsize);
+DCMSG(BLUE, "<<<<<<<\n%s\n>>>>>>>\n", buf);
 
    DCOLOR(black) ;
    if (rsize == -1) {
@@ -83,7 +90,7 @@ FUNCTION_START("Process::handleWrite(const epoll_event *ev)");
       }
    }
 
-   DCMSG(BLUE,"fd %i wrote %i bytes with 'fwrite(fwbuf, sizeof(char), fwsize, pipe)': ", fd, s);
+   DCMSG(BLUE,"pipe 0x%08x wrote %i bytes with 'fwrite(fwbuf, sizeof(char), fwsize, pipe)': ", pipe, s);
    CPRINT_HEXB(BLUE,fwbuf, s);
    DCOLOR(black);
 
@@ -114,4 +121,82 @@ FUNCTION_START("Process::handleWrite(const epoll_event *ev)");
 FUNCTION_INT("Process::handleWrite(const epoll_event *ev)", 0)
    return 0;
 }
+
+template <class Proc>
+Proc *Process::newProc(const char *cmd, bool readonly) {
+FUNCTION_START("::newProc(const char *cmd, bool readonly)")
+   Proc *proc = NULL;
+   FILE *pipe = NULL;
+   int fd = 0;
+
+   DCMSG(RED, "Starting process <<%s>>", cmd);
+   // open pipe to process using the given command
+   if ( !(pipe = (FILE*)popen(cmd,readonly?"r":"w")) ) {
+      perror("Problems with creating pipe");
+FUNCTION_HEX("::newProc(const char *cmd, bool readonly)", NULL)
+      return NULL;
+   }
+   fd = fileno(pipe);
+
+   // Create process object to track process progress
+   proc = new Proc(pipe);
+
+   // add to epoll
+   if (!addToEPoll(fd, proc)) {
+       delete proc;
+FUNCTION_HEX("::newProc(const char *cmd, bool readonly)", NULL)
+       return NULL;
+   }
+
+   // return the result
+FUNCTION_HEX("::newProc(const char *cmd, bool readonly)", proc)
+   return proc;
+}
+
+/***********************************************************
+*                  BackgroundProcess Class                 *
+***********************************************************/
+BackgroundProcess::BackgroundProcess(FILE *pipe) : Process(pipe) {
+FUNCTION_START("::BackgroundProcess(FILE *pipe)");
+
+   // don't do anything
+
+FUNCTION_END("::BackgroundProcess(FILE *pipe)");
+}
+
+void BackgroundProcess::newProc(const char *cmd) {
+
+   // look to see if we need to add an ampersand
+   bool needAmp = true;
+   for (int i=0; i<CMD_BUFFER_SIZE && cmd[i] != '\0'; i++) {
+      if (cmd[i] == '&') {
+         needAmp = false;
+      }
+   }
+
+   // run the process with or without ampersand
+   if (needAmp) {
+      // put in ampersand to make process run in background
+      char *newCmd = new char[CMD_BUFFER_SIZE];
+      snprintf(newCmd, CMD_BUFFER_SIZE, "%s &", cmd);
+      Process::newProc<BackgroundProcess>(newCmd, true); // read only, discard return value
+      delete [] newCmd;
+   } else {
+      // run as-is
+      Process::newProc<BackgroundProcess>(cmd, true); // read only, discard return value
+   }
+}
+
+// do nothing with the data, when finished, delete
+int BackgroundProcess::parseData(int rsize, const char *rbuf) {
+FUNCTION_START("::parseData(int rsize, const char *rbuf)");
+   // ignore data
+   DCMSG(RED, "Deleting background process") ;
+FUNCTION_INT("::parseData(int rsize, const char *rbuf)", -1);
+   return -1; // delete after first read (running in background, won't care if pipe is lost?)
+}
+
+
+// explicit declarations of newProc() template function
+template BackgroundProcess *Process::newProc<BackgroundProcess>(const char *cmd, bool readonly);
 

@@ -10,6 +10,7 @@ using namespace std;
 #ifdef FASIT_CONN
    #include "sit_client.h"
    #include "mit_client.h"
+   #include "ses_client.h"
 #endif
 
 #ifdef EVENT_CONN
@@ -249,6 +250,7 @@ FUNCTION_HEX("::newConn(C_Client *client)", conn)
 #ifdef FASIT_CONN
    template SIT_Conn *NL_Conn::newConn<SIT_Conn, SIT_Client>(SIT_Client *client);
    template MIT_Conn *NL_Conn::newConn<MIT_Conn, MIT_Client>(MIT_Client *client);
+   template SES_Conn *NL_Conn::newConn<SES_Conn, SES_Client>(SES_Client *client);
 #endif
 
 #ifdef EVENT_CONN

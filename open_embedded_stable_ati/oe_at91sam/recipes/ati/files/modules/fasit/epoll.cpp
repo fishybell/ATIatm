@@ -29,6 +29,7 @@ volatile int C_ERRORS;
 #include "sit_client.h"
 #undef extern
 #include "mit_client.h"
+#include "ses_client.h"
 
 // rough idea of how many connections we'll deal with and the max we'll deal with in a single loop
 #define MAX_CONNECTIONS 2048
@@ -319,12 +320,10 @@ const char *usage = "Usage: %s [options]\n\
    // start any handlers here
    SIT_Client *sit_client = NULL;
    MIT_Client *mit_client = NULL;
-#if 0
-   --- not done yet...but soon...soon
+   SES_Client *ses_client = NULL;
    if (startSES) {
       ses_client = factory->newConn <SES_Client> ();
    }
-#endif
    if (startSIT) {
       sit_client = factory->newConn <SIT_Client> ();
    }
@@ -401,6 +400,9 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
    }
    if (mit_client != NULL) {
       delete mit_client;
+   }
+   if (ses_client != NULL) {
+      delete ses_client;
    }
 
    return 0;

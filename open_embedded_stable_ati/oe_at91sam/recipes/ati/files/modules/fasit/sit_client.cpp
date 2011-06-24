@@ -459,11 +459,11 @@ FUNCTION_START("::handle_2100(int start, int end)");
 	     doShutdown();
 		 break;
 	  case CID_Sleep:
-	     DCMSG(RED,"CID_Sleep...shutting down") ; 
+	     DCMSG(RED,"CID_Sleep...sleeping") ; 
 	     doSleep();
 		 break;
 	  case CID_Wake:
-	     DCMSG(RED,"CID_Wake...shutting down") ; 
+	     DCMSG(RED,"CID_Wake...waking") ; 
 	     doWake();
 		 break;
    }
