@@ -220,7 +220,7 @@ FUNCTION_HEX("::newConn(C_Client *client)", NULL)
 FUNCTION_HEX("::newConn(C_Client *client)", NULL)
       return NULL;
    }
-   setnonblocking(nl_socket_get_fd(handle));
+   setnonblocking(nl_socket_get_fd(handle), true); // socket
 
    // resolve ATI family name to family id
    int family = genl_ctrl_resolve(handle, "ATI");

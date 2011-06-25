@@ -97,7 +97,7 @@ FUNCTION_INT("::newClientSock()", -1)
 FUNCTION_INT("::newClientSock()", -1)
       return -1;
    }
-   setnonblocking(sock);
+   setnonblocking(sock, true); // socket
 
 FUNCTION_INT("::newClientSock", sock)
    return sock;

@@ -128,7 +128,7 @@ __uint64_t getDevID () {
 
 // utility function to properly configure a client TCP connection
 void setnonblocking(int sock, bool socket) {
-FUNCTION_START("setnonblocking(int sock)")
+FUNCTION_START("setnonblocking(int sock, bool socket)")
    int opts, yes=1;
 
    // socket specific setup
@@ -159,7 +159,7 @@ FUNCTION_START("setnonblocking(int sock)")
       exit(EXIT_FAILURE);
    }
 
-FUNCTION_END("setnonblocking(int sock)")
+FUNCTION_END("setnonblocking(int sock, bool socket)")
 }
 
 /**********************************
@@ -364,7 +364,7 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
                perror("accept");
                continue;
             }
-            setnonblocking(client);
+            setnonblocking(client, true); // socket
             FASIT_TCP *fasit_tcp;
             // attach client to MIT?
             if (mit_client != NULL && !mit_client->hasSIT()) {

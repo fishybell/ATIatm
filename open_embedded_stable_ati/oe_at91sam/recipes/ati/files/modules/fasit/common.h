@@ -96,7 +96,7 @@ extern volatile int C_ERRORS;
 __uint64_t getDevID();
 
 // utility function to properly configure a client TCP connection
-void setnonblocking(int sock, bool socket=true);
+void setnonblocking(int sock, bool socket);
 
 // utility class for comparing structures used as keys in maps
 template <class T>

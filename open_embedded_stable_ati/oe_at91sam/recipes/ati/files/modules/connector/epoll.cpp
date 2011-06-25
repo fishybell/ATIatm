@@ -52,8 +52,8 @@ static void quitproc(int sig) {
 }
 
 // utility function to properly configure a client TCP connection
-void setnonblocking(int sock) {
-FUNCTION_START("setnonblocking(int sock)")
+void setnonblocking(int sock, bool socket) {
+FUNCTION_START("setnonblocking(int sock, bool socket)")
    int opts;
 
    opts = fcntl(sock, F_GETFL);
@@ -66,7 +66,7 @@ FUNCTION_START("setnonblocking(int sock)")
       perror("fcntl(F_SETFL)");
       exit(EXIT_FAILURE);
    }
-FUNCTION_END("setnonblocking(int sock)")
+FUNCTION_END("setnonblocking(int sock, bool socket)")
 }
 
 /**********************************
@@ -248,7 +248,7 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
                perror("accept");
                continue;
             }
-            setnonblocking(client);
+            setnonblocking(client, true); // socket
             // connect new client to kernel and add to epoll
             Kernel_TCP *kern_tcp = new Kernel_TCP(client);
             ev.events = EPOLLIN;
