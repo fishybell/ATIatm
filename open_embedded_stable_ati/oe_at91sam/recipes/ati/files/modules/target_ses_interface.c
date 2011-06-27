@@ -51,6 +51,7 @@
 #define OUTPUT_SES_MODE_TESTING_INDICATOR                       AT91_PIN_PB9
 #define OUTPUT_SES_MODE_RECORD_INDICATOR                        AT91_PIN_PB9
 #define OUTPUT_SES_MODE_LIVEFIRE_INDICATOR                      AT91_PIN_PB9
+#define OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG                  AT91_PIN_PB9
 
 #define INPUT_SELECTOR_KNOB_ACTIVE_STATE                        ACTIVE_LOW
 #define INPUT_SELECTOR_KNOB_PULLUP_STATE                        PULLUP_ON
@@ -82,6 +83,11 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 // This atomic variable is use to indicate that we are asleep/awake
 //---------------------------------------------------------------------------
 atomic_t sleep_atomic = ATOMIC_INIT(0); // awake
+
+//---------------------------------------------------------------------------
+// This atomic variable is use to indicate that if the mode button is enabled
+//---------------------------------------------------------------------------
+atomic_t mode_enable = ATOMIC_INIT(1); // mode button enabled
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to hold our driver id from netlink provider
@@ -161,11 +167,12 @@ static void do_mode(void)
 //   delay_printk("%s - %s() : %i\n",TARGET_NAME, __func__, mode);
 
     // turn off all indicator
-    del_timer(&blink_timeout_timer_list);
+    del_timer(&blink_timeout_timer_list); // stop all blinking
     at91_set_gpio_value(OUTPUT_SES_MODE_MAINT_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_value(OUTPUT_SES_MODE_TESTING_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
+    at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
 
     // turn on correct indicator
     switch (mode)
@@ -182,6 +189,25 @@ static void do_mode(void)
         case MODE_LIVEFIRE:
             // live fire blinks
             mod_timer(&blink_timeout_timer_list, jiffies+(100*HZ/1000));
+            break;
+        case MODE_REC_START:
+            // recording start blinks
+            mod_timer(&blink_timeout_timer_list, jiffies+(100*HZ/1000));
+            // disable mode button
+            atomic_set(&mode_enable, 0);
+            break;
+        case MODE_ENC_START:
+            // encoding start blinks
+            mod_timer(&blink_timeout_timer_list, jiffies+(100*HZ/1000));
+            // disable mode button
+            atomic_set(&mode_enable, 0);
+            break;
+        case MODE_REC_DONE:
+            at91_set_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
+            // re-enable mode button
+            atomic_set(&mode_enable, 1);
+
+            atomic_set(&mode_value_atomic, MODE_RECORD); // revert to normal record mode
             break;
         }
     } // error and stop show no lights
@@ -211,20 +237,41 @@ static int knob_read(void)
 //---------------------------------------------------------------------------
 // The function that gets called when the blink timeout fires.
 //---------------------------------------------------------------------------
-static void blink_timeout_fire(unsigned long data)
-    {
+static void blink_timeout_fire(unsigned long data) {
 //   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
-    if (at91_get_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR) == OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE)
-        {
-        at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED off
-        mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_OFF_IN_MSECONDS*HZ/1000));
-        }
-    else
-        {
-        at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED on
-        mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_ON_IN_MSECONDS*HZ/1000));
-        }
+    int mode = atomic_read(&mode_value_atomic);
+    switch (mode) {
+        case MODE_LIVEFIRE:
+            if (at91_get_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR) == OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE) {
+                at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED off
+                at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED off
+                mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_OFF_IN_MSECONDS*HZ/1000));
+            } else {
+                at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED on
+                at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED on
+                mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_ON_IN_MSECONDS*HZ/1000));
+            }
+            break;
+        case MODE_REC_START:
+            if (at91_get_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR) == OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE) {
+                at91_set_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED off
+                mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_OFF_IN_MSECONDS*HZ/3000)); // faster blink
+            } else {
+                at91_set_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED on
+                mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_ON_IN_MSECONDS*HZ/3000)); // faster blink
+            }
+            break;
+        case MODE_ENC_START:
+            if (at91_get_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR) == OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE) {
+                at91_set_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED off
+                mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_OFF_IN_MSECONDS*HZ/1000));
+            } else {
+                at91_set_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED on
+                mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_ON_IN_MSECONDS*HZ/1000));
+            }
+            break;
     }
+}
 
 
 //---------------------------------------------------------------------------
@@ -232,10 +279,10 @@ static void blink_timeout_fire(unsigned long data)
 //---------------------------------------------------------------------------
 irqreturn_t mode_int(int irq, void *dev_id, struct pt_regs *regs)
     {
-    if (!atomic_read(&full_init))
-        {
+    // don't handle interrupt if we're not initialized or the mode button is disabled
+    if (!atomic_read(&full_init) || !atomic_read(&mode_enable)) {
         return IRQ_HANDLED;
-        }
+    }
 
 //   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
@@ -369,6 +416,7 @@ static int hardware_init(void)
     at91_set_gpio_output(OUTPUT_SES_MODE_TESTING_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_SES_MODE_RECORD_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
 
     // turn amp up to 11
     at91_set_gpio_output(OUTPUT_SES_AMPLIFIER_ON, OUTPUT_SES_AMPLIFIER_ACTIVE_STATE);
@@ -566,6 +614,9 @@ delay_printk("SES: received value: %i\n", value);
         send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
         do_mode();
 
+        // re-enable mode button
+        atomic_set(&mode_enable, 1);
+
         // prepare response
         rc = nla_put_u8(skb, GEN_INT8_A_MSG, 1); // value is ignored
 
@@ -612,6 +663,10 @@ delay_printk("SES: received value: %i\n", value);
                 bit_data.bit_type = BIT_MODE;
                 bit_data.is_on = MODE_STOP;
                 send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
+
+                // re-enable mode button
+                atomic_set(&mode_enable, 1);
+
                 // turn off amp
                 at91_set_gpio_value(OUTPUT_SES_AMPLIFIER_ON, !OUTPUT_SES_AMPLIFIER_ACTIVE_STATE);
             } else {
@@ -706,11 +761,20 @@ delay_printk("SES: handling bit command\n");
                   bit_data->bit_type = BIT_MODE;
                   bit_data->is_on = MODE_STOP;
                   send_nl_message_multi(bit_data, bit_mfh, NL_C_BIT);
+
+                  // re-enable mode button
+                  atomic_set(&mode_enable, 1);
+
                   break;
               } else if (bit_data->is_on < MODE_ERROR) {
                   atomic_set(&mode_value_atomic, bit_data->is_on);
                   do_mode();
                   // fall through to send mode back to userspace (needed to actually change volume)
+              } else if (bit_data->is_on == MODE_REC_START ||bit_data->is_on == MODE_ENC_START ||  bit_data->is_on == MODE_REC_DONE) {
+                  // recoding progress modes need updating as well
+                  atomic_set(&mode_value_atomic, bit_data->is_on);
+                  do_mode();
+                  break; // ... but they don't update userspace
               } else {
                   break; // invalid mode, ignore message
               }
