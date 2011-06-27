@@ -472,7 +472,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Request knob value\nFormat: Z\n");
                         break;
                     default: // print default help
-                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob");
+                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob\n");
                         break;
                 }
                 write(client, wbuf, strnlen(wbuf,1024));
