@@ -24,8 +24,9 @@ FUNCTION_START("::SES_Client(int fd, int tnum) : Connection(fd)")
       deleteLater();
    } else {
       // initialize default settings
-      loop = 0; // no looping
-      mode = MODE_MAINTENANCE; // defalt mode
+      //loop = NO_LOOP; // no looping
+      loop = INFINITE_LOOP; // no looping
+      didMode(MODE_MAINTENANCE); // defalt mode
       strncpy(track, "/media/sda1/audio/builtin/1.mp3", SES_BUFFER_SIZE); // first built-in track
       memset(uri, 0, SES_BUFFER_SIZE); // no default stream uri
       lastBatteryVal = MAX_BATTERY_VAL;
@@ -263,8 +264,9 @@ FUNCTION_START("::handle_2100(int start, int end)");
          doStopPlay();
 
          // reset various values back to start
-         loop = 0; // no looping
-         mode = MODE_MAINTENANCE; // defalt mode
+         //loop = NO_LOOP; // no looping
+         loop = INFINITE_LOOP; // no looping
+         didMode(MODE_MAINTENANCE); // defalt mode
          strncpy(track, "/media/sda1/audio/builtin/1.mp3", SES_BUFFER_SIZE); // first built-in track
          nl_conn->doTrack(); // get correct track value
          memset(uri, 0, SES_BUFFER_SIZE); // no default stream uri
@@ -503,13 +505,28 @@ FUNCTION_START("::doRecord()");
 
    DCMSG(GREEN, "Recording %s", track) ;
 
-   // TODO -- start record process
+   // start record process if not doing any encoding right now
+   if (!EncodeProcess::isEncoding()) {
+      if (!RecordProcess::isRecording()) {
+         // not recording or encoding, start recording
+         RecordProcess::recordTrack(track, this); // pass "this" along so it knows who to notify when it's done encoding
+         doMode(MODE_REC_START); // notify kernel we're recording
+      } else {
+         // stop recording, start encoding
+         RecordProcess::StartEncoding();
+         doMode(MODE_ENC_START); // notify kernel we're encoding
+      }
+   } else {
+      // abort encoding
+      EncodeProcess::StopEncoding();
+      doMode(MODE_REC_DONE); // notify kernel we're done recording
+   }
 
 FUNCTION_END("::doRecord()");
 }
 
-void SES_Client::doMode(int mode) {
-FUNCTION_START("::doMode(int mode)");
+void SES_Client::didMode(int mode) {
+FUNCTION_START("::didMode(int mode)");
 
    // set member mode to mode
    this->mode = mode;
@@ -530,11 +547,11 @@ FUNCTION_START("::doMode(int mode)");
          break;
    }
 
-FUNCTION_END("::doMode(int mode)");
+FUNCTION_END("::didMode(int mode)");
 }
 
 void SES_Client::doLoop(unsigned int loop) {
-FUNCTION_START("::doPlayRecord(int loop)");
+FUNCTION_START("::doLoop(int loop)");
 
    // set member loop to loop
    this->loop = loop;
@@ -596,9 +613,19 @@ FUNCTION_END("::doStream(const char* uri)");
 void SES_Client::doStopPlay() {
 FUNCTION_START("::doStopPlay()");
 
-   // TODO -- stop play process
+   DCMSG(RED, "Stopping playback, recording, and streaming");
 
-   // TODO -- stop record process
+   // stop play process
+   PlayProcess::StopPlayback();
+
+   // stop record process
+   RecordProcess::StopRecording();
+   if (mode == MODE_RECORD) {
+      doMode(MODE_REC_DONE); // notify kernel we're done recording
+   }
+
+   // stop encoding process
+   EncodeProcess::StopEncoding();
 
    // TODO -- stop stream process
 
@@ -621,6 +648,15 @@ FUNCTION_START("::doTrack()")
       nl_conn->doTrack();
    }
 FUNCTION_END("::doTrack()")
+}
+
+void SES_Client::doMode(int mode) {
+FUNCTION_START("::doMode(int mode)")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doMode(mode);
+   }
+FUNCTION_END("::doMode(int mode)")
 }
 
 /***********************************************************
@@ -685,7 +721,7 @@ FUNCTION_START("SES_Conn::parseData(struct nl_msg *msg)")
             switch (bit_c->bit_type) {
                case BIT_TEST:
                   // play or record selected track
-                  if (bit_c->is_on) {
+                  if (bit_c->is_on) { // only play when button is pressed, not released
                      ses_client->doPlayRecord();
                   }
                   break;
@@ -698,7 +734,7 @@ FUNCTION_START("SES_Conn::parseData(struct nl_msg *msg)")
                   if (bit_c->is_on == MODE_STOP) {
                      ses_client->doStopPlay();
                   } else {
-                     ses_client->doMode(bit_c->is_on);
+                     ses_client->didMode(bit_c->is_on);
                   }
                   break;
             }
@@ -778,6 +814,22 @@ FUNCTION_START("::doMode()")
 
 FUNCTION_END("::doMode()")
 }
+
+// sets kernel mode value
+void SES_Conn::doMode(int mode) {
+FUNCTION_START("::doMode(int mode)")
+
+   // build command
+   struct bit_event bit_c;
+   bit_c.bit_type = BIT_MODE;
+   bit_c.is_on = mode;
+
+   // queue
+   queueMsg(NL_C_BIT, BIT_A_MSG, sizeof(struct bit_event), &bit_c);
+
+FUNCTION_END("::doMode(int mode)")
+}
+
 // retrieves correct track (knob) value
 void SES_Conn::doTrack() {
 FUNCTION_START("::doTrack()")
