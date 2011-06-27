@@ -36,7 +36,8 @@ public :
    void doPlayRecord(); // play or record over selected track
    void doPlay(); // play selected track
    void doRecord(); // record over selected track
-   void doMode(int mode); // change playback mode
+   void didMode(int mode); // changed playback mode
+   void doMode(int mode); // changes playback mode
    void doMode(); // get mode from kernel
    void doLoop(unsigned int loop); // set the loop value
    void doTrack(const char* track); // select an arbirtrary track
@@ -102,6 +103,7 @@ public:
    void doWake(); // wake target
    void doBattery(); // retrieve battery value
    void doStop(); // immediate stop (stops accessories as well)
+   void doMode(int mode); // changes playback mode
    void doMode(); // retrieve mode value
    void doTrack(); // retrieve track value
 
