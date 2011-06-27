@@ -25,8 +25,10 @@ FUNCTION_END("::Process(FILE *pipe)")
 Process::~Process() {
 FUNCTION_START("::~Process()")
 
-   // calling close instead of pclose should be fine, so let parent class do the work
+   // calling close instead of pclose will close the pipe connection only
    DCMSG(RED, "Closed pipe 0x%08x", pipe);
+
+   // the process will continue running the background until it finishes
 
 FUNCTION_END("::~Process()")
 }
@@ -205,4 +207,6 @@ FUNCTION_INT("::parseData(int rsize, const char *rbuf)", -1);
 // explicit declarations of newProc() template function
 template BackgroundProcess *Process::newProc<BackgroundProcess>(const char *cmd, bool readonly);
 template PlayProcess *Process::newProc<PlayProcess>(const char *cmd, bool readonly);
+template RecordProcess *Process::newProc<RecordProcess>(const char *cmd, bool readonly);
+template EncodeProcess *Process::newProc<EncodeProcess>(const char *cmd, bool readonly);
 
