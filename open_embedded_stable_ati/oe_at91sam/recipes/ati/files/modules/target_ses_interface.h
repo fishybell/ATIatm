@@ -12,5 +12,8 @@
 #define MODE_LIVEFIRE		3
 #define MODE_ERROR		4
 #define MODE_STOP		5 /* after error, so on error it loops back to maintenance */
+#define MODE_REC_START 6 /* recording started (display visual feedback, disable mode button) */
+#define MODE_ENC_START 7 /* encoding started (display visual feedback, disable mode button) */
+#define MODE_REC_DONE 8 /* recording/encoding finished (display visual feedback, re-enable mode button) */
 
 #endif // __TARGET_SES_INTERFACE_H__
