@@ -28,7 +28,7 @@ static int CONTINUE_ON[] = {2,1,3,0}; // leg = 1, quad = 2, both = 3, neither = 
 
 // TODO - replace with a table based on distance and speed?
 static int TIMEOUT_IN_MSECONDS[] = {500,12000,500,0};
-static int MOVER_DELAY_MULT[] = {3,2,3,0};
+static int MOVER_DELAY_MULT[] = {4,2,4,0};
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -75,10 +75,10 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
 // RA - low time setting - cannot exceed RC
 // RB - low time setting - cannot exceed RC
-static int MOTOR_PWM_RC[] = {0x0070,0x3074,0x4000,0};
-static int MOTOR_PWM_END[] = {0x0070,0x3074,0x4000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x001C,0x04D8,0x0000,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x001C,0x04D8,0x0000,0};
+static int MOTOR_PWM_RC[] = {0x01C0,0x3074,0x4000,0};
+static int MOTOR_PWM_END[] = {0x01C0,0x3074,0x4000,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x00A0,0x04D8,0x0000,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x00A0,0x04D8,0x0000,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -150,7 +150,7 @@ atomic_t legs = ATOMIC_INIT(0);
 atomic_t quad_direction = ATOMIC_INIT(0);
 atomic_t doing_pos = ATOMIC_INIT(FALSE);
 atomic_t doing_vel = ATOMIC_INIT(FALSE);
-atomic_t tc_clock = ATOMIC_INIT(4);
+atomic_t tc_clock = ATOMIC_INIT(2);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that an operation is in progress,
@@ -1600,14 +1600,30 @@ static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const
         { 
     __raw_writel(value, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
     __raw_writel(value, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
-    // de-assert the neg inputs to the h-bridge
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    // turn on directional lines
+    if (OUTPUT_H_BRIDGE[mover_type]) {
+        // H-bridge handling
+        // de-assert the neg inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
 
-    // we always turn both signals off first to ensure that both don't ever get turned
-    // on at the same time
-    at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        // we always turn both signals off first to ensure that both don't ever get turned
+        // on at the same time
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    } else {
+        // forward for non-h-bridge
+        // reverse off, forward on
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD, OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+    }
+
+    // forward for H-Bridge stuff
+    if (PWM_H_BRIDGE[mover_type]) {
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    } else if (OUTPUT_H_BRIDGE[mover_type]) {
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+    }
 
         // assert pwm line
         #if PWM_BLOCK == 0
@@ -1617,10 +1633,9 @@ static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const
         #endif
         }
 
-    if (!PWM_H_BRIDGE[mover_type]) {
-        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
-    } else {
-        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+    // turn off brake?
+    if (USE_BRAKE[mover_type]) {
+        at91_set_gpio_output(OUTPUT_MOVER_APPLY_BRAKE, !OUTPUT_MOVER_APPLY_BRAKE_ACTIVE_STATE);
     }
 
     return status;
@@ -2006,6 +2021,13 @@ static void movement_change(struct work_struct * work)
 static int __init target_mover_generic_init(void)
     {
     int retval;
+
+    // for debug
+    switch (mover_type) {
+        case 0: atomic_set(&tc_clock, 1); break;
+        case 1: atomic_set(&tc_clock, 2); break;
+        case 2: atomic_set(&tc_clock, 4); break;
+    }
 
     // initialize hardware registers
     hardware_init();
