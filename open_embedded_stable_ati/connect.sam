@@ -1,6 +1,10 @@
 #!/bin/bash
-echo -n "which sam (0-9,A-F)? "
-read i
+if [ -z "$1" ] ;then
+   echo -n "which sam (0-9,A-F)? "
+   read i
+else
+   i=$1
+fi
 
 sed -i -e "s/^sam$i.*//" ~/.ssh/known_hosts
 while ! ping -c1 -W1 sam$i 2>&1 >/dev/null; do sleep 1 ; done
