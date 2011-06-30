@@ -17,6 +17,7 @@ S = "${WORKDIR}/modules"
 inherit module
 
 do_compile() {
+    oe_runmake clean
     oe_runmake user_conn bit_button event_conn fasit_conn bcast_server bcast_client
 	unset CFLAGS CPPFLAGS CXXFLAGS LDFLAGS CC LD CPP
         oe_runmake 'KERNEL_SOURCE=${STAGING_KERNEL_DIR}' \
