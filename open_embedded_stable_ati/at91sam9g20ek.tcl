@@ -141,12 +141,14 @@ lappend u_boot_variables \
 # eeprom variables:
 # 0x00 : SIT/MIT/etc.
 # 0x40 : mac address
-# 0x80 : network/radio
+# 0x80 : network/radio/local/wifi
 # 0xC0 : ip address of server (127.0.0.1 for radio)
 # 0x100 : mechanical hit sensor parameter area (or none)
 # 0x140 : miles parameter area (or none)
 # 0x180 : muzzle flash parameter area (or none)
 # 0x1C0 : LOMAH parameter area (or none)
+# 0x200 : listen port (or none)
+# 0x240 : connect port (or none)
 lappend eeprom_variables \
     "0x00 $target_type" \
     "0x40 ${mac}${suffix}" \
@@ -156,7 +158,9 @@ lappend eeprom_variables \
     "0x140 none" \
     "0x180 none" \
     "0x1C0 none" \
-    "0x200" ;# fill up to <-- with zeroes
+    "0x200 none" \
+    "0x240 none" \
+    "0x400" ;# fill up to <-- with zeroes
 
 
 puts "-I- === Initialize the EEPROM access ==="
