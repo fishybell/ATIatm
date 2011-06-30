@@ -26,8 +26,8 @@ diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h linux-2.
 + * the heartbeat will incrimenta `counter' making it
 + *   so each object, using `offset,' `counter,' and
 + *   `modulo,' will run on (counter % modulo == offset)
-+ * the heartbeat counter will accumulate 3000 times
-+ *   every second, but the minumum modulo is 3
++ * the heartbeat counter will accumulate 10000 times
++ *   every second, but the minumum modulo is 1
 + * the offset will be adjusted automatically */
 +typedef struct heartbeat_object {
 +    heartbeat_callback_ticks callback_t;
@@ -57,7 +57,7 @@ diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h linux-2.
 + * if the table is being manipulated, heartbeat_run()
 + *   returns immediately, only increasing its accumulator
 + * needs to be ran by a periodic interval timer running
-+ * the timer needs to run at 3 khz (preferably precisely)
++ * the timer needs to run at 10 khz (preferably precisely)
 + * needs to be passed the number of computer ticks since
 + *   the last time it was called */
 +extern void heartbeat_run(int);
@@ -67,7 +67,7 @@ diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h linux-2.
 +
 +/* helper macros to initialize heartbeat objects */
 +#define HB_ZERO(a) memset(&a,0,sizeof(struct heartbeat_object))
-+#define HZ_TO_MOD(hz) (3000 / (hz))
++#define HZ_TO_MOD(hz) (10000 / (hz))
 +
 +#endif
 +
@@ -111,7 +111,7 @@ diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/at91sam926x_time.c linux-2.6.30/a
  	pit_rate = clk_get_rate(clk_get(NULL, "mck")) / 16;
 -	pit_cycle = (pit_rate + HZ/2) / HZ;
 +	pit_cycle = (pit_rate + HZ/2) / HZ; /* 100 hz original */
-+	pit_cycle /= 30; /* 3 khz new */
++	pit_cycle /= 100; /* 10 khz new */
  	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
  
 +	/* initialize heartbeat table */
@@ -136,7 +136,7 @@ diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/heartbeat.c linux-2.6.30/arch/arm
 +#include <mach/heartbeat.h>
 +
 +// the minimum modulus allowed
-+#define MINIMUM_MODULO 3
++#define MINIMUM_MODULO 1
 +
 +// preallocate this many table items (can't use kmalloc during initial kernel boot, and don't want to conflate alloc_bootmem() and kmalloc() calls)
 +#define MIN_TABLE_SIZE 5
@@ -385,8 +385,8 @@ diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h linux-2.
  
  /* helper macros to initialize heartbeat objects */
  #define HB_ZERO(a) memset(&a,0,sizeof(struct heartbeat_object))
--#define HZ_TO_MOD(hz) (3000 / (hz))
-+#define TICKS_PER_HZ 3000
+-#define HZ_TO_MOD(hz) (10000 / (hz))
++#define TICKS_PER_HZ 10000
 +#define HZ_TO_MOD(hz) (TICKS_PER_HZ / (hz))
  
  #endif
@@ -398,7 +398,7 @@ diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/at91sam926x_time.c linux-2.6.30/a
  
  #define PIT_CPIV(x)	((x) & AT91_PIT_CPIV)
  #define PIT_PICNT(x)	(((x) & AT91_PIT_PICNT) >> 20)
-+#define ATI_MULT	30
++#define ATI_MULT	100
  
  static u32 pit_cycle;		/* write-once */
  static u32 pit_cnt;		/* access only w/system irq blocked */
@@ -457,8 +457,8 @@ diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/at91sam926x_time.c linux-2.6.30/a
  	 */
  	pit_rate = clk_get_rate(clk_get(NULL, "mck")) / 16;
  	pit_cycle = (pit_rate + HZ/2) / HZ; /* 100 hz original */
--	pit_cycle /= 30; /* 3 khz new */
-+	pit_cycle /= ATI_MULT; /* 3 khz new */
+-	pit_cycle /= 100; /* 10 khz new */
++	pit_cycle /= ATI_MULT; /* 10 khz new */
  	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
  
  	/* initialize heartbeat table */
@@ -494,7 +494,7 @@ diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h linux-2.
 --- linux-2.6.30.orig/arch/arm/mach-at91/include/mach/heartbeat.h	2011-03-29 12:05:54.202842255 -0600
 +++ linux-2.6.30/arch/arm/mach-at91/include/mach/heartbeat.h	2011-03-29 12:35:20.204784220 -0600
 @@ -66,5 +66,18 @@
- #define TICKS_PER_HZ 3000
+ #define TICKS_PER_HZ 10000
  #define HZ_TO_MOD(hz) (TICKS_PER_HZ / (hz))
  
 +/* helper functions to initialize heartbeat objects */

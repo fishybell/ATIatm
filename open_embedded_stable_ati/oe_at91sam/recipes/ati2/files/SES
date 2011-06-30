@@ -10,11 +10,39 @@ start () {
                 "target_battery.ko minvoltval=12" \
                 "target_ses_interface.ko"
 
+   # check to see if default audio files need to be copied over
+   if ! ls "/media/sda1/audio/builtin/0.mp3" >/dev/null ; then
+      if ! [ -d "/media/sda1/audio/builtin" ] ;then
+         mkdir -p "/media/sda1/audio/builtin"
+      fi
+      if ! [ -d "/media/sda1/audio/user" ] ;then
+         mkdir -p "/media/sda1/audio/user"
+      fi
+      cp /home/root/sounds/*.mp3 "/media/sda1/audio/builtin"
+   fi
+
    # start default programs
    def_progs
 
+   # restart my programs
+   killall -q -9 esd ;# restart here, but leave running after stop
+   /usr/bin/esd &
+
+
    # start fasit client
-   fasit_conn -E -l $lport -p $cport -i $ip -vvv &
+   fasit_conn -E -l $lport -p $cport -i $ip -vv &
 }
 
-# leave default stop routine
+# overwrite stop routine...
+stop () {                                                               
+    # kill fasit client
+    killall -q -9 fasit_conn
+
+    # kill my programs
+    killall -q -9 madplay
+    killall -q -9 esddsp
+                            
+    # unload modules and other programs           
+    unload                             
+}                 
+

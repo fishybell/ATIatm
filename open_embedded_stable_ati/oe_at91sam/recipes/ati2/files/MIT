@@ -8,7 +8,7 @@ start () {
    # load modules
    load_modules "target_user_interface.ko mover=1" \
                 "target_battery.ko minvoltval=24" \
-                "target_mover_generic.ko mover_type=2 reverse=0" \
+                "target_mover_generic.ko mover_type=0 reverse=0" \
                 "target_generic_output.ko" \
                 "mover.ko"
 
@@ -16,7 +16,7 @@ start () {
    def_progs
 
    # start fasit client
-   fasit_conn -M -l $lport -p $cport -i $ip -vvv &
+   fasit_conn -M -l $lport -p $cport -i $ip -vv &
 }
 
 # leave default stop routine

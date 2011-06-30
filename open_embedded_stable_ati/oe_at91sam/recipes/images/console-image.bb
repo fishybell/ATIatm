@@ -14,6 +14,8 @@ ANGSTROM_EXTRA_INSTALL += " \
 	mtd-utils \
 	gdb \
 	tcl \
+    madplay \
+    osso-esd \
 	"
 
 DEPENDS = "task-base-extended \
@@ -24,6 +26,8 @@ DEPENDS = "task-base-extended \
 	   ati ati2\
            compat-wireless \
 	   tcl \
+    madplay \
+    osso-esd \
            u-boot-utils \
            ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
