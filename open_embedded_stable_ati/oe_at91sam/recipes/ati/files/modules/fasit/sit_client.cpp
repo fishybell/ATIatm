@@ -913,7 +913,8 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
     struct nlattr *attrs[NL_A_MAX+1];
    struct nlmsghdr *nlh = nlmsg_hdr(msg);
    struct genlmsghdr *ghdr = static_cast<genlmsghdr*>(nlmsg_data(nlh));
-
+   int *data;
+   
    DCMSG(GREEN,"parseData switch on netlink command enum of %d",ghdr->cmd) ;
    // parse message and call individual commands as needed
    switch (ghdr->cmd) {
@@ -930,8 +931,12 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
          break;
       case NL_C_EXPOSE:
          genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
-	 DCMSG(green,"parseData case NL_C_EXPOSE: attrs = 0x%x",attrs[GEN_INT8_A_MSG]) ;
-	 
+	 data=(int *)nla_data(attrs[GEN_INT8_A_MSG]);
+	 {
+	 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+
+	 DCMSG(green,"parseData case NL_C_EXPOSE: attrs = 0x%x, nla_data (0x%x)  =%d === %d ",attrs[GEN_INT8_A_MSG],data,*data,value);
+	 }
          if (attrs[GEN_INT8_A_MSG]) {
             // received change in exposure
             int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
@@ -950,7 +955,8 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
          break;
       case NL_C_BATTERY:
          genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
-	 DCMSG(BLUE,"parseData case NL_C_BATTERY: attrs = 0x%x",attrs[GEN_INT8_A_MSG]) ;
+	 data=(int *)nla_data(attrs[GEN_INT8_A_MSG]);
+	 DCMSG(BLUE,"parseData case NL_C_BATTERY: attrs = 0x%x, nla_data (0x%x)  =%d ",attrs[GEN_INT8_A_MSG],data,*data);
 
          if (attrs[GEN_INT8_A_MSG]) {
             // received change in battery value
@@ -1010,20 +1016,21 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
          
          break;
       case NL_C_HITS:
-         genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
-         DCMSG(RED,"parseData case NL_C_HITS: attrs = 0x%x ",attrs[GEN_INT8_A_MSG]) ;
+	 genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+	 data=(int *)nla_data(attrs[GEN_INT8_A_MSG]);
+	 DCMSG(RED,"parseData case NL_C_HITS: attrs = 0x%x, nla_data (0x%x)  =%d ",attrs[GEN_INT8_A_MSG],data,*data);
+	 
          if (attrs[GEN_INT8_A_MSG]) {
             // received hit count
 	    int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-	    
-	    DCMSG(RED,"parseData got a HIT COUNT of %d",value) ;
             sit_client->didHits(value); // tell client
          }
 
          break;
       case NL_C_ACCESSORY:
-         genlmsg_parse(nlh, 0, attrs, ACC_A_MAX, accessory_conf_policy);
-	 DCMSG(MAGENTA,"parseData case NL_C_ACCESSORY: attrs = 0x%x ",attrs[ACC_A_MSG]) ;
+	 genlmsg_parse(nlh, 0, attrs, ACC_A_MAX, accessory_conf_policy);
+	 data=(int *)nla_data(attrs[ACC_A_MSG]);
+	 DCMSG(MAGENTA,"parseData case NL_C_ACCESSORY: attrs = 0x%x, nla_data (0x%x)  =%d ",attrs[ACC_A_MSG],data,*data);
 
          if (attrs[ACC_A_MSG]) {
             // received calibration data
@@ -1052,7 +1059,8 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)")
 	 
       case NL_C_EVENT:
 	 genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
-	 DCMSG(RED,"parseData case NL_C_EVENT: attrs = 0x%x ",attrs[GEN_INT8_A_MSG]) ;
+	 data=(int *)nla_data(attrs[GEN_INT8_A_MSG]);
+	 DCMSG(RED,"parseData case NL_C_EVENT: attrs = 0x%x, nla_data (0x%x)  =%d ",attrs[GEN_INT8_A_MSG],data,*data);
 	 
          break;
    }
