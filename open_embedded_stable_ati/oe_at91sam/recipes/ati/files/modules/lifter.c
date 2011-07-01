@@ -871,7 +871,7 @@ void hit_event_internal(int line, bool upload) {
     struct hit_item *new_hit;
     int stay_up = 1;
     u8 hits = 0, kdata;
-    delay_printk("hit_event(%i)\n", line);
+    delay_printk("hit_event_internal(line=%i, upload=%d)\n", line,upload);
 
     // create event
     lift_event_internal(EVENT_HIT, upload);
@@ -902,9 +902,9 @@ void hit_event_internal(int line, bool upload) {
     spin_unlock(hit_lock);
         
     // send hits upstream
-    if (upload) {
+//    if (upload) {
         queue_nl_multi(NL_C_HITS, &hits, sizeof(hits));
-    }
+//    }
 
     // go down if we need to go down
     if (atomic_read(&hits_to_kill) > 0) {
