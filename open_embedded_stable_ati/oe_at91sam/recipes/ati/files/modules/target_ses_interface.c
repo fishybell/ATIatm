@@ -185,6 +185,7 @@ static void do_mode(void)
             break;
         case MODE_RECORD:
             at91_set_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
+            
             break;
         case MODE_LIVEFIRE:
             // live fire blinks
@@ -203,11 +204,12 @@ static void do_mode(void)
             atomic_set(&mode_enable, 0);
             break;
         case MODE_REC_DONE:
-            at91_set_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
             // re-enable mode button
             atomic_set(&mode_enable, 1);
 
-            atomic_set(&mode_value_atomic, MODE_RECORD); // revert to normal record mode
+            // revert to testing mode
+            at91_set_gpio_value(OUTPUT_SES_MODE_TESTING_INDICATOR, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
+            atomic_set(&mode_value_atomic, MODE_TESTING); 
             break;
         }
     } // error and stop show no lights
@@ -329,11 +331,11 @@ static void mode_timeout_fire(unsigned long data)
         atomic_set(&mode_value_atomic, value);
         }
 
-    // notify user-space
-    schedule_work(&mode_work);
-
     // change indicators
     do_mode();
+
+    // notify user-space
+    schedule_work(&mode_work);
     }
 
 //---------------------------------------------------------------------------
@@ -391,6 +393,9 @@ static void knob_timeout_fire(unsigned long data)
 
     // change indicators
     do_mode();
+
+    // notify user-space
+    schedule_work(&mode_work);
     }
 
 //---------------------------------------------------------------------------
@@ -614,6 +619,9 @@ delay_printk("SES: received value: %i\n", value);
         send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
         do_mode();
 
+        // notify user-space
+        schedule_work(&mode_work);
+
         // re-enable mode button
         atomic_set(&mode_enable, 1);
 
@@ -674,6 +682,9 @@ delay_printk("SES: received value: %i\n", value);
                 at91_set_gpio_value(OUTPUT_SES_AMPLIFIER_ON, OUTPUT_SES_AMPLIFIER_ACTIVE_STATE);
             }
             do_mode();
+
+            // notify user-space
+            schedule_work(&mode_work);
 
             // turn on/off amplifier
         } else {
@@ -774,7 +785,9 @@ delay_printk("SES: handling bit command\n");
                   // recoding progress modes need updating as well
                   atomic_set(&mode_value_atomic, bit_data->is_on);
                   do_mode();
-                  break; // ... but they don't update userspace
+                  if (bit_data->is_on != MODE_REC_DONE) {
+                     break; // ... but they don't update userspace
+                  } // fall through when recording is done
               } else {
                   break; // invalid mode, ignore message
               }
