@@ -36,16 +36,20 @@ public :
    void doPlayRecord(); // play or record over selected track
    void doPlay(); // play selected track
    void doRecord(); // record over selected track
+   void doEncode(); // encode ongoing recording
+   void doRecAbort(); // abort ongoing recording
+   void doRecordButton(); // record over selected track (call repeatedly to step through full recording process)
    void didMode(int mode); // changed playback mode
    void doMode(int mode); // changes playback mode
    void doMode(); // get mode from kernel
    void doLoop(unsigned int loop); // set the loop value
-   void doTrack(const char* track); // select an arbirtrary track
+   void doTrack(const char* track, int length); // select an arbirtrary track
    void doTrack(int track); // select a built-in track
    void doTrack(); // get track from kernel
-   void doStream(const char* uri); // stream audio from a selected uri
+   void doStream(const char* uri, int length); // stream audio from a selected uri
    void doStopPlay(); // stop playback/record
 
+   void finishedRecording(); // called from the recording/encoding processes to notify when it is done
 
 protected:
    virtual bool hasPair() { return nl_conn != NULL;};
@@ -68,6 +72,8 @@ protected:
    int handle_2110(int start, int end);
    int handle_2112(int start, int end);
    int handle_2113(int start, int end);
+   int handle_14400(int start, int end);
+   int handle_14401(int start, int end);
    
 private:
    class SES_Conn *nl_conn;
@@ -75,6 +81,10 @@ private:
    // helper functions for filling out a 2102 status message
    void fillStatus2102(FASIT_2102 *msg);
    void sendStatus2102();
+
+   // helper functions for filling out a 14401 status message
+   void fillStatus14401(FASIT_14401 *msg);
+   void sendStatus14401();
 
    // remember the last command we received for responses back
    int resp_num;
@@ -85,6 +95,7 @@ private:
    int mode; // playback mode
    char track[SES_BUFFER_SIZE]; // selected track
    char uri[SES_BUFFER_SIZE]; // selected stream uri
+   int knob; // knob selection
 
    // remember the battery value rather than send a response each time we get a change
    int lastBatteryVal;

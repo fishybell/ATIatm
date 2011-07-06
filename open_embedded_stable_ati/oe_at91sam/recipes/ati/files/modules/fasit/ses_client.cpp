@@ -24,15 +24,15 @@ FUNCTION_START("::SES_Client(int fd, int tnum) : Connection(fd)")
       deleteLater();
    } else {
       // initialize default settings
-      //loop = NO_LOOP; // no looping
-      loop = INFINITE_LOOP; // no looping
+      loop = NO_LOOP; // no looping
+      knob = 0; // unknown knob value, will retrieve later
       didMode(MODE_MAINTENANCE); // defalt mode
-      strncpy(track, "/media/sda1/audio/builtin/1.mp3", SES_BUFFER_SIZE); // first built-in track
+      strncpy(track, "/media/sda1/audio/builtin/0.mp3", SES_BUFFER_SIZE); // first built-in track
       memset(uri, 0, SES_BUFFER_SIZE); // no default stream uri
       lastBatteryVal = MAX_BATTERY_VAL;
       nl_conn->doBattery(); // get a correct battery value soon
       nl_conn->doMode(); // get correct mode value
-      nl_conn->doTrack(); // get correct track value
+      nl_conn->doTrack(); // get correct track/knob value
    }
 FUNCTION_END("::SES_Client(int fd, int tnum) : Connection(fd)")
 }
@@ -82,6 +82,74 @@ FUNCTION_START("::sendStatus2102()")
    finishMsg();
 
 FUNCTION_END("::sendStatus2102()")
+}
+
+// fill out 14401 status message
+void SES_Client::fillStatus14401(FASIT_14401 *msg) {
+FUNCTION_START("::fillStatus14401(FASIT_14401 *msg)")
+
+   // start with zeroes
+   memset(msg, 0, sizeof(FASIT_14401));
+
+   // fill out as response
+   msg->response.rnum = resp_num;
+   msg->response.rseq = resp_seq;
+   resp_num = resp_seq = 0; // the next one will be unsolicited
+
+   // fill values
+   msg->body.mode = mode;
+   switch (mode) {
+      case MODE_MAINTENANCE:
+      case MODE_TESTING:
+      case MODE_LIVEFIRE:
+         // playback, either streaming or playing
+         if (StreamProcess::isStreaming()) {
+            // streaming
+            msg->body.status = 4; // streaming
+         } else {
+            // TODO -- are we currently playing?
+            // TODO -- were we stopped?
+            msg->body.status = 3; // play ready
+         }
+         break;
+      case MODE_REC_START:
+      case MODE_ENC_START:
+      case MODE_REC_DONE:
+      case MODE_RECORD:
+         // recording, encoding, or ready to record
+         if (RecordProcess::isRecording()) {
+            msg->body.status = 5; // recording
+         } else if (EncodeProcess::isEncoding()) {
+            msg->body.status = 6; // streaming
+         } else {
+            msg->body.status = 7; // ready to record
+         }
+         break;
+   }
+   msg->body.track = knob;
+
+FUNCTION_END("::fillStatus14401(FASIT_14401 *msg)")
+}
+
+
+// create and send a status messsage to the FASIT server
+void SES_Client::sendStatus14401() {
+FUNCTION_START("::sendStatus14401()")
+
+   FASIT_header hdr;
+   FASIT_14401 msg;
+   defHeader(14401, &hdr); // sets the sequence number and other data
+   hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_14401));
+
+   // fill message
+   fillStatus14401(&msg); // fills in status values with current values
+
+   // send
+   queueMsg(&hdr, sizeof(FASIT_header));
+   queueMsg(&msg, sizeof(FASIT_14401));
+   finishMsg();
+
+FUNCTION_END("::sendStatus14401()")
 }
 
 /***********************************************************
@@ -264,10 +332,9 @@ FUNCTION_START("::handle_2100(int start, int end)");
          doStopPlay();
 
          // reset various values back to start
-         //loop = NO_LOOP; // no looping
-         loop = INFINITE_LOOP; // no looping
+         loop = NO_LOOP; // no looping
          didMode(MODE_MAINTENANCE); // defalt mode
-         strncpy(track, "/media/sda1/audio/builtin/1.mp3", SES_BUFFER_SIZE); // first built-in track
+         strncpy(track, "/media/sda1/audio/builtin/0.mp3", SES_BUFFER_SIZE); // first built-in track
          nl_conn->doTrack(); // get correct track value
          memset(uri, 0, SES_BUFFER_SIZE); // no default stream uri
 		 break;
@@ -370,6 +437,115 @@ int SES_Client::handle_2115(int start, int end) {
 
    FUNCTION_INT("::handle_2115(int start, int end)", 0)
 	 return 0;
+}
+
+int SES_Client::handle_14400(int start, int end) {
+FUNCTION_START("::handle_14400(int start, int end)")
+
+   // do handling of message
+   IMSG("Handling 14400 in SES\n");
+
+   // map header and body for both message and response
+   FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+   FASIT_14400 *msg = (FASIT_14400*)(rbuf + start + sizeof(FASIT_header));
+
+
+   // save response numbers
+   resp_num = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
+   resp_seq = hdr->seq;
+
+   // print pretty outpu
+   DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
+   DCMSG(RED,"\t\t\t\t\t\t\tmessage body\n"\
+	 "C-ID | Length | Data\n"\
+	 "%3d    %5d    ",
+	 msg->cid,msg->length);
+   CJUST_HEXB(RED, msg->data, 512);
+   
+   
+   // do the event that was requested
+   switch (msg->cid) {
+      case SES_No_Event:
+         // don't do anything, return
+         FUNCTION_INT("::handle_14400(int start, int end)", 0)
+         return 0;
+         break;
+      case SES_Request_Status:
+         // don't do anything, break out and send send status
+         break;
+      case SES_Play_Track:
+         doTrack((const char*)msg->data, msg->length); // set track
+         doPlay(); // start playing
+         break;
+      case SES_Record_Track:
+         doTrack((const char*)msg->data, msg->length); // set track
+         doMode(MODE_RECORD); // notify kernel we're changing mode
+         didMode(MODE_RECORD); // change mode
+         doRecord(); // start recording
+         break;
+      case SES_Play_Stream:
+         doStream((const char*)msg->data, msg->length); // stream uri
+         break;
+      case SES_Stop_Playback:
+         doStopPlay(); // stop everything
+         break;
+      case SES_Encode_Recording:
+         doEncode();
+         break;
+      case SES_Abort_Recording:
+         doRecAbort();
+         break;
+      case SES_Copy_Start:
+         // TODO -- impliment track copying
+         break;
+      case SES_Copy_Chunk:
+         // TODO -- impliment track copying
+         break;
+      case SES_Copy_Abort:
+         // TODO -- impliment track copying
+         break;
+      case SES_Maint_Volume:
+         didMode(MODE_MAINTENANCE); // change volume
+         doMode(MODE_MAINTENANCE); // tell kernel
+         break;
+      case SES_Test_Volume:
+         didMode(MODE_TESTING); // change volume
+         doMode(MODE_TESTING); // tell kernel
+         break;
+      case SES_Livefire_Volume:
+         didMode(MODE_LIVEFIRE); // change volume
+         doMode(MODE_LIVEFIRE); // tell kernel
+         break;
+      case SES_Loop:
+         DCMSG(BLUE, "Looping: %s", msg->data);
+         if (strncmp((const char*)msg->data, "infinite", 8) == 0) {
+            doLoop(INFINITE_LOOP);
+         } else {
+            char *endptr;
+            long lloop = strtol((const char*)msg->data, &endptr, 10);
+            if (msg->data[0] != '\0' && *endptr == '\0') {
+               // parsed only a number
+               doLoop(lloop);
+            }
+         }
+         break;
+   }
+
+   // send back status
+   sendStatus14401();
+
+FUNCTION_INT("::handle_14400(int start, int end)", 0)
+   return 0;
+}
+
+int SES_Client::handle_14401(int start, int end) {
+FUNCTION_START("::handle_14401(int start, int end)")
+
+   // do handling of message
+   IMSG("Handling 14401 in SES\n");
+
+FUNCTION_INT("::handle_14401(int start, int end)", 0)
+   return 0;
 }
 
 
@@ -481,7 +657,7 @@ FUNCTION_START("::doPlayRecord()");
 
    // play or record based on mode
    if (mode == MODE_RECORD) {
-      doRecord();
+      doRecordButton();
    } else {
       doPlay();
    }
@@ -495,34 +671,72 @@ FUNCTION_START("::doPlay()");
    DCMSG(GREEN, "Playing %s", track) ;
 
    // start play process
-   PlayProcess::playTrack(track, loop);
+   if (!StreamProcess::isStreaming()) {
+      PlayProcess::playTrack(track, loop);
+   }
 
 FUNCTION_END("::doPlay()");
 }
 
-void SES_Client::doRecord() {
-FUNCTION_START("::doRecord()");
+void SES_Client::doRecordButton() {
+FUNCTION_START("::doRecordButton()");
 
    DCMSG(GREEN, "Recording %s", track) ;
 
    // start record process if not doing any encoding right now
    if (!EncodeProcess::isEncoding()) {
       if (!RecordProcess::isRecording()) {
-         // not recording or encoding, start recording
-         RecordProcess::recordTrack(track, this); // pass "this" along so it knows who to notify when it's done encoding
-         doMode(MODE_REC_START); // notify kernel we're recording
+         // first button press is record
+         doRecord();
       } else {
-         // stop recording, start encoding
-         RecordProcess::StartEncoding();
-         doMode(MODE_ENC_START); // notify kernel we're encoding
+         // second button press is encode
+         doEncode();
       }
    } else {
-      // abort encoding
-      EncodeProcess::StopEncoding();
-      doMode(MODE_REC_DONE); // notify kernel we're done recording
+      // third button press (not usually done) is abort
+      doRecAbort();
+   }
+
+FUNCTION_END("::doRecordButton()");
+}
+
+void SES_Client::doRecord() {
+FUNCTION_START("::doRecord()");
+
+   // not recording or encoding, start recording
+   if (!EncodeProcess::isEncoding() && !RecordProcess::isRecording()) {
+      RecordProcess::recordTrack(track, this); // pass "this" along so it knows who to notify when it's done encoding
+      doMode(MODE_REC_START); // notify kernel we're recording
    }
 
 FUNCTION_END("::doRecord()");
+}
+
+void SES_Client::doEncode() {
+FUNCTION_START("::doEncode()");
+
+   // stop recording, start encoding
+   if (!EncodeProcess::isEncoding()) {
+      RecordProcess::StartEncoding();
+      doMode(MODE_ENC_START); // notify kernel we're encoding
+   }
+
+FUNCTION_END("::doEncode()");
+}
+
+void SES_Client::doRecAbort() {
+FUNCTION_START("::doRecAbort()");
+
+   // abort recording/encoding
+   RecordProcess::StopRecording();
+   EncodeProcess::StopEncoding();
+   if (mode == MODE_RECORD || mode == MODE_REC_START || mode == MODE_REC_DONE || mode == MODE_REC_START) {
+      doMode(MODE_REC_DONE); // notify kernel we're done recording
+   } else {
+      DCMSG(MAGENTA, "DID NOT doMode() FOR MODE %i", mode);
+   }
+
+FUNCTION_END("::doRecAbort()");
 }
 
 void SES_Client::didMode(int mode) {
@@ -530,6 +744,7 @@ FUNCTION_START("::didMode(int mode)");
 
    // set member mode to mode
    this->mode = mode;
+   DCMSG(MAGENTA, "BECAME MODE %i", mode);
 
    // start volume process -- TODO -- make these selectable on startup (preferably in eeprom)
    switch (mode) {
@@ -559,25 +774,30 @@ FUNCTION_START("::doLoop(int loop)");
 FUNCTION_END("::doLoop(int loop)");
 }
 
-void SES_Client::doTrack(const char* track) {
-FUNCTION_START("::doTrack(const char* track)");
+void SES_Client::doTrack(const char* track, int length) {
+FUNCTION_START("::doTrack(const char* track, int length)");
+
+   // fix length
+   if (length > SES_BUFFER_SIZE-1) {
+      length = SES_BUFFER_SIZE-1;
+   }
 
    // check track see if it's a full path
    if (track[0] == '/') {
       // copy contents of track to member track
-      strncpy(this->track, track, SES_BUFFER_SIZE);
+      strncpy(this->track, track, length);
    } else if (strncmp("builtin/", track, 8) == 0) { // check to see if it's built-in
       // add rest of path
-      snprintf(this->track, SES_BUFFER_SIZE, "/media/sda1/audio/%s", track);
+      snprintf(this->track, length, "/media/sda1/audio/%s", track);
    } else if (strncmp("user/", track, 5) == 0) { // check to see if it's user created
       // add rest of path
-      snprintf(this->track, SES_BUFFER_SIZE, "/media/sda1/audio/%s", track);
+      snprintf(this->track, length, "/media/sda1/audio/%s", track);
    } else { // assume user track
       // add rest of path
-      snprintf(this->track, SES_BUFFER_SIZE, "/media/sda1/audio/user/%s", track);
+      snprintf(this->track, length, "/media/sda1/audio/user/%s", track);
    }
 
-FUNCTION_END("::doTrack(const char* track)");
+FUNCTION_END("::doTrack(const char* track, int length)");
 }
 
 void SES_Client::doTrack(int track) {
@@ -589,25 +809,46 @@ FUNCTION_END("::doTrack(int track)");
       return;
    }
 
+   // remember track knob number
+   knob = track;
+
    // create string for track number
    char builtin[16];
    snprintf(builtin, 16, "builtin/%i.mp3", track);
 
    // set the track using the string
-   doTrack(builtin);
+   doTrack(builtin, 16);
 
 FUNCTION_END("::doTrack(int track)");
 }
 
-void SES_Client::doStream(const char* uri) {
-FUNCTION_START("::doStream(const char* uri)");
+void SES_Client::doStream(const char* uri, int length) {
+FUNCTION_START("::doStream(const char* uri, int length)");
 
-   // copy contents of uri to member uri
-   strncpy(this->uri, uri, SES_BUFFER_SIZE);
+   // fix length
+   if (length > SES_BUFFER_SIZE-1) {
+      length = SES_BUFFER_SIZE-1;
+   }
 
-   // TODO -- start streaming process
+   // start streaming process
+   if (!StreamProcess::isStreaming()) { // nothing streaming?
+      // remember new stream uri
+      strncpy(this->uri, uri, length);
 
-FUNCTION_END("::doStream(const char* uri)");
+      // stop track playback and recording
+      doRecAbort();
+
+      // play stream
+      StreamProcess::streamURI(uri);
+   } else if (strncmp(this->uri, uri, length) != 0) { // do we have a new uri?
+      // remember new stream uri
+      strncpy(this->uri, uri, length);
+
+      // change stream
+      StreamProcess::changeURI(uri);
+   } // otherwise, just continue playing
+
+FUNCTION_END("::doStream(const char* uri, int length)");
 }
 
 void SES_Client::doStopPlay() {
@@ -620,14 +861,17 @@ FUNCTION_START("::doStopPlay()");
 
    // stop record process
    RecordProcess::StopRecording();
-   if (mode == MODE_RECORD) {
+   if (mode == MODE_RECORD || mode == MODE_REC_START || mode == MODE_REC_DONE || mode == MODE_REC_START) {
       doMode(MODE_REC_DONE); // notify kernel we're done recording
+   } else {
+      DCMSG(MAGENTA, "DID NOT doMode() FOR MODE %i", mode);
    }
 
    // stop encoding process
    EncodeProcess::StopEncoding();
 
-   // TODO -- stop stream process
+   // stop stream process
+   StreamProcess::StopStreaming();
 
 FUNCTION_END("::doStopPlay()");
 }
@@ -745,6 +989,16 @@ FUNCTION_START("SES_Conn::parseData(struct nl_msg *msg)")
  
 FUNCTION_INT("SES_Conn::parseData(struct nl_msg *msg)", 0)
    return 0;
+}
+
+void SES_Client::finishedRecording() {
+FUNCTION_START("::finishedRecording()")
+
+   doMode(MODE_REC_DONE); // notify kernel
+   didMode(MODE_REC_DONE); // remember new mode (somewhat temporarily)
+   sendStatus14401(); // notify server
+
+FUNCTION_END("::finishedRecording()")
 }
 
 /***********************************************************
