@@ -209,4 +209,5 @@ template BackgroundProcess *Process::newProc<BackgroundProcess>(const char *cmd,
 template PlayProcess *Process::newProc<PlayProcess>(const char *cmd, bool readonly);
 template RecordProcess *Process::newProc<RecordProcess>(const char *cmd, bool readonly);
 template EncodeProcess *Process::newProc<EncodeProcess>(const char *cmd, bool readonly);
+template StreamProcess *Process::newProc<StreamProcess>(const char *cmd, bool readonly);
 
