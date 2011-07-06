@@ -28,7 +28,7 @@ static int CONTINUE_ON[] = {2,1,3,0}; // leg = 1, quad = 2, both = 3, neither = 
 
 // TODO - replace with a table based on distance and speed?
 static int TIMEOUT_IN_MSECONDS[] = {500,12000,500,0};
-static int MOVER_DELAY_MULT[] = {4,2,4,0};
+static int MOVER_DELAY_MULT[] = {6,2,6,0};
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -170,11 +170,6 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 atomic_t sleep_atomic = ATOMIC_INIT(0); // not sleeping
 
 //---------------------------------------------------------------------------
-// This atomic variable is use to remember the timeout delay multiplier
-//---------------------------------------------------------------------------
-atomic_t last_mult = ATOMIC_INIT(0);
-
-//---------------------------------------------------------------------------
 // This atomic variable is use to indicate the goal speed
 //---------------------------------------------------------------------------
 atomic_t goal_atomic = ATOMIC_INIT(0); // final speed desired
@@ -282,20 +277,12 @@ static const char * mover_movement[] =
 // Starts the timeout timer.
 //---------------------------------------------------------------------------
 static void timeout_timer_start(int mult) {
-    // remember a previous multiplier if we have no multiplier
-    int lmult = atomic_read(&last_mult);
-    if (mult == 1 && lmult > 1) {
-       mult = lmult - 1;
-       atomic_dec(&last_mult);
-    }
     if (mult <= 1) {
         // standard timer
         mod_timer(&timeout_timer_list, jiffies+((TIMEOUT_IN_MSECONDS[mover_type]*HZ)/1000));
     } else {
         // (timer + horn) * mult
         mod_timer(&timeout_timer_list, jiffies+((mult*(HORN_ON_IN_MSECONDS[mover_type]+TIMEOUT_IN_MSECONDS[mover_type])*HZ)/1000));
-        // remember long timeout so we don't reset to a shorter timeout
-        atomic_set(&last_mult, mult);
     }
 }
 
@@ -495,13 +482,10 @@ static int hardware_speed_set(int new_speed)
         return -EINVAL;
         }
 
-    // reset timer if we're being told to move
+    // check to see if we need to ramp if we're already moving
     if (atomic_read(&moving_atomic))
         {
-        timeout_timer_stop();
-        timeout_timer_start(1);
-
-        // don't ramp if we're already going there
+        // don't ramp if we're already going to the requested speed
         old_speed = atomic_read(&goal_atomic);
         if (old_speed == new_speed)
             {
