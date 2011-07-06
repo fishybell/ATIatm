@@ -47,6 +47,8 @@ protected:
    virtual int handle_2110(int start, int end);
    virtual int handle_2112(int start, int end);
    virtual int handle_2113(int start, int end);
+   virtual int handle_14400(int start, int end);
+   virtual int handle_14401(int start, int end);
 
    // FASIT helper functions
    virtual int send_2101_ACK(FASIT_header *hdr, int response);

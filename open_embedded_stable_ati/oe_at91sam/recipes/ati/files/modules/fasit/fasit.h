@@ -271,5 +271,96 @@ typedef struct FASIT_2113 {
    FASIT_2113b body;
 } FASIT_2113;
 
+/********************************************/
+/* 14400 - SES Command                      */
+/* NON-FASIT-COMPLIANT                      */
+/* cid = command id:                        */
+/*                  0  = No command         */
+/*                       data = unused      */
+/*                  1  = Request status     */
+/*                       data = unused      */
+/*                  2  = Play track         */
+/*                       data = track name  */
+/*                  3  = Record track       */
+/*                       data = track name  */
+/*                  4  = Play stream        */
+/*                       data = stream uri  */
+/*                  5  = Stop all playback  */
+/*                       data = unused      */
+/*                  6  = Encode recording   */
+/*                       data = unused      */
+/*                  7  = Abort recording    */
+/*                       data = unused      */
+/*                  8  = Copy start         */
+/*                       data = track name  */
+/*                  9  = Copy data chunk    */
+/*                       data = data chunk  */
+/*                  10 = Copy abort         */
+/*                       data = unused      */
+/*                  11 = Maintenance volume */
+/*                       data = unused      */
+/*                  12 = Testing volume     */
+/*                       data = unused      */
+/*                  13 = Live-fire volume   */
+/*                       data = unused      */
+/*                  14 = Set looping        */
+/*                       data = loop count  */
+/* length = length of data chunk            */
+/* data = data parameter (defined per cid)  */
+/********************************************/
+typedef struct FASIT_14400 {
+   __uint8_t  cid;
+   __uint16_t length PCKD;
+   __uint8_t  data[512];
+} FASIT_14400;
+// the Command ID values
+enum {
+   SES_No_Event,
+   SES_Request_Status,
+   SES_Play_Track,
+   SES_Record_Track,
+   SES_Play_Stream,
+   SES_Stop_Playback,
+   SES_Encode_Recording,
+   SES_Abort_Recording,
+   SES_Copy_Start,
+   SES_Copy_Chunk,
+   SES_Copy_Abort,
+   SES_Maint_Volume,
+   SES_Test_Volume,
+   SES_Livefire_Volume,
+   SES_Loop,
+};
+
+
+/********************************************/
+/* 14401 - SES Status                       */
+/* NON-FASIT-COMPLIANT                      */
+/* mode = playback volume level:            */
+/*                              0 = unknown */
+/*                              1 = maint   */
+/*                              2 = testing */
+/*                              3 = record  */
+/*                              4 = live    */
+/* status = playback status:                */
+/*                          0 = unknown     */
+/*                          1 = stopped     */
+/*                          2 = playing     */
+/*                          3 = play ready  */
+/*                          4 = streaming   */
+/*                          5 = recording   */
+/*                          6 = encoding    */
+/*                          7 = rec ready   */
+/* track = knob track number (0-15)         */
+/********************************************/
+typedef struct FASIT_14401b { // body
+   __uint8_t  mode;
+   __uint8_t  status;
+   __uint8_t  track;
+} FASIT_14401b;
+typedef struct FASIT_14401 {
+   FASIT_RESPONSE response;
+   FASIT_14401b body;
+} FASIT_14401;
 
 #endif

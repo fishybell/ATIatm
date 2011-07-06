@@ -141,6 +141,8 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0);
          HANDLE_FASIT (2110);
          HANDLE_FASIT (2112);
          HANDLE_FASIT (2113);
+         HANDLE_FASIT (14400);
+         HANDLE_FASIT (14401);
          default:
             IMSG("message valid, but not handled: %i\n", mnum);
             break;
@@ -203,6 +205,8 @@ TMSG("too short: %i > (%i - %i)\n", *start, rsize, sizeof(FASIT_header));
          CHECK_LENGTH (2110);
          CHECK_LENGTH (2112);
          CHECK_LENGTH (2113);
+         CHECK_LENGTH (14400);
+         CHECK_LENGTH (14401);
          default:      // not a valid number, not a valid header
             break;
       }
@@ -476,6 +480,40 @@ FUNCTION_START("::handle_2113(int start, int end)");
    }
 
 FUNCTION_INT("::handle_2113(int start, int end)", 0);
+   return 0;
+}
+
+int FASIT_TCP::handle_14400(int start, int end) {
+FUNCTION_START("::handle_14400(int start, int end)");
+   // map header and message
+   FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+   FASIT_14400 *msg = (FASIT_14400*)(rbuf + start + sizeof(FASIT_header));
+
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_14400));
+      pair()->finishMsg();
+   }
+
+FUNCTION_INT("::handle_14400(int start, int end)", 0);
+   return 0;
+}
+
+int FASIT_TCP::handle_14401(int start, int end) {
+FUNCTION_START("::handle_14401(int start, int end)");
+   // map header and message
+   FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+   FASIT_14401 *msg = (FASIT_14401*)(rbuf + start + sizeof(FASIT_header));
+
+   // send via client
+   if (hasPair()) {
+      pair()->queueMsg(hdr, sizeof(FASIT_header));
+      pair()->queueMsg(msg, sizeof(FASIT_14401));
+      pair()->finishMsg();
+   }
+
+FUNCTION_INT("::handle_14401(int start, int end)", 0);
    return 0;
 }
 
