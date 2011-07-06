@@ -593,6 +593,26 @@ int SIT_Client::handle_2115(int start, int end) {
 	 return 0;
 }
 
+int SIT_Client::handle_14400(int start, int end) {
+FUNCTION_START("::handle_14400(int start, int end)")
+
+   // do handling of message
+   IMSG("Handling 14400 in SIT\n");
+
+FUNCTION_INT("::handle_14400(int start, int end)", 0)
+   return 0;
+}
+
+int SIT_Client::handle_14401(int start, int end) {
+FUNCTION_START("::handle_14401(int start, int end)")
+
+   // do handling of message
+   IMSG("Handling 14401 in SIT\n");
+
+FUNCTION_INT("::handle_14401(int start, int end)", 0)
+   return 0;
+}
+
 
 /***********************************************************
 *                    Basic SIT Commands                    *

@@ -70,6 +70,8 @@ protected:
    int handle_2110(int start, int end);
    int handle_2112(int start, int end);
    int handle_2113(int start, int end);
+   int handle_14400(int start, int end);
+   int handle_14401(int start, int end);
    
 private:
    class SIT_Conn *nl_conn;
