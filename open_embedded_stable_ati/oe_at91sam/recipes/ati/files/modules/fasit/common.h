@@ -71,6 +71,12 @@ extern volatile int C_ERRORS;
        for (int _i=0; _i<size; _i++) printf("%02x", (__uint8_t)_data[_i]); \
        printf(" in %s at line %i\n", __FILE__, __LINE__); \
 }; fflush(stdout); }}
+#define CJUST_HEXB(SC,data, size)  { if (C_DEBUG) {{ \
+       printf("\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
+       char *_data = (char*)data; \
+       for (int _i=0; _i<size; _i++) printf("%02x", (__uint8_t)_data[_i]); \
+       printf("\n"); \
+}; fflush(stdout); }}
    
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
 #define BLIP { if (C_DEBUG ){ printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
