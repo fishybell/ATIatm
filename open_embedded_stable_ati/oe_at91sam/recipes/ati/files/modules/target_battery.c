@@ -131,7 +131,7 @@ const int BATTERY_NORMAL[] = {50, 104, 202, 255};	// at or above this value is c
 const int BATTERY_LOW[] = {49, 100, 196, 4};		// at or above this value (and below above) is considered low
 const int BATTERY_CRIT[] = {48, 99, 195, 3};		// at or above this value (and below above) is considered critical
 const int BATTERY_HALT[] = {45, 94, 188, 2};		// at or below this value (and above below) requires immediate halt of device
-const int BATTERY_WAIT[] = {1, 1, 1, 1};			// at or below this value signifies an invalid battery value...ignore
+const int BATTERY_WAIT[] = {5, 5, 5, 1};			// at or below this value signifies an invalid battery value...ignore
 
 //---------------------------------------------------------------------------
 // Declaration of the functions that gets called when the timers fire.
