@@ -11,11 +11,13 @@ using namespace std;
 #define CMD_BUFFER_SIZE 1024
 
 // define static members
-bool PlayProcess::stop = false; // stop value
-bool RecordProcess::stop = false; // stop value
-bool RecordProcess::started = false; // started value
-bool EncodeProcess::stop = false; // stop value
-bool EncodeProcess::started = false; // started value
+bool PlayProcess::stop = false; // not stopped
+bool RecordProcess::stop = false; // not stopped
+bool RecordProcess::started = false; // not started
+bool EncodeProcess::stop = false; // not stopped
+bool EncodeProcess::started = false; // not started
+int StreamProcess::stop = 0; // not stopped
+bool StreamProcess::started = false; // not started
 
 /***********************************************************
 *                     PlayProcess Class                    *
@@ -49,7 +51,7 @@ FUNCTION_START("::playTrack(const char *track, unsigned int loop)");
    } else {
       // repeat "loop" times
       DCMSG(BLUE, "Playing track <<%s>> with %i repeats", track, loop);
-      snprintf(cmd, CMD_BUFFER_SIZE, "esddsp madplay -m -r%i %s", track, loop);
+      snprintf(cmd, CMD_BUFFER_SIZE, "esddsp madplay -m -r%i %s", loop, track);
    }
 
    // start playback
@@ -199,12 +201,12 @@ FUNCTION_START("::~EncodeProcess()");
    BackgroundProcess::newProc(cmd); // removes track in background
    delete [] cmd;
 
-   // tell client we're done
-   client->doMode(MODE_REC_DONE);
-
    // we're no longer running
    started = false;
    delete [] track;
+
+   // tell client we're done
+   client->finishedRecording();
 
 FUNCTION_END("::~EncodeProcess()");
 }
@@ -250,4 +252,107 @@ FUNCTION_START("::parseData(int rsize, const char *rbuf)");
 FUNCTION_INT("::parseData(int rsize, const char *rbuf)", retval);
    return retval;
 }
+
+/***********************************************************
+*                    StreamProcess Class                   *
+***********************************************************/
+StreamProcess::StreamProcess(FILE *pipe) : Process(pipe) {
+FUNCTION_START("::StreamProcess(FILE *pipe)");
+
+   // ready for uri
+   uri = new char[CMD_BUFFER_SIZE];
+
+   // not stopped anymore
+   started = true;
+
+FUNCTION_END("::StreamProcess(FILE *pipe)");
+}
+
+StreamProcess::~StreamProcess() {
+FUNCTION_START("::~StreamProcess()");
+
+   // the stream process closed, either due to stop or due to change (or it crashed and needs restarting)
+   switch (stop) {
+      case 1: 
+         // stopped: not stopping or started anymore, restart esd
+         stop = 0;
+         started = false;
+         BackgroundProcess::newProc("esd"); // restarts esd process (this enables track playing, but disables streaming)
+         break;
+      case 2:
+         // changing uri: not stopping or started anymore
+         stop = 0;
+         started = false;
+         break;
+      default:
+         // not stopped, restart (crash of stream requires re-stream)
+         streamURI(uri);
+         break;
+   }
+
+   // clean up
+   delete [] uri;
+
+FUNCTION_END("::~StreamProcess()");
+}
+
+// starts streaming uri
+void StreamProcess::streamURI(const char *uri) {
+FUNCTION_START("::streamURI(const char *uri)");
+
+   StreamProcess *stream;
+   char *cmd = new char[CMD_BUFFER_SIZE];
+
+   // stop esd
+   BackgroundProcess::newProc("killall -q esd"); // kills all running esd processes (this disables track playing, but enables streaming)
+
+   // create the stream command
+   DCMSG(BLUE, "Streaming uri <<%s>>", uri);
+   snprintf(cmd, CMD_BUFFER_SIZE, "mplayer %s", uri);
+
+   // start streaming
+   stream = Process::newProc<StreamProcess>(cmd, true); // read only
+
+   // set uri in stream process
+   strncpy(stream->uri, uri, CMD_BUFFER_SIZE);
+   delete [] cmd;
+FUNCTION_END("::streamURI(const char *uri)");
+}
+
+// stops streaming of all running stream processes, and starts a new one
+void StreamProcess::changeURI(const char *uri) {
+FUNCTION_START("::changeURI(const char *uri)");
+
+   // stop current stream
+   stop = 2;
+   BackgroundProcess::newProc("killall -9 -q mplayer"); // kills all running stream processes
+
+   // start new one
+   streamURI(uri);
+
+FUNCTION_END("::changeURI(const char *uri)");
+}
+
+// stops streaming of all running stream processes
+void StreamProcess::StopStreaming() {
+FUNCTION_START("::StopStreaming()");
+   stop = 1;
+   BackgroundProcess::newProc("killall -9 -q mplayer"); // kills all running stream processes
+FUNCTION_END("::StopStreaming()");
+}
+
+// do nothing with the data, when stopped, delete
+int StreamProcess::parseData(int rsize, const char *rbuf) {
+FUNCTION_START("::parseData(int rsize, const char *rbuf)");
+   // ignore data
+   int retval = 0;
+   if (stop > 0) { // won't necessary get here, if process stops on its own from killall first for example
+      DCMSG(RED, "Stopping streaming");
+      retval = -1;
+   }
+FUNCTION_INT("::parseData(int rsize, const char *rbuf)", retval);
+   return retval;
+}
+
+
 

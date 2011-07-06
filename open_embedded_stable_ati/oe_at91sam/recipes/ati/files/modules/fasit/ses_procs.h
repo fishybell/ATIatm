@@ -55,4 +55,22 @@ protected:
    class SES_Client *client;
 };
 
+// starts streaming, ignores input, is able to be stopped during runtime
+// NOTE : only create one process at a time, undefined results if multiple are running
+// NOTE : cannot play audio tracks during streaming process, recording capabilities during streaming are undefined
+class StreamProcess : public Process {
+public:
+   StreamProcess(FILE *pipe); // create using StreamProcess::streamURI() or StreamProcess::changeURI()
+   virtual ~StreamProcess();
+   static void streamURI(const char *uri); // starts streaming
+   static void changeURI(const char *uri); // stops current stream and starts new one
+   static void StopStreaming(); // stops streaming of running stream process
+   static bool isStreaming() {return started;} ; // returns true if streaming
+
+protected:
+   static int stop; // 0 = not stopped, 1 = stopped, 2 = changing
+   static bool started;
+   int parseData(int rsize, const char *rbuf); // do nothing with the data, but watch for stop
+   char *uri;
+};
 #endif
