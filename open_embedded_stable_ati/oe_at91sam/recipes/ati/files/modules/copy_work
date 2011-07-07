@@ -11,9 +11,15 @@ if  {$argc == 1} {
     gets stdin num
 }
 
+# increase delays for wireless devices
+set delay 5
+if {[string match -nocase *w* $num]} {
+    set delay 16
+}
+
 system sed -i -e "s/^sam$num.*//" ~/.ssh/known_hosts
 eval spawn scp user_conn bit_button fasit_conn event_conn bcast_server bcast_client root@sam$num:/usr/bin
-set timeout 5.5
+set timeout $delay
 while 1 {
     expect {
         -re {.*word:.*} {
@@ -27,9 +33,9 @@ while 1 {
         }
     }
 }
-sleep 6
+sleep $delay
 eval spawn scp [glob *.ko] root@sam$num:/home/root
-set timeout 3.5
+set timeout $delay
 while 1 {
     expect {
         -re {.*word:.*} {
@@ -43,4 +49,4 @@ while 1 {
         }
     }
 }
-sleep 3
+sleep $delay
