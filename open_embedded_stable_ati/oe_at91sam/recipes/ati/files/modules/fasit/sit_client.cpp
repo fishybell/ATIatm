@@ -513,7 +513,7 @@ FUNCTION_START("::handle_2110(int start, int end)")
 
    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
    DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nOn/Off | Mode | I-Delay | R-Delay\n%7d  %5d  %8d  %8d",
-	 msg->on,msg->mode,htons(msg->idelay),htons(msg->rdelay));
+	 msg->on,msg->mode,msg->idelay,msg->rdelay);
    
    // check to see if we have muzzle flash capability -
    if (start_config&PD_MUZZLE){
