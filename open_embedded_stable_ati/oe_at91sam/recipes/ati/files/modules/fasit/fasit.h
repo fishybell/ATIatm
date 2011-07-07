@@ -337,11 +337,10 @@ enum {
 /* 14401 - SES Status                       */
 /* NON-FASIT-COMPLIANT                      */
 /* mode = playback volume level:            */
-/*                              0 = unknown */
-/*                              1 = maint   */
-/*                              2 = testing */
-/*                              3 = record  */
-/*                              4 = live    */
+/*                              0 = maint   */
+/*                              1 = testing */
+/*                              2 = record  */
+/*                              3 = live    */
 /* status = playback status:                */
 /*                          0 = unknown     */
 /*                          1 = stopped     */
