@@ -50,6 +50,7 @@ public :
    void doStopPlay(); // stop playback/record
 
    void finishedRecording(); // called from the recording/encoding processes to notify when it is done
+   void sendStatus14401();
 
 protected:
    virtual bool hasPair() { return nl_conn != NULL;};
@@ -82,9 +83,8 @@ private:
    void fillStatus2102(FASIT_2102 *msg);
    void sendStatus2102();
 
-   // helper functions for filling out a 14401 status message
+   // helper function for filling out a 14401 status message
    void fillStatus14401(FASIT_14401 *msg);
-   void sendStatus14401();
 
    // remember the last command we received for responses back
    int resp_num;

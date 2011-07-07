@@ -972,6 +972,7 @@ FUNCTION_START("SES_Conn::parseData(struct nl_msg *msg)")
                case BIT_KNOB:
                   // change selected track
                   ses_client->doTrack(bit_c->is_on);
+                  ses_client->sendStatus14401();
                   break;
                case BIT_MODE:
                   // change mode
@@ -980,6 +981,7 @@ FUNCTION_START("SES_Conn::parseData(struct nl_msg *msg)")
                   } else {
                      ses_client->didMode(bit_c->is_on);
                   }
+                  ses_client->sendStatus14401();
                   break;
             }
          }
