@@ -458,9 +458,8 @@ FUNCTION_START("::handle_14400(int start, int end)")
    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
    DCMSG(RED,"\t\t\t\t\t\t\tmessage body\n"\
 	 "C-ID | Length | Data\n"\
-	 "%3d    %5d    ",
-	 msg->cid,msg->length);
-   CJUST_HEXB(RED, msg->data, 512);
+	  "%3d    %5d   %s",
+	 msg->cid,htons(msg->length), msg->data);
    
    
    // do the event that was requested
@@ -474,17 +473,17 @@ FUNCTION_START("::handle_14400(int start, int end)")
          // don't do anything, break out and send send status
          break;
       case SES_Play_Track:
-         doTrack((const char*)msg->data, msg->length); // set track
+         doTrack((const char*)msg->data, htons(msg->length)); // set track
          doPlay(); // start playing
          break;
       case SES_Record_Track:
-         doTrack((const char*)msg->data, msg->length); // set track
+         doTrack((const char*)msg->data, htons(msg->length)); // set track
          doMode(MODE_RECORD); // notify kernel we're changing mode
          didMode(MODE_RECORD); // change mode
          doRecord(); // start recording
          break;
       case SES_Play_Stream:
-         doStream((const char*)msg->data, msg->length); // stream uri
+         doStream((const char*)msg->data, htons(msg->length)); // stream uri
          break;
       case SES_Stop_Playback:
          doStopPlay(); // stop everything
@@ -732,8 +731,6 @@ FUNCTION_START("::doRecAbort()");
    EncodeProcess::StopEncoding();
    if (mode == MODE_RECORD || mode == MODE_REC_START || mode == MODE_REC_DONE || mode == MODE_REC_START) {
       doMode(MODE_REC_DONE); // notify kernel we're done recording
-   } else {
-      DCMSG(MAGENTA, "DID NOT doMode() FOR MODE %i", mode);
    }
 
 FUNCTION_END("::doRecAbort()");
@@ -744,7 +741,6 @@ FUNCTION_START("::didMode(int mode)");
 
    // set member mode to mode
    this->mode = mode;
-   DCMSG(MAGENTA, "BECAME MODE %i", mode);
 
    // start volume process -- TODO -- make these selectable on startup (preferably in eeprom)
    switch (mode) {
@@ -788,13 +784,13 @@ FUNCTION_START("::doTrack(const char* track, int length)");
       strncpy(this->track, track, length);
    } else if (strncmp("builtin/", track, 8) == 0) { // check to see if it's built-in
       // add rest of path
-      snprintf(this->track, length, "/media/sda1/audio/%s", track);
+      snprintf(this->track, 19+length, "/media/sda1/audio/%s", track);
    } else if (strncmp("user/", track, 5) == 0) { // check to see if it's user created
       // add rest of path
-      snprintf(this->track, length, "/media/sda1/audio/%s", track);
+      snprintf(this->track, 19+length, "/media/sda1/audio/%s", track);
    } else { // assume user track
       // add rest of path
-      snprintf(this->track, length, "/media/sda1/audio/user/%s", track);
+      snprintf(this->track, 24+length, "/media/sda1/audio/user/%s", track);
    }
 
 FUNCTION_END("::doTrack(const char* track, int length)");
@@ -863,8 +859,6 @@ FUNCTION_START("::doStopPlay()");
    RecordProcess::StopRecording();
    if (mode == MODE_RECORD || mode == MODE_REC_START || mode == MODE_REC_DONE || mode == MODE_REC_START) {
       doMode(MODE_REC_DONE); // notify kernel we're done recording
-   } else {
-      DCMSG(MAGENTA, "DID NOT doMode() FOR MODE %i", mode);
    }
 
    // stop encoding process
@@ -972,7 +966,7 @@ FUNCTION_START("SES_Conn::parseData(struct nl_msg *msg)")
                case BIT_KNOB:
                   // change selected track
                   ses_client->doTrack(bit_c->is_on);
-                  ses_client->sendStatus14401();
+                  // ses_client->sendStatus14401(); -- ignored anyway, don't send
                   break;
                case BIT_MODE:
                   // change mode
