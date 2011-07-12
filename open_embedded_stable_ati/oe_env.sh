@@ -1,8 +1,3 @@
-if [ `id -g` != 555 ] ; then
-    echo "Changed to nathan.bell user"
-    su - nathan.bell
-    echo "User restored"
-fi
 export OE_DIR=${PWD}
 export PATH=/usr/local/bin/bitbake/bin:/usr/local/TclPro1.5/linux-ix86/bin:~/qtcreator-1.3.1/bin:/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin:/usr/NX/bin:/usr/java/j2sdk1.4.2_01/bin:/usr/local/pgsql/bin:.
 export BBPATH=${OE_DIR}/oe_at91sam:${OE_DIR}/openembedded
