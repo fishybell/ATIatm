@@ -18,7 +18,9 @@ export LANG=C
 export BB_ENV_EXTRAWHITE="MACHINE DISTRO ANGSTROM_MODE"
 
 if [ ! -f .cvsignore ] ; then
-    echo ".cvsignore" > .cvsignore
+    for i in .cvsignore flash oe_sources openembedded ; do
+        echo $i >> .cvsignore
+    done
 fi
 
 #for i in tmp oe_sources openembedded ; do
@@ -34,5 +36,4 @@ if [ ! -d flash ] ; then
     if [ ! -f .cvsignore ] ; then
         touch .cvsignore
     fi
-    echo "flash" >> .cvsignore
 fi
