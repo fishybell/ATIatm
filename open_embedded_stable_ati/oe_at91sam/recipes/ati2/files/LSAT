@@ -8,7 +8,7 @@ start () {
    # load modules
    load_modules "target_user_interface.ko mover=0" \
                 "target_battery.ko minvoltval=12" \
-                "target_hit_poll.ko line=1" \
+                "target_hit_poll.ko line=0" \
                 "target_generic_output.ko" \
                 "target_lifter_armor.ko" \
                 "lifter.ko"
