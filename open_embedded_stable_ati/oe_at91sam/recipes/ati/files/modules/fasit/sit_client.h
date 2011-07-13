@@ -42,11 +42,14 @@ public :
    void didHits(int num); // received "num" hits
    void doMSDH(int code, int ammo, int player, int delay); // change MSDH data
    void didMSDH(int code, int ammo, int player, int delay); // current MSDH data
-   void doMFS(int on, int mode, int idelay, int rdelay); // change MFS data
-   void didMFS(int *on, int *mode, int *idelay, int *rdelay); // current MFS data
+   void doMFS(int on, int mode, int idelay, int rdelay); // change MFS data   
+   void didMFS(int exists,int on, int mode, int idelay, int rdelay) ;
+   void doMGL(int on);
+   void didMGL(int exists,int on);
+   void doPHI(int on);
+   void didPHI(int exists,int on);
    void doGPS(); // retrieve gps data
    void didGPS(struct gps_conf gpc_c); // current gps data
-
 
 
 protected:
@@ -70,6 +73,10 @@ protected:
    int handle_2110(int start, int end);
    int handle_2112(int start, int end);
    int handle_2113(int start, int end);
+   int handle_13110(int start, int end);
+   int handle_13112(int start, int end);
+   int handle_14110(int start, int end);
+   int handle_14112(int start, int end);
    int handle_14400(int start, int end);
    int handle_14401(int start, int end);
    
@@ -79,6 +86,7 @@ private:
    // helper functions for filling out a 2102 status message
    void fillStatus2102(FASIT_2102 *msg);
    void sendStatus2102(int force);
+   void sendStatus2112(int on, int mode, int idelay, int rdelay) ;
 
    // remember the last command we received for responses back
    int resp_num;
@@ -121,6 +129,11 @@ public:
    void doHits(int num); // change received hits to "num" (usually to 0 for reset)
    void doMSDH(int code, int ammo, int player, int delay); // change MSDH data
    void doMFS(int on, int mode, int idelay, int rdelay); // change MFS data
+   void didMFS(int exists,int on, int mode, int idelay, int rdelay) ;
+   void doMGL(int on);
+   void didMGL(int exists,int on);
+   void doPHI(int on);
+   void didPHI(int exists,int on);
    void doGPS(); // retrieve gps dataprotected:
 
 

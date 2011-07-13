@@ -174,8 +174,9 @@ typedef struct FASIT_2111 {
    FASIT_RESPONSE response;
    FASIT_2111b body;
 } FASIT_2111;
+
 #define PD_MILES (1 << 0)
-#define PD_MUZZLE (1 << 1)
+#define PD_NES (1 << 1)
 #define PD_GPS (1 << 2)
 #define PD_RESERVED ((1 << 3) | (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7))
 
@@ -270,6 +271,44 @@ typedef struct FASIT_2113 {
    FASIT_RESPONSE response;
    FASIT_2113b body;
 } FASIT_2113;
+
+
+/********************************************/
+/* 13110 - Configure Moon Glow    */
+/********************************************/
+typedef struct FASIT_13110 {
+	__uint8_t  on;
+} FASIT_13110;
+
+/********************************************/
+/* 13112 - Muzzle Moon Glow Status    */
+/********************************************/
+typedef struct FASIT_13112b { // body
+	__uint8_t  on;
+} FASIT_13112b;
+typedef struct FASIT_13112 {
+	FASIT_RESPONSE response;
+	FASIT_13112b body;
+} FASIT_13112;
+
+/********************************************/
+/* 14110 - Configure Positive Hit Indicator    */
+/********************************************/
+typedef struct FASIT_14110 {
+	__uint8_t  on;
+} FASIT_14110;
+
+/********************************************/
+/* 14112 - Muzzle Positive Hit Indicator Status    */
+/********************************************/
+typedef struct FASIT_14112b { // body
+	__uint8_t  on;
+} FASIT_14112b;
+typedef struct FASIT_14112 {
+	FASIT_RESPONSE response;
+	FASIT_14112b body;
+} FASIT_14112;
+
 
 /********************************************/
 /* 14400 - SES Command                      */

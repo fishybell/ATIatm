@@ -18,7 +18,7 @@ using namespace std;
 #endif
 
 NL_Conn::NL_Conn(struct nl_handle *handle, Connection *client, int family) : Connection(nl_socket_get_fd(handle)) {
-FUNCTION_START("::NL_Conn(struct nl_handle *handle, Connection *client)")
+FUNCTION_START("::NL_Conn(struct nl_handle *handle, Connection *client)");
 
    this->handle = handle;
    this->client = client;
@@ -37,11 +37,11 @@ FUNCTION_START("::NL_Conn(struct nl_handle *handle, Connection *client)")
     nl_socket_modify_cb(this->handle, NL_CB_SEQ_CHECK, NL_CB_CUSTOM, ignore_cb, (void*)"SEQ_CHECK");
     nl_socket_modify_cb(this->handle, NL_CB_SEND_ACK, NL_CB_CUSTOM, ignore_cb, (void*)"SEND_ACK");
 
-FUNCTION_END("::NL_Conn(struct nl_handle *handle, Connection *client)")
+FUNCTION_END("::NL_Conn(struct nl_handle *handle, Connection *client)");
 }
 
 NL_Conn::~NL_Conn() {
-FUNCTION_START("::~NL_Conn()")
+FUNCTION_START("::~NL_Conn()");
 
    // kill netlink connection
    if (handle) {
@@ -62,35 +62,35 @@ FUNCTION_START("::~NL_Conn()")
       nlmsg_free(*it);
    }
 
-FUNCTION_END("::~NL_Conn()")
+FUNCTION_END("::~NL_Conn()");
 }
 
 // the file descriptor is ready to give us data, read as much as possible (max of BUF_SIZE)
 int NL_Conn::handleRead(const epoll_event *ev) {
-FUNCTION_START("NL_Conn::handleRead(const epoll_event *ev)")
+FUNCTION_START("NL_Conn::handleRead(const epoll_event *ev)");
 
    // call the callback functions for this message now (if full message received)
    nl_recvmsgs_default(handle);
 
-FUNCTION_INT("NL_Conn::handleRead(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleRead(const epoll_event *ev)", 0);
    return 0;
 }
 
 // the file descriptor is ready to receive the data, send it on through
 int NL_Conn::handleWrite(const epoll_event *ev) {
-FUNCTION_START("NL_Conn::handleWrite(const epoll_event *ev)")
+FUNCTION_START("NL_Conn::handleWrite(const epoll_event *ev)");
 
    // are we ready for message sending?
    if (handle == NULL || client == NULL) {
       makeWritable(false);
-FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0);
       return 0;
    }
 
    // do we have anything to write?
    if (outq.empty()) {
       makeWritable(false);
-FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0);
       return 0;
    }
 
@@ -106,11 +106,11 @@ FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
       makeWritable(false); // hold off until the timer times out
       
       // leave at front of queue
-FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0);
       return 0;
    } else if (retval < 0) {
       // our netlink connection is broken, kill it
-FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", -1)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", -1);
       return -1;
    }
 
@@ -120,7 +120,7 @@ FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", -1)
    // delete the front queue item
    outq.pop_front();
 
-FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
+FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0);
    return 0;
 }
 
@@ -129,10 +129,10 @@ FUNCTION_INT("NL_Conn::handleWrite(const epoll_event *ev)", 0)
 //   preempted, the caller may call this function multiple times to create a complete
 //   message and be sure that the entire message is sent
 void NL_Conn::queueMsg(struct nl_msg *msg) {
-FUNCTION_START("NL_Conn::queueMsg(struct nl_msg *msg)")
+FUNCTION_START("NL_Conn::queueMsg(struct nl_msg *msg)");
    // don't queue a non message
    if (msg == NULL) {
-FUNCTION_END("NL_Conn::queueMsg(struct nl_msg *msg)")
+FUNCTION_END("NL_Conn::queueMsg(struct nl_msg *msg)");
       return;
    }
 
@@ -142,12 +142,12 @@ FUNCTION_END("NL_Conn::queueMsg(struct nl_msg *msg)")
    // send the message later
    makeWritable(true);
 
-FUNCTION_END("NL_Conn::queueMsg(struct nl_msg *msg)")
+FUNCTION_END("NL_Conn::queueMsg(struct nl_msg *msg)");
 }
 
 // helper for queueing message with arbitrary attribute
 void NL_Conn::queueMsg(int cmd, int att_c, size_t att_t, void *attr) {
-FUNCTION_START("NL_Conn::queueMsg(int cmd, int att_c, size_t att_t, void *attr)")
+FUNCTION_START("NL_Conn::queueMsg(int cmd, int att_c, size_t att_t, void *attr)");
 
    // Create a new netlink message
    struct nl_msg *msg;
@@ -160,12 +160,12 @@ FUNCTION_START("NL_Conn::queueMsg(int cmd, int att_c, size_t att_t, void *attr)"
    // queue message for sending later
    queueMsg(msg);
 
-FUNCTION_END("NL_Conn::queueMsg(int cmd, int att_c, size_t att_t, void *attr)")
+FUNCTION_END("NL_Conn::queueMsg(int cmd, int att_c, size_t att_t, void *attr)");
 }
 
 // helper for queueing message with u8 attribute 
 void NL_Conn::queueMsgU8(int cmd, int attr) {
-FUNCTION_START("NL_Conn::queueMsgU8(int cmd, int attr)")
+FUNCTION_START("NL_Conn::queueMsgU8(int cmd, int attr)");
 
    // Create a new netlink message
    struct nl_msg *msg;
@@ -178,12 +178,12 @@ FUNCTION_START("NL_Conn::queueMsgU8(int cmd, int attr)")
    // queue message for sending later
    queueMsg(msg);
 
-FUNCTION_END("NL_Conn::queueMsgU8(int cmd, int attr)")
+FUNCTION_END("NL_Conn::queueMsgU8(int cmd, int attr)");
 }
 
 // helper for queueing message with u16 attribute 
 void NL_Conn::queueMsgU16(int cmd, int attr) {
-FUNCTION_START("NL_Conn::queueMsgU16(int cmd, int attr)")
+FUNCTION_START("NL_Conn::queueMsgU16(int cmd, int attr)");
 
    // Create a new netlink message
    struct nl_msg *msg;
@@ -196,18 +196,18 @@ FUNCTION_START("NL_Conn::queueMsgU16(int cmd, int attr)")
    // queue message for sending later
    queueMsg(msg);
 
-FUNCTION_END("NL_Conn::queueMsgU16(int cmd, int attr)")
+FUNCTION_END("NL_Conn::queueMsgU16(int cmd, int attr)");
 }
 
 
 template <class C_Conn, class C_Client>
 C_Conn *NL_Conn::newConn(C_Client *client) {
-FUNCTION_START("::newConn(C_Client *client)")
+FUNCTION_START("::newConn(C_Client *client)");
    C_Conn *conn = NULL;
    // allocate a netlink handle
    struct nl_handle *handle = nl_handle_alloc();
    if (handle == NULL) {
-FUNCTION_HEX("::newConn(C_Client *client)", NULL)
+FUNCTION_HEX("::newConn(C_Client *client)", NULL);
       return NULL;
    }
 
@@ -217,7 +217,7 @@ FUNCTION_HEX("::newConn(C_Client *client)", NULL)
    // Connect to generic netlink handle on kernel side
    if (genl_connect(handle) < 0) {
       nl_handle_destroy(handle);
-FUNCTION_HEX("::newConn(C_Client *client)", NULL)
+FUNCTION_HEX("::newConn(C_Client *client)", NULL);
       return NULL;
    }
    setnonblocking(nl_socket_get_fd(handle), true); // socket
@@ -226,7 +226,7 @@ FUNCTION_HEX("::newConn(C_Client *client)", NULL)
    int family = genl_ctrl_resolve(handle, "ATI");
    if (family < 0) {
       nl_handle_destroy(handle);
-FUNCTION_HEX("::newConn(C_Client *client)", NULL)
+FUNCTION_HEX("::newConn(C_Client *client)", NULL);
       return NULL;
    }
    DMSG("Resolved ATI netlink family id as %i\n", family);
@@ -237,12 +237,12 @@ FUNCTION_HEX("::newConn(C_Client *client)", NULL)
    // add to epoll
    if (!addToEPoll(nl_socket_get_fd(handle), conn)) {
        delete conn;
-FUNCTION_HEX("::newConn(C_Client *client)", NULL)
+FUNCTION_HEX("::newConn(C_Client *client)", NULL);
        return NULL;
    }
 
    // return the result
-FUNCTION_HEX("::newConn(C_Client *client)", conn)
+FUNCTION_HEX("::newConn(C_Client *client)", conn);
    return conn;
 }
 

@@ -221,7 +221,7 @@ const char *usage = "Usage: %s [options]\n\
             startMIT = true;
             break;
 	 case 'F' :
-	    start_config |= PD_MUZZLE;
+	    start_config |= PD_NES;
 	    break;
          case 'l' :
             if (sscanf(argv[++i], "%i", &sport) != 1) {
