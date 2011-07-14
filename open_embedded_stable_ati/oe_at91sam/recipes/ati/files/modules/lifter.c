@@ -785,91 +785,6 @@ void lift_event_internal(int etype, bool upload) {
     int enable_at = atomic_read(&enable_on);
     delay_printk("lift_event(%i)\n", etype);
 
-<<<<<<< lifter.c
-    // send event upstream?
-    if (upload) {
-        u8 data = etype; // cast to 8-bits
-        queue_nl_multi(NL_C_EVENT, &data, sizeof(data));
-    }
-
-    // create event for outputs
-    generic_output_event(etype);
-
-    // notify user-space
-    switch (etype) {
-        case EVENT_RAISE:
-        case EVENT_LOWER:
-        case EVENT_UP:
-        case EVENT_DOWN:
-        case EVENT_ERROR:
-            schedule_work(&position_work);
-            break;
-    }
-
-    // disable or enable hit sensor on raise and lower events
-    switch (etype) {
-        case EVENT_UP:
-        case EVENT_DOWN:
-            switch (enable_at) {
-                case ENABLE_ALWAYS:
-                    // we never blank
-                    hit_blanking_off();
-                    break;
-                case ENABLE_AT_POSITION:
-                case DISABLE_AT_POSITION:
-                    // we reached a new position; change hit sensor enabled state
-                    atomic_set(&enable_doing, 1); // an action, not a calibration is changing the sensor
-                    schedule_work(&hit_enable_work);
-                    break;
-                case BLANK_ALWAYS:
-                    // we always blank
-                    hit_blanking_on();
-                    break;
-                case BLANK_ON_CONCEALED:
-                    if (etype == EVENT_DOWN) {
-                        // we're down; blank
-                        hit_blanking_on();
-                    }
-                    break;
-            }
-            break;
-        case EVENT_RAISE:
-            if (enable_at == BLANK_ON_CONCEALED) {
-                // we're not concealed, blank a little longer, or stop blanking now
-                if (atomic_read(&blank_time) == 0) { // no blanking time
-                    hit_blanking_off();
-                } else {
-                    mod_timer(&blank_timer, jiffies+((atomic_read(&blank_time)*HZ)/1000)); // blank for X milliseconds
-                }
-            }
-            break;
-    }
-
-    // reset kill counter on start of raise
-    if (etype == EVENT_RAISE) {
-        atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
-    }
-
-    // do bob?
-    if (atomic_read(&at_conceal) == 1) {
-        switch (etype) {
-            case EVENT_HIT:
-            case EVENT_KILL:
-            case EVENT_LOWER:
-                // ignore
-                break;
-            case EVENT_DOWN:
-                // bob after we went down
-                atomic_set(&at_conceal, 0); // reset to do nothing
-                lifter_position_set(LIFTER_POSITION_UP); // expose now
-                break;
-            default:
-                // everything else implies something went wrong
-                atomic_set(&at_conceal, 0); // reset to do nothing
-                break;
-        }
-    }
-=======
 	// send event upstream?
 	if (upload) {
 		u8 data = etype; // cast to 8-bits
@@ -957,7 +872,7 @@ void lift_event_internal(int etype, bool upload) {
 				break;
 		}
 	}
->>>>>>> 1.22
+
 }
 
 //---------------------------------------------------------------------------
@@ -968,82 +883,6 @@ void hit_event(int line) {
 }
 
 void hit_event_internal(int line, bool upload) {
-<<<<<<< lifter.c
-    struct hit_item *new_hit;
-    int stay_up = 1;
-    u8 hits = 0, kdata;
-    delay_printk("hit_event_internal(line=%i, upload=%d)\n", line,upload);
-
-    // create event
-    lift_event_internal(EVENT_HIT, upload);
-
-    // log event
-    new_hit = kmalloc(sizeof(struct hit_item), GFP_KERNEL);
-    memset(new_hit, 0, sizeof(struct hit_item));
-    if (new_hit != NULL) {
-        // change change around
-        spin_lock(hit_lock);
-        new_hit->next = hit_chain;
-        hit_chain = new_hit;
-        spin_unlock(hit_lock);
-
-        // set values in new hit item
-        new_hit->time = timespec_sub(current_kernel_time(), hit_start); // time since start
-        new_hit->line = line;
-    }
-
-    // create netlink message for userspace (always, no matter what the upload value is)
-    // get data from log
-    spin_lock(hit_lock);
-    new_hit = hit_chain;
-    while (new_hit != NULL) {
-        hits++; // count hit (doesn't matter which line)
-        new_hit = new_hit->next; // next link in chain
-    }
-    spin_unlock(hit_lock);
-
-    // send hits upstream
-    //    if (upload) {
-    queue_nl_multi(NL_C_HITS, &hits, sizeof(hits));
-    //    }
-
-    // go down if we need to go down
-    if (atomic_read(&hits_to_kill) > 0) {
-        stay_up = !atomic_dec_and_test(&kill_counter);
-    }
-    if (!stay_up) {
-        atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
-
-        // create events for outputs
-        generic_output_event(EVENT_KILL);
-
-        // send kill upstream (always, no matter what the upload value is)
-        kdata = EVENT_KILL; // cast to 8-bits
-        queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
-
-        // bob if we need to bob
-        switch (atomic_read(&after_kill)) {
-            case 0: /* fall */
-            case 1: /* kill -- TODO -- find out difference between fall and kill */
-                // put down
-                lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-                break;
-            case 2: /* stop */
-                // TODO -- send stop movement message to mover
-                break;
-            case 3: /* fall/stop */
-                // put down
-                lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-                // TODO -- send stop movement message to mover
-                break;
-            case 4: /* bob */
-                // put down
-                lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-                atomic_set(&at_conceal, 1); // when we get a CONCEAL event, go back up
-                break;
-        }
-    }
-=======
 	struct hit_item *new_hit;
 	int stay_up = 1;
 	u8 hits = 0, kdata;
@@ -1121,7 +960,7 @@ void hit_event_internal(int line, bool upload) {
 				break;
 		}
 	}
->>>>>>> 1.22
+
 }
 
 //---------------------------------------------------------------------------
