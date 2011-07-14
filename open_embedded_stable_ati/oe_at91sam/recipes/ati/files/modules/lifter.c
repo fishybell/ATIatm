@@ -17,6 +17,7 @@
 #include "target_lifter_infantry.h"
 #include "target_generic_output.h"
 #include "target_hit_poll.h"
+#include "target_battery.h"
 
 //---------------------------------------------------------------------------
 #define TARGET_NAME		"lifter"
@@ -108,6 +109,7 @@ delay_printk("Lifter: received value: %i\n", value);
 
         switch (value) {
             case TOGGLE:
+                enable_battery_check(0); // disable battery checking while motor is on
                 // grab current position
                 if (lifter_position_get() == LIFTER_POSITION_UP) {
                     // was up, go down
@@ -133,6 +135,7 @@ delay_printk("Lifter: received value: %i\n", value);
                 break;
 
             case EXPOSE:
+                enable_battery_check(0); // disable battery checking while motor is on
                 // do expose
                 if (lifter_position_get() != LIFTER_POSITION_UP) {
                     lifter_position_set(LIFTER_POSITION_UP); // expose now
@@ -145,6 +148,7 @@ delay_printk("Lifter: received value: %i\n", value);
                 break;
 
             case CONCEAL:
+                enable_battery_check(0); // disable battery checking while motor is on
                 // do conceal
                 if (lifter_position_get() != LIFTER_POSITION_DOWN) {
                     lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
@@ -362,6 +366,7 @@ delay_printk("Lifter: received value: %i\n", value);
 
         // stop motor wherever it is
         lifter_position_set(LIFTER_POSITION_ERROR_NEITHER);
+        enable_battery_check(1); // enable battery checking while motor is off
 
         // TODO -- disable hit sensor (but don't clear hit log)
 
@@ -791,11 +796,13 @@ void lift_event_internal(int etype, bool upload) {
 
 	// notify user-space
 	switch (etype) {
+        case EVENT_ERROR:
+            enable_battery_check(1); // enable battery checking while motor is off
+            // fall through
 		case EVENT_RAISE:
 		case EVENT_LOWER:
 		case EVENT_UP:
 		case EVENT_DOWN:
-		case EVENT_ERROR:
 			schedule_work(&position_work);
 			break;
 	}
@@ -804,6 +811,7 @@ void lift_event_internal(int etype, bool upload) {
 	switch (etype) {
 		case EVENT_UP:
 		case EVENT_DOWN:
+            enable_battery_check(1); // enable battery checking while motor is off
 			switch (enable_at) {
 				case ENABLE_ALWAYS:
 					// we never blank
@@ -855,6 +863,7 @@ void lift_event_internal(int etype, bool upload) {
 			case EVENT_DOWN:
 				// bob after we went down
 				atomic_set(&at_conceal, 0); // reset to do nothing
+                enable_battery_check(0); // disable battery checking while motor is on
 				lifter_position_set(LIFTER_POSITION_UP); // expose now
 				break;
 			default:
@@ -930,6 +939,7 @@ void hit_event_internal(int line, bool upload) {
 			case 0: /* fall */
 			case 1: /* kill -- TODO -- find out difference between fall and kill */
 				// put down
+                enable_battery_check(0); // disable battery checking while motor is on
 				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
 				break;
 			case 2: /* stop */
@@ -937,11 +947,13 @@ void hit_event_internal(int line, bool upload) {
 				break;
 			case 3: /* fall/stop */
 				// put down
+                enable_battery_check(0); // disable battery checking while motor is on
 				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
 				// TODO -- send stop movement message to mover
 				break;
 			case 4: /* bob */
 				// put down
+                enable_battery_check(0); // disable battery checking while motor is on
 				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
 				atomic_set(&at_conceal, 1); // when we get a CONCEAL event, go back up
 				break;
