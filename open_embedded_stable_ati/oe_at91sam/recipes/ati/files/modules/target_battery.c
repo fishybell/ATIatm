@@ -172,6 +172,11 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 atomic_t driver_id = ATOMIC_INIT(-1);
 
 //---------------------------------------------------------------------------
+// This atomic variable is used for battyer enable/disable checking
+//---------------------------------------------------------------------------
+atomic_t check_atomic = ATOMIC_INIT(1); // enabled
+
+//---------------------------------------------------------------------------
 // This atomic variable used for storing the last adc value read
 //---------------------------------------------------------------------------
 atomic_t adc_atomic = ATOMIC_INIT(0);
@@ -187,6 +192,14 @@ atomic_t blink_count = ATOMIC_INIT(0);
 // level has changed
 //---------------------------------------------------------------------------
 static struct work_struct level_work;
+
+//---------------------------------------------------------------------------
+// enables/disables battery sensing (so we don't sense while running a moter)
+//---------------------------------------------------------------------------
+void enable_battery_check(int enable) {
+   atomic_set(&check_atomic, enable);
+}
+EXPORT_SYMBOL(enable_battery_check);
 
 //---------------------------------------------------------------------------
 // Shutdown the device
@@ -247,6 +260,12 @@ static void adc_read_fire(unsigned long data)
 	{
 	unsigned char adc_val;
 	unsigned char old_adc_val;
+
+    // check/don't check adc line
+    if (!atomic_read(&check_atomic)) {
+        return;
+    }
+
 	// check if the register adc register is ready
 	if(!(__raw_readl(adc_base + ADC_SR) & CH_EN))
 		{
@@ -292,14 +311,16 @@ static void adc_read_fire(unsigned long data)
 //---------------------------------------------------------------------------
 // The function that gets called when the timeout fires.
 //---------------------------------------------------------------------------
-static void timeout_fire(unsigned long data)
-	{
-	// start the adc reading
-	hardware_adc_read_start();
+static void timeout_fire(unsigned long data) {
+    // check/don't check adc line
+    if (atomic_read(&check_atomic)) {
+        // start the adc reading
+        hardware_adc_read_start();
+    }
 
-	// Restart the timeout timer
-	mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS*HZ));
-	}
+    // Restart the timeout timer
+    mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS*HZ));
+}
 
 //---------------------------------------------------------------------------
 // connected or disconnected the charging harness
