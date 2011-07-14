@@ -28,11 +28,11 @@ extern void generic_output_set_state(int type, int num, GO_state_t value);
 
 // get/set routines for active-on mode
 #define MANUAL_ACTIVE		(1<<0)	// activate/deactivate only on manual action
-#define ACTIVE_RAISE		(1<<1)	// activate on start of raise (for lifting targets)
+#define ACTIVE_RAISE			(1<<1)	// activate on start of raise (for lifting targets)
 #define UNACTIVE_RAISE		(1<<2)	// deactivate on start of raise (for lifting targets)
-#define ACTIVE_UP			(1<<3)	// activate on end of raise (for lifting targets)
+#define ACTIVE_UP				(1<<3)	// activate on end of raise (for lifting targets)
 #define UNACTIVE_UP			(1<<4)	// deactivate on end of raise (for lifting targets)
-#define ACTIVE_LOWER		(1<<5)	// activate on start of lower (for lifting targets)
+#define ACTIVE_LOWER			(1<<5)	// activate on start of lower (for lifting targets)
 #define UNACTIVE_LOWER		(1<<6)	// deactivate on start of lower (for lifting targets)
 #define ACTIVE_DOWN			(1<<7)	// activate on end of lower (for lifting targets)
 #define UNACTIVE_DOWN		(1<<8)	// deactivate on end of lower (for lifting targets)
@@ -40,17 +40,17 @@ extern void generic_output_set_state(int type, int num, GO_state_t value);
 #define UNACTIVE_MOVE		(1<<10)	// deactivate on start of moving (for moving targets)
 #define ACTIVE_MOVING		(1<<11)	// activate on moving at speed (for moving targets)
 #define UNACTIVE_MOVING		(1<<12)	// deactivate on moving at speed (for moving targets)
-#define ACTIVE_COAST		(1<<13)	// activate on start of coasting (for moving targets)
+#define ACTIVE_COAST			(1<<13)	// activate on start of coasting (for moving targets)
 #define UNACTIVE_COAST		(1<<14)	// deactivate on start of coasting (for moving targets)
 #define ACTIVE_STOP			(1<<15)	// activate on start of stopping (for moving targets)
 #define UNACTIVE_STOP		(1<<16)	// deactivate on start of stopping (for moving targets)
 #define ACTIVE_STOPPED		(1<<17)	// activate on full stop (for moving targets)
 #define UNACTIVE_STOPPED	(1<<18)	// deactivate on full stop (for moving targets)
 #define ACTIVE_HIT			(1<<19)	// activate on hit (arbirtrary hit event)
-#define UNACTIVE_HIT		(1<<20)	// deactivate on hit (arbirtrary hit event)
+#define UNACTIVE_HIT	   	(1<<20)	// deactivate on hit (arbirtrary hit event)
 #define ACTIVE_KILL			(1<<21)	// activate on kill (arbitrary kill event)
 #define UNACTIVE_KILL		(1<<22)	// deactivate on kill (arbitrary kill event)
-#define ACTIVE_ERROR		(1<<23)	// activate on error (deactivates on everything else)
+#define ACTIVE_ERROR			(1<<23)	// activate on error (deactivates on everything else)
 extern int generic_output_get_active_on(int type, int num); // value ORed from above
 extern void generic_output_set_active_on(int type, int num, int value); // value ORed from above
 

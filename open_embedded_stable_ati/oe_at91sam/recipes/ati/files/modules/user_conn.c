@@ -17,7 +17,6 @@
 // size of client buffer
 #define CLIENT_BUFFER 1024
 
-
 // global connection junk
 static int efd, nl_fd; // epoll file descriptor and netlink file descriptor
 static struct nl_handle *g_handle;
@@ -218,7 +217,7 @@ printf("NL_C_HIT_CAL\n");
                 struct accessory_conf *acc_c = (struct accessory_conf*)nla_data(attrs[ACC_A_MSG]);
                 if (acc_c != NULL) {
                     switch (acc_c->acc_type) {
-                        case ACC_NES_MOON_GLOW:
+                        case ACC_NES_MGL:
                             // Moon Glow data
                             snprintf(wbuf, 1024, "Q MGL");
                             break;
@@ -641,7 +640,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                                case 'G' : case 'g' :
                                    switch (cmd[arg1 + 2]) { /* third letter */
                                        case 'L' : case 'l' :
-                                           acc_c.acc_type = ACC_NES_MOON_GLOW;
+                                           acc_c.acc_type = ACC_NES_MGL;
                                            break;
                                    }
                                    break;

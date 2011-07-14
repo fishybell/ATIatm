@@ -136,8 +136,8 @@ typedef struct accessory_conf {
     u8 on_exp:2;	/* 1 for active when fully exposed, 2 for active when partially exposed and fully exposed, 3 for active only while exposing/concealing */
     u8 on_hit:2;	/* 1 for activate on hit, 2 for deactivate on hit */
     u8 on_kill:2;	/* 1 for activate on kill, 2 for deactivate on kill */
-    u16 on_time __attribute__ ((packed));			/* time on (in milliseconds, 0 for forever) */
-    u16 off_time __attribute__ ((packed));			/* time off (in milliseconds, 0 for forever) */
+    u16 on_time __attribute__ ((packed));	/* time on (in milliseconds, 0 for forever) */
+    u16 off_time __attribute__ ((packed));	/* time off (in milliseconds, 0 for forever) */
     u8 start_delay;	/* time to delay before activation (in half-seconds) */
     u8 repeat_delay;/* time to delay before repeat (in half-seconds) */
     u16 repeat:6 __attribute__ ((packed));			/* repeat count (0 for no repeat, 63 for forever) */
@@ -146,7 +146,7 @@ typedef struct accessory_conf {
     u8 ex_data3;	/* even more extra data specific to the accessory type */
 } accessory_conf_t;
 enum {
-    ACC_NES_MOON_GLOW,      /* Night Effects Simulator, Moon Glow light */
+    ACC_NES_MGL,      /* Night Effects Simulator, Moon Glow light */
     ACC_NES_PHI,            /* Night Effects Simulator, Positive Hit Indicator light */
     ACC_NES_MFS,            /* Night Effects Simulator, Muzzle Flash Simulator light : ex_data1 = flash type, ex_data2 = burst count */
     ACC_SES,                /* Sound Effects Simulator : ex_data1 = track #, ex_data2 = record length (in seconds, 0 for play) */

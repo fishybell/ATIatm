@@ -428,7 +428,7 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
 				case ACC_SES :
 				case ACC_NES_MFS :
 				case ACC_NES_PHI :
-				case ACC_NES_MOON_GLOW :
+				case ACC_NES_MGL :
 					for (i=generic_output_exists(acc_c->acc_type); i > 0; i--) { // do I have one?
 						delay_printk("Lifter: Using Single Accessory %i\n", acc_c->acc_type);
 						num = i; // use this one

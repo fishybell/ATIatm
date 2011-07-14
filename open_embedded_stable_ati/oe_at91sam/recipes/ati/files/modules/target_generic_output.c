@@ -159,7 +159,7 @@ struct generic_output output_table[] = {
     },
     // Moon Glow
     {
-        ACC_NES_MOON_GLOW,		// type
+        ACC_NES_MGL,		// type
         1,						// number
         0,						// exists
         DISABLED,				// enabled
@@ -912,7 +912,7 @@ delay_printk("Looking at %i : %i\n", i, output_table[i].type);
 
         // determine if this item should exist
         switch (output_table[i].type) {
-            case ACC_NES_MOON_GLOW:
+            case ACC_NES_MGL:
                 // only one moon glow light
                 if (has_moon && output_table[i].number == 1) {
 delay_printk("Has Moon\n");
