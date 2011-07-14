@@ -28,8 +28,12 @@ extern volatile int C_INFO;
 extern volatile int C_ERRORS;
 
 // for run time tracing of application
-#define FUNCTION_START(arg) { if (C_TRACE) { printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_END(arg) { if (C_TRACE){ printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+//#define FUNCTION_START(arg) { if (C_TRACE) { printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+//#define FUNCTION_END(arg) { if (C_TRACE){ printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+
+#define FUNCTION_START(arg) { if (C_DEBUG) { printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_END(arg) { if (C_DEBUG){ printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+
 #define FUNCTION_INT(arg, ret) { if (C_TRACE) { printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
 #define FUNCTION_HEX(arg, ret) { if (C_TRACE) { printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); fflush(stdout);}}
 #define FUNCTION_STR(arg, ret) { if (C_TRACE) { printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
