@@ -16,6 +16,7 @@
 //---------------------------------------------------------------------------
 #include "target_mover_generic.h"
 #include "target_generic_output.h"
+#include "target_battery.h"
 
 //---------------------------------------------------------------------------
 // These variables are parameters given when doing an insmod (insmod blah.ko variable=5)
@@ -124,6 +125,7 @@ static void move_event_internal(int etype, bool upload) {
             mod_timer(&moved_timer, jiffies+(((MOVED_DELAY/2)*HZ)/1000)); // wait for X milliseconds for sensor to settle
             break;
         case EVENT_STOPPED:
+            enable_battery_check(1); // enable battery checking while motor is off
             mod_timer(&moved_timer, jiffies+(((MOVED_DELAY*4)*HZ)/1000)); // wait for X milliseconds for sensor to settle
             schedule_work(&position_work);
             break;
@@ -211,6 +213,7 @@ delay_printk("Mover: received value: %i\n", value);
             }
         } else {
             // move
+            enable_battery_check(0); // disable battery checking while motor is on
             mover_speed_set(value-128); // unsigned value to signed speed (0 will coast)
         }
 
