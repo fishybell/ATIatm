@@ -1152,7 +1152,11 @@ void SIT_Client::didPHI(int exists,int on) {
     // send status message to FASIT server
     DCOLOR(RED) ; // change color
     if (exists) {
-        sendStatus14112(on);
+	if (on) {
+	    sendStatus14112(1);
+	} else {
+	    sendStatus14112(0);
+	}
     } else {
 //        send_2101_ACK(hdr,'F'); // probably not really right
     }
@@ -1331,7 +1335,7 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
                         sit_client->didMGL(acc_c->exists,acc_c->on_exp); // tell client
                         break;                      
                     case ACC_NES_PHI:
-                        sit_client->didPHI(acc_c->exists,acc_c->on_exp); // tell client
+                        sit_client->didPHI(acc_c->exists,acc_c->on_hit); // tell client
                         break;                      
                     case ACC_SMOKE:
                     case ACC_THERMAL:
