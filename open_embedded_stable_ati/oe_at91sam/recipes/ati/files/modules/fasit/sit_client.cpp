@@ -194,9 +194,9 @@ void SIT_Client::sendStatus2112(int on, int mode, int idelay, int rdelay) {
 	DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htonl(hdr.seq),htonl(hdr.rsrvd),htons(hdr.length));
 	DCMSG(BLUE,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htonl(msg.response.rseq));
 	DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n "\
-			"  ON  | MODE  | idelay|rdelay \n"\
-			"  %3d    %3d     %3d     %3d   ",
-			msg.body.on,msg.body.mode,msg.body.idelay,msg.body.rdelay);
+	      "  ON  | MODE  | idelay|rdelay \n"\
+	      "  %3d    %3d     %3d     %3d   ",
+	      msg.body.on,msg.body.mode,msg.body.idelay,msg.body.rdelay);
 
 	// send
 	queueMsg(&hdr, sizeof(FASIT_header));
@@ -205,6 +205,78 @@ void SIT_Client::sendStatus2112(int on, int mode, int idelay, int rdelay) {
 
 
 	FUNCTION_END("::sendStatus2112()");
+}
+
+
+// create and send a status messsage to the FASIT server
+void SIT_Client::sendStatus13112(int on) {
+	FUNCTION_START("::sendStatus13112()");
+
+	FASIT_header hdr;
+	FASIT_13112 msg;
+	defHeader(13112, &hdr); // sets the sequence number and other data
+	hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_13112));
+
+	// set response
+		// fill out as response
+	msg.response.rnum = resp_num;
+	msg.response.rseq = resp_seq;
+	resp_num = resp_seq = 0; // the next one will be unsolicited
+
+	msg.body.on = on;
+//      didMFS(&rmsg.body.on,&rmsg.body.mode,&rmsg.body.idelay,&rmsg.body.rdelay);
+
+	DCMSG(BLUE,"Prepared to send 13112 status packet:");
+	DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htonl(hdr.seq),htonl(hdr.rsrvd),htons(hdr.length));
+	DCMSG(BLUE,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htonl(msg.response.rseq));
+	DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n "\
+	      "  ON  \n"\
+	      "  %3d   ",
+	      msg.body.on);
+
+	// send
+	queueMsg(&hdr, sizeof(FASIT_header));
+	queueMsg(&msg, sizeof(FASIT_13112));
+	finishMsg();
+
+
+	FUNCTION_END("::sendStatus13112()");
+}
+
+
+// create and send a status messsage to the FASIT server
+void SIT_Client::sendStatus14112(int on) {
+	FUNCTION_START("::sendStatus14112()");
+
+	FASIT_header hdr;
+	FASIT_14112 msg;
+	defHeader(14112, &hdr); // sets the sequence number and other data
+	hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_14112));
+
+	// set response
+		// fill out as response
+	msg.response.rnum = resp_num;
+	msg.response.rseq = resp_seq;
+	resp_num = resp_seq = 0; // the next one will be unsolicited
+
+	msg.body.on = on;
+//      didMFS(&rmsg.body.on,&rmsg.body.mode,&rmsg.body.idelay,&rmsg.body.rdelay);
+
+	DCMSG(BLUE,"Prepared to send 14112 status packet:");
+	DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htonl(hdr.seq),htonl(hdr.rsrvd),htons(hdr.length));
+	DCMSG(BLUE,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htonl(msg.response.rseq));
+	DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n "\
+	      "  ON  \n"\
+	      "  %3d   ",
+	      msg.body.on);
+
+	// send
+	queueMsg(&hdr, sizeof(FASIT_header));
+	queueMsg(&msg, sizeof(FASIT_14112));
+	finishMsg();
+
+
+	FUNCTION_END("::sendStatus14112()");
 }
 
 /***********************************************************
@@ -684,7 +756,7 @@ int SIT_Client::handle_13112(int start, int end) {
 //
 int SIT_Client::handle_14110(int start, int end) {
 	FUNCTION_START("::handle_14110(int start, int end)");
-#if 0
+#if 1
    // do handling of message
 	IMSG("Handling 14110 in SIT\n");
 
@@ -695,13 +767,13 @@ int SIT_Client::handle_14110(int start, int end) {
 	FASIT_14110 *msg = (FASIT_14110*)(rbuf + start + sizeof(FASIT_header));
 
 	DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
-	DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nOn/Off \n%7d ",
+	DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nOn/Off \n%7d",
 	      msg->on);
 
    // check to see if we have the Night Effects Simulator
-	if (start_config&PD_NES){
+	if (start_config&PD_NES) {
 
-		doMFS(msg->on,msg->mode,msg->idelay,msg->rdelay);
+		doPHI(msg->on);
 
    // then respond with a 14112 of it's status
 		defHeader(14112, &rhdr); // sets the sequence number and other data
@@ -718,8 +790,10 @@ int SIT_Client::handle_14110(int start, int end) {
 		finishMsg();
 
 	} else {
-		send_2101_ACK(hdr,'F');	// no NES capability, so send a negative ack
+		send_2101_ACK(hdr,'F');	// no muzzle flash capability, so send a negative ack
 	}
+
+
 #endif
 	FUNCTION_INT("::handle_14110(int start, int end)", 0);
 			return 0;
@@ -727,12 +801,12 @@ int SIT_Client::handle_14110(int start, int end) {
 
 
 int SIT_Client::handle_14112(int start, int end) {
-	FUNCTION_START("::handle_14112(int start, int end)")
+	FUNCTION_START("::handle_14112(int start, int end)");
 
 	// do handling of message
 			IMSG("Handling 14112 in SIT\n");
 
-	FUNCTION_INT("::handle_14112(int start, int end)", 0)
+	FUNCTION_INT("::handle_14112(int start, int end)", 0);
 			return 0;
 }
 
@@ -1051,7 +1125,7 @@ void SIT_Client::doMGL(int on) {
 	FUNCTION_START("::doMGL(int on)");
 	// pass directly to kernel for actual action
 	if (hasPair()) {
-//		nl_conn->doMGL(on);
+		nl_conn->doMGL(on);
 	}
 	FUNCTION_END("::doMGL(int on)");
 }
@@ -1062,7 +1136,7 @@ void SIT_Client::didMGL(int exists,int on) {
 		// send status message to FASIT server
 	DCOLOR(RED) ; // change color
 	if (exists) {
-//		sendStatus2112(on);
+		sendStatus13112(on);
 	} else {
 //		send_2101_ACK(hdr,'F');	// probably not really right
 	}
@@ -1076,7 +1150,7 @@ void SIT_Client::doPHI(int on) {
 	FUNCTION_START("::doPHI(int on)");
 	// pass directly to kernel for actual action
 	if (hasPair()) {
-//		nl_conn->doMFS(on);
+		nl_conn->doPHI(on);
 	}
 	FUNCTION_END("::doPHI(int on)");
 }
@@ -1087,7 +1161,7 @@ void SIT_Client::didPHI(int exists,int on) {
 		// send status message to FASIT server
 	DCOLOR(RED) ; // change color
 	if (exists) {
-//		sendStatus2112(on);
+		sendStatus14112(on);
 	} else {
 //		send_2101_ACK(hdr,'F');	// probably not really right
 	}
@@ -1259,7 +1333,7 @@ FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)");
             struct accessory_conf *acc_c = (struct accessory_conf*)nla_data(attrs[ACC_A_MSG]);
             switch (acc_c->acc_type) {
                /* TODO -- fill in support for additional accessories */
-					case ACC_NES_MOON_GLOW:
+					case ACC_NES_MGL:
 						sit_client->didMGL(acc_c->exists,acc_c->on_exp); // tell client
 						break;						
 					case ACC_NES_PHI:
@@ -1434,7 +1508,12 @@ struct accessory_conf acc_c;
    sit_client->getAccC(&acc_c);
 
    acc_c.acc_type = ACC_NES_MFS;
-   acc_c.on_exp = on;
+   if (on) {
+	   acc_c.on_exp = 1;	// on
+	   acc_c.on_kill = 2;	// 2 = deactivate on kill
+   } else {
+	   acc_c.on_exp = 0;	// off
+   }
    if (mode == 1) {
       acc_c.ex_data1 = 1; // do burst
       acc_c.ex_data2 = 5; // burst 5 times
@@ -1452,6 +1531,53 @@ struct accessory_conf acc_c;
 
    
 FUNCTION_END("::doMFS(int on, int mode, int idelay, int rdelay)");
+}
+
+// change MFS data
+void SIT_Conn::doMGL(int on) {
+	FUNCTION_START("::doMFS(int on)");
+
+	struct accessory_conf acc_c;
+
+   // Create attribute
+	memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out\
+	sit_client->getAccC(&acc_c);
+
+	acc_c.acc_type = ACC_NES_MGL;
+	if (on) {
+		acc_c.on_exp = 2;	// 2 = 2 for active when partially exposed and fully exposed
+	} else {
+		acc_c.on_exp = 0;	// off
+	}
+	
+   // Queue command
+	queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // MFS is an accessory
+
+	FUNCTION_END("::doMGL(int on)");
+}
+
+// change MFS data
+void SIT_Conn::doPHI(int on) {
+	FUNCTION_START("::doPHI(int on)");
+
+	struct accessory_conf acc_c;
+
+   // Create attribute
+	memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out\
+	sit_client->getAccC(&acc_c);
+
+	acc_c.acc_type = ACC_NES_PHI;
+	if (on) {
+		acc_c.on_hit = 1;	// 2 = 2 for active when partially exposed and fully exposed
+		acc_c.on_time = 2000;	// time to stay on
+	} else {
+		acc_c.on_exp = 0;	// off
+	}
+
+   // Queue command
+	queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // MFS is an accessory
+
+	FUNCTION_END("::doPHI(int on)");
 }
 
 // retrieve gps dataprotected:

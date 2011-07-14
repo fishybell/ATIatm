@@ -87,6 +87,8 @@ private:
    void fillStatus2102(FASIT_2102 *msg);
    void sendStatus2102(int force);
    void sendStatus2112(int on, int mode, int idelay, int rdelay) ;
+   void sendStatus13112(int on);
+   void sendStatus14112(int on);
 
    // remember the last command we received for responses back
    int resp_num;
