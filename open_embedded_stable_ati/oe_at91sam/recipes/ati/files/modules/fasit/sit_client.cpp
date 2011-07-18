@@ -802,6 +802,27 @@ int SIT_Client::handle_14112(int start, int end) {
 }
 
 
+int SIT_Client::handle_14200(int start, int end) {
+    FUNCTION_START("::handle_14200(int start, int end)");
+
+    // do handling of message
+    IMSG("Handling 14200 in SIT\n");
+
+    // map header and body for both message and response
+    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+    FASIT_14200 *msg = (FASIT_14200*)(rbuf + start + sizeof(FASIT_header));
+
+    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
+    DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nBlank \n%7d",
+          htons(msg->blank));
+
+    // set hit sensor blanking
+    doBlank(htons(msg->blank));
+
+    FUNCTION_INT("::handle_14200(int start, int end)", 0);
+    return 0;
+}
+
 int SIT_Client::handle_14400(int start, int end) {
     FUNCTION_START("::handle_14400(int start, int end)");
 
@@ -1163,6 +1184,14 @@ void SIT_Client::didPHI(int exists,int on) {
 
     // there needs to be some actual code here if it is going to function
     FUNCTION_END("::didPHI");
+}
+
+void SIT_Client::doBlank(int blank) {
+    FUNCTION_START("::doBlank(int blank)");
+    lastHitCal.blank_time = blank;
+    lastHitCal.set = HIT_OVERWRITE_ALL;    // nothing will change without this
+    doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
+    FUNCTION_END("::doBlank(int blank)");
 }
 
 // retrieve gps data

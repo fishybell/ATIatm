@@ -309,6 +309,12 @@ typedef struct FASIT_14112 {
 	FASIT_14112b body;
 } FASIT_14112;
 
+/********************************************/
+/* 14200 - Configure Hit Blanking           */
+/********************************************/
+typedef struct FASIT_14200 {
+   __uint16_t blank PCKD; // hundredths of seconds
+} FASIT_14200;
 
 /********************************************/
 /* 14400 - SES Command                      */

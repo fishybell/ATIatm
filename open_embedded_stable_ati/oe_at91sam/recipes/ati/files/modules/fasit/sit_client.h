@@ -48,6 +48,7 @@ public :
    void didMGL(int exists,int on);
    void doPHI(int on);
    void didPHI(int exists,int on);
+   void doBlank(int blank);
    void doGPS(); // retrieve gps data
    void didGPS(struct gps_conf gpc_c); // current gps data
 
@@ -77,6 +78,7 @@ protected:
    int handle_13112(int start, int end);
    int handle_14110(int start, int end);
    int handle_14112(int start, int end);
+   int handle_14200(int start, int end);
    int handle_14400(int start, int end);
    int handle_14401(int start, int end);
    
