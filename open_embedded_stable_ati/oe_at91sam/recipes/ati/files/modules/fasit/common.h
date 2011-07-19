@@ -21,25 +21,6 @@
         (void) (&_x == &_y);            \
         _x > _y ? _x : _y; })
 
-// comment these out to remove the TRACE, etc. lines from entire program, redefine to 0 to make individual chunks of code turn it off
-extern volatile int C_TRACE;
-extern volatile int C_DEBUG;
-extern volatile int C_INFO;
-extern volatile int C_ERRORS;
-
-// for run time tracing of application
-//#define FUNCTION_START(arg) { if (C_TRACE) { printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
-//#define FUNCTION_END(arg) { if (C_TRACE){ printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
-
-#define FUNCTION_START(arg) { if (C_TRACE) { printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_END(arg) { if (C_TRACE){ printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
-
-#define FUNCTION_INT(arg, ret) { if (C_TRACE) { printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_HEX(arg, ret) { if (C_TRACE) { printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_STR(arg, ret) { if (C_TRACE) { printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
-#define HERE { if (C_TRACE) { printf("TRACE: Here! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
-#define TMSG(...) { if (C_TRACE) { printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); printf(__VA_ARGS__); fflush(stdout);}}
-
 //  colors for the DCMSG  
 #define black	0
 #define red	1
@@ -60,8 +41,23 @@ extern volatile int C_ERRORS;
 #define CYAN	14
 #define GRAY	15
 
-// for run time debugging of application
-#define PRINT_HEXB(data, size) {if (C_DEBUG) {{ \
+// comment these out to remove the TRACE, etc. lines from entire program, redefine to 0 to make individual chunks of code turn it off
+extern volatile int C_TRACE;
+extern volatile int C_DEBUG;
+extern volatile int C_INFO;
+extern volatile int C_ERRORS;
+
+// for run time tracing of application
+#define FUNCTION_START(arg) { if (C_TRACE) { printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_END(arg) { if (C_TRACE){ printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+
+#define FUNCTION_INT(arg, ret) { if (C_TRACE) { printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_HEX(arg, ret) { if (C_TRACE) { printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_STR(arg, ret) { if (C_TRACE) { printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
+#define HERE { if (C_TRACE) { printf("TRACE: Here! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define TMSG(...) { if (C_TRACE) { printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); printf(__VA_ARGS__); fflush(stdout);}}
+
+#define PRINT_HEXB(data, size) {if (C_TRACE) {{ \
         printf("DEBUG: 0x"); \
         char *_data = (char*)data; \
         for (int _i=0; _i<size; _i++) { \
@@ -69,13 +65,13 @@ extern volatile int C_ERRORS;
         } \
         printf(" in %s at line %i\n", __FILE__, __LINE__); \
         }; fflush(stdout);}}
-#define CPRINT_HEXB(SC,data, size)  { if (C_DEBUG) {{ \
+#define CPRINT_HEXB(SC,data, size)  { if (C_TRACE) {{ \
        printf("DEBUG:\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
        char *_data = (char*)data; \
        for (int _i=0; _i<size; _i++) printf("%02x", (__uint8_t)_data[_i]); \
        printf(" in %s at line %i\n", __FILE__, __LINE__); \
 }; fflush(stdout); }}
-#define CJUST_HEXB(SC,data, size)  { if (C_DEBUG) {{ \
+#define CJUST_HEXB(SC,data, size)  { if (C_TRACE) {{ \
        printf("\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
        char *_data = (char*)data; \
        for (int _i=0; _i<size; _i++) printf("%02x", (__uint8_t)_data[_i]); \
@@ -83,6 +79,8 @@ extern volatile int C_ERRORS;
 }; fflush(stdout); }}
    
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
+
+// for run time debugging of application
 #define BLIP { if (C_DEBUG ){ printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
 #define DMSG(...) { if (C_DEBUG) { printf("DEBUG: " __VA_ARGS__); fflush(stdout);}}
 #define DCMSG(SC, FMT, ...) { if (C_DEBUG) { printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
