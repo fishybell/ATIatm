@@ -356,7 +356,7 @@ typedef struct FASIT_14200 {
 typedef struct FASIT_14400 {
    __uint8_t  cid;
    __uint16_t length PCKD;
-   __uint8_t  data[512];
+   __uint8_t  data[2048];
 } FASIT_14400;
 // the Command ID values
 enum {
@@ -395,6 +395,7 @@ enum {
 /*                          5 = recording   */
 /*                          6 = encoding    */
 /*                          7 = rec ready   */
+/*                          8 = copy ready  */
 /* track = knob track number (0-15)         */
 /********************************************/
 typedef struct FASIT_14401b { // body

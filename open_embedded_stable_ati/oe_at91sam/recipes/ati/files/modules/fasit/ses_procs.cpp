@@ -8,7 +8,7 @@ using namespace std;
 
 #include "target_ses_interface.h"
 
-#define CMD_BUFFER_SIZE 1024
+#define CMD_BUFFER_SIZE 2048
 
 // define static members
 bool PlayProcess::stop = false; // not stopped

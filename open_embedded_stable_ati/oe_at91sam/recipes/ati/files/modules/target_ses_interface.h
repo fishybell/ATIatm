@@ -15,5 +15,6 @@
 #define MODE_REC_START 6 /* recording started (display visual feedback, disable mode button) */
 #define MODE_ENC_START 7 /* encoding started (display visual feedback, disable mode button) */
 #define MODE_REC_DONE 8 /* recording/encoding finished (display visual feedback, re-enable mode button) */
+#define MODE_COPYING 9 /* copying data (unused in lower kernel) */
 
 #endif // __TARGET_SES_INTERFACE_H__

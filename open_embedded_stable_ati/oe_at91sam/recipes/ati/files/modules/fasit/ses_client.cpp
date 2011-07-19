@@ -25,6 +25,7 @@ FUNCTION_START("::SES_Client(int fd, int tnum) : Connection(fd)")
    } else {
       // initialize default settings
       loop = NO_LOOP; // no looping
+      copyfile = NULL; // ready for copying
       knob = 0; // unknown knob value, will retrieve later
       didMode(MODE_MAINTENANCE); // defalt mode
       strncpy(track, "/media/sda1/audio/builtin/0.mp3", SES_BUFFER_SIZE); // first built-in track
@@ -124,6 +125,10 @@ FUNCTION_START("::fillStatus14401(FASIT_14401 *msg)")
          } else {
             msg->body.status = 7; // ready to record
          }
+         break;
+      case MODE_COPYING:
+         msg->body.status = 8; // ready for next chunk
+         mode = copyMode;
          break;
    }
    msg->body.track = knob;
@@ -503,13 +508,14 @@ FUNCTION_START("::handle_14400(int start, int end)")
    // save response numbers
    resp_num = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
    resp_seq = hdr->seq;
+   
 
    // print pretty outpu
    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
    DCMSG(RED,"\t\t\t\t\t\t\tmessage body\n"\
 	 "C-ID | Length | Data\n"\
 	  "%3d    %5d   %s",
-	 msg->cid,htons(msg->length), msg->data);
+	 msg->cid,htons(msg->length), msg->cid==SES_Copy_Chunk?"<binary data>":(const char*)msg->data);
    
    
    // do the event that was requested
@@ -545,13 +551,13 @@ FUNCTION_START("::handle_14400(int start, int end)")
          doRecAbort();
          break;
       case SES_Copy_Start:
-         // TODO -- impliment track copying
+         doCopyStart((const char*)msg->data, htons(msg->length));
          break;
       case SES_Copy_Chunk:
-         // TODO -- impliment track copying
+         doCopyChunk((const char*)msg->data, htons(msg->length));
          break;
       case SES_Copy_Abort:
-         // TODO -- impliment track copying
+         doCopyAbort();
          break;
       case SES_Maint_Volume:
          didMode(MODE_MAINTENANCE); // change volume
@@ -918,6 +924,141 @@ FUNCTION_START("::doStopPlay()");
    StreamProcess::StopStreaming();
 
 FUNCTION_END("::doStopPlay()");
+}
+
+void SES_Client::doCopyStart(const char* track, int length) {
+FUNCTION_START("::doCopyStart(const char* track, int length)");
+
+   // fix length
+   if (length > SES_BUFFER_SIZE-1) {
+      length = SES_BUFFER_SIZE-1;
+   }
+
+   // clean up old copy
+   if (copyfile != NULL) {
+      doCopyAbort();
+   }
+
+   // remember file name as track name
+   doTrack(track, length);
+
+   // move original file to backup file
+   rename(this->track, "/media/sda1/audio/backup.temp");
+
+   // open for writing (overwrite)
+   copyfile = fopen(this->track, "w+");
+
+   // ready for next chunk
+   copyMode = mode;
+   mode = MODE_COPYING;
+
+FUNCTION_END("::doCopyStart(const char* track, int length)");
+}
+
+// helper functions to decode base64 back to binary
+static const char  base64table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+static const int   BASE64_INPUT_SIZE = 57;
+
+// check validity of an individual character within encoded string
+static bool isBase64(char c) {
+   // check for not-null c and for c existing in base64table
+   return c && strchr(base64table, c) != NULL;
+}
+
+// grab numerical value of individual character within encoded string
+static inline char base64value(char c) {
+   const char *loc = strchr(base64table, c);
+   if(loc) {
+      // valid location, return difference as value
+      return loc-base64table;
+   } else {
+      // invalid location, ignore in decoding as zero value
+      return 0;
+   }
+}
+
+// decode base64 string (src, srclen) into binary data (dest, pre-allocated to at least 3/4 srclen)
+static int decodeBase64(char *dest, const char *src, int srclen) {
+   *dest = 0;
+   if(*src == 0) {
+      return 0;
+   }
+   char *tmp = dest; // don't change dest pointer so we can calculate final size
+   do {
+      // grab numerical values (0-63) for the 4 characters in each chunk
+      char a = base64value(src[0]);
+      char b = base64value(src[1]);
+      char c = base64value(src[2]);
+      char d = base64value(src[3]);
+
+      // convert the 4 chunk characters into 3 binary data values
+      *tmp++ = (a << 2) | (b >> 4); // result =    all 6 on top with top 2 on bottom, and incriment tmp
+      *tmp++ = (b << 4) | (c >> 2); // result = bottom 4 on top with top 4 on bottom, and incriment tmp
+      *tmp++ = (c << 6) | d;        // result = bottom 2 on top with all 6 on bottom, and incriment tmp
+
+      // check forward source values for padding
+      if(!isBase64(src[1])) {
+         tmp -= 2; // 2nd character isn't, move back last 2 of 3 values
+         break;
+      } else if(!isBase64(src[2])) {
+         tmp -= 2; // 3rd character isn't, move back last 2 of 3 values
+         break;
+      } else if(!isBase64(src[3])) {
+         tmp--;    // 4th character isn't, move back last 1 of 3 values
+         break;
+      }
+      src += 4; // move on to next chunk
+//      while(*src && (*src == 13 || *src == 10)) src++; don't need to skip past linefeed/carraige return
+   } while(srclen-= 4); // decrease size of len respective of chunk size
+//   *tmp = 0; null termination not needed
+   return tmp-dest; // calculate size via pointer difference
+}
+
+void SES_Client::doCopyChunk(const char* chunk, int length) {
+FUNCTION_START("::doCopyChunk(const char* chunk, int length)");
+
+   if (copyfile != NULL) {
+      if (length > 0) {
+         // decode data
+         char *data = new char[length]; // will actually only take up 3/4 the size
+         int declen = decodeBase64(data, chunk, length);
+
+         // append data to file
+         fwrite(data, sizeof(char), declen, copyfile);
+         delete [] data;
+
+         // ready for next chunk
+         copyMode = mode;
+         mode = MODE_COPYING;
+      } else {
+         // close file
+         fclose(copyfile);
+         copyfile = NULL;
+
+         // remove temp backup file
+         remove("/media/sda1/audio/backup.temp");
+      }
+   }
+
+FUNCTION_END("::doCopyChunk(const char* chunk, int length)");
+}
+
+void SES_Client::doCopyAbort() {
+FUNCTION_START("::doCopyAbort()")
+   
+   // close file
+   if (copyfile != NULL) {
+      fclose(copyfile);
+      copyfile = NULL;
+
+      // delete broken file
+      remove(this->track);
+
+      // restore original file from backup file
+      rename("/media/sda1/audio/backup.temp", this->track);
+   }
+
+FUNCTION_END("::doCopyAbort()")
 }
 
 void SES_Client::doMode() {

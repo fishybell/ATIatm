@@ -12,7 +12,7 @@ using namespace std;
 
 extern int start_config;
 
-#define SES_BUFFER_SIZE 512
+#define SES_BUFFER_SIZE 2048
 #define NO_LOOP 1
 #define INFINITE_LOOP 0xFFFFFFFF
 
@@ -48,6 +48,9 @@ public :
    void doTrack(); // get track from kernel
    void doStream(const char* uri, int length); // stream audio from a selected uri
    void doStopPlay(); // stop playback/record
+   void doCopyStart(const char* track, int length); // prepare for copying track
+   void doCopyChunk(const char* chunk, int length); // write out file chunk
+   void doCopyAbort(); // abort copying of track
 
    void finishedRecording(); // called from the recording/encoding processes to notify when it is done
    void sendStatus14401();
@@ -101,6 +104,10 @@ private:
    char track[SES_BUFFER_SIZE]; // selected track
    char uri[SES_BUFFER_SIZE]; // selected stream uri
    int knob; // knob selection
+
+   // copy values
+   int copyMode; // mode before copying started
+   FILE *copyfile; // file to copy data to
 
    // remember the battery value rather than send a response each time we get a change
    int lastBatteryVal;

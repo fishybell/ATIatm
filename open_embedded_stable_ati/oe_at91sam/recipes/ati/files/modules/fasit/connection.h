@@ -9,7 +9,7 @@
 
 
 // max amount of data we'll read per fd in a single loop
-#define BUF_SIZE 256
+#define BUF_SIZE 1024
 
 using namespace std;
 
