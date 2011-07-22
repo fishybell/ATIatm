@@ -22,8 +22,7 @@ SRC_URI += "file://be_*"
 SRC_URI += "file://is_*"
 SRC_URI += "file://EIM"
 SRC_URI += "file://SIT"
-SRC_URI += "file://LSAT"
-SRC_URI += "file://HSAT"
+SRC_URI += "file://SAT"
 SRC_URI += "file://MIT"
 SRC_URI += "file://MAT"
 SRC_URI += "file://TTMT"
@@ -68,8 +67,7 @@ do_install () {
     install -m 755 ${WORKDIR}/is_* ${D}/usr/bin
     install -m 755 ${WORKDIR}/be_* ${D}/usr/bin
     install -m 644 ${WORKDIR}/SIT ${D}/usr/bin
-    install -m 644 ${WORKDIR}/LSAT ${D}/usr/bin
-    install -m 644 ${WORKDIR}/HSAT ${D}/usr/bin
+    install -m 644 ${WORKDIR}/SAT ${D}/usr/bin
     install -m 644 ${WORKDIR}/MIT ${D}/usr/bin
     install -m 644 ${WORKDIR}/MAT ${D}/usr/bin
     install -m 644 ${WORKDIR}/SES ${D}/usr/bin
