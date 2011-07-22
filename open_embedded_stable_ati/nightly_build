@@ -7,6 +7,7 @@ mkdir -p "$dirname"
 # attempt build
 cd /usr/local/var/oe
 source oe_env.sh
+bitbake -c clean ati ati2 2>&1 >/dev/null
 date > "$dirname/build.log"
 bitbake console-image 2>&1 >> "$dirname/build.log"
 date >> "$dirname/build.log"
