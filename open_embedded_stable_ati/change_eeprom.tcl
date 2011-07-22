@@ -74,7 +74,7 @@ if {![string is integer -strict $suffix] || $suffix > 9 || $suffix < 0} {
     }
 }
 
-puts "Enter target type (MIT/SIT/MAT/HSAT/LSAT): "
+puts "Enter target type (MIT/SIT/MAT/SAT/SES): "
 set target_type [gets stdin]
 if ($target_type == {}) {
     set target_type "none"
