@@ -104,6 +104,12 @@ atomic_t bit_indicator_atomic = ATOMIC_INIT(BIT_STATUS_OFF);
 // Declaration of the function that gets called when the press timeout fires.
 //---------------------------------------------------------------------------
 static void press_timeout_fire(unsigned long data);
+static void startup_timeout_fire(unsigned long data);
+
+//---------------------------------------------------------------------------
+// Kernel timer for the full init timeout (wait 5 seconds at startup)
+//---------------------------------------------------------------------------
+static struct timer_list startup_timer_list = TIMER_INITIALIZER(startup_timeout_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Kernel timer for the blink timeout.
@@ -330,6 +336,14 @@ static void bit_timeout_fire(unsigned long data)
         atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
         }
     }
+
+//---------------------------------------------------------------------------
+// The function that gets called when the startup timeout fires.
+//---------------------------------------------------------------------------
+static void startup_timeout_fire(unsigned long data) {
+    // we're finally fully initialized
+    atomic_set(&full_init, TRUE);
+}
 
 //---------------------------------------------------------------------------
 // The function that gets called when the press timeout fires.
@@ -734,7 +748,7 @@ delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
     retval=target_sysfs_add(&target_device_user_interface);
 
     // signal that we are fully initialized
-    atomic_set(&full_init, TRUE);
+    mod_timer(&startup_timer_list, jiffies+(5*HZ)); // start up finalized after 5 seconds
     return retval;
     }
 
