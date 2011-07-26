@@ -75,10 +75,10 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
 // RA - low time setting - cannot exceed RC
 // RB - low time setting - cannot exceed RC
-static int MOTOR_PWM_RC[] = {0x01C0,0x3074,0x4000,0};
-static int MOTOR_PWM_END[] = {0x01C0,0x3074,0x4000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x00A0,0x04D8,0x0000,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x00A0,0x04D8,0x0000,0};
+static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x4000,0};
+static int MOTOR_PWM_END[] = {0x1180,0x3074,0x4000,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0640,0x04D8,0x0000,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0640,0x04D8,0x0000,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
