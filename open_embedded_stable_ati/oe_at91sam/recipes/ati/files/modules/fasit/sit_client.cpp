@@ -55,7 +55,8 @@ SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
         lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
         lastHitCal.blank_time = 50; // half a second blanking
         lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
-        lastHitCal.hits_to_kill = 1; // kill on first hit
+//        lastHitCal.hits_to_kill = 1; // kill on first hit
+        lastHitCal.hits_to_kill = 0; // infinite hits to kill
         lastHitCal.after_kill = 0; // 0 for fall
         lastHitCal.type = 1; // mechanical sensor
         lastHitCal.invert = 0; // don't invert sensor input line
