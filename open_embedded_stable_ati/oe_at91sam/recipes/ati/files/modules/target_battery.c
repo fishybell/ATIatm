@@ -494,8 +494,8 @@ static int hardware_init(void)
     atomic_set(&blink_count, LED_BLINK_COUNT);
     mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
 
-    // check the value for the first time after 1 second
-    mod_timer(&timeout_timer_list, jiffies+(1*HZ));
+    // check the value for the first time after 10 second
+    mod_timer(&timeout_timer_list, jiffies+(10*HZ));
 
     // configure interrupt
     // if we disabled the charging pin, don't handle
