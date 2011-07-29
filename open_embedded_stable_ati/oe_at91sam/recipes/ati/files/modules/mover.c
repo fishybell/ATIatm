@@ -112,7 +112,8 @@ static void move_event_internal(int etype, bool upload) {
     // event causes change in motion?
     if (etype == EVENT_KILL) {
         // TODO -- programmable coast vs. stop vs. ignore
-        mover_speed_stop();
+        // mover_speed_stop();
+        mover_speed_set(0);
     }
 
     // create event for outputs
@@ -198,7 +199,8 @@ delay_printk("Mover: received value: %i\n", value);
         // do something to the mover
         if (value == VELOCITY_STOP) {
             // stop
-            mover_speed_stop();
+            // mover_speed_stop(); -- this is emergency stop
+            mover_speed_set(0);
         } else if (value == VELOCITY_REQ) {
             // retrieve speed
             value = 128+mover_speed_get(); // signed speed turned to unsigned byte
