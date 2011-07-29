@@ -9,6 +9,7 @@
 #include <linux/clk.h>
 #include <linux/atmel_pwm.h>
 
+#include "netlink_kernel.h"
 #include "target.h"
 #include "target_mover_generic.h"
 
@@ -27,7 +28,7 @@ static char* MOVER_TYPE[] = {"infantry","armor","infantry","error"};
 static int CONTINUE_ON[] = {2,1,3,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
-static int TIMEOUT_IN_MSECONDS[] = {500,12000,500,0};
+static int TIMEOUT_IN_MSECONDS[] = {5000,12000,500,0};
 static int MOVER_DELAY_MULT[] = {6,2,6,0};
 
 #define MOVER_POSITION_START 		0
@@ -47,8 +48,16 @@ static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0};
 static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0};
 
 // the paremeters of the velocity ramp up
-static int RAMP_TIME_IN_MSECONDS[] = {750,5000,750,0};
+static int RAMP_UP_TIME_IN_MSECONDS[] = {750,5000,750,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {250,5000,250,0};
 static int RAMP_STEPS[] = {100,100,100,0};
+
+// the parameters needed for PID speed control
+static int PID_GAIN_MULT[] = {1,1000,1000,0};
+static int PID_GAIN_DIV[]  = {10,1000,1000,1};
+static int PID_HZ[]        = {50,1000,1000,1};
+static int PID_SF[]        = {1,1,1,1}; // time derivitive / delta t
+static int PID_SG[]        = {1,1,1,1}; // time integral / delta t
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -77,8 +86,8 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // RB - low time setting - cannot exceed RC
 static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x4000,0};
 static int MOTOR_PWM_END[] = {0x1180,0x3074,0x4000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0640,0x04D8,0x0000,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0640,0x04D8,0x0000,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -165,6 +174,11 @@ atomic_t moving_atomic = ATOMIC_INIT(FALSE);
 atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
+// This atomic variable is for our registration with netlink_provider
+//---------------------------------------------------------------------------
+atomic_t driver_id = ATOMIC_INIT(-1);
+
+//---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are awake/asleep
 //---------------------------------------------------------------------------
 atomic_t sleep_atomic = ATOMIC_INIT(0); // not sleeping
@@ -239,6 +253,23 @@ static int speed_from_pwm(int ra);		// absolute velocity, calculated
 static int pwm_from_speed(int speed);	// best-guess pwm, calculated
 static int current_speed(void);			// velocity/direction, measured
 static int current_speed10(void);		// 10 * velocity/direction, measured
+
+//---------------------------------------------------------------------------
+// Declaration of functions related to effort/speed/pwm conversions
+//---------------------------------------------------------------------------
+static int percent_from_speed(int speed);	// 1000 * percent, calculated
+static int pwm_from_effort(int effort);		// absolute pwm, calculated
+
+//---------------------------------------------------------------------------
+// Variables for PID speed control
+//---------------------------------------------------------------------------
+spinlock_t pid_lock = SPIN_LOCK_UNLOCKED;
+int pid_error = 0;			// current error
+int pid_last_error = 0;		// prior error
+int pid_last_last_error = 0;// prior, prior error
+int pid_last_effort = 0;	// prior effort
+int pid_effort = 0;			// current effort
+atomic_t pid_set_point = ATOMIC_INIT(0); // set point for speed to maintain
 
 //---------------------------------------------------------------------------
 // Kernel timer for the delayed update for position and velocity
@@ -348,21 +379,24 @@ static int hardware_motor_on(int direction)
             }
         }
 
-    // turn on horn and wait to do actual move
-    del_timer(&horn_on_timer_list); // start horn timer over
-    if (HORN_ON_IN_MSECONDS[mover_type] > 0)
-        {
-        at91_set_gpio_output(OUTPUT_MOVER_HORN, OUTPUT_MOVER_HORN_ACTIVE_STATE);
-        mod_timer(&horn_on_timer_list, jiffies+((HORN_ON_IN_MSECONDS[mover_type]*HZ)/1000));
-        }
-    else
-        {
-        mod_timer(&horn_on_timer_list, jiffies+((10*HZ)/1000));
-        }
+    // did we just start moving from a stop?
+    if (current_speed() == 0) {
+        // turn on horn and wait to do actual move
+        del_timer(&horn_on_timer_list); // start horn timer over
+        if (HORN_ON_IN_MSECONDS[mover_type] > 0)
+            {
+            at91_set_gpio_output(OUTPUT_MOVER_HORN, OUTPUT_MOVER_HORN_ACTIVE_STATE);
+            mod_timer(&horn_on_timer_list, jiffies+((HORN_ON_IN_MSECONDS[mover_type]*HZ)/1000));
+            }
+        else
+            {
+            mod_timer(&horn_on_timer_list, jiffies+((10*HZ)/1000));
+            }
 
-    // setup PWM for nothing at start
-    __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA)); // change to smallest value
-    __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB)); // change to smallest value
+        // setup PWM for nothing at start (disables brakes on MAT?)
+        __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA)); // change to smallest value
+        __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB)); // change to smallest value
+    }
 
 
     // log and set direction
@@ -467,7 +501,7 @@ static int hardware_motor_off(void)
 //---------------------------------------------------------------------------
 static int hardware_speed_set(int new_speed)
     {
-    int old_speed, ra;
+    int old_speed, ra, ramp_time=RAMP_UP_TIME_IN_MSECONDS[mover_type];
 
    delay_printk("%s - %s(%i)\n",TARGET_NAME[mover_type], __func__, new_speed);
 
@@ -498,16 +532,19 @@ static int hardware_speed_set(int new_speed)
     if (new_speed != old_speed)
         {
         atomic_set(&goal_atomic, new_speed); // reset goal speed
-//        atomic_set(&goal_start_atomic, old_speed); // reset ramp start
-        ra = __raw_readl(tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA)); // read current raw pwm value
-        ra = speed_from_pwm(ra); // calculate speed from pwm value
-        atomic_set(&speed_atomic, ra); // reset current speed to actual speed
-        atomic_set(&goal_start_atomic, ra); // reset ramp start to actual speed
+////        atomic_set(&goal_start_atomic, old_speed); // reset ramp start
+//        ra = __raw_readl(tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA)); // read current raw pwm value
+//        ra = speed_from_pwm(ra); // calculate speed from pwm value
+//        atomic_set(&speed_atomic, ra); // reset current speed to actual speed
+//        atomic_set(&goal_start_atomic, ra); // reset ramp start to actual speed
+       ra = abs(current_speed());
+       atomic_set(&goal_start_atomic, ra); // reset ramp start to actual measured speed
        delay_printk("%s - %s : old (%i), new (%i), are(%i)\n",TARGET_NAME[mover_type], __func__, old_speed, new_speed, ra);
         del_timer(&ramp_timer_list); // start ramp over
         if (new_speed < old_speed)
             {
             atomic_set(&goal_step_atomic, -1); // stepping backwards
+            ramp_time=RAMP_DOWN_TIME_IN_MSECONDS[mover_type];
             }
         else
             {
@@ -525,7 +562,7 @@ static int hardware_speed_set(int new_speed)
         if (atomic_read(&moving_atomic))
             {
             // start the ramp up/down of the mover immediately
-            mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS[mover_type]*HZ)/1000)/RAMP_STEPS[mover_type]));
+            mod_timer(&ramp_timer_list, jiffies+(((ramp_time*HZ)/1000)/RAMP_STEPS[mover_type]));
             }
         }
 
@@ -547,6 +584,12 @@ static int hardware_movement_stop(int stop_timer)
     del_timer(&ramp_timer_list); // start ramp over
     speed = atomic_read(&goal_atomic);
     atomic_set(&speed_atomic, 0);
+
+    // reset PID algorithm
+    atomic_set(&pid_set_point, 0);
+    spin_lock(&pid_lock);
+    pid_last_effort = pid_effort;
+    spin_unlock(&pid_lock);
 
     // turn off the motor
     hardware_motor_off();
@@ -1196,7 +1239,7 @@ static void horn_on_fire(unsigned long data)
    delay_printk("%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // start the ramp up/down of the mover
-    mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS[mover_type]*HZ)/1000)/RAMP_STEPS[mover_type]));
+    mod_timer(&ramp_timer_list, jiffies+((10*HZ)/1000));
 
     // turn off the horn later?
     if (HORN_ON_IN_MSECONDS[mover_type] > 0)
@@ -1222,6 +1265,39 @@ static void horn_off_fire(unsigned long data)
         at91_set_gpio_output(OUTPUT_MOVER_HORN, !OUTPUT_MOVER_HORN_ACTIVE_STATE);
         }
     }
+
+//---------------------------------------------------------------------------
+// Helper function to map 1000*percent values from speed values
+//---------------------------------------------------------------------------
+static int percent_from_speed(int speed) {
+    // limit to max speed
+    if (speed > NUMBER_OF_SPEEDS[mover_type]) {
+        speed = NUMBER_OF_SPEEDS[mover_type];
+    }
+    // limit to min speed
+    if (speed < 0) {
+        speed = 0;
+    }
+    return (1000*speed/NUMBER_OF_SPEEDS[mover_type]); // 1000 * percent = 0 to 1000
+}
+
+//---------------------------------------------------------------------------
+// Helper function to map pwm values from effort values
+//---------------------------------------------------------------------------
+static int pwm_from_effort(int effort) {
+    // limit to max effort
+    if (effort > 1000) {
+        effort = 1000;
+    }
+    // limit to min effort
+    if (effort < 0) {
+        effort = 0;
+    }
+    // use straight percentage
+    return MOTOR_PWM_RB_DEFAULT[mover_type] + (
+      (effort * (MOTOR_PWM_END[mover_type] - MOTOR_PWM_RB_DEFAULT[mover_type]))
+      / 1000);
+}
 
 //---------------------------------------------------------------------------
 // Helper function to map pwm values to speed values
@@ -1311,15 +1387,15 @@ int mover_speed_set(int speed) {
       return 0; // nope
    }
 
-   // first set the desired speed
-   hardware_speed_set(abs(speed));
-
-   // next fire off movement
+   // first select desired movement movement
    if (speed < 0) {
       hardware_movement_set(MOVER_DIRECTION_REVERSE);
    } else if (speed > 0) {
       hardware_movement_set(MOVER_DIRECTION_FORWARD);
    } // setting 0 will cause the mover to "coast" if it isn't already stopped
+
+   // next start ramping to desired speed
+   hardware_speed_set(abs(speed));
 
    return 1;
 }
@@ -1364,10 +1440,10 @@ EXPORT_SYMBOL(mover_sleep_get);
 
 
 //---------------------------------------------------------------------------
-// The function that gets called when the ramp timer fires.
+// The function that gets called when the ramp timer fires (adjusts speed up or down gradually)
 //---------------------------------------------------------------------------
 static void ramp_fire(unsigned long data) {
-    int goal_start, goal_step, goal_end, new_speed, ticks_change, ramp, start_speed, direction, speed_steps;
+    int goal_start, goal_step, goal_end, new_speed, ticks_change, ramp, start_speed, direction, speed_steps, ramp_time=RAMP_UP_TIME_IN_MSECONDS[mover_type];
     if (!atomic_read(&full_init)) {
         return;
     }
@@ -1377,10 +1453,10 @@ static void ramp_fire(unsigned long data) {
     goal_end = atomic_read(&goal_atomic);
 
     // calculate speed based on percent of full difference
-    ticks_change = abs(pwm_from_speed(goal_end) - pwm_from_speed(goal_start));
+    ticks_change = abs(percent_from_speed(goal_end) - percent_from_speed(goal_start));
 
     // calculate start speed
-    start_speed = pwm_from_speed(goal_start);
+    start_speed = percent_from_speed(goal_start);
 
     // calculate number of steps to take based on the amount of speed change
     speed_steps = (RAMP_STEPS[mover_type] * abs(goal_end - goal_start)) / 2; // 1/2 normal steps * number of speed change
@@ -1389,6 +1465,7 @@ static void ramp_fire(unsigned long data) {
     if (goal_end < goal_start) {
         direction = -1;
         goal_step *= -1;
+        ramp_time = RAMP_DOWN_TIME_IN_MSECONDS[mover_type];
     } else {
         direction = 1;
     }
@@ -1424,7 +1501,7 @@ static void ramp_fire(unsigned long data) {
 
     // take another step?
     if (abs(goal_step) < speed_steps) {
-        mod_timer(&ramp_timer_list, jiffies+(((RAMP_TIME_IN_MSECONDS[mover_type]*HZ)/1000)/RAMP_STEPS[mover_type])); // use original number of steps here to allow speed_steps to stretch the time
+        mod_timer(&ramp_timer_list, jiffies+(((ramp_time*HZ)/1000)/RAMP_STEPS[mover_type])); // use original number of steps here to allow speed_steps to stretch the time
     } else {
         // done moving
         atomic_set(&speed_atomic, goal_end); // reached new speed value
@@ -1437,9 +1514,8 @@ static void ramp_fire(unsigned long data) {
         }
     }
 
-    // These change the pwm duty cycle
-    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
-    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
+    // set desired percentage
+    atomic_set(&pid_set_point, new_speed);
 }
 
 //---------------------------------------------------------------------------
@@ -2000,10 +2076,62 @@ static void movement_change(struct work_struct * work)
     }
 
 //---------------------------------------------------------------------------
+// PID loop step
+//---------------------------------------------------------------------------
+static void pid_step(void) {
+    int new_speed=1, input_speed=0;
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
+    new_speed = atomic_read(&pid_set_point); // read desired pid set point
+
+    // read input speed (adjust speed10 value to 1000*percent)
+    input_speed = (100 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type]; // absolute velocity, no direction
+    delay_printk("s: %i; p: %i;", new_speed, input_speed);
+
+    // We have just a few microseconds to complete operations, so die if we can't lock
+    if (!spin_trylock(&pid_lock)) {
+        return;
+    }
+
+    // move error values
+    pid_last_last_error = pid_last_error;
+    pid_last_error = pid_error;
+    pid_error = new_speed - input_speed; // set point - input
+
+    // move effort values
+    pid_last_effort = pid_effort;
+
+    // descrete PID algorithm gleamed from wikipedia
+    pid_effort = pid_last_effort + ((PID_GAIN_MULT[mover_type] * (
+       (((PID_SG[mover_type] + 1 + (PID_SG[mover_type] * PID_SF[mover_type])) / PID_SG[mover_type]) * pid_error) +
+       ((-1 - (2 * PID_SF[mover_type])) * pid_last_error) +
+       (PID_SF[mover_type] * pid_last_last_error)
+    )) / PID_GAIN_DIV[mover_type]);
+
+    // convert effort to pwm
+    new_speed = pwm_from_effort(pid_effort);
+
+    // These change the pwm duty cycle
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
+
+    // unlock for next time
+    spin_unlock(&pid_lock);
+    delay_printk(" r: %i; f: %i; e: %i\n", new_speed, pid_effort, pid_error);
+}
+
+
+//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init target_mover_generic_init(void)
     {
+    struct heartbeat_object hb_obj;
+    int d_id;
+    struct nl_driver driver = {&hb_obj, NULL, 0, NULL}; // only heartbeat object
     int retval;
 
     // for debug
@@ -2021,6 +2149,11 @@ static int __init target_mover_generic_init(void)
     INIT_WORK(&velocity_work, do_velocity);
     INIT_WORK(&delta_work, do_delta);
     INIT_WORK(&movement_work, movement_change);
+
+    // setup heartbeat for polling
+    hb_obj_init_nt(&hb_obj, pid_step, PID_HZ[mover_type]); // heartbeat object calling pid_step()
+    d_id = install_nl_driver(&driver);
+    atomic_set(&driver_id, d_id);
 
     // initialize sysfs structure
     target_device_mover_generic.name = TARGET_NAME[mover_type]; // set name in structure here as we can't initialize on a non-constant
@@ -2041,6 +2174,7 @@ static void __exit target_mover_generic_exit(void)
     ati_flush_work(&velocity_work); // close any open work queue items
     ati_flush_work(&delta_work); // close any open work queue items
     ati_flush_work(&movement_work); // close any open work queue items
+    uninstall_nl_driver(atomic_read(&driver_id));
     hardware_exit();
     target_sysfs_remove(&target_device_mover_generic);
     }
