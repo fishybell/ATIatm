@@ -585,11 +585,8 @@ static int hardware_movement_stop(int stop_timer)
     speed = atomic_read(&goal_atomic);
     atomic_set(&speed_atomic, 0);
 
-    // reset PID algorithm
+    // reset PID set point
     atomic_set(&pid_set_point, 0);
-    spin_lock(&pid_lock);
-    pid_last_effort = pid_effort;
-    spin_unlock(&pid_lock);
 
     // turn off the motor
     hardware_motor_off();
@@ -2110,6 +2107,9 @@ static void pid_step(void) {
        ((-1 - (2 * PID_SF[mover_type])) * pid_last_error) +
        (PID_SF[mover_type] * pid_last_last_error)
     )) / PID_GAIN_DIV[mover_type]);
+
+    // clamp effort to positive numbers only
+    pid_effort = max(pid_effort, 0);
 
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
