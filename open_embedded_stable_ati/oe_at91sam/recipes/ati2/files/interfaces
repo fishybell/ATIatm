@@ -15,15 +15,15 @@ iface lo inet loopback
 #	wireless-mode managed
 #	wpa-essid HHC
 #	wpa-psk 1234567890
-#auto wlan0
-#iface wlan0 inet dhcp
-#	wireless-mode managed
-#	wpa-essid HHC
-#	wpa-psk 1234567890
 auto wlan0
-iface wlan0 inet dhcp  
-	wireless-essid ATI-wlan
-	wireless-key d4df081de2
+iface wlan0 inet dhcp
+	wireless-mode managed
+	wpa-essid ATI-atm
+	wpa-psk d4df081de2
+#auto wlan0
+#iface wlan0 inet dhcp  
+#	wireless-essid ATI-wlan
+#	wireless-key d4df081de2
 ##
 #
 # Same as above but locked to a specific access point:
