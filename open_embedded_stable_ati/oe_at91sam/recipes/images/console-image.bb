@@ -6,7 +6,6 @@ ANGSTROM_EXTRA_INSTALL += " \
 	usbview \
 	mplayer \
 	thttpd \
-	madplay \
 	alsa-utils-aplay \
 	alsa-utils-amixer \
 	iperf \
@@ -21,7 +20,6 @@ ANGSTROM_EXTRA_INSTALL += " \
 DEPENDS = "task-base-extended \
            at91bootstrap \
            u-boot \
-           python \
 	   libnl \
 	   ati ati2\
            compat-wireless \
@@ -34,7 +32,6 @@ DEPENDS = "task-base-extended \
 
 IMAGE_INSTALL = "task-base-extended \
 	   ${ANGSTROM_EXTRA_INSTALL} \
-           python-modules \
            kernel-modules \
 	   libnl \
 	   ati ati2\
