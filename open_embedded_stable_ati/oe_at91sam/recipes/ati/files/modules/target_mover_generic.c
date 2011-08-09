@@ -28,7 +28,7 @@ static char* MOVER_TYPE[] = {"infantry","armor","infantry","error"};
 static int CONTINUE_ON[] = {2,1,3,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
-static int TIMEOUT_IN_MSECONDS[] = {5000,12000,500,0};
+static int TIMEOUT_IN_MSECONDS[] = {500,12000,500,0};
 static int MOVER_DELAY_MULT[] = {6,2,6,0};
 
 #define MOVER_POSITION_START 		0
@@ -207,6 +207,11 @@ atomic_t fault_atomic = ATOMIC_INIT(FAULT_NORMAL);
 atomic_t speed_atomic = ATOMIC_INIT(0);
 
 //---------------------------------------------------------------------------
+// This atomic variable is to store the last timeout multiplier
+//---------------------------------------------------------------------------
+atomic_t last_mult_atomic = ATOMIC_INIT(1);
+
+//---------------------------------------------------------------------------
 // This atomic variable is used to store which track sensor (front or rear)
 // was last triggered. It is used to determine the actual direction of the
 // mover. Note: Should be initialized in hardware_init() or at least after
@@ -308,6 +313,20 @@ static const char * mover_movement[] =
 // Starts the timeout timer.
 //---------------------------------------------------------------------------
 static void timeout_timer_start(int mult) {
+    if (mult <= 1) {
+       // count down to zero
+       if (!atomic_dec_and_test(&last_mult_atomic)) {
+          // was bigger than zero, use that value + 1 as multiplier
+          mult = atomic_read(&last_mult_atomic) + 1;
+       } else {
+          // reset to 1 if it became zero
+          atomic_set(&last_mult_atomic, 1);
+       }
+    } else {
+       // reset count-down
+       atomic_set(&last_mult_atomic, mult);
+    }
+    
     if (mult <= 1) {
         // standard timer
         mod_timer(&timeout_timer_list, jiffies+((TIMEOUT_IN_MSECONDS[mover_type]*HZ)/1000));
@@ -2110,6 +2129,15 @@ static void pid_step(void) {
 
     // clamp effort to positive numbers only
     pid_effort = max(pid_effort, 0);
+
+    // clamp at zero if everything went to zero
+    if (new_speed == 0 && input_speed == 0) {
+       pid_effort = 0;
+       pid_last_effort = 0;
+       pid_error = 0;
+       pid_last_error = 0;
+       pid_last_last_error = 0;
+    }
 
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
