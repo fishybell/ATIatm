@@ -1,0 +1,38 @@
+#!/usr/bin/tclsh
+package require Expect
+package require Tclx
+fconfigure stdin -blocking 1            ;#expect bug?
+
+system sed -i -e "s/^192.168.3.10.*//" ~/.ssh/known_hosts
+#eval spawn scp user_conn bit_button fasit_conn event_conn bcast_server bcast_client root@192.168.3.10:/usr/bin
+#set timeout 10
+#while 1 {
+#    expect {
+#        -re {.*word:.*} {
+#            send "\r"
+#        }
+#        -re {.*yes/no.*} {
+#            send "yes\r"
+#        }
+#        default {
+#            break
+#        }
+#    }
+#}
+#sleep 10
+eval spawn scp [glob *.ko] root@192.168.3.10:/home/root
+set timeout 10
+while 1 {
+    expect {
+        -re {.*word:.*} {
+            send "\r"
+        }
+        -re {.*yes/no.*} {
+            send "yes\r"
+        }
+        default {
+            break
+        }
+    }
+}
+sleep 10
