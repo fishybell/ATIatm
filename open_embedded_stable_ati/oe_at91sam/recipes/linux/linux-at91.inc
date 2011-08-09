@@ -113,6 +113,7 @@ SRC_URI_append_at91sam9g20ek_2mmc = " \
 #	file://no_wm8731.patch;patch=1 \
 #	file://noleds.patch;patch=1 \
 #	file://pwm.patch;patch=1 \
+#	file://mmc.patch;patch=1 \
 SRC_URI_append_at91sam9g10ek = ${at91sam_patch}
 SRC_URI_append_at91sam9xeek = ${at91sam_patch}
 SRC_URI_append_at91sam9g45ekes = ${at91sam_patch}

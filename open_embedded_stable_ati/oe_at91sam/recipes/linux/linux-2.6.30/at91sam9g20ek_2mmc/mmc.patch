@@ -1,0 +1,24 @@
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c linux-2.6.30/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
+--- linux-2.6.30.orig/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c	2011-08-04 15:10:38.678949215 -0600
++++ linux-2.6.30/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c	2011-08-04 15:14:02.229184203 -0600
+@@ -214,9 +214,9 @@
+ };
+ #else
+ static struct at91_mmc_data __initdata ek_mmc_data = {
+-	.slot_b		= 1,	/* Only one slot so use slot B */
++	.slot_b		= 0,	/* Only one slot so use slot A */
+ 	.wire4		= 1,
+-	.det_pin	= AT91_PIN_PC9,
++	.det_pin	= 0,
+ };
+ #endif
+ 
+@@ -312,7 +312,7 @@
+ #if defined(CONFIG_MMC_ATMELMCI) || defined(CONFIG_MMC_ATMELMCI_MODULE)
+ //	at91_add_device_mci(0, &ek_mmc_data);
+ #else
+-//	at91_add_device_mmc(0, &ek_mmc_data);
++	at91_add_device_mmc(0, &ek_mmc_data);
+ #endif
+ 	/* I2C */
+ 	at91_add_device_i2c(ek_i2c_devices, ARRAY_SIZE(ek_i2c_devices));
