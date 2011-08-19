@@ -67,6 +67,7 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
       case 1: msg->body.move = 1; break; // forward
       case -1: msg->body.move = 2; break; // reverse
    }
+  
    msg->body.speed = htonf(lastSpeed);
    msg->body.pos = htons(feetToMeters(lastPosition));
 
@@ -432,7 +433,7 @@ void MIT_Client::didMove(float speed, int direction) {
 FUNCTION_START("::didMove(int direction)")
 
    // remember speed/direction values, send status if changed
-   if (((speed - lastSpeed < .00001) && (speed - lastSpeed > -.00001)) || direction != lastDirection) {
+   if ((fabs(speed - lastSpeed) > 0.0001) || direction != lastDirection) {
       lastSpeed = speed;
       lastDirection = direction;
       DCMSG(GREEN,"didMove is forcing a 2102 status") ;      
@@ -584,12 +585,11 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
             // moving at # mph
             int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 32768; // message was unsigned, fix it
 	    float fvalue = (float)value;
-            DCMSG(RED, "int value: %i, float value: %f\n", value, fvalue);
             fvalue = fvalue / 10;
             // convert to absolute speed and a direction
-            if (fvalue < 0) {
+            if (fvalue < -0.00001) {
                mit_client->didMove(-1*fvalue, -1);
-            } else if (fvalue > 0) {
+            } else if (fvalue > 0.00001) {
                mit_client->didMove(fvalue, 1);
             } else {
                mit_client->didMove(0, 0);
