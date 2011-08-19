@@ -81,14 +81,14 @@ int move_mfh(struct sk_buff *skb, void *move_data) {
 // Timer timeout function for finishing a move change
 //---------------------------------------------------------------------------
 static void move_change(unsigned long data) {
-    u8 move_data;
+    u16 move_data;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
     }
 
     // notify netlink userspace
-    move_data = 128+mover_speed_get(); // signed speed turned to unsigned byte
+    move_data = 32768+mover_speed_get(); // signed speed turned to unsigned byte
     send_nl_message_multi(&move_data, pos_mfh, NL_C_MOVE);
 }
 
@@ -145,10 +145,10 @@ int nl_stop_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
 delay_printk("Mover: handling stop command\n");
     
     // get attribute from message
-    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    na = info->attrs[GEN_INT16_A_MSG]; // generic 8-bit message
     if (na) {
         // grab value from attribute
-        value = nla_get_u8(na); // value is ignored
+        value = nla_get_u16(na); // value is ignored
 delay_printk("Mover: received value: %i\n", value);
 
         // stop mover
@@ -158,7 +158,7 @@ delay_printk("Mover: received value: %i\n", value);
         generic_output_event(EVENT_ERROR);
 
         // prepare response
-        rc = nla_put_u8(skb, GEN_INT8_A_MSG, 1); // value is ignored
+        rc = nla_put_u16(skb, GEN_INT16_A_MSG, 1); // value is ignored
 
         // message creation success?
         if (rc == 0) {
@@ -183,14 +183,14 @@ delay_printk("Mover: returning rc: %i\n", rc);
 int nl_move_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
     int rc;
-    u8 value = 0;
+    u16 value = 0;
 delay_printk("Mover: handling move command\n");
     
     // get attribute from message
-    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    na = info->attrs[GEN_INT16_A_MSG]; // generic 8-bit message
     if (na) {
         // grab value from attribute
-        value = nla_get_u8(na); // value is ignored
+        value = nla_get_u16(na); // value is ignored
 delay_printk("Mover: received value: %i\n", value);
 
         // default to message handling success (further feedback will come from move_event)
@@ -203,8 +203,8 @@ delay_printk("Mover: received value: %i\n", value);
             mover_speed_set(0);
         } else if (value == VELOCITY_REQ) {
             // retrieve speed
-            value = 128+mover_speed_get(); // signed speed turned to unsigned byte
-            rc = nla_put_u8(skb, GEN_INT8_A_MSG, value);
+            value = 32768+mover_speed_get(); // signed speed turned to unsigned byte
+            rc = nla_put_u16(skb, GEN_INT16_A_MSG, value);
 
             // message creation success?
             if (rc == 0) {
@@ -216,7 +216,8 @@ delay_printk("Mover: received value: %i\n", value);
         } else {
             // move
             enable_battery_check(0); // disable battery checking while motor is on
-            mover_speed_set(value-128); // unsigned value to signed speed (0 will coast)
+            delay_printk("NL_MOVE_HANDLER: value1: %d value2: %d\n", value, value-32768);
+            mover_speed_set(value-32768); // unsigned value to signed speed (0 will coast)
         }
 
     } else {

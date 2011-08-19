@@ -28,7 +28,7 @@ static char* MOVER_TYPE[] = {"infantry","armor","infantry","error"};
 static int CONTINUE_ON[] = {2,1,3,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
-static int TIMEOUT_IN_MSECONDS[] = {500,12000,500,0};
+static int TIMEOUT_IN_MSECONDS[] = {5000,12000,500,0};
 static int MOVER_DELAY_MULT[] = {6,2,6,0};
 
 #define MOVER_POSITION_START 		0
@@ -41,7 +41,8 @@ static int MOVER_DELAY_MULT[] = {6,2,6,0};
 #define MOVER_DIRECTION_STOPPED_FAULT	3
 
 // the maximum allowed speed ticks
-static int NUMBER_OF_SPEEDS[] = {10,20,10,0};
+//static int NUMBER_OF_SPEEDS[] = {10,20,10,0};
+static int NUMBER_OF_SPEEDS[] = {100,200,100,0};
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
 static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0};
@@ -56,6 +57,7 @@ static int RAMP_STEPS[] = {100,100,100,0};
 static int PID_GAIN_MULT[] = {1,1000,1000,0};
 static int PID_GAIN_DIV[]  = {10,1000,1000,1};
 static int PID_HZ[]        = {50,1000,1000,1};
+//static int PID_HZ[]        = {3,1000,1000,1};
 static int PID_SF[]        = {1,1,1,1}; // time derivitive / delta t
 static int PID_SG[]        = {1,1,1,1}; // time integral / delta t
 
@@ -207,11 +209,6 @@ atomic_t fault_atomic = ATOMIC_INIT(FAULT_NORMAL);
 atomic_t speed_atomic = ATOMIC_INIT(0);
 
 //---------------------------------------------------------------------------
-// This atomic variable is to store the last timeout multiplier
-//---------------------------------------------------------------------------
-atomic_t last_mult_atomic = ATOMIC_INIT(1);
-
-//---------------------------------------------------------------------------
 // This atomic variable is used to store which track sensor (front or rear)
 // was last triggered. It is used to determine the actual direction of the
 // mover. Note: Should be initialized in hardware_init() or at least after
@@ -256,7 +253,7 @@ static void horn_off_fire(unsigned long data);
 //---------------------------------------------------------------------------
 static int speed_from_pwm(int ra);		// absolute velocity, calculated
 static int pwm_from_speed(int speed);	// best-guess pwm, calculated
-static int current_speed(void);			// velocity/direction, measured
+//static int current_speed(void);			// velocity/direction, measured
 static int current_speed10(void);		// 10 * velocity/direction, measured
 
 //---------------------------------------------------------------------------
@@ -313,20 +310,6 @@ static const char * mover_movement[] =
 // Starts the timeout timer.
 //---------------------------------------------------------------------------
 static void timeout_timer_start(int mult) {
-    if (mult <= 1) {
-       // count down to zero
-       if (!atomic_dec_and_test(&last_mult_atomic)) {
-          // was bigger than zero, use that value + 1 as multiplier
-          mult = atomic_read(&last_mult_atomic) + 1;
-       } else {
-          // reset to 1 if it became zero
-          atomic_set(&last_mult_atomic, 1);
-       }
-    } else {
-       // reset count-down
-       atomic_set(&last_mult_atomic, mult);
-    }
-    
     if (mult <= 1) {
         // standard timer
         mod_timer(&timeout_timer_list, jiffies+((TIMEOUT_IN_MSECONDS[mover_type]*HZ)/1000));
@@ -399,7 +382,7 @@ static int hardware_motor_on(int direction)
         }
 
     // did we just start moving from a stop?
-    if (current_speed() == 0) {
+    if (current_speed10() == 0) {	//changed from current_speed
         // turn on horn and wait to do actual move
         del_timer(&horn_on_timer_list); // start horn timer over
         if (HORN_ON_IN_MSECONDS[mover_type] > 0)
@@ -521,8 +504,7 @@ static int hardware_motor_off(void)
 static int hardware_speed_set(int new_speed)
     {
     int old_speed, ra, ramp_time=RAMP_UP_TIME_IN_MSECONDS[mover_type];
-
-   delay_printk("%s - %s(%i)\n",TARGET_NAME[mover_type], __func__, new_speed);
+    delay_printk("%s - %s(%i)\n",TARGET_NAME[mover_type], __func__, new_speed);
 
     // check for full initialization
     if (!atomic_read(&full_init))
@@ -556,7 +538,7 @@ static int hardware_speed_set(int new_speed)
 //        ra = speed_from_pwm(ra); // calculate speed from pwm value
 //        atomic_set(&speed_atomic, ra); // reset current speed to actual speed
 //        atomic_set(&goal_start_atomic, ra); // reset ramp start to actual speed
-       ra = abs(current_speed());
+       ra = abs(current_speed10());  //changed from current_speed
        atomic_set(&goal_start_atomic, ra); // reset ramp start to actual measured speed
        delay_printk("%s - %s : old (%i), new (%i), are(%i)\n",TARGET_NAME[mover_type], __func__, old_speed, new_speed, ra);
         del_timer(&ramp_timer_list); // start ramp over
@@ -614,6 +596,7 @@ static int hardware_movement_stop(int stop_timer)
     atomic_set(&moving_atomic, FALSE);
 
     // reset speed ramping
+    delay_printk("hardware_movement_stop - speed: %i\n", speed);
     hardware_speed_set(speed);
 
     // notify user-space
@@ -1319,6 +1302,7 @@ static int pwm_from_effort(int effort) {
 // Helper function to map pwm values to speed values
 //---------------------------------------------------------------------------
 static int pwm_from_speed(int speed) {
+    delay_printk("pwm_from_speed(%i)\n", speed);
     // limit to max speed
     if (speed > NUMBER_OF_SPEEDS[mover_type]) {
         speed = NUMBER_OF_SPEEDS[mover_type];
@@ -1343,6 +1327,7 @@ static int pwm_from_speed(int speed) {
 // Helper function to map speed values to pwm values
 //---------------------------------------------------------------------------
 static int speed_from_pwm(int ra) {
+    delay_printk("speed_from_pwm(%i)\n", ra);
     int i;
     // limit to max pwm
     if (ra > MOTOR_PWM_END[mover_type]) {
@@ -1372,12 +1357,11 @@ static int speed_from_pwm(int ra) {
 //---------------------------------------------------------------------------
 // Helper function to get current measured speed (slight lag behind actual speed)
 //---------------------------------------------------------------------------
-static int current_speed() {
+/*static int current_speed() {
     return current_speed10()/10;
-}
+}*/
 
 static int current_speed10() {
-
     int vel = atomic_read(&velocity);
     if (vel != 0) {
         vel = (100*RPM_K[mover_type]/vel)/VELO_K[mover_type];
@@ -1390,14 +1374,15 @@ static int current_speed10() {
 // Get/set functions for external control from within kernel
 //---------------------------------------------------------------------------
 int mover_speed_get(void) {
-   return current_speed();
+   delay_printk("mover_speed_get\n");
+   return current_speed10();  // changed from current_speed
 }
 EXPORT_SYMBOL(mover_speed_get);
 
 int mover_speed_set(int speed) {
    // check to see if we're sleeping or not
    if (atomic_read(&sleep_atomic) == 1) { return 0; }
-
+   
    // can we go the requested speed?
    if (abs(speed) > NUMBER_OF_SPEEDS[mover_type]) {
       return 0; // nope
@@ -1958,6 +1943,7 @@ delay_printk("failed with %i\n", status);
 //---------------------------------------------------------------------------
 static ssize_t speed_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
     {
+    delay_printk("speed_store");
     long value;
     ssize_t status;
 
@@ -1966,6 +1952,7 @@ static ssize_t speed_store(struct device *dev, struct device_attribute *attr, co
            (value >= 0) &&
            (value <= NUMBER_OF_SPEEDS[mover_type]))
         {
+        delay_printk("speed_store - speed: %i\n", value);
         hardware_speed_set(value);
         status = size;
         }
@@ -2104,8 +2091,9 @@ static void pid_step(void) {
     new_speed = atomic_read(&pid_set_point); // read desired pid set point
 
     // read input speed (adjust speed10 value to 1000*percent)
-    input_speed = (100 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type]; // absolute velocity, no direction
-    delay_printk("s: %i; p: %i;", new_speed, input_speed);
+    //input_speed = (523 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type];
+    input_speed = (1000 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type]; // absolute velocity, no direction
+    //delay_printk("s: %i; p: %i;", new_speed, input_speed);
 
     // We have just a few microseconds to complete operations, so die if we can't lock
     if (!spin_trylock(&pid_lock)) {
@@ -2130,15 +2118,6 @@ static void pid_step(void) {
     // clamp effort to positive numbers only
     pid_effort = max(pid_effort, 0);
 
-    // clamp at zero if everything went to zero
-    if (new_speed == 0 && input_speed == 0) {
-       pid_effort = 0;
-       pid_last_effort = 0;
-       pid_error = 0;
-       pid_last_error = 0;
-       pid_last_last_error = 0;
-    }
-
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
 
@@ -2148,7 +2127,7 @@ static void pid_step(void) {
 
     // unlock for next time
     spin_unlock(&pid_lock);
-    delay_printk(" r: %i; f: %i; e: %i\n", new_speed, pid_effort, pid_error);
+    //delay_printk(" r: %i; f: %i; e: %i\n", new_speed, pid_effort, pid_error);
 }
 
 

@@ -93,12 +93,12 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
 
             break;
         case NL_C_MOVE:
-            genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+            genlmsg_parse(nlh, 0, attrs, GEN_INT16_A_MAX, generic_int16_policy);
 
-            if (attrs[GEN_INT8_A_MSG]) {
+            if (attrs[GEN_INT16_A_MSG]) {
                 // moving at # mph
-                int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-                snprintf(wbuf, 1024, "M %i\n", value-128);
+                int value = nla_get_u16(attrs[GEN_INT16_A_MSG]);
+                snprintf(wbuf, 1024, "M %i\n", value-32768);
             }
 
             break;
@@ -441,7 +441,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-5)enable_on_value\n");
                         break;
                     case 'M': case 'm':
-                        snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-127 to 126)speed_in_mph\n");
+                        snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-32767 to 32766)speed_in_mph\n");
                         break;
                     case 'O': case 'o':
                         snprintf(wbuf, 1024, "Change Mode\nFormat: O (0-3)mode_number\nMode request\nFormat: O\n");
@@ -517,14 +517,14 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     break;
                 case NL_C_MOVE:
                     if (cmd[1] == '\0') {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, VELOCITY_REQ); // velocity request
+                        nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_REQ); // velocity request
                     } else if (sscanf(cmd+1, "%i", &arg1) == 1) {
-                        if (arg1 > 126 || arg1 < -127) {
+                        if (arg1 > 32766 || arg1 < -32767) {
                             arg1 = 0; // stay away from the edge conditions
                         }
-                        nla_put_u8(msg, GEN_INT8_A_MSG, 128+arg1); // move request (add 128 as we're not signed)
+                        nla_put_u16(msg, GEN_INT16_A_MSG, 32768+arg1); // move request (add 32768 as we're not signed)
                     } else {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, VELOCITY_STOP); // stop
+                        nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
                     }
                     break;
                 case NL_C_BIT:

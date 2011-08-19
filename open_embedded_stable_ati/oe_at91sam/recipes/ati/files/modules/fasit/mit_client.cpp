@@ -27,7 +27,7 @@ FUNCTION_START("::MIT_Client(int fd, int tnum) : Connection(fd)")
    } else {
       // initialize default settings
       lastPosition = 0;
-      lastSpeed = 0; // the kernel message is in whole numbers, so don't bother storing more precision
+      lastSpeed = 0.0; // the kernel message is in whole numbers, so don't bother storing more precision
       lastDirection = 0;
       memset(&lastSITdevcaps, 0, sizeof(FASIT_2111));
       memset(&lastSITstatus, 0, sizeof(FASIT_2102));
@@ -67,7 +67,7 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
       case 1: msg->body.move = 1; break; // forward
       case -1: msg->body.move = 2; break; // reverse
    }
-   msg->body.speed = htonf((float)lastSpeed);
+   msg->body.speed = htonf(lastSpeed);
    msg->body.pos = htons(feetToMeters(lastPosition));
 
    // device type
@@ -231,7 +231,7 @@ FUNCTION_START("::handle_100(int start, int end)")
    msg.body.flags = lastSITdevcaps.body.flags; // the MIT has no flags of its own -- TODO -- unless we have GPS
 
    // grab current values from kernel
-   if (lastPosition == 0 && lastDirection == 0 && lastSpeed == 0) {
+   if (lastPosition == 0 && lastDirection == 0 && lastSpeed < 0.00001 && lastSpeed > -0.00001) {
       doPosition();
       doMove(0, 0); // stops the mover and grabs current values for speed and direction
    }
@@ -255,6 +255,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
    FASIT_2100 *msg = (FASIT_2100*)(rbuf + start + sizeof(FASIT_header));
 
+   IMSG("handle_2100: %f\n", ntohf(msg->speed));
    // TODO -- handle other commands here
    bool needPass = true;
    switch (msg->cid) {
@@ -406,14 +407,14 @@ FUNCTION_END("::didPosition(int pos)")
 }
 
 // start movement or change movement
-void MIT_Client::doMove(int speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
-FUNCTION_START("::doMove(int speed, int direction)")
-   DMSG("Moving %i %i\n", speed, direction);
+void MIT_Client::doMove(float speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
+FUNCTION_START("::doMove(float speed, int direction)")
+   DMSG("Moving %f %i\n", speed, direction);
    // pass directly to kernel for actual action
    if (nl_conn != NULL) {
       nl_conn->doMove(speed, direction);
    }
-FUNCTION_END("::doMove(int speed, int direction)")
+FUNCTION_END("::doMove(float speed, int direction)")
 }
 
 // retrieve movement values
@@ -427,11 +428,11 @@ FUNCTION_END("::doMove()")
 }
 
 // current direction value
-void MIT_Client::didMove(int speed, int direction) {
+void MIT_Client::didMove(float speed, int direction) {
 FUNCTION_START("::didMove(int direction)")
 
    // remember speed/direction values, send status if changed
-   if (speed != lastSpeed || direction != lastDirection) {
+   if (((speed - lastSpeed < .00001) && (speed - lastSpeed > -.00001)) || direction != lastDirection) {
       lastSpeed = speed;
       lastDirection = direction;
       DCMSG(GREEN,"didMove is forcing a 2102 status") ;      
@@ -577,16 +578,19 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
          break;
 
       case NL_C_MOVE :
-         genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+         genlmsg_parse(nlh, 0, attrs, GEN_INT16_A_MAX, generic_int16_policy);
 
-         if (attrs[GEN_INT8_A_MSG]) {
+         if (attrs[GEN_INT16_A_MSG]) {
             // moving at # mph
-            int value = nla_get_u8(attrs[GEN_INT8_A_MSG]) - 128; // message was unsigned, fix it
+            int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 32768; // message was unsigned, fix it
+	    float fvalue = (float)value;
+            DCMSG(RED, "int value: %i, float value: %f\n", value, fvalue);
+            fvalue = fvalue / 10;
             // convert to absolute speed and a direction
-            if (value < 0) {
-               mit_client->didMove(-1*value, -1);
-            } else if (value > 0) {
-               mit_client->didMove(value, 1);
+            if (fvalue < 0) {
+               mit_client->didMove(-1*fvalue, -1);
+            } else if (fvalue > 0) {
+               mit_client->didMove(fvalue, 1);
             } else {
                mit_client->didMove(0, 0);
             }
@@ -634,14 +638,14 @@ FUNCTION_END("::doPosition()")
 }
 
 // start movement or change movement
-void MIT_Conn::doMove(int speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
-FUNCTION_START("::doMove(int speed, int direction)")
-
+void MIT_Conn::doMove(float speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
+FUNCTION_START("::doMove(float speed, int direction)")
+   DCMSG(GREEN, "MIT_Conn doMove - speed: %f", speed);
    // force valid value for speed
    if (speed < 0 || direction == 0) {
       speed = 0;
    }
-   if (speed > 126) {
+   if (speed > 32766) {
       speed = 0; // fault, so stop
    }
 
@@ -650,24 +654,25 @@ FUNCTION_START("::doMove(int speed, int direction)")
       direction = 0;
    }
 
+   //Multiply the speed by 10 to get rid of the decimal
+   
    // Queue command
    if (direction < 0) {
-      queueMsgU8(NL_C_MOVE, 128-speed);
+      queueMsgU16(NL_C_MOVE, 32768-(speed*10));  //speed * 10
    } else if (direction > 0) {
-      queueMsgU8(NL_C_MOVE, 128+speed);
+      queueMsgU16(NL_C_MOVE, 32768+(speed*10));  //speed * 10
    } else {
-      queueMsgU8(NL_C_MOVE, VELOCITY_STOP);
+      queueMsgU16(NL_C_MOVE, VELOCITY_STOP);
    }
 
-FUNCTION_END("::doMove(int speed, int direction)")
+FUNCTION_END("::doMove(float speed, int direction)")
 }
 
 // retrieve movement values
 void MIT_Conn::doMove() {
 FUNCTION_START("::doMove()")
-
    // Queue command
-   queueMsgU8(NL_C_MOVE, VELOCITY_REQ);
+   queueMsgU16(NL_C_MOVE, VELOCITY_REQ);
 
 FUNCTION_END("::doMove()")
 }

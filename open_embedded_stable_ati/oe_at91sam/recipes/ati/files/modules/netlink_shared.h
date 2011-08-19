@@ -204,7 +204,7 @@ enum {
     NL_C_FAILURE,	/* failure message (reply) (generic string) */
     NL_C_BATTERY,	/* battery status as percentage (request/reply) (generic 8-bit int) */
     NL_C_EXPOSE,	/* expose/conceal (command/reply) (generic 8-bit int) */
-    NL_C_MOVE,		/* move as mph (command/reply) (generic 8-bit int) */
+    NL_C_MOVE,		/* move as mph (command/reply) (generic 16-bit int) */
     NL_C_POSITION,	/* position in feet from home (request/reply) (generic 16-bit int) */
     NL_C_STOP,		/* stop (command/reply) (generic 8-bit int) */
     NL_C_HITS,		/* hit count (request/reply) (generic 8-bit int) */

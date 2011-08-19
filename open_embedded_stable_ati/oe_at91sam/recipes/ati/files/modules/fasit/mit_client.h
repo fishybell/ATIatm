@@ -29,9 +29,9 @@ public :
    void doShutdown(); // shutdown the target
    void doSleep(); // sleep the target
    void doWake(); // wake the target
-   void doMove(int speed, int direction); // start movement or change movement
+   void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
-   void didMove(int speed, int direction); // current direction value
+   void didMove(float speed, int direction); // current direction value
    void doBattery(); // retrieve battery value
    void didBattery(int val); // current battery value
    void doStop(); // emergency stop (stops accessories as well)
@@ -78,7 +78,7 @@ private:
 
    // remember data to send back over and over again
    int lastPosition;
-   int lastSpeed;
+   float lastSpeed;
    int lastDirection;
    FASIT_2111 lastSITdevcaps;
    FASIT_2102 lastSITstatus;
@@ -133,7 +133,7 @@ public:
    void doShutdown(); // shutdown the target
    void doSleep(); // sleep the target
    void doWake(); // wake the target
-   void doMove(int speed, int direction); // start movement or change movement
+   void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
    void doBattery(); // retrieve battery value
    void doStop(); // immediate stop (stops accessories as well)

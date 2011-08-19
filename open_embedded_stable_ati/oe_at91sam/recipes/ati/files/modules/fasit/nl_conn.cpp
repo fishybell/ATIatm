@@ -184,7 +184,6 @@ FUNCTION_END("NL_Conn::queueMsgU8(int cmd, int attr)");
 // helper for queueing message with u16 attribute 
 void NL_Conn::queueMsgU16(int cmd, int attr) {
 FUNCTION_START("NL_Conn::queueMsgU16(int cmd, int attr)");
-
    // Create a new netlink message
    struct nl_msg *msg;
    msg = nlmsg_alloc();
@@ -195,6 +194,7 @@ FUNCTION_START("NL_Conn::queueMsgU16(int cmd, int attr)");
 
    // queue message for sending later
    queueMsg(msg);
+   DCMSG(GREEN, "queueMsgU16 attr: %i, msg: %s", attr, msg);
 
 FUNCTION_END("NL_Conn::queueMsgU16(int cmd, int attr)");
 }

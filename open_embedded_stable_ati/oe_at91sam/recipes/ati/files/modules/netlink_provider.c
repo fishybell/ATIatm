@@ -365,7 +365,7 @@ struct genl_ops provider_gnl_ops_expose = {
 struct genl_ops provider_gnl_ops_move = {
     .cmd = NL_C_MOVE,
     .flags = 0,
-    .policy = generic_int8_policy,
+    .policy = generic_int16_policy,
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
