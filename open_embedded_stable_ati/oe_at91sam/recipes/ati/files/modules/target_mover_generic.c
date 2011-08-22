@@ -49,9 +49,9 @@ static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0};
 static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0};
 
 // the paremeters of the velocity ramp up
-static int RAMP_UP_TIME_IN_MSECONDS[] = {750,5000,750,0};
-static int RAMP_DOWN_TIME_IN_MSECONDS[] = {250,5000,250,0};
-static int RAMP_STEPS[] = {100,100,100,0};
+static int RAMP_UP_TIME_IN_MSECONDS[] = {150,5000,150,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {100,5000,100,0};
+static int RAMP_STEPS[] = {25,100,25,0};
 
 // the parameters needed for PID speed control
 static int PID_GAIN_MULT[] = {1,1000,1000,0};
