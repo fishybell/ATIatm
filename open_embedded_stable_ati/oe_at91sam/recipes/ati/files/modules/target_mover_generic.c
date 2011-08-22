@@ -88,8 +88,10 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // RB - low time setting - cannot exceed RC
 static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x4000,0};
 static int MOTOR_PWM_END[] = {0x1180,0x3074,0x4000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
+//static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
+//static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0001,0x0001,0x0001,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0001,0x0001,0x0001,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -1327,8 +1329,8 @@ static int pwm_from_speed(int speed) {
 // Helper function to map speed values to pwm values
 //---------------------------------------------------------------------------
 static int speed_from_pwm(int ra) {
-    delay_printk("speed_from_pwm(%i)\n", ra);
     int i;
+    delay_printk("speed_from_pwm(%i)\n", ra);
     // limit to max pwm
     if (ra > MOTOR_PWM_END[mover_type]) {
         ra = MOTOR_PWM_END[mover_type];
@@ -1943,9 +1945,9 @@ delay_printk("failed with %i\n", status);
 //---------------------------------------------------------------------------
 static ssize_t speed_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
     {
-    delay_printk("speed_store");
     long value;
     ssize_t status;
+    delay_printk("speed_store");
 
     status = strict_strtol(buf, 0, &value);
     if ((status == 0) &&
@@ -2117,6 +2119,9 @@ static void pid_step(void) {
 
     // clamp effort to positive numbers only
     pid_effort = max(pid_effort, 0);
+
+    // clamp effort to 100%
+    pid_effort = min(pid_effort, 1000);
 
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
