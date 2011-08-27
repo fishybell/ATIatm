@@ -28,7 +28,7 @@ static char* MOVER_TYPE[] = {"infantry","armor","infantry","error"};
 static int CONTINUE_ON[] = {2,1,3,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
-static int TIMEOUT_IN_MSECONDS[] = {5000,12000,500,0};
+static int TIMEOUT_IN_MSECONDS[] = {500,12000,500,0};
 static int MOVER_DELAY_MULT[] = {6,2,6,0};
 
 #define MOVER_POSITION_START 		0
@@ -51,15 +51,18 @@ static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0};
 // the paremeters of the velocity ramp up
 static int RAMP_UP_TIME_IN_MSECONDS[] = {150,5000,150,0};
 static int RAMP_DOWN_TIME_IN_MSECONDS[] = {100,5000,100,0};
-static int RAMP_STEPS[] = {25,100,25,0};
+//static int RAMP_STEPS[] = {25,100,25,0};
+static int RAMP_STEPS[] = {1,100,25,0};
 
 // the parameters needed for PID speed control
 static int PID_GAIN_MULT[] = {1,1000,1000,0};
-static int PID_GAIN_DIV[]  = {10,1000,1000,1};
-static int PID_HZ[]        = {50,1000,1000,1};
+static int PID_GAIN_DIV[]  = {15,1000,1000,1};
+static int PID_HZ[]        = {20,100,100,1};
+static int PID_DELTA_T[]   = {50,10,10,1}; // inversely proportial to HZ (ie 100 dt = 1000 ms / 100 hz)
 //static int PID_HZ[]        = {3,1000,1000,1};
-static int PID_SF[]        = {1,1,1,1}; // time derivitive / delta t
-static int PID_SG[]        = {1,1,1,1}; // time integral / delta t
+static int PID_TD[]        = {2,1,1,1}; // time derivitive
+static int PID_TI_MULT[]   = {2500,1,1,1}; // time integral numerator
+static int PID_TI_DIV[]    = {1,1,1,1}; // time integral denominator
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -90,8 +93,8 @@ static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x4000,0};
 static int MOTOR_PWM_END[] = {0x1180,0x3074,0x4000,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0001,0x0001,0x0001,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0001,0x0001,0x0001,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x0001,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x0001,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -1463,6 +1466,7 @@ static void ramp_fire(unsigned long data) {
 
     // calculate number of steps to take based on the amount of speed change
     speed_steps = (RAMP_STEPS[mover_type] * abs(goal_end - goal_start)) / 2; // 1/2 normal steps * number of speed change
+    speed_steps = 1;
 
     // find direction
     if (goal_end < goal_start) {
@@ -2095,7 +2099,7 @@ static void pid_step(void) {
     // read input speed (adjust speed10 value to 1000*percent)
     //input_speed = (523 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type];
     input_speed = (1000 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type]; // absolute velocity, no direction
-    //delay_printk("s: %i; p: %i;", new_speed, input_speed);
+    delay_printk("s: %i; p: %i;", new_speed, input_speed);
 
     // We have just a few microseconds to complete operations, so die if we can't lock
     if (!spin_trylock(&pid_lock)) {
@@ -2110,18 +2114,33 @@ static void pid_step(void) {
     // move effort values
     pid_last_effort = pid_effort;
 
+    // macro definitions to make equation below more clear
+#define dt_Ti (((1000 * PID_DELTA_T[mover_type] * PID_TI_DIV[mover_type]) / PID_TI_MULT[mover_type]) / 1000)
+#define Td_dt ((1000 * PID_TD[mover_type] / PID_DELTA_T[mover_type]) / 1000)
+
     // descrete PID algorithm gleamed from wikipedia
-    pid_effort = pid_last_effort + ((PID_GAIN_MULT[mover_type] * (
-       (((PID_SG[mover_type] + 1 + (PID_SG[mover_type] * PID_SF[mover_type])) / PID_SG[mover_type]) * pid_error) +
-       ((-1 - (2 * PID_SF[mover_type])) * pid_last_error) +
-       (PID_SF[mover_type] * pid_last_last_error)
-    )) / PID_GAIN_DIV[mover_type]);
+    pid_effort = pid_last_effort + (
+        (PID_GAIN_MULT[mover_type]
+            * (
+              ((1 + dt_Ti + Td_dt) * pid_error) +
+              ((-1 - (2 * Td_dt) * pid_last_error)) +
+              (Td_dt * pid_last_last_error)
+              )
+        ) / PID_GAIN_DIV[mover_type]
+    );
+
 
     // clamp effort to positive numbers only
     pid_effort = max(pid_effort, 0);
 
     // clamp effort to 100%
     pid_effort = min(pid_effort, 1000);
+
+    // clamp everything at 0 if we're truly stopped
+    if (new_speed == 0 && input_speed == 0 && pid_error == 0 && pid_last_error == 0 && pid_last_last_error == 0) {
+        pid_effort = 0;
+        pid_last_effort = 0;
+    }
 
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
@@ -2133,6 +2152,8 @@ static void pid_step(void) {
     // unlock for next time
     spin_unlock(&pid_lock);
     //delay_printk(" r: %i; f: %i; e: %i\n", new_speed, pid_effort, pid_error);
+    delay_printk(" r: %i; f: %i; e: %i-----p: %i/%i; i: %i/%i; d: %i\n", new_speed, pid_effort, pid_error,
+                 PID_GAIN_MULT[mover_type], PID_GAIN_DIV[mover_type], PID_TI_MULT[mover_type], PID_TI_DIV[mover_type], PID_TD[mover_type]);
 }
 
 
