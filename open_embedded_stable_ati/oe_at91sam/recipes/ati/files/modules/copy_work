@@ -14,7 +14,7 @@ if  {$argc == 1} {
 # increase delays for wireless devices
 set delay 5
 if {[string match -nocase *w* $num]} {
-    set delay 16
+    set delay 10
 }
 
 system sed -i -e "s/^sam$num.*//" ~/.ssh/known_hosts
