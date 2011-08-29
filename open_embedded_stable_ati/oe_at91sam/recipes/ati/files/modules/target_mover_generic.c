@@ -55,14 +55,14 @@ static int RAMP_DOWN_TIME_IN_MSECONDS[] = {100,5000,100,0};
 static int RAMP_STEPS[] = {1,100,25,0};
 
 // the parameters needed for PID speed control
-static int PID_GAIN_MULT[] = {1,1000,1000,0};
-static int PID_GAIN_DIV[]  = {15,1000,1000,1};
-static int PID_HZ[]        = {20,100,100,1};
-static int PID_DELTA_T[]   = {50,10,10,1}; // inversely proportial to HZ (ie 100 dt = 1000 ms / 100 hz)
-//static int PID_HZ[]        = {3,1000,1000,1};
-static int PID_TD[]        = {2,1,1,1}; // time derivitive
-static int PID_TI_MULT[]   = {2500,1,1,1}; // time integral numerator
+static int PID_HZ[]        = {20,100,20,1};
+static int PID_DELTA_T[]   = {50,10,50,1}; // inversely proportial to HZ (ie 100 dt = 1000 ms / 100 hz)
+static int PID_GAIN_MULT[] = {10,1000,1,0}; // proportional gain numerator
+static int PID_GAIN_DIV[]  = {275,1000,15,1}; // proportional gain denominator
+static int PID_TI_MULT[]   = {25,1,2500,1}; // time integral numerator
 static int PID_TI_DIV[]    = {1,1,1,1}; // time integral denominator
+static int PID_TD_MULT[]   = {1,1,2,1}; // time derivitive numerator
+static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -93,8 +93,8 @@ static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x4000,0};
 static int MOTOR_PWM_END[] = {0x1180,0x3074,0x4000,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x0001,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x0001,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x0320,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x0320,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -2116,7 +2116,7 @@ static void pid_step(void) {
 
     // macro definitions to make equation below more clear
 #define dt_Ti (((1000 * PID_DELTA_T[mover_type] * PID_TI_DIV[mover_type]) / PID_TI_MULT[mover_type]) / 1000)
-#define Td_dt ((1000 * PID_TD[mover_type] / PID_DELTA_T[mover_type]) / 1000)
+#define Td_dt (((1000 * PID_TD_MULT[mover_type]) / (PID_TD_DIV[mover_type] * PID_DELTA_T[mover_type])) / 1000)
 
     // descrete PID algorithm gleamed from wikipedia
     pid_effort = pid_last_effort + (
@@ -2152,8 +2152,8 @@ static void pid_step(void) {
     // unlock for next time
     spin_unlock(&pid_lock);
     //delay_printk(" r: %i; f: %i; e: %i\n", new_speed, pid_effort, pid_error);
-    delay_printk(" r: %i; f: %i; e: %i-----p: %i/%i; i: %i/%i; d: %i\n", new_speed, pid_effort, pid_error,
-                 PID_GAIN_MULT[mover_type], PID_GAIN_DIV[mover_type], PID_TI_MULT[mover_type], PID_TI_DIV[mover_type], PID_TD[mover_type]);
+    delay_printk(" r: %i; f: %i; e: %i; p: %i/%i; i: %i/%i; d: %i/%i\n", new_speed, pid_effort, pid_error,
+                 PID_GAIN_MULT[mover_type], PID_GAIN_DIV[mover_type], PID_TI_MULT[mover_type], PID_TI_DIV[mover_type], PID_TD_MULT[mover_type], PID_TD_DIV[mover_type]);
 }
 
 
