@@ -145,12 +145,14 @@ static void bit_timeout_fire(unsigned long data);
 // Declaration of the function that gets called when the move timeout fires.
 //---------------------------------------------------------------------------
 static void move_timeout_fire(unsigned long data);
+static void hold_timeout_fire(unsigned long data);
 
 //---------------------------------------------------------------------------
 // Kernel timer for the bit timeout.
 //---------------------------------------------------------------------------
 static struct timer_list bit_timeout_timer_list = TIMER_INITIALIZER(bit_timeout_fire, 0, 0);
 static struct timer_list move_timeout_timer_list = TIMER_INITIALIZER(move_timeout_fire, 0, 0);
+static struct timer_list hold_timeout_timer_list = TIMER_INITIALIZER(hold_timeout_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space that the bit
@@ -244,14 +246,14 @@ static void move_button_int(int button)
     //delay_printk("%s - %s fail: (!%i) || (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, bit_value,button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
    delay_printk("%s - %s fail: (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
         // were we moving?
-        if (atomic_read(&move_button_atomic) != MOVING_STOP)
-            {
+        //if (atomic_read(&move_button_atomic) != MOVING_STOP)
+        //    {
             // stop
             atomic_set(&move_button_atomic, MOVING_STOP);
 
             // notify user-space
             schedule_work(&move_button_work);
-            }
+        //    }
         return;
         }
 
@@ -273,6 +275,36 @@ irqreturn_t rev_button_int(int irq, void *dev_id, struct pt_regs *regs)
     move_button_int(REVERSE_BUTTON);
     return IRQ_HANDLED;
     }
+
+//---------------------------------------------------------------------------
+// The function that gets called when the move timeout fires.
+//---------------------------------------------------------------------------
+static void hold_timeout_fire(unsigned long data) {
+    // int bit_value;
+    int fwd_value, rev_value;
+    // if we're not a mover, don't bother
+    delay_printk("%s - %s\n",TARGET_NAME, __func__);
+    if (!mover)
+        {
+        return;
+        }
+
+    // we should be holding these values
+    fwd_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_FWD) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
+    rev_value = (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_REV) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE);
+
+    // check vs. direction
+    if (fwd_value == rev_value) { // if same state, stop moving
+        atomic_set(&move_button_atomic, MOVING_STOP);
+
+        // notify user-space
+        schedule_work(&move_button_work);
+        return;
+    }
+
+    // check again later
+    mod_timer(&hold_timeout_timer_list, jiffies+((MOVE_WAIT_IN_MSECONDS/10)*HZ/1000));
+}
 
 //---------------------------------------------------------------------------
 // The function that gets called when the move timeout fires.
@@ -307,12 +339,14 @@ static void move_timeout_fire(unsigned long data)
         // forward
        delay_printk("%s - %s - FORWARD\n",TARGET_NAME, __func__);
         atomic_set(&move_button_atomic, MOVING_FWD);
+        mod_timer(&hold_timeout_timer_list, jiffies+((MOVE_WAIT_IN_MSECONDS/10)*HZ/1000));
         }
     else if (!fwd_value && rev_value)
         {
         // reverse
        delay_printk("%s - %s - REVERSE\n",TARGET_NAME, __func__);
         atomic_set(&move_button_atomic, MOVING_REV);
+        mod_timer(&hold_timeout_timer_list, jiffies+((MOVE_WAIT_IN_MSECONDS/10)*HZ/1000));
         }
     else
         {
@@ -547,6 +581,7 @@ static int hardware_exit(void)
     if (mover)
         {
         del_timer(&move_timeout_timer_list);
+        del_timer(&hold_timeout_timer_list);
         free_irq(INPUT_MOVER_TEST_BUTTON_FWD, NULL);
         free_irq(INPUT_MOVER_TEST_BUTTON_REV, NULL);
         }

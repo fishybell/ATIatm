@@ -53,7 +53,7 @@ printf("BIT: sending REV\n");
             break;
         case BIT_MOVE_STOP:
 printf("BIT: sending STOP\n");
-            nla_put_u8(msg, GEN_INT8_A_MSG, VELOCITY_STOP); // stop
+            nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
             break;
     }
 
