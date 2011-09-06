@@ -1,0 +1,17 @@
+# Sep 6th 2011, found on mover type 0 off track:
+tu = period of oscillation: .9 seconds = 29490 ticks
+ku = ultimate gain: 1/1
+kp = .6 ku
+ki = 2 kp / tu
+kd = kp tu / 8
+
+
+kp = 3/5
+ki = 2 (3/5) / 29490
+kd = (3/5) (29490) / 8
+
+
+kp - 3/5
+ki = 2 / 24575
+kd = 8847 / 4
+

@@ -1,0 +1,74 @@
+# Aug 29-31, 2011, mover type 0, off track
+----moved to 100 hz & 10 delta t----
+----changed ramp to be less rampy----
+p = 1/10, i = 1/3 d = 3 ; @ 1: doesn't go (times out), @ 5: 20% ringing
+p = 1/5, i = 1/3 d = 3 ; @ 1: doesn't go (jumps too high, then down), @ 5: 20% ringing (sometimes jumps then stops)
+p = 1/50, i = 1/3 d = 3 ; @ 1: doesn't go (jumps too high, then down), @ 5: 25% ringing (sometimes jumps then stops) -- goes from 1000 to 0 to 1000 to 0 when ringing
+p = 1/50, i = 1/3 d = 10 ; @ 1: doesn't go (jumps too high, then down), @ 5: 25% ringing (sometimes jumps then stops) -- goes from 1000 to 0 to 1000 to 0 when ringing
+p = 1/50, i = 1/10 d = 10 ; @ 1: doesn't go (jumps too high, then down), @ 5: 15% ringing (sometimes jumps then stops) -- goes from 1000 to 0 to 1000 to 0 when ringing
+p = 10/1, i = 1/100 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: doesn't go (jumps too high, then down)
+p = 10/1, i = 1/10000 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: doesn't go (jumps too high, then down)
+p = 10/1, i = 100/1 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: doesn't go (jumps too high, then down)
+p = 1/10, i = 100/1 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with 2% ringing, @ 1.7, goes with high overshoot and small ringing
+p = 1/10, i = 100/1 d = 4 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with 2% ringing, @ 1.7, goes with high overshoot and small ringing
+p = 1/10, i = 100/1 d = 1 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with 2% ringing, @ 1.8, goes with high overshoot and small ringing
+p = 1/5, i = 100/1 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with 25% ringing, @ 1.7, goes with high overshoot and small ringing
+p = 1/5, i = 250/1 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with 25% ringing, @ 1.7, goes with high overshoot and small ringing
+p = 1/5, i = 2500/1 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with 25% ringing, @ 1.7, goes with high overshoot and small ringing
+----changed ramp to be more rampy----
+p = 1/5, i = 2500/1 d = 2 ; @ 1: doesn't go (smoothly up, then timeout), @ 5: doesn't go (smoothly up, then timeout), @ 2.2, goes with high overshoot and significant ringing
+----changed ramp to be no rampy----
+p = 1/5, i = 2500/1 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with 25% ringing, @ 1.7, goes with high overshoot and small ringing
+p = 1/8, i = 2500/1 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with 25% ringing, @ 1.7, goes with high overshoot and small ringing (could almost move at 1.4)
+p = 1/10, i = 2500/1 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with minimal ringing (10% going down to 0%) -- lowest 2
+p = 1/15, i = 2500/1 d = 2 ; @ 1: doesn't go (jumps too high, then down), @ 5: goes with minimal ringing (10% going down to 0%) -- lowest 1.8
+----moved to 20 hz & 50 delta t----
+p = 1/15, i = 2500/1 d = 2 ; @ 1: goes very well with minimal ringing, @ 5: goes very well with 2% ringing, @ 10: goes very well with 2% ringing
+p = 1/15, i = 2500/1 d = 10 ; @ 1: goes very well with slightly less ringing, @ 5: goes very well with 2% ringing, @ 10: goes very well with 2% ringing, slight overshoot
+p = 1/15, i = 2500/1 d = 50 ; @ 1: goes mostly well with slight ringing (sometimes times out), @ 5: goes very well with 2% ringing, @ 10: goes with 3-4% ringing, slight overshoot
+p = 1/15, i = 2500/1 d = 1/10 ; @ 1: goes mostly well with slight ringing (sometimes times out), @ 5: goes with 2% ringing around "10" error , @ 10: goes with 3-5% ringing, slight overshoot
+p = 1/15, i = 2500/1 d = 5/4 ; @ 1: goes very well with slight ringing, @ 5: goes very well with 2% ringing, @ 10: goes with 3-4% ringing, slight overshoot
+p = 1/35, i = 2500/1 d = 4/1 ; @ 1: doesn't go (times out), @ 5: goes with 2% ringing, 5% steady state error, @ 10: goes with 2% ringing, no overshoot, 2% steady state error, @0 slow to stop (2 seconds)
+p = 1/35, i = 250/1 d = 4/1 ; @ 1: goes with 30% steady state error, @ 5: goes with 2% ringing, 5% steady state error, @ 10: goes with 2% ringing, no overshoot, 2% steady state error, @0 slow to stop (2 seconds)
+p = 1/25, i = 100/1 d = 4/1 ; @ 1: goes with 20% steady state error (times out 75% of time), @ 5: goes with 2% ringing, 3% steady state error, @ 10: goes with 2% ringing, slight overshoot, 1% steady state error
+p = 1/25, i = 250/1 d = 10/1 ; @ 1: times out, @ 5: goes with 2% ringing, 2% steady state error, @ 10: goes with 2% ringing, 1% steady state error
+p = 1/35, i = 250/1 d = 10/1 ; @ 1: doesn't go well (times out 75%), 30% steady state error, @ 5: goes with 2% ringing, 10% steady state error, @ 10: goes with 2% ringing, no overshoot, 2% steady state error, @0 slow to stop (5 seconds)
+p = 1/35, i = 250/1 d = 10/1 ; @ 1: doesn't go well (times out 75%), 30% steady state error, @ 5: goes with 2% ringing, 10% steady state error, @ 10: goes with 2% ringing, no overshoot, 2% steady state error, @0 slow to stop (5 seconds)
+p = 1/35, i = 250/1 d = 1/1 ; @ 1: times out (times out @2 75% with 30% steady state error), @ 5: goes with 2% ringing, 5% steady state error, @ 10: goes with 2% ringing, no overshoot, 2% steady state error, @0 slow to stop (5 seconds)
+p = 1/30, i = 50/1 d = 25/1 ; @ 1: goes very well, @ 5: goes with 2% ringing, @ 10: goes with 4% ringing, slight overshoot
+p = 1/30, i = 50/1 d = 50/1 ; @ 1: goes very well, @ 5: goes with 2% ringing, slow ringing though, @ 10: goes with 3% ringing, slight overshoot, fast ringing
+p = 1/30, i = 50/1 d = 500/1 ; @ 1: goes very well, @ 5: goes with 2% ringing, fast ringing, @ 10: goes with 5% ringing, slight overshoot, fast ringing
+p = 1/30, i = 50/1 d = 1/10 ; @ 1: goes very well, @ 5: goes with 2% ringing, @ 10: goes with 3% ringing, slight overshoot, fast ringing
+p = 10/275, i = 50/1 d = 1/25 ; @ 1: goes very well, @ 5: goes with 2% ringing, @ 10: goes with 3% ringing, slight overshoot, fast ringing
+p = 10/275, i = 50/1 d = 1/50 ; @ 1: goes very well, @ 5: goes with 2% ringing, @ 10: goes with 3% ringing, slight overshoot, fast ringing
+p = 10/275, i = 50/1 d = 1/10 ; @ 1: goes very well, @ 5: goes with 2% ringing, @ 10: goes with 3% ringing, slight overshoot, fast ringing
+# new Scott method (parallel form pid, 20 previous PID errors) and Nathan method (call pid_step from quad interrupt)
+p = 10/1, i = 1/10 d = 1/1 ; @ everything: goes way too high, then way too low, then times out
+p = 1/1, i = 1/10000 d = 1/1 ; @ 
+p = 2/1, i = 1/1000 d = 3/2 ; @ 1: goes with heavy steady state error (high side), then slows and stops, @ 5: goes steady at 3.5, @ 10: goes steady at 7
+p = 3/2, i = 1/100 d = 10/1 ; @ everything: goes way too high, then way too low, then times out
+p = 5/4, i = 1/1000 d = 1000/1 ; @ 1, 5: goes with heavy steady state error (high side), then slows and stops, @ 10: goes steady at 6
+p = 1/4, i = 1/100 d = 1000/1 ; @ everything: goes way too high, then way too low, then times out
+p = 1/10, i = 1/500 d = 5000/1 ; @ everything: goes way too high, then way too low, then times out (10 never actually gets to 10 though)
+# previous PID errors now 5
+p = 1/10, i = 1/2500 d = 2500/1 ; @ everything: goes a little, then way too low, then times out
+# previous PID errors now 2
+p = 1/5, i = 1/2500 d = 2500/1 ; @ everything: goes a little, then way too low, then times out
+p = 1/1, i = 1/2500 d = 2500/1 ; @ 1: goes with heavy steady state error (low side), then slows and stops, @ 5: goes steady at 2.5, @ 10: goes steady at 5
+# Sep 6th, 2011, mover type 0, off track, (mover type 2 on track)
+# now including last effort
+p = 1/10, i = 1/2500 d = 2500/1 ; @ 1: 400% overshot, then slows and stops, @ 5: goes with fast 2% ringing, @ 10: goes with fast 4% ringing
+# previous PID errors now 5
+p = 1/15, i = 1/5000 d = 5000/1 ; @ 1: 400% overshot, then slows and stops, @ >1.9: won't go at all (damping from KD too big)
+p = 1/15, i = 1/2500 d = 500/1 ; @ everything: 400% overshot, then slows and stops
+p = 1/15, i = 0/2500 d = 0/1 ; @ 1: won't go, @ 5: goes with minimal ringing, @ 10 goes with fast ringing
+p = 1/10, i = 0/2500 d = 0/1 ; @ 1: won't go, @ 5: goes with minimal ringing, @ 10 goes with fast ringing
+p = 1/5, i = 0/2500 d = 0/1 ; @ 1: won't go, @ 5: expected overshoot, goes with minimal ringing, @ 10 goes with fast ringing
+p = 1/1, i = 0/2500 d = 0/1 ; @ 1: goes, @ 5: goes with max ringing, @ 10 goes with fast ringing
+# applied http://en.wikipedia.org/wiki/Ziegler%E2%80%93Nichols_method for "classic PID" rule
+p = 3/5, i = 2/24575, d = 8847/4 ; @ 1: won't go, @ 5: goes with large slow ringing, @ 10 goes with medium ringing
+# previous PID errors now 2
+p = 3/5, i = 2/24575, d = 8847/4 ; @ 1: goes 75% of the time (on track 0%), @ 2: (noticable overshoot and ringing on track), @ 5: goes with large slow ringing (on track not noticable), @ 10 goes with medium ringing (on track not noticable)
+p = 1/1, i = 2/24575, d = 8847/4 ; @ .5: goes 50% of the time (on track 0%), @ 1: goes well (on track goes and stops), @ 5: goes with large slow ringing (on track noticable), @ 10 goes with medium ringing (on track not noticable)
+
+
