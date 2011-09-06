@@ -744,6 +744,9 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
     if ( status & ATMEL_TC_COVFS )
         {
         atomic_set(&o_count, atomic_read(&o_count) + MAX_TIME);
+// new method
+        // call pid_step to change motor at each input of encoder
+        pid_step(MAX_TIME);
         }
 
     // Pin A going high caused IRQ?
@@ -1552,8 +1555,8 @@ static void ramp_fire(unsigned long data) {
     atomic_set(&pid_set_point, new_speed);
 
 // new method
-    // call initial pid_step if we were stopped
-    if (start_speed == 0) {
+    // call initial pid_step if we are just starting to ramp and we're moving slowly
+    if (abs(goal_step) <= 1 && start_speed < 2) {
         pid_step(MAX_TIME); // use maximum delta_t
     }
 }
