@@ -52,9 +52,11 @@ static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0};
 static int RAMP_UP_TIME_IN_MSECONDS[] = {150,5000,150,0};
 static int RAMP_DOWN_TIME_IN_MSECONDS[] = {100,5000,100,0};
 //static int RAMP_STEPS[] = {25,100,25,0};
-static int RAMP_STEPS[] = {1,100,25,0};
+static int RAMP_STEPS[] = {1,100,1,0};
 
 // the parameters needed for PID speed control
+// old method
+#if 0
 static int PID_HZ[]        = {20,100,20,1};
 static int PID_DELTA_T[]   = {50,10,50,1}; // inversely proportial to HZ (ie 100 dt = 1000 ms / 100 hz)
 static int PID_GAIN_MULT[] = {10,1000,1,0}; // proportional gain numerator
@@ -63,6 +65,14 @@ static int PID_TI_MULT[]   = {25,1,2500,1}; // time integral numerator
 static int PID_TI_DIV[]    = {1,1,1,1}; // time integral denominator
 static int PID_TD_MULT[]   = {1,1,2,1}; // time derivitive numerator
 static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
+#endif
+// new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 1 second:29490 ticks off track on type 0, tested on type 2 on track)
+static int PID_KP_MULT[]   = {3, 1, 3, 0}; // proportional gain numerator
+static int PID_KP_DIV[]    = {5, 1, 5, 0}; // proportional gain denominator
+static int PID_KI_MULT[]   = {2, 1, 2, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {24575, 1, 24575, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {8847, 1, 8847, 0}; // derivitive gain numerator
+static int PID_KD_DIV[]    = {4, 1, 4, 0}; // derivitive gain denominator
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -180,10 +190,19 @@ atomic_t moving_atomic = ATOMIC_INIT(FALSE);
 //---------------------------------------------------------------------------
 atomic_t full_init = ATOMIC_INIT(FALSE);
 
+// old method
+#if 0
 //---------------------------------------------------------------------------
 // This atomic variable is for our registration with netlink_provider
 //---------------------------------------------------------------------------
 atomic_t driver_id = ATOMIC_INIT(-1);
+#endif
+
+// new method
+//---------------------------------------------------------------------------
+// Forward definition of pid function
+//---------------------------------------------------------------------------
+static void pid_step(int delta_t);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are awake/asleep
@@ -271,11 +290,11 @@ static int pwm_from_effort(int effort);		// absolute pwm, calculated
 // Variables for PID speed control
 //---------------------------------------------------------------------------
 spinlock_t pid_lock = SPIN_LOCK_UNLOCKED;
-int pid_error = 0;			// current error
-int pid_last_error = 0;		// prior error
-int pid_last_last_error = 0;// prior, prior error
-int pid_last_effort = 0;	// prior effort
-int pid_effort = 0;			// current effort
+#define MAX_PID_ERRORS 2
+int pid_errors[MAX_PID_ERRORS];		// previous errors (fully calculated for use in summing integral part of PID)
+int pid_last_effort = 0;			// prior effort
+int pid_last_error = 0;				// prior error
+int pid_error = 0;					// current error
 atomic_t pid_set_point = ATOMIC_INIT(0); // set point for speed to maintain
 
 //---------------------------------------------------------------------------
@@ -594,6 +613,11 @@ static int hardware_movement_stop(int stop_timer)
     // reset PID set point
     atomic_set(&pid_set_point, 0);
 
+// new method
+    // reset PID errors and update internal pid variables
+    memset(pid_errors, 0, sizeof(int)*MAX_PID_ERRORS);
+    pid_step(MAX_TIME); // use maximum delta_t
+
     // turn off the motor
     hardware_motor_off();
 
@@ -762,6 +786,9 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
             atomic_set(&doing_vel, TRUE);
             mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
             }
+// new method
+        // call pid_step to change motor at each input of encoder
+        pid_step(this_t);
         }
     else
         {
@@ -1523,6 +1550,12 @@ static void ramp_fire(unsigned long data) {
 
     // set desired percentage
     atomic_set(&pid_set_point, new_speed);
+
+// new method
+    // call initial pid_step if we were stopped
+    if (start_speed == 0) {
+        pid_step(MAX_TIME); // use maximum delta_t
+    }
 }
 
 //---------------------------------------------------------------------------
@@ -2087,8 +2120,14 @@ static void movement_change(struct work_struct * work)
 //---------------------------------------------------------------------------
 // PID loop step
 //---------------------------------------------------------------------------
+// old method
+#if 0
 static void pid_step(void) {
-    int new_speed=1, input_speed=0;
+#endif
+
+// new method
+static void pid_step(int delta_t) {
+    int new_speed=1, input_speed=0, error_sum=0, i, pid_effort=0, pid_p, pid_i, pid_d;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
@@ -2099,13 +2138,16 @@ static void pid_step(void) {
     // read input speed (adjust speed10 value to 1000*percent)
     //input_speed = (523 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type];
     input_speed = (1000 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type]; // absolute velocity, no direction
-    delay_printk("s: %i; p: %i;", new_speed, input_speed);
+    delay_printk("s:%i; i:%i;", new_speed, input_speed);
 
     // We have just a few microseconds to complete operations, so die if we can't lock
     if (!spin_trylock(&pid_lock)) {
         return;
     }
 
+
+// old method
+# if 0
     // move error values
     pid_last_last_error = pid_last_error;
     pid_last_error = pid_error;
@@ -2128,18 +2170,48 @@ static void pid_step(void) {
               )
         ) / PID_GAIN_DIV[mover_type]
     );
+#endif
 
+// new method
+    // move error values
+    pid_last_error = pid_error;
+    pid_error = new_speed - input_speed; // set point - input
 
-    // clamp effort to positive numbers only
+    // put calculated current error to end of list
+    pid_errors[MAX_PID_ERRORS-1] = (delta_t * (pid_last_error - pid_error)) / 2;
+
+    // calculate sum of past errors
+    for (i=0; i<MAX_PID_ERRORS; i++) {
+       error_sum += pid_errors[i];
+    }
+
+    // individual pid steps to make full equation more clean
+    pid_p = (((1000 * PID_KP_MULT[mover_type] * pid_error) / PID_KP_DIV[mover_type]) / 1000);
+    pid_i = (((1000 * PID_KI_MULT[mover_type] * error_sum) / PID_KI_DIV[mover_type]) / 1000);
+    pid_d = (((1000 * PID_KD_MULT[mover_type] * (pid_error - pid_last_error)) / (PID_KD_DIV[mover_type] * delta_t)) / 1000);
+
+    // descrete PID algorithm gleamed from Scott's brain
+    pid_effort = pid_last_effort + pid_p + pid_i + pid_d;
+
+    // min effort to positive numbers only -- TODO -- negative effort uses reverse motor techniques to apply negative pressure
     pid_effort = max(pid_effort, 0);
 
-    // clamp effort to 100%
+    // max effort to 100%
     pid_effort = min(pid_effort, 1000);
 
+// old method
+#if 0
     // clamp everything at 0 if we're truly stopped
     if (new_speed == 0 && input_speed == 0 && pid_error == 0 && pid_last_error == 0 && pid_last_last_error == 0) {
         pid_effort = 0;
         pid_last_effort = 0;
+    }
+#endif
+
+// new method
+    // move past errors back in error buffer
+    for (i=0; i<MAX_PID_ERRORS-1; i++) {
+       pid_errors[i] = pid_errors[i+1];
     }
 
     // convert effort to pwm
@@ -2149,11 +2221,22 @@ static void pid_step(void) {
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
 
+    // move effort values
+    pid_last_effort = pid_effort;
+
     // unlock for next time
     spin_unlock(&pid_lock);
     //delay_printk(" r: %i; f: %i; e: %i\n", new_speed, pid_effort, pid_error);
+// old method
+#if 0
     delay_printk(" r: %i; f: %i; e: %i; p: %i/%i; i: %i/%i; d: %i/%i\n", new_speed, pid_effort, pid_error,
                  PID_GAIN_MULT[mover_type], PID_GAIN_DIV[mover_type], PID_TI_MULT[mover_type], PID_TI_DIV[mover_type], PID_TD_MULT[mover_type], PID_TD_DIV[mover_type]);
+#endif
+// new method
+    delay_printk(" n:%i; u:%i; e:%i; p:%i:%i/%i; i:%i:%i/%i; d:%i:%i/%i\n", new_speed, pid_effort, pid_error,
+                 pid_p, PID_KP_MULT[mover_type], PID_KP_DIV[mover_type],
+                 pid_i, PID_KI_MULT[mover_type], PID_KI_DIV[mover_type],
+                 pid_d, PID_KD_MULT[mover_type], PID_KD_DIV[mover_type]);
 }
 
 
@@ -2162,9 +2245,12 @@ static void pid_step(void) {
 //---------------------------------------------------------------------------
 static int __init target_mover_generic_init(void)
     {
+// old method
+#if 0
     struct heartbeat_object hb_obj;
     int d_id;
     struct nl_driver driver = {&hb_obj, NULL, 0, NULL}; // only heartbeat object
+#endif
     int retval;
 
     // for debug
@@ -2183,10 +2269,17 @@ static int __init target_mover_generic_init(void)
     INIT_WORK(&delta_work, do_delta);
     INIT_WORK(&movement_work, movement_change);
 
+// old method
+#if 0
     // setup heartbeat for polling
     hb_obj_init_nt(&hb_obj, pid_step, PID_HZ[mover_type]); // heartbeat object calling pid_step()
     d_id = install_nl_driver(&driver);
     atomic_set(&driver_id, d_id);
+#endif
+
+// new method
+    // initialize pid stuff
+    memset(pid_errors, 0, sizeof(int)*MAX_PID_ERRORS);
 
     // initialize sysfs structure
     target_device_mover_generic.name = TARGET_NAME[mover_type]; // set name in structure here as we can't initialize on a non-constant
@@ -2207,7 +2300,10 @@ static void __exit target_mover_generic_exit(void)
     ati_flush_work(&velocity_work); // close any open work queue items
     ati_flush_work(&delta_work); // close any open work queue items
     ati_flush_work(&movement_work); // close any open work queue items
+// old method
+#if 0
     uninstall_nl_driver(atomic_read(&driver_id));
+#endif
     hardware_exit();
     target_sysfs_remove(&target_device_mover_generic);
     }
