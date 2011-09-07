@@ -16,6 +16,7 @@ obj-m := 	target.o \
 			mover.o \
 			target_generic_output.o \
 			target_hit_poll.o \
+			nchs.o \
 
 CURD := $(shell basename `pwd`)
 ifeq (${CURD},modules)
