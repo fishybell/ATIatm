@@ -66,7 +66,7 @@ static int PID_TI_DIV[]    = {1,1,1,1}; // time integral denominator
 static int PID_TD_MULT[]   = {1,1,2,1}; // time derivitive numerator
 static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
 #endif
-// new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 1 second:29490 ticks off track on type 0, tested on type 2 on track)
+// new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track)
 static int PID_KP_MULT[]   = {3, 1, 3, 0}; // proportional gain numerator
 static int PID_KP_DIV[]    = {5, 1, 5, 0}; // proportional gain denominator
 static int PID_KI_MULT[]   = {2, 1, 2, 0}; // integral gain numerator
@@ -911,6 +911,29 @@ static void init_quad_pins(void)
 //---------------------------------------------------------------------------
 // Initialize the timer counter as PWM output for motor control
 //---------------------------------------------------------------------------
+static void hardware_pwm_exit(void) {
+
+   // disable clock registers
+   __raw_writel(ATMEL_TC_CLKEN, tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, CCR));
+
+   // disable specific interrupts for the encoder A
+   __raw_writel(ATMEL_TC_COVFS                            // interrupt on counter overflow
+              | ATMEL_TC_LDRAS,                           // interrupt on loading RA
+                tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, IDR)); // interrupt disable register
+
+   // free softwrae irqs
+   free_irq(tc->irq[ENCODER_PWM_CHANNEL], NULL);
+
+   // disable clocks
+   clk_disable(tc->clk[ENCODER_PWM_CHANNEL]);
+
+   // free timer counter
+   target_timer_free(tc);
+}
+
+//---------------------------------------------------------------------------
+// Initialize the timer counter as PWM output for motor control
+//---------------------------------------------------------------------------
 static int hardware_pwm_init(void)
     {
     unsigned int mck_freq;
@@ -1209,12 +1232,11 @@ static int hardware_exit(void)
     del_timer(&position_timer_list);
     del_timer(&velocity_timer_list);
 
-    free_irq(tc->irq[ENCODER_PWM_CHANNEL], NULL);
     free_irq(INPUT_MOVER_TRACK_HOME, NULL);
     free_irq(INPUT_MOVER_TRACK_END, NULL);
     free_irq(INPUT_MOVER_TRACK_SENSOR_1, NULL);
 
-    target_timer_free(tc);
+    hardware_pwm_exit();
 
     return 0;
     }
