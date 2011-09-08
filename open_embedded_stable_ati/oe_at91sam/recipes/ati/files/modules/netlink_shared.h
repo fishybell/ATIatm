@@ -215,6 +215,7 @@ enum {
     NL_C_GPS,		/* gps status (request/reply) (gps structure) */
     NL_C_EVENT,		/* mover/lifter event (command/reply) (generic 8-bit int) */
     NL_C_SLEEP,		/* sleep/wake command (command) (generic 8-bit int) */
+    NL_C_MAC,		/* Reads or sets te mac address */
     __NL_C_MAX,
 };
 #define NL_C_MAX (__NL_C_MAX - 1)

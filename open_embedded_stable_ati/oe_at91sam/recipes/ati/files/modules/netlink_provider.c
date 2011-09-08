@@ -439,6 +439,13 @@ struct genl_ops provider_gnl_ops_sleep = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
+struct genl_ops provider_gnl_ops_mac = {
+    .cmd = NL_C_MAC,
+    .flags = 0,
+    .policy = generic_int16_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
 
 static struct genl_ops *command_op_map[] = {
     /* NL_C_UNSPEC */		NULL,
@@ -456,6 +463,7 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_GPS */			&provider_gnl_ops_gps,
     /* NL_C_EVENT */		&provider_gnl_ops_event,
     /* NL_C_SLEEP */		&provider_gnl_ops_sleep,
+    /* NL_C_MAC */		&provider_gnl_ops_mac,
 };
 
 typedef struct hb_obj_list {

@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <stdio.h>
 
 #include "netlink_user.h"
 
@@ -285,6 +286,16 @@ printf("NL_C_HIT_CAL\n");
             }
 
             break;
+        case NL_C_MAC:
+            genlmsg_parse(nlh, 0, attrs, GEN_INT16_A_MAX, generic_int16_policy);
+
+            if (attrs[GEN_INT16_A_MSG]) {
+                // # feet from home
+                int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
+                snprintf(wbuf, 1024, "A %i\n", value);
+            }
+
+            break;
         default:
             fprintf(stderr, "failure to parse unkown command\n"); fflush(stderr);
             break;
@@ -302,6 +313,61 @@ printf("NL_C_HIT_CAL\n");
 
 // global family id for ATI netlink family
 int family;
+
+char* readEeprom(char* eepromCmd, char* dest) {
+	int path_max = 256;
+	FILE *fp;
+	int status;
+	char path[path_max];
+
+
+	//fp = popen("/usr/bin/eeprom_rw read -addr 0x40", "r");
+	fp = popen(eepromCmd, "r");
+	if (fp == NULL)
+		printf ("Error: fp is NULL");
+
+	while (fgets(path, path_max, fp) != NULL) {
+		printf("runProcess path: %s\n", path);
+		strcat(dest,path);
+	}
+	
+
+	status = pclose(fp);
+	if (status == -1) {
+		// Error reported by pclose() 
+	} else {
+		// Use macros described under wait() to inspect `status' in order
+		// to determine success/failure of command executed by popen() 
+	}
+	return dest;
+}
+
+char* writeEeprom(char* eepromCmd, char* dest, char* writeCmd, int size) {
+	int path_max = 256;
+	FILE *fp;
+	int status;
+	char path[path_max];
+
+
+	//fp = popen("/usr/bin/eeprom_rw read -addr 0x40", "r");
+	fp = popen(eepromCmd, "w");
+	if (fp == NULL) {
+		printf ("Error: fp is NULL");
+	}
+
+	//fwrite("00:11:bc:00:ff:00", sizeof(char), 22, fp);
+	fwrite(writeCmd, sizeof(char), size, fp);
+	fflush(fp);
+
+	status = pclose(fp);
+	if (status == -1) {
+		// Error reported by pclose() 
+	} else {
+		// Use macros described under wait() to inspect `status' in order
+		// to determine success/failure of command executed by popen() 
+	}
+	return writeCmd;
+}
 
 int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     char wbuf[1024];
@@ -399,6 +465,96 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             case 'Z': case 'z':
                 nl_cmd = NL_C_BIT;
                 break;
+			case 'I': case 'i':
+				//nl_cmd = NL_C_MAC;
+				arg1 = cmd[1] == ' ' ? 2 : 1;
+				switch (cmd[arg1]) { /* second letter */
+					case 'B': case 'b':		// Reads the board type
+						// read the board type from eeprom_rw 
+						printf("Read Board type");
+						char str[25] = {'\0'};
+						char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x00";
+						snprintf(wbuf, 1024, "I B %s\n", readEeprom(eRead, str));
+						break;
+					case 'C': case 'c':		// Sets and Reads the connect port number
+						arg2 = cmd[3] == 1;
+						if (sscanf(cmd+3, "%s", &arg3) == 1) {
+							char str[25] = {'\0'};
+							int size = strlen(cmd+4)+1;
+							char eWrite[60] = {'\0'};
+							// write the connect port number to eeprom_rw
+							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x240 -size %i -blank 0x40", size);
+							snprintf(wbuf, 1024, "I C %s\n", writeEeprom(eWrite, str, cmd+4, size));
+						} else {
+			 				char str[25] = {'\0'};
+							// read the connect port number from eeprom_rw 
+							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x240";
+							snprintf(wbuf, 1024, "I C %s\n", readEeprom(eRead, str));
+						}
+				        break;
+					case 'D': case 'd':		// Reads communication type
+						// read the board type from eeprom_rw 
+						printf("Read Communication type");
+						char strD[25] = {'\0'};
+						char eReadD[40] = "/usr/bin/eeprom_rw read -addr 0x80";
+						snprintf(wbuf, 1024, "I D %s\n", readEeprom(eReadD, strD));
+						break;
+					case 'I': case 'i':		// Sets and Reads the IP address
+						arg2 = cmd[3] == 1;
+						if (sscanf(cmd+3, "%s", &arg3) == 1) {
+							char str[25] = {'\0'};
+							int size = strlen(cmd+4)+1;
+							char eWrite[60] = {'\0'};
+							// write the ip address to eeprom_rw
+							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0xC0 -size %i -blank 0x40", size);
+							snprintf(wbuf, 1024, "I I %s\n", writeEeprom(eWrite, str, cmd+4, size));
+						} else {
+			 				char str[25] = {'\0'};
+							// read the ip address from eeprom_rw 
+							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0xC0";
+							snprintf(wbuf, 1024, "I I %s\n", readEeprom(eRead, str));
+						}
+				        break;
+					case 'L': case 'l':		// Sets and Reads the listen port number
+						arg2 = cmd[3] == 1;
+						if (sscanf(cmd+3, "%s", &arg3) == 1) {
+							char str[25] = {'\0'};
+							int size = strlen(cmd+4)+1;
+							char eWrite[60] = {'\0'};
+							// write the listen port number to eeprom_rw
+							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x200 -size %i -blank 0x40", size);
+							snprintf(wbuf, 1024, "I L %s\n", writeEeprom(eWrite, str, cmd+4, size));
+						} else {
+			 				char str[25] = {'\0'};
+							// read the listen port number from eeprom_rw 
+							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x200";
+							snprintf(wbuf, 1024, "I L %s\n", readEeprom(eRead, str));
+						}
+				        break;
+					case 'M': case 'm':		// Sets and Reads the MAC address
+						arg2 = cmd[3] == 1;
+						if (sscanf(cmd+3, "%s", &arg3) == 1) {
+							char str[25] = {'\0'};
+							int size = strlen(cmd+4)+1;
+							char eWrite[60] = {'\0'};
+							// write the mac address to eeprom_rw
+							if(isMac(cmd+4)) {
+								sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x40 -size %i -blank 0x40", size);
+								snprintf(wbuf, 1024, "I M %s\n", writeEeprom(eWrite, str, cmd+4, size));
+							}
+							else {
+								snprintf(wbuf, 1024, "I M invalid MAC address\n");
+							}
+						} else {
+			 				char str[25] = {'\0'};
+							// read the mac address from eeprom_rw 
+							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x40";
+							snprintf(wbuf, 1024, "I M %s\n", readEeprom(eRead, str));
+						}
+				        break;
+				}
+				write(client, wbuf, strnlen(wbuf,1024));
+				break;
             case '#':
                 if (sscanf(cmd+1, "%i", &arg1) == 1) {
                    epoll_ctl(efd, EPOLL_CTL_DEL, nl_fd, NULL);
@@ -409,6 +565,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             case '?':
                 // help command
                 arg1 = cmd[1] == ' ' ? 2 : 1; // next letter location in the command (ignore up to one space)
+				arg2 = cmd[3] == ' ' ? 4 : 3;
                 switch (cmd[arg1]) { /* second letter */
                     case 'A': case 'a':
                         snprintf(wbuf, 1024, "Request position\nFormat: A\n");
@@ -433,7 +590,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         break;
                     case 'H': case 'h':
                         snprintf(wbuf, 1024, "Request hit data\nFormat: H\nReset Hit data\nFormat: H 0\n");
-                        break;
+                        break; 
                     case 'K': case 'k':
                         snprintf(wbuf, 1024, "Shutdown device\nFormat: K\n");
                         break;
@@ -470,8 +627,30 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                     case 'Z': case 'z':
                         snprintf(wbuf, 1024, "Request knob value\nFormat: Z\n");
                         break;
+					case 'I': case 'i':
+						switch (cmd[arg2]) { /* second letter */
+							case 'B': case 'b':
+                        		snprintf(wbuf, 1024, "Get board type\nFormat: I B\n");
+								break;
+							case 'D': case 'd':
+                        		snprintf(wbuf, 1024, "Get comm type\nFormat: I D\n");
+								break;
+							case 'I': case 'i':
+                        		snprintf(wbuf, 1024, "Get/Set current IP address\nFormat: I P <ip>\n");			
+								break;
+							case 'C': case 'c':
+                        		snprintf(wbuf, 1024, "Get/Set connect port number\nFormat: I C <cport>\n");		
+								break;
+							case 'L': case 'l':
+                        		snprintf(wbuf, 1024, "Get/Set listen port number\nFormat: I L <lport>\n");		
+								break;
+							case 'M': case 'm':
+                        		snprintf(wbuf, 1024, "Get/Set current mac address\nFormat: I M <mac>\n");			
+								break;
+						}
+                        break;
                     default: // print default help
-                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob\n");
+                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI I: IP Address\nI L: Listen Port Number\nI M: MAC Address\n");
                         break;
                 }
                 write(client, wbuf, strnlen(wbuf,1024));
@@ -694,6 +873,15 @@ printf("unrecognized command '%c'\n", cmd[0]);
                            }
                            break;
                     }
+		case NL_C_MAC:
+                    if (cmd[0] == 'I' || cmd[0] == 'i') {
+			nla_put_u16(msg, GEN_INT16_A_MSG, "Get Mac info");
+                    	snprintf(wbuf, 1024, "Mac address appears here\n");
+                    } else {
+			nla_put_u16(msg, GEN_INT16_A_MSG, "Set Mac info");
+			snprintf(wbuf, 1024, "Mac address appears here\n");
+                    }
+                    break;
 
                     // grab as many pieces as we can get (always in same order for all accessory types)
                     unsigned int req = 1, onn = 0, one = 0, onh = 0, onk = 0, ont = 0, oft = 0, std = 0, rpd = 0, rpt = 0, ex1 = 0, ex2 = 0, ex3 = 0; // placeholders as we can't take address of bit-field for sscanf
@@ -933,5 +1121,30 @@ printf("sk %i closing\n", client);
 
     return 0;
 }
+
+// Verifies the input is a correctly formed MAC address
+int isMac(char* cmd) {
+	int arg1, arg2;
+	arg2 = 0;
+    int i = 0;
+
+	while(i <= 16) {
+		int hex = cmd[arg2+i];
+		if(i==2 || i==5 || i==8 || i==11 || i==14) {
+			// Check for the colon to be in the right place
+			if(hex != 58) {
+				return 0;
+			}
+		}	// Make sure all numbers fall within the hexidecimal range
+		else if ( (hex >= 48 && hex <= 58) || (hex >= 97 && hex <= 102) || (hex >= 65 && hex <= 70) ) {
+			// nothing in here
+		} else {
+			return 0;
+		}
+		i++;	
+	}
+	return 1;
+}
+
 
 

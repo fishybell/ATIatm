@@ -145,7 +145,7 @@ int nl_stop_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
 delay_printk("Mover: handling stop command\n");
     
     // get attribute from message
-    na = info->attrs[GEN_INT16_A_MSG]; // generic 8-bit message
+    na = info->attrs[GEN_INT16_A_MSG]; // generic 16-bit message
     if (na) {
         // grab value from attribute
         value = nla_get_u16(na); // value is ignored
@@ -191,7 +191,8 @@ delay_printk("Mover: handling move command\n");
     if (na) {
         // grab value from attribute
         value = nla_get_u16(na); // value is ignored
-delay_printk("Mover: received value: %i\n", value);
+	delay_printk("Mover: received value: %i\n", value-32768);
+        delay_printk("Current speed: %i\n", mover_speed_get());
 
         // default to message handling success (further feedback will come from move_event)
         rc = HANDLE_SUCCESS_NO_REPLY;
@@ -213,7 +214,12 @@ delay_printk("Mover: received value: %i\n", value);
                 delay_printk("Mover: could not create return message\n");
                 rc = HANDLE_FAILURE;
             }
-        } else {
+        } //else if ((mover_speed_get() > 0 && value-32768 < 0) || (mover_speed_get() < 0 && value-32768 > 0)) {
+	    //delay_printk("mover is reversing direction\n");
+	    //enable_battery_check(0); // disable battery checking while motor is on
+	    //mover_speed_set(0);  // set speed to 0 first to make easier on equipment
+	    //mover_speed_set(value-32768); // unsigned value to signed speed (0 will coast)
+	 else {
             // move
             enable_battery_check(0); // disable battery checking while motor is on
             delay_printk("NL_MOVE_HANDLER: value1: %d value2: %d\n", value, value-32768);
