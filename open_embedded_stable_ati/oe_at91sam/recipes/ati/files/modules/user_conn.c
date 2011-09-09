@@ -470,11 +470,19 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 				arg1 = cmd[1] == ' ' ? 2 : 1;
 				switch (cmd[arg1]) { /* second letter */
 					case 'B': case 'b':		// Reads the board type
-						// read the board type from eeprom_rw 
-						printf("Read Board type");
-						char str[25] = {'\0'};
-						char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x00";
-						snprintf(wbuf, 1024, "I B %s\n", readEeprom(eRead, str));
+						arg2 = cmd[3] == 1;
+						if (sscanf(cmd+3, "%s", &arg3) == 1) {
+							char str[25] = {'\0'};
+							int size = strlen(cmd+4)+1;
+							char eWrite[60] = {'\0'};
+							// write the connect port number to eeprom_rw
+							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x00 -size %i -blank 0x40", size);
+							snprintf(wbuf, 1024, "I B %s\n", writeEeprom(eWrite, str, cmd+4, size));
+						} else {
+							char str[25] = {'\0'};
+							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x00";
+							snprintf(wbuf, 1024, "I B %s\n", readEeprom(eRead, str));
+						}
 						break;
 					case 'C': case 'c':		// Sets and Reads the connect port number
 						arg2 = cmd[3] == 1;
@@ -493,11 +501,21 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 						}
 				        break;
 					case 'D': case 'd':		// Reads communication type
-						// read the board type from eeprom_rw 
-						printf("Read Communication type");
-						char strD[25] = {'\0'};
-						char eReadD[40] = "/usr/bin/eeprom_rw read -addr 0x80";
-						snprintf(wbuf, 1024, "I D %s\n", readEeprom(eReadD, strD));
+						arg2 = cmd[3] == 1;
+						if (sscanf(cmd+3, "%s", &arg3) == 1) {
+							char str[25] = {'\0'};
+							int size = strlen(cmd+4)+1;
+							char eWrite[60] = {'\0'};
+							// write the communication type to eeprom_rw
+							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x80 -size %i -blank 0x40", size);
+							snprintf(wbuf, 1024, "I D %s\n", writeEeprom(eWrite, str, cmd+4, size));
+						} else {
+							// read the communication type from eeprom_rw 
+							printf("Read Communication type");
+							char strD[25] = {'\0'};
+							char eReadD[40] = "/usr/bin/eeprom_rw read -addr 0x80";
+							snprintf(wbuf, 1024, "I D %s\n", readEeprom(eReadD, strD));
+						}
 						break;
 					case 'I': case 'i':		// Sets and Reads the IP address
 						arg2 = cmd[3] == 1;
@@ -552,6 +570,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 							snprintf(wbuf, 1024, "I M %s\n", readEeprom(eRead, str));
 						}
 				        break;
+					case 'R': case 'r':		// Reboot
+						printf("Go down for a reboot");
+						char str[25] = {'\0'};
+						char eRead[40] = "reboot";
+						readEeprom(eRead, str);
+						break;
 				}
 				write(client, wbuf, strnlen(wbuf,1024));
 				break;
@@ -630,10 +654,10 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 					case 'I': case 'i':
 						switch (cmd[arg2]) { /* second letter */
 							case 'B': case 'b':
-                        		snprintf(wbuf, 1024, "Get board type\nFormat: I B\n");
+                        		snprintf(wbuf, 1024, "Get/Set board type\nFormat: I B <HSAT>, <LSAT>, <MAT>, <MIT>, <SES>, <SIT>\n");
 								break;
 							case 'D': case 'd':
-                        		snprintf(wbuf, 1024, "Get comm type\nFormat: I D\n");
+                        		snprintf(wbuf, 1024, "Get/Set comm type\nFormat: I D <local>, <network>, <radio>, <wifi>, <wimax>\n");
 								break;
 							case 'I': case 'i':
                         		snprintf(wbuf, 1024, "Get/Set current IP address\nFormat: I P <ip>\n");			
@@ -647,10 +671,13 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 							case 'M': case 'm':
                         		snprintf(wbuf, 1024, "Get/Set current mac address\nFormat: I M <mac>\n");			
 								break;
+							case 'R': case 'r':
+                        		snprintf(wbuf, 1024, "Reboot\nFormat: I R reboot\n");			
+								break;
 						}
                         break;
                     default: // print default help
-                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI I: IP Address\nI L: Listen Port Number\nI M: MAC Address\n");
+                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI I: IP Address\nI L: Listen Port Number\nI M: MAC Address\nI R: Reboot\n");
                         break;
                 }
                 write(client, wbuf, strnlen(wbuf,1024));
