@@ -206,5 +206,6 @@
 #define	NCHS_ROD_A_UPPER 				AT91_PIN_PC9
 #define	NCHS_ROD_B_LOWER 				AT91_PIN_PA27
 #define	NCHS_ROD_B_UPPER 				AT91_PIN_PC7
+#define  NCHS_PULLUP_STATE          PULLUP_ON
 
 #endif //  __TARGET_HARDWARE_H__
