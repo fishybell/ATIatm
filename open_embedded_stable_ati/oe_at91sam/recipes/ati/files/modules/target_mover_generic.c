@@ -914,7 +914,7 @@ static void init_quad_pins(void)
 static void hardware_pwm_exit(void) {
 
    // disable clock registers
-   __raw_writel(ATMEL_TC_CLKEN, tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, CCR));
+   __raw_writel(ATMEL_TC_CLKDIS, tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, CCR));
 
    // disable specific interrupts for the encoder A
    __raw_writel(ATMEL_TC_COVFS                            // interrupt on counter overflow
