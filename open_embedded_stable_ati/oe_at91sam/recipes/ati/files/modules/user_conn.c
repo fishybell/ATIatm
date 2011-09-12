@@ -373,6 +373,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     char wbuf[1024];
     wbuf[0] = '\0';
     int arg1, arg2, arg3, arg4;
+	int farg1;
     // read as many commands out of the buffer as possible
     while (1) {
         // read line from client buffer
@@ -722,14 +723,16 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     }
                     break;
                 case NL_C_MOVE:
+					printf("Converting velocity to a float.\n");
+					float farg1 = (float)arg1;
                     if (cmd[1] == '\0') {
                         nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_REQ); // velocity request
-                    } else if (sscanf(cmd+1, "%i", &arg1) == 1) {
-						printf("User conn move: %i, divided: %f\n", arg1, arg1/10);
-                        if (arg1 > 32766 || arg1 < -32767) {
-                            arg1 = 0; // stay away from the edge conditions
+                    } else if (sscanf(cmd+1, "%f", &farg1) == 1) {
+						farg1 = farg1*10;	// muliplied to work with floats in target_mover_generic
+                        if (farg1 > 32766 || farg1 < -32767) {
+                            farg1 = 0; // stay away from the edge conditions
                         }
-                        nla_put_u16(msg, GEN_INT16_A_MSG, 32768+arg1); // move request (add 32768 as we're not signed)
+                        nla_put_u16(msg, GEN_INT16_A_MSG, 32768+farg1); // move request (add 32768 as we're not signed)
                     } else {
                         nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
                     }
