@@ -725,6 +725,7 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     if (cmd[1] == '\0') {
                         nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_REQ); // velocity request
                     } else if (sscanf(cmd+1, "%i", &arg1) == 1) {
+						printf("User conn move: %i, divided: %f\n", arg1, arg1/10);
                         if (arg1 > 32766 || arg1 < -32767) {
                             arg1 = 0; // stay away from the edge conditions
                         }

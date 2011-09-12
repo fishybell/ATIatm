@@ -23,7 +23,7 @@ set timeout $delay
 while 1 {
     expect {
         -re {.*word:.*} {
-            send "\r"
+            send "shoot\r"
         }
         -re {.*yes/no.*} {
             send "yes\r"
@@ -38,7 +38,7 @@ set timeout $delay
 while 1 {
     expect {
         -re {.*word:.*} {
-            send "\r"
+            send "shoot\r"
         }
         -re {.*yes/no.*} {
             send "yes\r"
