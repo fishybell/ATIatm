@@ -37,6 +37,7 @@ SRC_URI += "file://fasit/sounds/*.mp3"
 
 FILES_${PN} += "/lib/firmware/*"
 FILES_${PN} += "/etc/init.d/*"
+FILES_${PN} += "/etc/passwd/*"
 FILES_${PN} += "/etc/rcS.d/*"
 FILES_${PN} += "/etc/network/*"
 FILES_${PN} += "/home/root/*"
@@ -50,6 +51,7 @@ do_compile () {
 do_install () {
     install -m 755 -d ${D}/usr/bin
     install -m 755 -d ${D}/etc/init.d
+	install -m 755 -d ${D}/etc/passwd
     install -m 755 -d ${D}/etc/rcS.d
     install -m 755 -d ${D}/etc/network
     install -m 755 -d ${D}/home/root/sounds
