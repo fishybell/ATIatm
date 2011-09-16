@@ -1,0 +1,51 @@
+#!/bin/bash
+
+low=$1
+high=$2
+
+if [ -z $low ] ; then
+   low=0
+fi
+
+if [ -z $high ] ; then
+   high=20
+fi
+
+a=$low
+while [ $a -le $high ] ; do
+   # find samX and samwX for each number between low and high
+   for t in "" w ; do
+      # test for valid domain name
+      if nslookup sam$t$a | grep "Name" >/dev/null ; then
+         # test if up
+         if ping -c 1 -q -W 1 sam$t$a >/dev/null ; then
+            echo -n "sam$t$a Up"
+            # test telnet interface
+            if exec 3<>/dev/tcp/sam$t$a/4422 ; then
+               # find board type via telnet
+               echo "I B" >&3 # find board type
+               read i b isboard <&3
+               if [ -n $isboard ] ; then
+                  echo -n " -- is $isboard"
+               else
+                  echo -n " -- can't find board type from port 4422"
+               fi
+               # find mac address via telnet
+               echo "I M" >&3 # find board type
+               read i b ismac <&3
+               if [ -n $ismac ] ; then
+                  echo " -- is $ismac"
+               else
+                  echo " -- can't find mac address from port 4422"
+               fi
+            else
+               echo " -- not listening on port 4422"
+            fi
+         else   
+            echo sam$t$a Down
+         fi
+      fi
+   done
+   ((a=a+1))
+done
+
