@@ -3,6 +3,7 @@
 PR = "r0"
 
 SRC_URI = "file://issue*"
+SRC_URI = "file://passwd"
 #SRC_URI +=  "file://*gpio*"
 SRC_URI += "file://ati2-0.9/*.cpp"
 SRC_URI += "file://ati2-0.9/*.c"
@@ -37,7 +38,7 @@ SRC_URI += "file://fasit/sounds/*.mp3"
 
 FILES_${PN} += "/lib/firmware/*"
 FILES_${PN} += "/etc/init.d/*"
-FILES_${PN} += "/etc/passwd/*"
+#FILES_${PN} += "/etc/passwd/*"
 FILES_${PN} += "/etc/rcS.d/*"
 FILES_${PN} += "/etc/network/*"
 FILES_${PN} += "/home/root/*"
@@ -51,7 +52,7 @@ do_compile () {
 do_install () {
     install -m 755 -d ${D}/usr/bin
     install -m 755 -d ${D}/etc/init.d
-	install -m 755 -d ${D}/etc/passwd
+#	 install -m 755 -d ${D}/etc/passwd
     install -m 755 -d ${D}/etc/rcS.d
     install -m 755 -d ${D}/etc/network
     install -m 755 -d ${D}/home/root/sounds
@@ -60,6 +61,7 @@ do_install () {
     install -m 755 ${WORKDIR}/${P}/radio_conv ${D}/usr/bin
     install -m 755 ${WORKDIR}/${P}/eeprom_rw ${D}/usr/bin
     install -m 644 ${WORKDIR}/issue* ${D}/etc
+	install -m 644 ${WORKDIR}/passwd ${D}/etc
 #    install -m 644 ${WORKDIR}/fasit/*.py ${D}/home/root/fasit
     install -m 644 ${WORKDIR}/fasit/*.mp3 ${D}/home/root/sounds
     install -m 755 ${WORKDIR}/start_up ${D}/etc/init.d
