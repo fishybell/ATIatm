@@ -3,7 +3,7 @@
 PR = "r0"
 
 SRC_URI = "file://issue*"
-SRC_URI = "file://passwd"
+SRC_URI += "file://passwd"
 #SRC_URI +=  "file://*gpio*"
 SRC_URI += "file://ati2-0.9/*.cpp"
 SRC_URI += "file://ati2-0.9/*.c"
