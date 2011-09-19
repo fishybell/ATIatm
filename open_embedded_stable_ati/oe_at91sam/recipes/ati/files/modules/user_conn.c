@@ -59,7 +59,7 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
     wbuf[0] = '\0';
 
     // Validate message and parse attributes
-printf("Parsing: %i:%i\n", ghdr->cmd, client);
+//printf("Parsing: %i:%i\n", ghdr->cmd, client);
     switch (ghdr->cmd) {
         case NL_C_BATTERY:
             genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
@@ -153,7 +153,7 @@ printf("Parsing: %i:%i\n", ghdr->cmd, client);
 
             break;
         case NL_C_HIT_CAL:
-printf("NL_C_HIT_CAL\n");
+//printf("NL_C_HIT_CAL\n");
             genlmsg_parse(nlh, 0, attrs, HIT_A_MAX, hit_calibration_policy);
 
             if (attrs[HIT_A_MSG]) {
@@ -313,11 +313,12 @@ char* readEeprom(char* eepromCmd, char* dest) {
 
 	//fp = popen("/usr/bin/eeprom_rw read -addr 0x40", "r");
 	fp = popen(eepromCmd, "r");
-	if (fp == NULL)
-		printf ("Error: fp is NULL");
+	if (fp == NULL) {
+		return "Error: fp is NULL";
+   }
 
 	while (fgets(path, path_max, fp) != NULL) {
-		printf("runProcess path: %s\n", path);
+		//printf("runProcess path: %s\n", path);
 		strcat(dest,path);
 	}
 	
@@ -342,7 +343,7 @@ char* writeEeprom(char* eepromCmd, char* dest, char* writeCmd, int size) {
 	//fp = popen("/usr/bin/eeprom_rw read -addr 0x40", "r");
 	fp = popen(eepromCmd, "w");
 	if (fp == NULL) {
-		printf ("Error: fp is NULL");
+		return "Error: fp is NULL";
 	}
 
 	//fwrite("00:11:bc:00:ff:00", sizeof(char), 22, fp);
@@ -501,7 +502,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 							snprintf(wbuf, 1024, "I D %s\n", writeEeprom(eWrite, str, cmd+4, size));
 						} else {
 							// read the communication type from eeprom_rw 
-							printf("Read Communication type");
+							//printf("Read Communication type");
 							char strD[25] = {'\0'};
 							char eReadD[40] = "/usr/bin/eeprom_rw read -addr 0x80";
 							snprintf(wbuf, 1024, "I D %s\n", readEeprom(eReadD, strD));
@@ -561,8 +562,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 						}
 				        break;
 					case 'R': case 'r':		// Reboot
-						printf("Go down for a reboot");
-						char str[25] = {'\0'};
+						//printf("Go down for a reboot");
+						;char str[25] = {'\0'};
 						char eRead[40] = "reboot";
 						readEeprom(eRead, str);
 						break;
@@ -676,7 +677,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                 // empty string, just ignore
                 break;
             default:
-printf("unrecognized command '%c'\n", cmd[0]);
+//printf("unrecognized command '%c'\n", cmd[0]);
                 break;
         }
 
@@ -712,8 +713,8 @@ printf("unrecognized command '%c'\n", cmd[0]);
                     }
                     break;
                 case NL_C_MOVE:
-					printf("Converting velocity to a float.\n");
-					float farg1 = (float)arg1;
+					//printf("Converting velocity to a float.\n");
+					     ;float farg1;
                     if (cmd[1] == '\0') {
                         nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_REQ); // velocity request
                     } else if (sscanf(cmd+1, "%f", &farg1) == 1) {
@@ -1042,7 +1043,7 @@ int main(int argc, char **argv) {
         int pid = fork();
         if (pid == 0) {
             // child process, break out of loop
-printf("forked child\n");
+//printf("forked child\n");
             close(listener);
             break;
         } else if (pid < 0) {
@@ -1054,7 +1055,7 @@ printf("forked child\n");
         close(listener);
         return 0;
     }
-printf("is child\n");
+//printf("is child\n");
 
     // set up epoll
     struct epoll_event ev, events[MAX_EVENTS];
@@ -1100,23 +1101,23 @@ printf("is child\n");
             for (i=0; i<nfds; i++) {
                 if (events[i].data.fd == nl_fd) {
                     // netlink talking 
-printf("nl\n");
+//printf("nl\n");
                     nl_recvmsgs_default(g_handle); // will call callback functions
                 } else if (events[i].data.fd == client) {
                     // client talking
-printf("sk %i:", client);
+//printf("sk %i:", client);
                     b = strnlen(client_buf, CLIENT_BUFFER); // see where we left off
                     // is there any space left in the buffer?
-printf("%i", b);
+//printf("%i", b);
                     if (b >= CLIENT_BUFFER) {
                         close_nicely = 1; // exit loop
                     }
                     // read client
                     rsize = read(client, client_buf+b, CLIENT_BUFFER-b); // read into buffer at appropriate place, at most to end of buffer
-printf(":%i\n", rsize);
+//printf(":%i\n", rsize);
                     // parse buffer and send any netlink messages needed
                     if (rsize == 0 || telnet_client(g_handle, client_buf, client) != 0) {
-printf("sk %i closing\n", client);
+//printf("sk %i closing\n", client);
                         close_nicely = 1; // exit loop
                     }
                 }
