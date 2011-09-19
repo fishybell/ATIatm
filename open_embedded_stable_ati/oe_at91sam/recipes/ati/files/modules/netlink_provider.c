@@ -36,6 +36,11 @@ static struct work_struct nl_q_work;
 //---------------------------------------------------------------------------
 atomic_t full_init = ATOMIC_INIT(FALSE);
 
+//---------------------------------------------------------------------------
+// This atomic variable is use to hold our driver id from netlink provider
+//---------------------------------------------------------------------------
+atomic_t driver_id = ATOMIC_INIT(-1);
+
 /* delayed work queues */
 static struct work_struct init_work; // work to perform just after init
 
@@ -439,10 +444,10 @@ struct genl_ops provider_gnl_ops_sleep = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
-struct genl_ops provider_gnl_ops_mac = {
-    .cmd = NL_C_MAC,
+struct genl_ops provider_gnl_ops_dmsg = {
+    .cmd = NL_C_DMSG,
     .flags = 0,
-    .policy = generic_int16_policy,
+    .policy = generic_string_policy,
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
@@ -463,7 +468,7 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_GPS */			&provider_gnl_ops_gps,
     /* NL_C_EVENT */		&provider_gnl_ops_event,
     /* NL_C_SLEEP */		&provider_gnl_ops_sleep,
-    /* NL_C_MAC */		&provider_gnl_ops_mac,
+    /* NL_C_DMSG */		&provider_gnl_ops_dmsg,
 };
 
 typedef struct hb_obj_list {
@@ -721,8 +726,38 @@ static void init_final(struct work_struct * work) {
     }*/
 }
 
+//---------------------------------------------------------------------------
+// netlink command handler for debug messages
+//---------------------------------------------------------------------------
+int nl_dmsg_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc;
+    char *value;
+
+    // get attribute from message
+    na = info->attrs[GEN_STRING_A_MSG]; // generic string message
+    if (na) {
+        // grab value from attribute
+        value = (char*) nla_data(na);
+
+        // print userspace message as kernel message
+        delay_printk(value);
+        rc = HANDLE_SUCCESS_NO_REPLY;
+    } else {
+        rc = HANDLE_FAILURE;
+    }
+
+    // return to let provider send message back
+    return rc;
+}
+
 static int __init gnKernel_init(void) {
-    int rc, i;
+    int rc, i, d_id;
+    struct driver_command commands[] = {
+        {NL_C_DMSG, nl_dmsg_handler},
+    };
+    struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
+
     delay_printk("INIT GENERIC NETLINK PROVIDER MODULE\n");
 
     /* initialize global map */
@@ -764,6 +799,10 @@ delay_printk("NL GROUP ID: %i\n", nl_event_mcgrp.id);
     schedule_work(&init_work);
 
     atomic_set(&full_init, TRUE);
+
+    // after full init, do instantiation of debug message handler
+    d_id = install_nl_driver(&driver);
+    atomic_set(&driver_id, d_id);
     return 0;
 
   failure:
@@ -777,6 +816,7 @@ static void __exit gnKernel_exit(void) {
     int ret, i;
     struct command_handler *this;
     struct command_handler *last;
+    uninstall_nl_driver(atomic_read(&driver_id)); // first uninstall debug message handler
     atomic_set(&full_init, FALSE);
     ati_flush_work(&init_work); // close any open work queue items
     ati_flush_work(&nl_q_work); // close any open work queue items

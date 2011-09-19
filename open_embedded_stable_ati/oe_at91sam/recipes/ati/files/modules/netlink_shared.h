@@ -129,21 +129,21 @@ static struct nla_policy bit_event_policy[BIT_A_MAX + 1] = {
 
 /* specific policy for accessory configuration */
 typedef struct accessory_conf {
-    u8 acc_type:6;	/* type of accessory used (enum below) */
-    u8 request:1;	/* request all data for this accessory (on reply, on_now will indicate current status (if available), exists will indicate existence of accessory */
-    u8 exists:1;	/* 1 for exists, not used except for requests */
-    u8 on_now:2;	/* 1 for activate normal, 2 for activate immediate */
-    u8 on_exp:2;	/* 1 for active when fully exposed, 2 for active when partially exposed and fully exposed, 3 for active only while exposing/concealing */
-    u8 on_hit:2;	/* 1 for activate on hit, 2 for deactivate on hit */
-    u8 on_kill:2;	/* 1 for activate on kill, 2 for deactivate on kill */
-    u16 on_time __attribute__ ((packed));	/* time on (in milliseconds, 0 for forever) */
-    u16 off_time __attribute__ ((packed));	/* time off (in milliseconds, 0 for forever) */
-    u8 start_delay;	/* time to delay before activation (in half-seconds) */
-    u8 repeat_delay;/* time to delay before repeat (in half-seconds) */
-    u16 repeat:6 __attribute__ ((packed));			/* repeat count (0 for no repeat, 63 for forever) */
-    u16 ex_data1:10 __attribute__ ((packed));		/* extra data specific to the accessory type */
-    u8 ex_data2;	/* more extra data specific to the accessory type */
-    u8 ex_data3;	/* even more extra data specific to the accessory type */
+    u8 acc_type:6;   /* type of accessory used (enum below) */
+    u8 request:1;    /* request all data for this accessory (on reply, on_now will indicate current status (if available), exists will indicate existence of accessory */
+    u8 exists:1;     /* 1 for exists, not used except for requests */
+    u8 on_now:2;     /* 1 for activate normal, 2 for activate immediate */
+    u8 on_exp:2;     /* 1 for active when fully exposed, 2 for active when partially exposed and fully exposed, 3 for active only while exposing/concealing */
+    u8 on_hit:2;     /* 1 for activate on hit, 2 for deactivate on hit */
+    u8 on_kill:2;    /* 1 for activate on kill, 2 for deactivate on kill */
+    u16 on_time __attribute__ ((packed));     /* time on (in milliseconds, 0 for forever) */
+    u16 off_time __attribute__ ((packed));    /* time off (in milliseconds, 0 for forever) */
+    u8 start_delay;  /* time to delay before activation (in half-seconds) */
+    u8 repeat_delay; /* time to delay before repeat (in half-seconds) */
+    u16 repeat:6 __attribute__ ((packed));    /* repeat count (0 for no repeat, 63 for forever) */
+    u16 ex_data1:10 __attribute__ ((packed)); /* extra data specific to the accessory type */
+    u8 ex_data2;     /* more extra data specific to the accessory type */
+    u8 ex_data3;     /* even more extra data specific to the accessory type */
 } accessory_conf_t;
 enum {
     ACC_NES_MGL,      /* Night Effects Simulator, Moon Glow light */
@@ -201,21 +201,21 @@ static struct nla_policy gps_conf_policy[GPS_A_MAX + 1] = {
  */
 enum {
     NL_C_UNSPEC,
-    NL_C_FAILURE,	/* failure message (reply) (generic string) */
-    NL_C_BATTERY,	/* battery status as percentage (request/reply) (generic 8-bit int) */
-    NL_C_EXPOSE,	/* expose/conceal (command/reply) (generic 8-bit int) */
-    NL_C_MOVE,		/* move as mph (command/reply) (generic 16-bit int) */
-    NL_C_POSITION,	/* position in feet from home (request/reply) (generic 16-bit int) */
-    NL_C_STOP,		/* stop (command/reply) (generic 8-bit int) */
-    NL_C_HITS,		/* hit count (request/reply) (generic 8-bit int) */
-    NL_C_HIT_LOG,	/* hit count (request/reply) (generic string) */
-    NL_C_HIT_CAL,	/* calibrate hit sensor (command/reply) (hit calibrate structure) */
-    NL_C_BIT,		/* bit button event (broadcast) (bit event structure) */
-    NL_C_ACCESSORY,	/* configure accesories (command/reply) (accessory structure) */
-    NL_C_GPS,		/* gps status (request/reply) (gps structure) */
-    NL_C_EVENT,		/* mover/lifter event (command/reply) (generic 8-bit int) */
-    NL_C_SLEEP,		/* sleep/wake command (command) (generic 8-bit int) */
-    NL_C_MAC,		/* Reads or sets te mac address */
+    NL_C_FAILURE,    /* failure message (reply) (generic string) */
+    NL_C_BATTERY,    /* battery status as percentage (request/reply) (generic 8-bit int) */
+    NL_C_EXPOSE,     /* expose/conceal (command/reply) (generic 8-bit int) */
+    NL_C_MOVE,       /* move as mph (command/reply) (generic 16-bit int) */
+    NL_C_POSITION,   /* position in feet from home (request/reply) (generic 16-bit int) */
+    NL_C_STOP,       /* stop (command/reply) (generic 8-bit int) */
+    NL_C_HITS,       /* hit count (request/reply) (generic 8-bit int) */
+    NL_C_HIT_LOG,    /* hit count (request/reply) (generic string) */
+    NL_C_HIT_CAL,    /* calibrate hit sensor (command/reply) (hit calibrate structure) */
+    NL_C_BIT,        /* bit button event (broadcast) (bit event structure) */
+    NL_C_ACCESSORY,  /* configure accesories (command/reply) (accessory structure) */
+    NL_C_GPS,        /* gps status (request/reply) (gps structure) */
+    NL_C_EVENT,      /* mover/lifter event (command/reply) (generic 8-bit int) */
+    NL_C_SLEEP,      /* sleep/wake command (command) (generic 8-bit int) */
+    NL_C_DMSG,       /* debug message (reply) (generic string) */
     __NL_C_MAX,
 };
 #define NL_C_MAX (__NL_C_MAX - 1)
@@ -235,11 +235,11 @@ enum {
 #define BATTERY_REQUEST 1
 #define BATTERY_SHUTDOWN 0
 // defined battery percentage stop-points
-#define BAT_NORMAL	90
-#define BAT_LOW		20
-#define BAT_CRIT	5
-#define BAT_INVALID	1
-#define BAT_HALT	0
+#define BAT_NORMAL   90
+#define BAT_LOW      20
+#define BAT_CRIT     5
+#define BAT_INVALID  1
+#define BAT_HALT     0
 
 #define SLEEP_COMMAND 0
 #define WAKE_COMMAND 1
