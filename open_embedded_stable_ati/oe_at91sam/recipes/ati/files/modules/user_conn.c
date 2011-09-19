@@ -286,16 +286,6 @@ printf("NL_C_HIT_CAL\n");
             }
 
             break;
-        case NL_C_MAC:
-            genlmsg_parse(nlh, 0, attrs, GEN_INT16_A_MAX, generic_int16_policy);
-
-            if (attrs[GEN_INT16_A_MSG]) {
-                // # feet from home
-                int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
-                snprintf(wbuf, 1024, "A %i\n", value);
-            }
-
-            break;
         default:
             fprintf(stderr, "failure to parse unkown command\n"); fflush(stderr);
             break;
@@ -467,7 +457,6 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                 nl_cmd = NL_C_BIT;
                 break;
 			case 'I': case 'i':
-				//nl_cmd = NL_C_MAC;
 				arg1 = cmd[1] == ' ' ? 2 : 1;
 				switch (cmd[arg1]) { /* second letter */
 					case 'B': case 'b':		// Reads the board type
@@ -904,15 +893,6 @@ printf("unrecognized command '%c'\n", cmd[0]);
                            }
                            break;
                     }
-		case NL_C_MAC:
-                    if (cmd[0] == 'I' || cmd[0] == 'i') {
-			nla_put_u16(msg, GEN_INT16_A_MSG, "Get Mac info");
-                    	snprintf(wbuf, 1024, "Mac address appears here\n");
-                    } else {
-			nla_put_u16(msg, GEN_INT16_A_MSG, "Set Mac info");
-			snprintf(wbuf, 1024, "Mac address appears here\n");
-                    }
-                    break;
 
                     // grab as many pieces as we can get (always in same order for all accessory types)
                     unsigned int req = 1, onn = 0, one = 0, onh = 0, onk = 0, ont = 0, oft = 0, std = 0, rpd = 0, rpt = 0, ex1 = 0, ex2 = 0, ex3 = 0; // placeholders as we can't take address of bit-field for sscanf
