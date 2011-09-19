@@ -15,12 +15,12 @@ def_progs() {
    case $board in
       TTMT|MIT|MAT)
          # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
-         event_conn -vv &
+         event_conn -vv -k &
          ;;
       EIM|SES|SIT|LSAT|HSAT|SAT)
          if [ "$comm" == "local" ] ; then
             # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
-            event_conn -i $ip -C -vv &
+            event_conn -i $ip -C -vv -k &
          fi
          ;;
    esac
@@ -50,7 +50,7 @@ def_progs() {
    esac
    if [ "$comm" == "radio" ] ; then
       # listen or connect on the "connect-to" port
-      radio_conv -p $cport -s /dev/ttyS1 $BASE -vv &
+      radio_conv -p $cport -s /dev/ttyS1 $BASE -vv -k &
       ip="127.0.0.1"
    fi
    export ip=$ip

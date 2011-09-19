@@ -16,6 +16,7 @@ volatile int C_TRACE;
 volatile int C_DEBUG;
 volatile int C_INFO;
 volatile int C_ERRORS;
+volatile int C_KERNEL = 0;
 
 #include "connection.h"
 #include "tcp_factory.h"
@@ -147,6 +148,9 @@ const char *usage = "Usage: %s [options]\n\
                }
             }
             break;
+         case 'k' :
+            C_KERNEL=1; // enable output to kernel
+           break;
          case '-' : // for --help
             if (argv[i][2] == 'h') {
                printf(usage, argv[0]);

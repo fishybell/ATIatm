@@ -3,6 +3,9 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include "nl_conn.h"
+#include "netlink_user.h"
 
 /*
  * min()/max() macros that also do
@@ -46,46 +49,121 @@ extern volatile int C_TRACE;
 extern volatile int C_DEBUG;
 extern volatile int C_INFO;
 extern volatile int C_ERRORS;
+extern volatile int C_KERNEL; // send messages to kernel for organized output over serial line
+
+// helper function to send kernel netlink message
+static int ignoreFromKernel(struct nl_msg *msg, void *arg) { return NL_OK; } ; // ignores everything received from kernel on this handler
+
+static void msgToKernel(char *buf) {
+   static struct nl_handle *handle = NULL;
+   static int family = 0;
+
+   // initialize once
+   if (handle == NULL) {
+      // connect to kernel
+      handle = nl_handle_alloc();
+      if (handle == NULL) { return; }
+      if (genl_connect(handle) < 0) {
+         nl_handle_destroy(handle);
+         handle = NULL;
+         return;
+      }
+
+      // prepare connection
+      family = genl_ctrl_resolve(handle, "ATI");
+      if (family < 0) {
+         nl_handle_destroy(handle);
+         handle = NULL;
+         return;
+      }
+
+      // Prepare handle to receive the answer by specifying the callback (ignores everything)
+      nl_socket_modify_cb(handle, NL_CB_VALID, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+      nl_socket_modify_cb(handle, NL_CB_FINISH, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+      nl_socket_modify_cb(handle, NL_CB_OVERRUN, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+      nl_socket_modify_cb(handle, NL_CB_SKIPPED, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+      nl_socket_modify_cb(handle, NL_CB_ACK, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+      nl_socket_modify_cb(handle, NL_CB_MSG_IN, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+      nl_socket_modify_cb(handle, NL_CB_MSG_OUT, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+      nl_socket_modify_cb(handle, NL_CB_INVALID, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+      nl_socket_modify_cb(handle, NL_CB_SEQ_CHECK, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+      nl_socket_modify_cb(handle, NL_CB_SEND_ACK, NL_CB_CUSTOM, ignoreFromKernel, NULL);
+
+   }
+
+   // send to handler
+   struct nl_msg *msg;
+   msg = nlmsg_alloc();
+   genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_DMSG, 1);
+
+   // add attribute (debug message)
+   nla_put_string(msg, GEN_STRING_A_MSG, buf);
+
+   // send
+   nl_send_auto_complete(handle, msg); // send the message over the netlink handle
+
+   // free the message
+   nlmsg_free(msg);
+}
+
+// helper function to send to kernel or to userspace output (don't use with anything but stdout and stderr)
+inline int myfprintf(_IO_FILE* file, const char *fmt, ...) {
+   va_list args;
+   int i;
+   char buf[1024];
+
+   va_start(args, fmt);
+   i=vsnprintf(buf,1024,fmt,args);
+   va_end(args);
+
+   if (C_KERNEL) {
+      msgToKernel(buf);
+   } else {
+      fprintf(file,buf);
+   }
+
+   return i;
+}
 
 // for run time tracing of application
-#define FUNCTION_START(arg) { if (C_TRACE) { printf("TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_END(arg) { if (C_TRACE){ printf("TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_START(arg) { if (C_TRACE) { myfprintf(stdout, "TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_END(arg) { if (C_TRACE){ myfprintf(stdout, "TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
 
-#define FUNCTION_INT(arg, ret) { if (C_TRACE) { printf("TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_HEX(arg, ret) { if (C_TRACE) { printf("TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_STR(arg, ret) { if (C_TRACE) { printf("TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
-#define HERE { if (C_TRACE) { printf("TRACE: Here! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
-#define TMSG(...) { if (C_TRACE) { printf("TRACE: in %s at line %i:\t", __FILE__, __LINE__); printf(__VA_ARGS__); fflush(stdout);}}
+#define FUNCTION_INT(arg, ret) { if (C_TRACE) { myfprintf(stdout, "TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_HEX(arg, ret) { if (C_TRACE) { myfprintf(stdout, "TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_STR(arg, ret) { if (C_TRACE) { myfprintf(stdout, "TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
+#define HERE { if (C_TRACE) { myfprintf(stdout, "TRACE: Here! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define TMSG(...) { if (C_TRACE) { myfprintf(stdout, "TRACE: in %s at line %i:\t", __FILE__, __LINE__); myfprintf(stdout, __VA_ARGS__); fflush(stdout);}}
 
 #define PRINT_HEXB(data, size) {if (C_TRACE) {{ \
-        printf("DEBUG: 0x"); \
+        myfprintf(stdout, "DEBUG: 0x"); \
         char *_data = (char*)data; \
         for (int _i=0; _i<size; _i++) { \
-           printf("%02x", (__uint8_t)_data[_i]); \
+           myfprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
         } \
-        printf(" in %s at line %i\n", __FILE__, __LINE__); \
+        myfprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
         }; fflush(stdout);}}
 #define CPRINT_HEXB(SC,data, size)  { if (C_TRACE) {{ \
-       printf("DEBUG:\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
+       myfprintf(stdout, "DEBUG:\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
        char *_data = (char*)data; \
-       for (int _i=0; _i<size; _i++) printf("%02x", (__uint8_t)_data[_i]); \
-       printf(" in %s at line %i\n", __FILE__, __LINE__); \
+       for (int _i=0; _i<size; _i++) myfprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
+       myfprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
 }; fflush(stdout); }}
 #define CJUST_HEXB(SC,data, size)  { if (C_TRACE) {{ \
-       printf("\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
+       myfprintf(stdout, "\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
        char *_data = (char*)data; \
-       for (int _i=0; _i<size; _i++) printf("%02x", (__uint8_t)_data[_i]); \
-       printf("\n"); \
+       for (int _i=0; _i<size; _i++) myfprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
+       myfprintf(stdout, "\n"); \
 }; fflush(stdout); }}
    
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
 
 // for run time debugging of application
-#define BLIP { if (C_DEBUG ){ printf("DEBUG: Blip! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
-#define DMSG(...) { if (C_DEBUG) { printf("DEBUG: " __VA_ARGS__); fflush(stdout);}}
-#define DCMSG(SC, FMT, ...) { if (C_DEBUG) { printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
-#define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ printf("DEBUG: \x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
-#define DCOLOR(SC) { if (C_DEBUG){ printf("\x1B[3%d;%dm",SC&7,(SC>>3)&1); fflush(stdout);}}
+#define BLIP { if (C_DEBUG ){ myfprintf(stdout, "DEBUG: Blip! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define DMSG(...) { if (C_DEBUG) { myfprintf(stdout, "DEBUG: " __VA_ARGS__); fflush(stdout);}}
+#define DCMSG(SC, FMT, ...) { if (C_DEBUG) { myfprintf(stdout, "DEBUG: \x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
+#define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ myfprintf(stdout, "DEBUG: \x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
+#define DCOLOR(SC) { if (C_DEBUG){ myfprintf(stdout, "\x1B[3%d;%dm",SC&7,(SC>>3)&1); fflush(stdout);}}
    
 //  here are two usage examples of DCMSG
 //DCMSG(RED,"example of DCMSG macro  with arguments  enum = %d  biff=0x%x",ghdr->cmd,biff) ;
@@ -94,11 +172,11 @@ extern volatile int C_ERRORS;
 
 
 // for run time information viewing of application
-#define PROG_START { if (C_INFO) { printf("INFO: Starting in %s, compiled at %s %s MST\n\n", __FILE__, __DATE__, __TIME__);}}
-#define IMSG(...) { if (C_INFO) { printf("INFO: " __VA_ARGS__);}}
+#define PROG_START { if (C_INFO) { myfprintf(stdout, "INFO: Starting in %s, compiled at %s %s MST\n\n", __FILE__, __DATE__, __TIME__);}}
+#define IMSG(...) { if (C_INFO) { myfprintf(stdout, "INFO: " __VA_ARGS__);}}
 
 // for run time viewing of application errors
-#define IERROR(...) { if (C_ERRORS) {fprintf(stderr, "\x1B[31;1mERROR at %s %i: \x1B[30;0m\n", __FILE__, __LINE__);} fprintf(stderr, __VA_ARGS__); fflush(stderr);}
+#define IERROR(...) { if (C_ERRORS) {myfprintf(stderr, "\x1B[31;1mERROR at %s %i: \x1B[30;0m\n", __FILE__, __LINE__);} myfprintf(stderr, __VA_ARGS__); fflush(stderr);}
 
 // utility function to get Device ID (mac address)
 __uint64_t getDevID();

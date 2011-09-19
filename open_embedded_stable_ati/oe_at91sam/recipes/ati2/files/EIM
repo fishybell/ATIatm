@@ -17,7 +17,7 @@ start () {
    def_progs
 
    # start fasit client
-   fasit_conn -S -F -l $lport -p $cport -i $ip -vv &
+   fasit_conn -S -F -l $lport -p $cport -i $ip -vv -k &
 }
 
 # leave default stop routine

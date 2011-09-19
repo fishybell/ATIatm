@@ -13,10 +13,11 @@
 using namespace std;
 
 // Sorry Nate, I can't get it to work for me with these as statics declaired in common.h
-volatile int C_TRACE;
-volatile int C_DEBUG;
-volatile int C_INFO;
-volatile int C_ERRORS;
+volatile int C_TRACE = 0;
+volatile int C_DEBUG = 0;
+volatile int C_INFO = 0;
+volatile int C_ERRORS = 0;
+volatile int C_KERNEL = 0;
 
 
 #include "connection.h"
@@ -203,7 +204,7 @@ const char *usage = "Usage: %s [options]\n\
 \t-vvvv  -- Enable ERROR, INFO, DEBUG, TRACE messages\n\
 \t-h     -- print out usage information\n";
 
-   start_config = 0;	//BDR  kludge to get MFS configuration into SIT_client
+   start_config = 0; //BDR  kludge to get MFS configuration into SIT_client
 
    for (int i = 1; i < argc; i++) {
       if (argv[i][0] != '-') {
@@ -220,9 +221,9 @@ const char *usage = "Usage: %s [options]\n\
          case 'M' :
             startMIT = true;
             break;
-	 case 'F' :
-	    start_config |= PD_NES;
-	    break;
+         case 'F' :
+            start_config |= PD_NES;
+            break;
          case 'l' :
             if (sscanf(argv[++i], "%i", &sport) != 1) {
                IERROR("invalid argument (%i)\n", i)
@@ -254,6 +255,9 @@ const char *usage = "Usage: %s [options]\n\
                }
             }
             break;
+         case 'k' :
+            C_KERNEL=1; // enable output to kernel
+           break;
          case '-' : // for --help
             if (argv[i][2] == 'h') {
                printf(usage, argv[0]);
