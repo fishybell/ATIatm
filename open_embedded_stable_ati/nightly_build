@@ -1,11 +1,11 @@
 #!/bin/bash
 
+cwd=`pwd`
 # make new build directory
 dirname="/ati/share/Research & Development/ATM/Daily/$(date +%F)"
 mkdir -p "$dirname"
 
 # attempt build
-cd /usr/local/var/oe
 source oe_env.sh
 bitbake -c clean ati ati2 2>&1 >/dev/null
 date > "$dirname/build.log"
@@ -13,15 +13,15 @@ bitbake console-image 2>&1 >> "$dirname/build.log"
 date >> "$dirname/build.log"
 
 # copy latest greatest
-cd /usr/local/var/oe/tmp/deploy/glibc/images/at91sam9g20ek_2mmc
+cd $cwd/tmp/deploy/glibc/images/at91sam9g20ek_2mmc
 cp uImage-at91sam9g20ek_2mmc.bin \
   console-image-at91sam9g20ek_2mmc.jffs2 \
   u-boot-at91sam9g20ek_2mmc-nandflash.bin \
   at91bootstrap.bin \
-  /usr/local/var/oe/flash
+  $cwd/flash
 
 
 # copy last build to build directory
-cd /usr/local/var/oe/flash
+cd $cwd/flash
 cp *.jffs2 *.bin "$dirname"
 
