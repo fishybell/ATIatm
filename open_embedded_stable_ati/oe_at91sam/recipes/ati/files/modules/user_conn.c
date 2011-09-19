@@ -304,60 +304,55 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
 // global family id for ATI netlink family
 int family;
 
-char* readEeprom(char* eepromCmd, char* dest) {
-	int path_max = 256;
-	FILE *fp;
-	int status;
-	char path[path_max];
+char* runCmd(char *cmd, int read, char *buffer, int buffer_max) {
+   FILE *fp;
+   int status;
 
-
-	//fp = popen("/usr/bin/eeprom_rw read -addr 0x40", "r");
-	fp = popen(eepromCmd, "r");
-	if (fp == NULL) {
-		return "Error: fp is NULL";
+   // open pipe
+   fp = popen(cmd, read?"r":"w");
+   if (fp == NULL) {
+      return "Error: fp is NULL";
    }
 
-	while (fgets(path, path_max, fp) != NULL) {
-		//printf("runProcess path: %s\n", path);
-		strcat(dest,path);
-	}
-	
+   // read/write
+   if (read) {
+      if (fread(buffer, buffer_max, sizeof(char), fp) == -1) {
+         return "Error: no data read";
+      }
+   } else {
+      if (fwrite(buffer, buffer_max, sizeof(char), fp) == -1) {
+         return "Error: no data written";
+      }
+   }
 
-	status = pclose(fp);
-	if (status == -1) {
-		// Error reported by pclose() 
-	} else {
-		// Use macros described under wait() to inspect `status' in order
-		// to determine success/failure of command executed by popen() 
-	}
-	return dest;
+   // close pipe
+   status = pclose(fp);
+   if (status == -1) {
+      return "Error: could not close";
+   }
+   return buffer;
 }
 
-char* writeEeprom(char* eepromCmd, char* dest, char* writeCmd, int size) {
-	int path_max = 256;
-	FILE *fp;
-	int status;
-	char path[path_max];
+char* readEeprom(int address, int size) {
+   static char buffer[256];
+   char cmd[256];
+   buffer[size+1] = '\0'; // null terminate read buffer
 
+   // create command
+   snprintf(cmd, 256, "/usr/bin/eeprom_rw read -addr 0x%02X -size 0x%02X", address, size);
+   
+   // run command and send data, return result
+   return runCmd(cmd, 1, buffer, size); // 1 == read
+}
 
-	//fp = popen("/usr/bin/eeprom_rw read -addr 0x40", "r");
-	fp = popen(eepromCmd, "w");
-	if (fp == NULL) {
-		return "Error: fp is NULL";
-	}
+char* writeEeprom(int address, int size, int blank, char *data) {
+   char cmd[256];
 
-	//fwrite("00:11:bc:00:ff:00", sizeof(char), 22, fp);
-	fwrite(writeCmd, sizeof(char), size, fp);
-	fflush(fp);
-
-	status = pclose(fp);
-	if (status == -1) {
-		// Error reported by pclose() 
-	} else {
-		// Use macros described under wait() to inspect `status' in order
-		// to determine success/failure of command executed by popen() 
-	}
-	return writeCmd;
+   // create command
+   snprintf(cmd, 256, "/usr/bin/eeprom_rw write -addr 0x%02X -size %i -blank 0x%02X", address, size, blank);
+   
+   // run command and send data, return result
+   return runCmd(cmd, 0, data, size); // 0 == write
 }
 
 int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
@@ -457,119 +452,61 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             case 'Z': case 'z':
                 nl_cmd = NL_C_BIT;
                 break;
-			case 'I': case 'i':
-				arg1 = cmd[1] == ' ' ? 2 : 1;
-				switch (cmd[arg1]) { /* second letter */
-					case 'B': case 'b':		// Reads the board type
-						arg2 = cmd[3] == 1;
-						if (sscanf(cmd+3, "%s", &arg3) == 1) {
-							char str[25] = {'\0'};
-							int size = strlen(cmd+4)+1;
-							char eWrite[60] = {'\0'};
-							// write the connect port number to eeprom_rw
-							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x00 -size %i -blank 0x40", size);
-							snprintf(wbuf, 1024, "I B %s\n", writeEeprom(eWrite, str, cmd+4, size));
-						} else {
-							char str[25] = {'\0'};
-							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x00";
-							snprintf(wbuf, 1024, "I B %s\n", readEeprom(eRead, str));
-						}
-						break;
-					case 'C': case 'c':		// Sets and Reads the connect port number
-						arg2 = cmd[3] == 1;
-						if (sscanf(cmd+3, "%s", &arg3) == 1) {
-							char str[25] = {'\0'};
-							int size = strlen(cmd+4)+1;
-							char eWrite[60] = {'\0'};
-							// write the connect port number to eeprom_rw
-							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x240 -size %i -blank 0x40", size);
-							snprintf(wbuf, 1024, "I C %s\n", writeEeprom(eWrite, str, cmd+4, size));
-						} else {
-			 				char str[25] = {'\0'};
-							// read the connect port number from eeprom_rw 
-							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x240";
-							snprintf(wbuf, 1024, "I C %s\n", readEeprom(eRead, str));
-						}
-				        break;
-					case 'D': case 'd':		// Reads communication type
-						arg2 = cmd[3] == 1;
-						if (sscanf(cmd+3, "%s", &arg3) == 1) {
-							char str[25] = {'\0'};
-							int size = strlen(cmd+4)+1;
-							char eWrite[60] = {'\0'};
-							// write the communication type to eeprom_rw
-							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x80 -size %i -blank 0x40", size);
-							snprintf(wbuf, 1024, "I D %s\n", writeEeprom(eWrite, str, cmd+4, size));
-						} else {
-							// read the communication type from eeprom_rw 
-							//printf("Read Communication type");
-							char strD[25] = {'\0'};
-							char eReadD[40] = "/usr/bin/eeprom_rw read -addr 0x80";
-							snprintf(wbuf, 1024, "I D %s\n", readEeprom(eReadD, strD));
-						}
-						break;
-					case 'I': case 'i':		// Sets and Reads the IP address
-						arg2 = cmd[3] == 1;
-						if (sscanf(cmd+3, "%s", &arg3) == 1) {
-							char str[25] = {'\0'};
-							int size = strlen(cmd+4)+1;
-							char eWrite[60] = {'\0'};
-							// write the ip address to eeprom_rw
-							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0xC0 -size %i -blank 0x40", size);
-							snprintf(wbuf, 1024, "I I %s\n", writeEeprom(eWrite, str, cmd+4, size));
-						} else {
-			 				char str[25] = {'\0'};
-							// read the ip address from eeprom_rw 
-							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0xC0";
-							snprintf(wbuf, 1024, "I I %s\n", readEeprom(eRead, str));
-						}
-				        break;
-					case 'L': case 'l':		// Sets and Reads the listen port number
-						arg2 = cmd[3] == 1;
-						if (sscanf(cmd+3, "%s", &arg3) == 1) {
-							char str[25] = {'\0'};
-							int size = strlen(cmd+4)+1;
-							char eWrite[60] = {'\0'};
-							// write the listen port number to eeprom_rw
-							sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x200 -size %i -blank 0x40", size);
-							snprintf(wbuf, 1024, "I L %s\n", writeEeprom(eWrite, str, cmd+4, size));
-						} else {
-			 				char str[25] = {'\0'};
-							// read the listen port number from eeprom_rw 
-							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x200";
-							snprintf(wbuf, 1024, "I L %s\n", readEeprom(eRead, str));
-						}
-				        break;
-					case 'M': case 'm':		// Sets and Reads the MAC address
-						arg2 = cmd[3] == 1;
-						if (sscanf(cmd+3, "%s", &arg3) == 1) {
-							char str[25] = {'\0'};
-							int size = strlen(cmd+4)+1;
-							char eWrite[60] = {'\0'};
-							// write the mac address to eeprom_rw
-							if(isMac(cmd+4)) {
-								sprintf(eWrite, "/usr/bin/eeprom_rw write -addr 0x40 -size %i -blank 0x40", size);
-								snprintf(wbuf, 1024, "I M %s\n", writeEeprom(eWrite, str, cmd+4, size));
-							}
-							else {
-								snprintf(wbuf, 1024, "I M invalid MAC address\n");
-							}
-						} else {
-			 				char str[25] = {'\0'};
-							// read the mac address from eeprom_rw 
-							char eRead[40] = "/usr/bin/eeprom_rw read -addr 0x40";
-							snprintf(wbuf, 1024, "I M %s\n", readEeprom(eRead, str));
-						}
-				        break;
-					case 'R': case 'r':		// Reboot
-						//printf("Go down for a reboot");
-						;char str[25] = {'\0'};
-						char eRead[40] = "reboot";
-						readEeprom(eRead, str);
-						break;
-				}
-				write(client, wbuf, strnlen(wbuf,1024));
-				break;
+            case 'I': case 'i':
+               arg1 = cmd[1] == ' ' ? 2 : 1; // find index of second argument
+               arg2 = cmd[arg1+1] == ' ' ? arg1+2 : arg1+1; // find index of third argument
+               arg3 = strlen(cmd+arg2)+1; // size value, add 1 for null terminator
+               switch (cmd[arg1]) { /* second letter */
+                  case 'B': case 'b':     // Reads the board type
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "I B %s\n", writeEeprom(0x00, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "I B %s\n", readEeprom(0x00, 0x40)); // reads and prints out what it read
+                     }
+                     break;
+                  case 'C': case 'c':     // Sets and Reads the connect port number
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "I C %s\n", writeEeprom(0x240, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "I C %s\n", readEeprom(0x240, 0x40)); // reads and prints out what it read
+                     }
+                     break;
+                  case 'D': case 'd':      // Reads communication type
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "I D %s\n", writeEeprom(0x80, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "I D %s\n", readEeprom(0x80, 0x40)); // reads and prints out what it read
+                     }
+                     break;
+                  case 'I': case 'i':      // Sets and Reads the IP address
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "I I %s\n", writeEeprom(0xC0, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "I I %s\n", readEeprom(0xC0, 0x40)); // reads and prints out what it read
+                     }
+                     break;
+                  case 'L': case 'l':      // Sets and Reads the listen port number
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "I L %s\n", writeEeprom(0x200, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "I L %s\n", readEeprom(0x200, 0x40)); // reads and prints out what it read
+                     }
+                     break;
+                  case 'M': case 'm':      // Sets and Reads the MAC address
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "I M %s\n", writeEeprom(0x40, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "I M %s\n", readEeprom(0x40, 0x40)); // reads and prints out what it read
+                     }
+                     break;
+                  case 'R': case 'r':      // Reboot
+                     //printf("Go down for a reboot");
+                     snprintf(wbuf, 1024, "I R\n"); // rebooting
+                     runCmd("reboot", 1, NULL, 0);
+                     break;
+               }
+               write(client, wbuf, strnlen(wbuf,1024));
+               break;
             case '#':
                 if (sscanf(cmd+1, "%i", &arg1) == 1) {
                    epoll_ctl(efd, EPOLL_CTL_DEL, nl_fd, NULL);
