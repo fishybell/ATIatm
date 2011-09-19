@@ -44,15 +44,15 @@ void handle_bit_move(struct nl_handle *handle, int type) {
     // fill with the correct movement data
     switch (type) {
         case BIT_MOVE_FWD:
-printf("BIT: sending FWD\n");
+//printf("BIT: sending FWD\n");
             nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 20); // fwd at 2 mph
             break;
         case BIT_MOVE_REV:
-printf("BIT: sending REV\n");
+//printf("BIT: sending REV\n");
             nla_put_u16(msg, GEN_INT16_A_MSG, 32768 - 20); // rev at 2 mph
             break;
         case BIT_MOVE_STOP:
-printf("BIT: sending STOP\n");
+//printf("BIT: sending STOP\n");
             nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
             break;
     }
@@ -75,7 +75,7 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
     struct nl_handle *handle = (struct nl_handle*)arg;
 
     // Validate message and parse attributes
-printf("BIT: Parsing: %i\n", ghdr->cmd);
+//printf("BIT: Parsing: %i\n", ghdr->cmd);
     switch (ghdr->cmd) {
 #if 0
         case NL_C_EXPOSE:
@@ -113,7 +113,7 @@ printf("BIT: Parsing: %i\n", ghdr->cmd);
 
             if (attrs[GEN_STRING_A_MSG]) {
                 char *data = nla_get_string(attrs[GEN_STRING_A_MSG]);
-                printf("BIT: failure attribute: %s\n", data);
+                //printf("BIT: failure attribute: %s\n", data);
             }
 
             break;
@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
             for (i=0; i<nfds; i++) {
                 if (events[i].data.fd == nl_fd) {
                     // netlink talking 
-printf("BIT: nl\n");
+//printf("BIT: nl\n");
                     nl_recvmsgs_default(handle); // will call callback functions
                 }
             }
