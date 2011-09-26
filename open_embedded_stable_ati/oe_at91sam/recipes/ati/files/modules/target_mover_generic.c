@@ -43,6 +43,7 @@ static int MOVER_DELAY_MULT[] = {6,2,6,0};
 // the maximum allowed speed ticks
 //static int NUMBER_OF_SPEEDS[] = {10,20,10,0};
 static int NUMBER_OF_SPEEDS[] = {100,200,100,0};
+static int MIN_SPEED[] = {15,20,15,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
 static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0};
@@ -66,13 +67,23 @@ static int PID_TI_DIV[]    = {1,1,1,1}; // time integral denominator
 static int PID_TD_MULT[]   = {1,1,2,1}; // time derivitive numerator
 static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
 #endif
-// new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track)
-static int PID_KP_MULT[]   = {3, 1, 3, 0}; // proportional gain numerator
+// new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- standard
+// static int PID_KP_MULT[]   = {3, 1, 3, 0}; // proportional gain numerator
+// static int PID_KP_DIV[]    = {5, 1, 5, 0}; // proportional gain denominator
+// static int PID_KI_MULT[]   = {2, 1, 2, 0}; // integral gain numerator
+// static int PID_KI_DIV[]    = {24575, 1, 24575, 0}; // integral gain denominator
+// static int PID_KD_MULT[]   = {8847, 1, 8847, 0}; // derivitive gain numerator
+// static int PID_KD_DIV[]    = {4, 1, 4, 0}; // derivitive gain denominator
+// new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot
+static int PID_KP_MULT[]   = {1, 1, 1, 0}; // proportional gain numerator
 static int PID_KP_DIV[]    = {5, 1, 5, 0}; // proportional gain denominator
-static int PID_KI_MULT[]   = {2, 1, 2, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {24575, 1, 24575, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {8847, 1, 8847, 0}; // derivitive gain numerator
-static int PID_KD_DIV[]    = {4, 1, 4, 0}; // derivitive gain denominator
+static int PID_KI_MULT[]   = {1, 1, 2, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {73725, 1, 73725, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {5898, 1, 5898, 0}; // derivitive gain numerator
+static int PID_KD_DIV[]    = {3, 1, 3, 0}; // derivitive gain denominator
+static int MIN_EFFORT[]    = {295, 1, 295, 0}; // minimum effort given to ensure motor moves
+static int SPEED_AFTER[]   = {3, 3, 3, 0}; // clamp effort if we hit this many correct values in a row
+static int SPEED_CHANGE[]  = {20, 30, 20, 0}; // unclamp if the error is bigger than this
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -120,8 +131,8 @@ static int TICKS_PER_LEG[] = {2292, 1833, 2292, 0}; // 5:1 ratio 10 inch wheel 6
 #define TICKS_DIV 100
 
 // to keep updates to the file system in check somewhat
-#define POSITION_DELAY_IN_MSECONDS	1000
-#define VELOCITY_DELAY_IN_MSECONDS	1000
+#define POSITION_DELAY_IN_MSECONDS	200
+#define VELOCITY_DELAY_IN_MSECONDS	200
 
 // speed charts (TODO -- update with mover on track with load)
 // static in MOVER0_PWM_TABLE = ?
@@ -290,11 +301,12 @@ static int pwm_from_effort(int effort);		// absolute pwm, calculated
 // Variables for PID speed control
 //---------------------------------------------------------------------------
 spinlock_t pid_lock = SPIN_LOCK_UNLOCKED;
-#define MAX_PID_ERRORS 2
-int pid_errors[MAX_PID_ERRORS];		// previous errors (fully calculated for use in summing integral part of PID)
+#define MAX_PID_ERRORS 5
+int pid_errors[MAX_PID_ERRORS];  // previous errors (fully calculated for use in summing integral part of PID)
 int pid_last_effort = 0;			// prior effort
 int pid_last_error = 0;				// prior error
 int pid_error = 0;					// current error
+int pid_correct_count = 0;       // number of correct speeds (used to clamp effort)
 atomic_t pid_set_point = ATOMIC_INIT(0); // set point for speed to maintain
 
 //---------------------------------------------------------------------------
@@ -540,6 +552,13 @@ static int hardware_speed_set(int new_speed)
         {
         return -EINVAL;
         }
+
+    // set to minimum
+    if (new_speed <= 0) {
+        new_speed = 0;
+    } else if (new_speed < MIN_SPEED[mover_type]) {
+        new_speed = MIN_SPEED[mover_type];
+    }
 
     // check to see if we need to ramp if we're already moving
     if (atomic_read(&moving_atomic))
@@ -1332,7 +1351,7 @@ static int percent_from_speed(int speed) {
     }
     // limit to min speed
     if (speed < 0) {
-        speed = 0;
+        speed = 0; // limit to zero
     }
     return (1000*speed/NUMBER_OF_SPEEDS[mover_type]); // 1000 * percent = 0 to 1000
 }
@@ -2152,7 +2171,7 @@ static void pid_step(void) {
 
 // new method
 static void pid_step(int delta_t) {
-    int new_speed=1, input_speed=0, error_sum=0, i, pid_effort=0, pid_p, pid_i, pid_d;
+    int new_speed=1, input_speed=0, error_sum=0, i, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
@@ -2210,19 +2229,40 @@ static void pid_step(int delta_t) {
        error_sum += pid_errors[i];
     }
 
-    // individual pid steps to make full equation more clean
-    pid_p = (((1000 * PID_KP_MULT[mover_type] * pid_error) / PID_KP_DIV[mover_type]) / 1000);
-    pid_i = (((1000 * PID_KI_MULT[mover_type] * error_sum) / PID_KI_DIV[mover_type]) / 1000);
-    pid_d = (((1000 * PID_KD_MULT[mover_type] * (pid_error - pid_last_error)) / (PID_KD_DIV[mover_type] * delta_t)) / 1000);
+    // are we correct?
+    if (pid_error == 0) {
+       pid_correct_count++; // correct one more time
+    } else if (pid_correct_count < SPEED_AFTER[mover_type] || abs(pid_error) >= SPEED_CHANGE[mover_type]) {
+delay_printk("UN-CLAMPED!");
+       pid_correct_count = 0; // no longer correct
+    }
 
-    // descrete PID algorithm gleamed from Scott's brain
-    pid_effort = pid_last_effort + pid_p + pid_i + pid_d;
+    // check to see if we've found the right effort for this speed (and haven't left the given error range)
+    if (pid_correct_count >= SPEED_AFTER[mover_type] && abs(pid_error) < SPEED_CHANGE[mover_type]) {
+       // clamp effort to same as last time
+       pid_effort = pid_last_effort;
+delay_printk("CLAMPED!");
+    } else {
+       // do the PID calculations
 
-    // min effort to positive numbers only -- TODO -- negative effort uses reverse motor techniques to apply negative pressure
-    pid_effort = max(pid_effort, 0);
+       // individual pid steps to make full equation more clean
+       pid_p = (((1000 * PID_KP_MULT[mover_type] * pid_error) / PID_KP_DIV[mover_type]) / 1000);
+       pid_i = (((1000 * PID_KI_MULT[mover_type] * error_sum) / PID_KI_DIV[mover_type]) / 1000);
+       pid_d = (((1000 * PID_KD_MULT[mover_type] * (pid_error - pid_last_error)) / (PID_KD_DIV[mover_type] * delta_t)) / 1000);
+
+       // descrete PID algorithm gleamed from Scott's brain
+       pid_effort = pid_last_effort + pid_p + pid_i + pid_d;
+    }
 
     // max effort to 100%
     pid_effort = min(pid_effort, 1000);
+
+    // min effort to positive numbers only -- TODO -- negative effort uses reverse motor techniques to apply negative pressure
+    if (new_speed == 0) {
+       pid_effort = max(pid_effort, 0); // minimum when stopping is 0
+    } else {
+       pid_effort = max(pid_effort, MIN_EFFORT[mover_type]); // minimum when moving
+    }
 
 // old method
 #if 0
