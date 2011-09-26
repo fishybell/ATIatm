@@ -99,7 +99,7 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
             if (attrs[GEN_INT16_A_MSG]) {
                 // moving at # mph
                 int value = nla_get_u16(attrs[GEN_INT16_A_MSG]);
-                snprintf(wbuf, 1024, "M %i\n", value-32768);
+                snprintf(wbuf, 1024, "M %f\n", ((float)(value-32768))/10.0);
             }
 
             break;
