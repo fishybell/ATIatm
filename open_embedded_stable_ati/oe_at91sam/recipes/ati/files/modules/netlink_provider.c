@@ -451,6 +451,20 @@ struct genl_ops provider_gnl_ops_dmsg = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
+struct genl_ops provider_gnl_ops_cmd_event = {
+    .cmd = NL_C_CMD_EVENT,
+    .flags = 0,
+    .policy = cmd_event_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
+struct genl_ops provider_gnl_ops_scenario = {
+    .cmd = NL_C_SCENARIO,
+    .flags = 0,
+    .policy = generic_string_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
 
 static struct genl_ops *command_op_map[] = {
     /* NL_C_UNSPEC */		NULL,
@@ -469,6 +483,8 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_EVENT */		&provider_gnl_ops_event,
     /* NL_C_SLEEP */		&provider_gnl_ops_sleep,
     /* NL_C_DMSG */		&provider_gnl_ops_dmsg,
+    /* NL_C_CMD_EVENT */	&provider_gnl_ops_cmd_event,
+    /* NL_C_SCENARIO */		&provider_gnl_ops_scenario,
 };
 
 typedef struct hb_obj_list {
