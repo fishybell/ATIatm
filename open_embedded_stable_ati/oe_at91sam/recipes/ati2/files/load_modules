@@ -5,6 +5,7 @@ cd /home/root/
 insmod delay_printk.ko
 insmod target.ko
 insmod netlink_provider.ko
+insmod scenario.ko
 
 # load other modules (with potential parameters)
 while [ -n "$1" ] ; do     
