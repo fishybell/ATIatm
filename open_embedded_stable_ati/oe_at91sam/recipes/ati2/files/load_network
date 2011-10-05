@@ -15,12 +15,25 @@ def_progs() {
    case $board in
       TTMT|MIT|MAT)
          # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
-         event_conn -vv -k &
+         # always start stand-alone (will also act as server)
+         event_conn -S -vv -k -r MOVER &
          ;;
-      EIM|SES|SIT|LSAT|HSAT|SAT)
+      SIT|LSAT|HSAT|SAT)
          if [ "$comm" == "local" ] ; then
             # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
-            event_conn -i $ip -C -vv -k &
+            event_conn -i $ip -C -vv -k -r LIFTER &
+         else
+            # start stand-alone
+            event_conn -i $ip -S -vv -k -r LIFTER &
+         fi
+         ;;
+      EIM|SES)
+         if [ "$comm" == "local" ] ; then
+            # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
+            event_conn -i $ip -C -vv -k -r SOUND &
+         else
+            # start stand-alone
+            event_conn -i $ip -S -vv -k -r SOUND &
          fi
          ;;
    esac
