@@ -7,6 +7,7 @@
 #include <sys/epoll.h>
 
 #include "netlink_user.h"
+#include "scenario.h"
 
 // kill switch to program
 static int close_nicely = 0;
@@ -16,6 +17,53 @@ static void quitproc() {
 
 // global family id for ATI netlink family
 int family;
+
+// bit button has been pressed (long-press)
+void handle_bit_test_long(struct nl_handle *handle, int is_on) {
+    // build scenario
+    // Step 1 - Conceal
+    // Step 2 - Wait for Concealed
+    // Step 3 - Enable MFS in burst mode
+    // Step 4 - Expose
+    // Step 5 - Wait 3 seconds
+    // Step 6 - Conceal
+    const char *scen = "{Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
+                        {DoWait;Nothing;EVENT_DOWN;15000;Nothing} -- Wait 15 seconds for conceal \
+                        {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} -- Enable MFS (data installed below) \
+                        {Send;R_LIFTER;NL_C_EXPOSE;1;01} -- Send Expose to lifter \
+                        {Delay;3000;;;} -- Wait 3 seconds \
+                        {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter";
+    char scen_buf[1024];
+    char hex_buf[1024];
+    // build accessory configuration message
+    struct accessory_conf acc_c;
+    acc_c.acc_type  = ACC_NES_MFS;
+    acc_c.request = 0;     // not a request
+    acc_c.on_exp = 1;      // on
+    acc_c.on_kill = 2;     // 2 = deactivate on kill
+    acc_c.ex_data1 = 1;    // do burst
+    acc_c.ex_data2 = 5;    // burst 5 times
+    acc_c.on_time = 50;    // on 50 milliseconds
+    acc_c.off_time = 100;  // off 100 milliseconds
+    acc_c.repeat_delay = 2 * 3;  // when burst, burst every 6 half-seconds
+    acc_c.repeat = 63;     // infinite repeat
+    acc_c.start_delay = 2 * 1;   // start after 2 half-seconds
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf); // use helper function to build scenario
+    snprintf(scen_buf, 1024, scen, hex_buf); // format scenario
+
+//printf("BIT: sending NL_C_SCENARIO: %s\n", scen_buf);
+    // send scenario
+    struct nl_msg *msg;
+    msg = nlmsg_alloc();
+    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_SCENARIO, 1);
+    nla_put_string(msg, GEN_STRING_A_MSG, scen_buf);
+
+    // Send message over netlink handle
+    nl_send_auto_complete(handle, msg);
+
+    // Free message
+    nlmsg_free(msg);
+}
 
 // bit button might have been pressed, move the lifter up or down
 void handle_bit_test(struct nl_handle *handle, int is_on) {
@@ -103,6 +151,9 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                         case BIT_MOVE_REV:
                         case BIT_MOVE_STOP:
                             handle_bit_move(handle, bit->bit_type);
+                            break;
+                        case BIT_LONG_PRESS:
+                            handle_bit_test_long(handle, bit->is_on);
                             break;
                     }
                 }
