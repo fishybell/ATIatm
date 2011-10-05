@@ -17,6 +17,7 @@ obj-m := 	target.o \
 			target_generic_output.o \
 			target_hit_poll.o \
 			nchs.o \
+			scenario.o \
 
 CURD := $(shell basename `pwd`)
 ifeq (${CURD},modules)
