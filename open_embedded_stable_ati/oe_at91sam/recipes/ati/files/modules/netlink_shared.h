@@ -112,6 +112,7 @@ enum {
     BIT_KNOB,       /* knob twisted (is_on contains number) */
     BIT_KNOB_REQ,   /* request knob */
     BIT_MODE_REQ,   /* request mode */
+    BIT_LONG_PRESS, /* test button, long press */
 };
 enum {
     BIT_A_UNSPEC,
@@ -191,6 +192,28 @@ static struct nla_policy gps_conf_policy[GPS_A_MAX + 1] = {
 #endif
 };
 
+/* specific policy for command event */
+typedef struct cmd_event {
+    u32 role:8;         /* Which "role" should tackle this message */
+    u32 cmd:8;          /* The netlink command to send */
+    u32 payload_size:8; /* The payload size of the netlink command (0-16 are valid) */
+    u32 attribute:8;    /* The payload attribute parameter */
+    u8  payload[16];    /* Payload data */
+} cmd_event_t;
+enum {
+    CMD_EVENT_A_UNSPEC,
+    CMD_EVENT_A_MSG, /* command event structure */
+    __CMD_EVENT_A_MAX,
+};
+#define CMD_EVENT_A_MAX (__CMD_EVENT_A_MAX - 1)
+static struct nla_policy cmd_event_policy[CMD_EVENT_A_MAX + 1] = {
+#ifdef NETLINK_USER_H
+    {}, { NLA_UNSPEC, sizeof(struct cmd_event), sizeof(struct cmd_event) },
+#else
+    [CMD_EVENT_A_MSG] = { .len = sizeof(struct cmd_event) },
+#endif
+};
+
 /* this value needs to be the highest among MAX attribute values (so far, mine are all the same) */
 #define NL_A_MAX GPS_A_MAX
 
@@ -216,6 +239,8 @@ enum {
     NL_C_EVENT,      /* mover/lifter event (command/reply) (generic 8-bit int) */
     NL_C_SLEEP,      /* sleep/wake command (command) (generic 8-bit int) */
     NL_C_DMSG,       /* debug message (reply) (generic string) */
+    NL_C_CMD_EVENT,  /* command event (command) (command event structure) */
+    NL_C_SCENARIO,   /* run scenario message (reply) (generic string) */
     __NL_C_MAX,
 };
 #define NL_C_MAX (__NL_C_MAX - 1)

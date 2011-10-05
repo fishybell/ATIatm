@@ -8,13 +8,23 @@ using namespace std;
 #include "nl_conn.h"
 #include "netlink_user.h"
 
-// event structure passed over tcp
+// generic output event structure passed over tcp
 #include "target_generic_output.h"
-typedef struct kern_event {
+typedef struct kern_go_event {
    int start;
    GO_event_t event;
    int end;
-} kern_event_t;
+} kern_go_event_t;
+
+// command event structure passed over tcp
+typedef struct kern_cmd_event {
+   int start;
+   cmd_event_t event;
+   int end;
+} kern_cmd_event_t;
+
+
+extern volatile int KERN_ROLE; // the role this kernel handles
 
 /***********************************************************
 *     A pair of classes to move kernel events over tcp     *
@@ -28,12 +38,15 @@ public :
    virtual ~Kernel_TCP();
    virtual int parseData(int rsize, const char *rbuf);
 
-   void outgoingEvent(kern_event_t *event); // send an event over tcp
+   void outgoingGOEvent(kern_go_event_t *event); // send a generic output event over tcp
+   void outgoingCmdEvent(kern_cmd_event_t *event); // send a command event over tcp
 
 protected:
    virtual bool hasPair() { return kern_conn != NULL;};
 
 private:
+   void sendRole(); // send the role to the opposite tcp connection
+   int role; // the role this connection handles
    class Kern_Conn *kern_conn;
 };
 
@@ -44,7 +57,9 @@ public:
    virtual ~Kern_Conn(); // closes, cleans up, etc.
    virtual int parseData(struct nl_msg *msg); // call the correct handler in the Kernel_TCP
 
-   void incomingEvent(kern_event_t *event); // send an event to the kernel
+   void incomingGOEvent(kern_go_event_t *event); // send a generic output event to the kernel
+
+   void incomingCmdEvent(kern_cmd_event_t *event); // send a command event to the kernel
 
 private:
    Kernel_TCP *kern_tcp;

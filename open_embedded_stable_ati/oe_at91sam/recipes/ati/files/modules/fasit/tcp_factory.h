@@ -21,7 +21,13 @@ protected :
    int handleRead(const epoll_event *ev) { return 0; };
    int parseData(int rsize, const char *rbuf) { return 0; };
 
+#ifdef EVENT_CONN
+   public:
+#endif
    int findNextTnum(); // look for the lowest available tnum
+#ifdef EVENT_CONN
+   protected:
+#endif
 
    struct sockaddr_in server;
 };

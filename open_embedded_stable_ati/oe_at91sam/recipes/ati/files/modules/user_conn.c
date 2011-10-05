@@ -205,6 +205,7 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                         case BIT_MOVE_STOP: btyp = "STOP"; break;
                         case BIT_MODE: btyp = "MODE"; break;
                         case BIT_KNOB: btyp = "KNOB"; break;
+                        case BIT_LONG_PRESS: btyp = "LONG"; break;
                     }
                     snprintf(wbuf, 1024, "BIT %s %i\n", btyp, bit->is_on);
                 }
@@ -285,6 +286,12 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                 snprintf(wbuf, 1024, "failure attribute: %s\n", data);
             }
 
+            break;
+        case NL_C_DMSG:
+        case NL_C_CMD_EVENT:
+        case NL_C_SCENARIO:
+            // ignore these
+            snprintf(wbuf, 1024, "ignored unknown command %i\n", ghdr->cmd);
             break;
         default:
             fprintf(stderr, "failure to parse unkown command\n"); fflush(stderr);

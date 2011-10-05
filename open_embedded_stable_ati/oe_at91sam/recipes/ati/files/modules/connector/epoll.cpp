@@ -18,12 +18,15 @@ volatile int C_INFO;
 volatile int C_ERRORS;
 volatile int C_KERNEL = 0;
 
+volatile int KERN_ROLE = 0;
+
 #include "connection.h"
 #include "tcp_factory.h"
 #include "common.h"
 #include "timers.h"
 #include "timeout.h"
 #include "kernel_tcp.h"
+#include "scenario.h"
 
 // rough idea of how many connections we'll deal with and the max we'll deal with in a single loop
 #define MAX_CONNECTIONS 2048
@@ -95,12 +98,23 @@ PROG_START
    int base = 0;
    const char *defIP = "192.168.0.1";
    bool startClient = false;
+   bool standAlone = false;
    
+   const char *roles[] = {
+      "UNSPECIFIED",
+      "LIFTER",
+      "MOVER",
+      "SOUND",
+      "GUNNER",
+      "DRIVER",
+   };
 const char *usage = "Usage: %s [options]\n\
 \t-l X   -- listen on port X rather than the default \n\
 \t-p X   -- connect to port X rather than the default \n\
 \t-i X   -- connect to IP address X\n\
 \t-C     -- initiate a client connection\n\
+\t-S     -- initiate a standalone client\n\
+\t-r X   -- handling role X\n\
 \t-v     -- Enable ERROR messages\n\
 \t-vv    -- Enable ERROR, INFO messages\n\
 \t-vvv   -- Enable ERROR, INFO, DEBUG messages\n\
@@ -114,6 +128,9 @@ const char *usage = "Usage: %s [options]\n\
          return 1;
       }
       switch (argv[i][1]) {
+         case 'S' :
+            standAlone = true;
+            break;
          case 'C' :
             startClient = true;
             break;
@@ -128,6 +145,24 @@ const char *usage = "Usage: %s [options]\n\
                IERROR("invalid argument (%i)\n", i)
                return 1;
             }
+            break;
+         case 'r' :
+            // check integer value first
+            if (sscanf(argv[++i], "%i", &KERN_ROLE) != 1) {
+               // check string value second
+               for (int j=0; j<sizeof(roles)/sizeof(char*); j++) {
+                  if (strncmp(roles[j], argv[i], strlen(roles[j])) == 0) {
+                     KERN_ROLE = j;
+                     break;
+                  }
+               }
+            }
+            // verify valid number last
+            if (KERN_ROLE == 0 || KERN_ROLE >= R_MAX) {
+               IERROR("invalid argument (%i)\n", i)
+               return 1;
+            }
+            DMSG("Found Role: %s\n", roles[KERN_ROLE]);
             break;
          case 'i' :
             base = ++i; // remember the ip address parameter index for later
@@ -222,7 +257,15 @@ const char *usage = "Usage: %s [options]\n\
    // start any clients here
    Kernel_TCP *kern_client = NULL;
    if (startClient) {
+      // start client
       kern_client = factory->newConn <Kernel_TCP> ();
+   } else if (standAlone) {
+      // start stand-alone client
+      int fd = open("/dev/null", O_WRONLY);
+      kern_client = new Kernel_TCP(fd, factory->findNextTnum());
+      DMSG("Created Stand Alone connection %i with tnum %i\n", kern_client->getFD(), kern_client->getTnum());
+      
+      factory->addToEPoll(kern_client->getFD(), kern_client);
    }
 
    while(!close_nicely) {

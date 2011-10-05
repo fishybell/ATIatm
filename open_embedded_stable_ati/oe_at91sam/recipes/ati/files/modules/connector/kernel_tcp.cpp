@@ -9,8 +9,13 @@ using namespace std;
 #include "common.h"
 #include "timers.h"
 
-#define START 0xABCD0123
-#define END 0x0123ABCD
+// start/end magic for generic output event message
+#define GO_START 0xABCD0123
+#define GO_END 0x0123ABCD
+
+// start/end magic for command event message
+#define CMD_START 0xFEDC9876
+#define CMD_END 0x6789CDEF
 
 /***********************************************************
 *                     Kernel_TCP Class                     *
@@ -21,6 +26,9 @@ FUNCTION_START("::Kernel_TCP(int fd) : Connection(fd)")
    kern_conn = NL_Conn::newConn<Kern_Conn>(this);
    if (kern_conn == NULL) {
       deleteLater();
+   } else {
+      // send my role to the other side
+      sendRole();
    }
 FUNCTION_END("::Kernel_TCP(int fd) : Connection(fd)")
 }
@@ -33,6 +41,9 @@ FUNCTION_START("::Kernel_TCP(int fd, int tnum) : Connection(fd)")
    kern_conn = NL_Conn::newConn<Kern_Conn>(this);
    if (kern_conn == NULL) {
       deleteLater();
+   } else {
+      // send my role to the other side
+      sendRole();
    }
 FUNCTION_END("::Kernel_TCP(int fd, int tnum) : Connection(fd)")
 }
@@ -41,6 +52,20 @@ Kernel_TCP::~Kernel_TCP() {
 FUNCTION_START("::~Kernel_TCP()")
 
 FUNCTION_END("::~Kernel_TCP()")
+}
+
+void Kernel_TCP::sendRole() {
+FUNCTION_START("::sendRole()")
+
+   // create "I am this role" message
+   kern_cmd_event_t msg;
+   memset(&msg, 0, sizeof(kern_cmd_event_t)); // everything 0...
+   msg.event.role = KERN_ROLE;                // ... except role
+
+   // send
+   queueMsg(&msg, sizeof(kern_cmd_event_t));
+
+FUNCTION_END("::sendRole()")
 }
 
 int Kernel_TCP::parseData(int size, const char *buf) {
@@ -54,18 +79,34 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0)
    }
 
    // check for a valid message
-   while (size >= sizeof(kern_event_t)) {
-      // map a trial event structure to the receive buffer
-      kern_event_t *trial = (kern_event_t*)buf;
+   while (size >= min(sizeof(kern_go_event_t), sizeof(kern_cmd_event_t))) { // msg at least as big as smallest event structure
+      // map a trial generic output event structure to the receive buffer
+      kern_go_event_t *go_trial = (kern_go_event_t*)buf;
+
+      // map a trial command event structure to the receive buffer
+      kern_cmd_event_t *cmd_trial = (kern_cmd_event_t*)buf;
 
       // check the start and end values
-      if (trial->start == START && trial->end == END) {
+      if (size >= sizeof(kern_go_event_t) && go_trial->start == GO_START && go_trial->end == GO_END) { // message a valid go event?
          // send to kernel
-         kern_conn->incomingEvent(trial);
+         kern_conn->incomingGOEvent(go_trial);
 
          // move on to next object
-         buf += sizeof(kern_event_t);
-         size -= sizeof(kern_event_t);
+         buf += sizeof(kern_go_event_t);
+         size -= sizeof(kern_go_event_t);
+      } else if (size >= sizeof(kern_cmd_event_t) && go_trial->start == CMD_START && go_trial->end == CMD_END) { // message a valid cmd event?
+         // check to see if we're just getting the other side's kernel role
+         if (cmd_trial->event.cmd == 0 && cmd_trial->event.payload_size == 0 && cmd_trial->event.attribute == 0) {
+            // remember role
+            role = cmd_trial->event.role;
+         } else {
+            // send to kernel
+            kern_conn->incomingCmdEvent(cmd_trial);
+         }
+
+         // move on to next object
+         buf += sizeof(kern_cmd_event_t);
+         size -= sizeof(kern_cmd_event_t);
       } else {
          // move to next character in receive buffer
          buf++;
@@ -76,14 +117,27 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0)
    return 0;
 }
 
-// send an event over tcp
-void Kernel_TCP::outgoingEvent(kern_event_t *event) {
-FUNCTION_START("::outgoingEvent(kern_event_t *event)")
+// send a generic output event over tcp
+void Kernel_TCP::outgoingGOEvent(kern_go_event_t *event) {
+FUNCTION_START("::outgoingGOEvent(kern_go_event_t *event)")
 
    // just queue the message for sending
-   queueMsg(event, sizeof(kern_event_t));
+   queueMsg(event, sizeof(kern_go_event_t));
 
-FUNCTION_END("::outgoingEvent(kern_event_t *event)")
+FUNCTION_END("::outgoingGOEvent(kern_go_event_t *event)")
+}
+
+// send a command event over tcp
+void Kernel_TCP::outgoingCmdEvent(kern_cmd_event_t *event) {
+FUNCTION_START("::outgoingCmdEvent(kern_cmd_event_t *event)")
+
+   // check to see if we're attached to the correct role
+   if (event->event.role == role) {
+      // ...we are, queue the message for sending
+      queueMsg(event, sizeof(kern_cmd_event_t));
+   }
+
+FUNCTION_END("::outgoingCmdEvent(kern_cmd_event_t *event)")
 }
 
 /***********************************************************
@@ -133,26 +187,51 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
 
                // send SHUTDOWN message on to other devices
                // create an event structure and pass to tcp handler for transmission
-               kern_event_t event;
-               event.start = START;
+               kern_go_event_t event;
+               event.start = GO_START;
                event.event = EVENT_SHUTDOWN;
-               event.end = END;
-               kern_tcp->outgoingEvent(&event);
+               event.end = GO_END;
+               kern_tcp->outgoingGOEvent(&event);
             }
          }
          break;
       case NL_C_EVENT:
          genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
 
-         // handle event from kernel
+         // handle generic output event from kernel
          if (attrs[GEN_INT8_A_MSG]) {
             u8 data = nla_get_u8(attrs[GEN_INT8_A_MSG]);
             // create an event structure and pass to tcp handler for transmission
-            kern_event_t event;
-            event.start = START;
+            kern_go_event_t event;
+            event.start = GO_START;
             event.event = (GO_event_t)data;
-            event.end = END;
-            kern_tcp->outgoingEvent(&event);
+            event.end = GO_END;
+            kern_tcp->outgoingGOEvent(&event);
+         }
+         break;
+      case NL_C_CMD_EVENT:
+         struct nlattr *na;
+         genlmsg_parse(nlh, 0, attrs, CMD_EVENT_A_MAX, cmd_event_policy);
+
+         // handle command event from kernel
+         na = attrs[CMD_EVENT_A_MSG];
+         if (na) {
+            cmd_event_t *data = (cmd_event_t*)nla_data(na);
+            // create an event structure and pass to tcp handler for transmission
+            kern_cmd_event_t event;
+            event.start = CMD_START;
+            event.event = *data; // copy data
+            event.end = CMD_END;
+            DCMSG(RED, "Received Command Event: %i %i %i %i", data->cmd, data->attribute, data->payload_size, data->role);
+            for (int i=0; i<data->payload_size; i++) {
+               DCMSG(RED, "Byte %i : %02X", i, data->payload[i]);
+            }
+            // handle with the appropriate role handler
+            if (data->role == KERN_ROLE) { // is this kernel the right role?
+               incomingCmdEvent(&event);
+            } else { // maybe the tcp connection has the right role...
+               kern_tcp->outgoingCmdEvent(&event);
+            }
          }
          break;
       default:
@@ -164,12 +243,22 @@ FUNCTION_INT("::parseData(struct nl_msg *msg)", 0)
    return 0;
 }
 
-// send an event to the kernel
-void Kern_Conn::incomingEvent(kern_event_t *event) {
-FUNCTION_START("::incomingEvent(kern_event_t *event)")
+// send a generic output event to the kernel
+void Kern_Conn::incomingGOEvent(kern_go_event_t *event) {
+FUNCTION_START("::incomingGOEvent(kern_go_event_t *event)")
 
    // just queue the event for sending
    queueMsgU8(NL_C_EVENT, event->event);
 
-FUNCTION_END("::incomingEvent(kern_event_t *event)")
+FUNCTION_END("::incomingGOEvent(kern_go_event_t *event)")
+}
+
+// send a command event to the kernel
+void Kern_Conn::incomingCmdEvent(kern_cmd_event_t *event) {
+FUNCTION_START("::incomingCmdEvent(kern_cmd_event_t *event)")
+
+    // queue message to kernel
+    queueMsg(event->event.cmd, event->event.attribute, event->event.payload_size, event->event.payload); // pass structure without changing
+
+FUNCTION_END("::incomingCmdEvent(kern_cmd_event_t *event)")
 }

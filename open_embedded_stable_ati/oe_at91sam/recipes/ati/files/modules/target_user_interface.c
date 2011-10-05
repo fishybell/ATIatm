@@ -16,6 +16,7 @@
 #define BIT_READ_IN_MSECONDS		50
 #define BIT_CANCEL_IN_MSECONDS		2500
 #define MOVE_WAIT_IN_MSECONDS		2000
+#define BIT_LONG_WAIT_IN_MSECONDS 2000
 
 #define BLINK_ON_IN_MSECONDS		1000
 #define BLINK_OFF_IN_MSECONDS		500
@@ -40,7 +41,7 @@
 #define MOVING_REV	1
 #define MOVING_STOP	2
 
-// #define TESTING_ON_EVAL
+#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
 	#undef INPUT_TEST_BUTTON_ACTIVE_STATE
 	#undef INPUT_TEST_BUTTON_PULLUP_STATE
@@ -130,11 +131,13 @@ static struct timer_list blink_timeout_timer_list = TIMER_INITIALIZER(blink_time
 // Declaration of the function that gets called when the bit read timeout fires.
 //---------------------------------------------------------------------------
 static void bit_read_timeout_fire(unsigned long data);
+static void bit_long_read_timeout_fire(unsigned long data);
 
 //---------------------------------------------------------------------------
 // Kernel timer for the bit read timeout.
 //---------------------------------------------------------------------------
 static struct timer_list bit_read_timeout_timer_list = TIMER_INITIALIZER(bit_read_timeout_fire, 0, 0);
+static struct timer_list bit_long_read_timeout_timer_list = TIMER_INITIALIZER(bit_long_read_timeout_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Declaration of the function that gets called when the bit timeout fires.
@@ -159,6 +162,7 @@ static struct timer_list hold_timeout_timer_list = TIMER_INITIALIZER(hold_timeou
 // button has been pressed.
 //---------------------------------------------------------------------------
 static struct work_struct bit_button_work;
+static struct work_struct bit_long_button_work;
 static struct work_struct move_button_work;
 
 //---------------------------------------------------------------------------
@@ -227,7 +231,7 @@ static void move_button_int(int button)
         return;
         }
 
-    delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, button);
+    //delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, button);
 
     // look at all three values
     //bit_value = (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE);
@@ -244,7 +248,7 @@ static void move_button_int(int button)
         {
 
     //delay_printk("%s - %s fail: (!%i) || (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, bit_value,button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
-   delay_printk("%s - %s fail: (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
+   //delay_printk("%s - %s fail: (%i == %i && !%i) || (%i == %i && !%i)\n",TARGET_NAME, __func__, button,FORWARD_BUTTON,fwd_value,button,REVERSE_BUTTON,rev_value);
         // were we moving?
         //if (atomic_read(&move_button_atomic) != MOVING_STOP)
         //    {
@@ -283,7 +287,7 @@ static void hold_timeout_fire(unsigned long data) {
     // int bit_value;
     int fwd_value, rev_value;
     // if we're not a mover, don't bother
-    delay_printk("%s - %s\n",TARGET_NAME, __func__);
+    //delay_printk("%s - %s\n",TARGET_NAME, __func__);
     if (!mover)
         {
         return;
@@ -314,7 +318,7 @@ static void move_timeout_fire(unsigned long data)
     // int bit_value;
     int fwd_value, rev_value;
     // if we're not a mover, don't bother
-   delay_printk("%s - %s\n",TARGET_NAME, __func__);
+   //delay_printk("%s - %s\n",TARGET_NAME, __func__);
     if (!mover)
         {
         return;
@@ -328,7 +332,7 @@ static void move_timeout_fire(unsigned long data)
     // check for an error state
     /*if (!bit_value)
         {
-       delay_printk("%s - %s - NONE\n",TARGET_NAME, __func__);
+       //delay_printk("%s - %s - NONE\n",TARGET_NAME, __func__);
         move_button_int(TEST_BUTTON);
         return;
         }*/
@@ -337,21 +341,21 @@ static void move_timeout_fire(unsigned long data)
     if (fwd_value && !rev_value)
         {
         // forward
-       delay_printk("%s - %s - FORWARD\n",TARGET_NAME, __func__);
+       //delay_printk("%s - %s - FORWARD\n",TARGET_NAME, __func__);
         atomic_set(&move_button_atomic, MOVING_FWD);
         mod_timer(&hold_timeout_timer_list, jiffies+((MOVE_WAIT_IN_MSECONDS/10)*HZ/1000));
         }
     else if (!fwd_value && rev_value)
         {
         // reverse
-       delay_printk("%s - %s - REVERSE\n",TARGET_NAME, __func__);
+       //delay_printk("%s - %s - REVERSE\n",TARGET_NAME, __func__);
         atomic_set(&move_button_atomic, MOVING_REV);
         mod_timer(&hold_timeout_timer_list, jiffies+((MOVE_WAIT_IN_MSECONDS/10)*HZ/1000));
         }
     else
         {
         // error
-       delay_printk("%s - %s - STOP\n",TARGET_NAME, __func__);
+       //delay_printk("%s - %s - STOP\n",TARGET_NAME, __func__);
         move_button_int(TEST_BUTTON);
         return;
         }
@@ -364,7 +368,7 @@ static void move_timeout_fire(unsigned long data)
 //---------------------------------------------------------------------------
 static void bit_timeout_fire(unsigned long data)
     {
-   delay_printk("%s - %s\n",TARGET_NAME, __func__);
+   //delay_printk("%s - %s\n",TARGET_NAME, __func__);
     if (atomic_read(&bit_button_atomic) != BUTTON_STATUS_PRESSED)
         {
         atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
@@ -384,11 +388,22 @@ static void startup_timeout_fire(unsigned long data) {
 //---------------------------------------------------------------------------
 static void press_timeout_fire(unsigned long data)
     {
-   delay_printk("%s - %s\n",TARGET_NAME, __func__);
+   //delay_printk("%s - %s\n",TARGET_NAME, __func__);
     atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
 
     // notify user-space only when fully double-clicked
     schedule_work(&bit_button_work);
+    }
+
+//---------------------------------------------------------------------------
+// The function that gets called when the press timeout fires.
+//---------------------------------------------------------------------------
+static void long_press_timeout_fire(unsigned long data)
+    {
+   //delay_printk("%s - %s\n",TARGET_NAME, __func__);
+    atomic_set(&bit_button_atomic, BUTTON_STATUS_CLEAR);
+
+    // notify user-space only when fully double-clicked
     }
 
 //---------------------------------------------------------------------------
@@ -418,14 +433,14 @@ irqreturn_t bit_button_int(int irq, void *dev_id, struct pt_regs *regs)
         {
         return IRQ_HANDLED;
         }
-    delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, 0);
+    //delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, 0);
 
     // tell the movement code that the test button has changed
     //move_button_int(TEST_BUTTON);
 
     // check if the button has been pressed but not read by user-space
     value = atomic_read(&bit_button_atomic);
-    delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, value);
+    //delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, value);
     if (value == BUTTON_STATUS_PRESSED)
 	{
 	return IRQ_HANDLED;
@@ -435,61 +450,71 @@ irqreturn_t bit_button_int(int irq, void *dev_id, struct pt_regs *regs)
     del_timer(&bit_read_timeout_timer_list);
     mod_timer(&bit_read_timeout_timer_list, jiffies+(BIT_READ_IN_MSECONDS*HZ/1000));
 
-    delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, 3);
+    // user let go of bit too early for long-bit
+    del_timer(&bit_long_read_timeout_timer_list);
+
+    //delay_printk("%s - %s(%i)\n",TARGET_NAME, __func__, 3);
     return IRQ_HANDLED;
     }
 
 //---------------------------------------------------------------------------
+// The function that gets called when the bit long read timeout fires.
+//---------------------------------------------------------------------------
+static void bit_long_read_timeout_fire(unsigned long data) {
+
+   //delay_printk("%s - %s()\n",TARGET_NAME, __func__);
+   if (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE) {
+      schedule_work(&bit_long_button_work);
+   }
+}
+
+//---------------------------------------------------------------------------
 // The function that gets called when the bit read timeout fires.
 //---------------------------------------------------------------------------
-static void bit_read_timeout_fire(unsigned long data)
-    {
-    int value;
-    // read in value of bit button
-    value = atomic_read(&bit_button_atomic);
+static void bit_read_timeout_fire(unsigned long data) {
+   int value;
+   // read in value of bit button
+   value = atomic_read(&bit_button_atomic);
 
-   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
+   //delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
-    // We get an interrupt on both edges, so we have to check to which edge
-    //  we are responding.
-    if (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE)
-        {
-       delay_printk("%s - ACTIVE\n",TARGET_NAME);
-        if (value == BUTTON_STATUS_CLEAR || BUTTON_STATUS_RECLEAR)
-            {
-            // signal that the wake-up button has been pressed
-            atomic_set(&bit_button_atomic, ++value);
+   // We get an interrupt on both edges, so we have to check to which edge
+   //  we are responding.
+   if (at91_get_gpio_value(INPUT_TEST_BUTTON) == INPUT_TEST_BUTTON_ACTIVE_STATE) {
+      //delay_printk("%s - ACTIVE\n",TARGET_NAME);
+      if (value == BUTTON_STATUS_CLEAR || value == BUTTON_STATUS_RECLEAR) {
+         // signal that the wake-up button has been pressed
+         atomic_set(&bit_button_atomic, ++value);
 
-            // schedule a timeout in case we don't double-click
-            if (value != BUTTON_STATUS_PRESSED)
-                {
-                mod_timer(&bit_timeout_timer_list, jiffies+(BIT_DOUBLE_IN_MSECONDS*HZ/1000));
-                }
-            else
-                {
-                // notify user-space only when fully double-clicked
-                schedule_work(&bit_button_work);
-
-                // at some point clear out the press
-                mod_timer(&press_timeout_timer_list, jiffies+(BIT_CANCEL_IN_MSECONDS*HZ/1000));
-                }
-            }
-        }
-    else
-        {
-       delay_printk("%s - INACTIVE\n",TARGET_NAME);
-        if (value == BUTTON_STATUS_UNCLEAR)
-            {
-            // signal that the wake-up button has been pressed
-            atomic_set(&bit_button_atomic, ++value);
-
-            // schedule a timeout in case we don't double-click
+         // schedule a timeout in case we don't double-click
+         if (value != BUTTON_STATUS_PRESSED) {
             mod_timer(&bit_timeout_timer_list, jiffies+(BIT_DOUBLE_IN_MSECONDS*HZ/1000));
-            }
-        }
+            // watch for long-bit
+            mod_timer(&bit_long_read_timeout_timer_list, jiffies+(BIT_LONG_WAIT_IN_MSECONDS*HZ/1000));
+         } else {
+            // notify user-space only when fully double-clicked
+            schedule_work(&bit_button_work);
 
-   delay_printk("%s - %i\n",TARGET_NAME, value);
-    }
+            // at some point clear out the press
+            mod_timer(&press_timeout_timer_list, jiffies+(BIT_CANCEL_IN_MSECONDS*HZ/1000));
+         }
+      }
+   } else {
+      //delay_printk("%s - INACTIVE\n",TARGET_NAME);
+      if (value == BUTTON_STATUS_UNCLEAR) {
+         // signal that the wake-up button has been pressed
+         atomic_set(&bit_button_atomic, ++value);
+
+         // schedule a timeout in case we don't double-click
+         mod_timer(&bit_timeout_timer_list, jiffies+(BIT_DOUBLE_IN_MSECONDS*HZ/1000));
+      } else {
+         // user let go of bit too early for long-bit
+         del_timer(&bit_long_read_timeout_timer_list);
+      }
+   }
+
+   //delay_printk("%s - %i\n",TARGET_NAME, value);
+}
 
 //---------------------------------------------------------------------------
 //
@@ -575,6 +600,7 @@ static int hardware_exit(void)
     del_timer(&press_timeout_timer_list);
     del_timer(&bit_timeout_timer_list);
     del_timer(&bit_read_timeout_timer_list);
+    del_timer(&bit_long_read_timeout_timer_list);
     del_timer(&blink_timeout_timer_list);
     free_irq(INPUT_TEST_BUTTON, NULL);
     // if we're not a mover, don't bother
@@ -646,24 +672,24 @@ static ssize_t bit_status_store(struct device *dev, struct device_attribute *att
 
     if (sysfs_streq(buf, "on"))
         {
-    delay_printk("%s - %s() : user command on\n",TARGET_NAME, __func__);
+    //delay_printk("%s - %s() : user command on\n",TARGET_NAME, __func__);
     	del_timer(&blink_timeout_timer_list);
         hardware_bit_status_on();
         }
     else if (sysfs_streq(buf, "off"))
         {
-    delay_printk("%s - %s() : user command off\n",TARGET_NAME, __func__);
+    //delay_printk("%s - %s() : user command off\n",TARGET_NAME, __func__);
     	del_timer(&blink_timeout_timer_list);
         hardware_bit_status_off();
         }
     else if (sysfs_streq(buf, "blink"))
 		{
-	delay_printk("%s - %s() : user command blink\n",TARGET_NAME, __func__);
+	//delay_printk("%s - %s() : user command blink\n",TARGET_NAME, __func__);
 		mod_timer(&blink_timeout_timer_list, jiffies+(100*HZ/1000));
 		}
     else
 		{
-	delay_printk("%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
+	//delay_printk("%s - %s() : unrecognized user command\n",TARGET_NAME, __func__);
 		}
 
     return status;
@@ -743,6 +769,22 @@ static void bit_pressed(struct work_struct * work)
 	}
 
 //---------------------------------------------------------------------------
+// Work item to notify the user-space about a bit button press
+//---------------------------------------------------------------------------
+static void bit_long_pressed(struct work_struct * work) {
+   struct bit_event bit_data;
+   // not initialized or exiting?
+   if (atomic_read(&full_init) != TRUE) {
+      return;
+   }
+  
+   // notify netlink userspace
+   bit_data.bit_type = BIT_LONG_PRESS;
+   bit_data.is_on = atomic_read(&bit_button_atomic) == BUTTON_STATUS_PRESSED;
+   send_nl_message_multi(&bit_data, bit_mfh, NL_C_BIT);
+}
+
+//---------------------------------------------------------------------------
 // Work item to notify the user-space about a move button press
 //---------------------------------------------------------------------------
 static void move_pressed(struct work_struct * work)
@@ -773,11 +815,12 @@ static void move_pressed(struct work_struct * work)
 static int __init target_user_interface_init(void)
     {
     int retval;
-delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+//delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 
 	hardware_init();
 
 	INIT_WORK(&bit_button_work, bit_pressed);
+	INIT_WORK(&bit_long_button_work, bit_long_pressed);
 	INIT_WORK(&move_button_work, move_pressed);
 
     retval=target_sysfs_add(&target_device_user_interface);
@@ -794,6 +837,7 @@ static void __exit target_user_interface_exit(void)
     {
     atomic_set(&full_init, FALSE);
     ati_flush_work(&bit_button_work); // close any open work queue items
+    ati_flush_work(&bit_long_button_work); // close any open work queue items
     ati_flush_work(&move_button_work); // close any open work queue items
 	hardware_exit();
     target_sysfs_remove(&target_device_user_interface);
