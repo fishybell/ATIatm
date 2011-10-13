@@ -4,10 +4,11 @@
 #define DELAY 3
 
 int main(int argc, char *argv[]) {
-   int sender1, sender2; // file descriptors
+   int sender1, sender2, sender3; // file descriptors
    struct sockaddr_in serveraddr;
    struct sockaddr_in serveraddr_avahi; // address for non-dhcp driven networks 
-   int i, yes=1;
+   struct sockaddr_in serveraddr_wifi;  // address for detachable wifi networks
+   int i, yes=1, wifion;
    bcast_packet_t packet_out;
 
    /* install signal handlers */
@@ -19,7 +20,7 @@ int main(int argc, char *argv[]) {
    int port = PORT;
    
 const char *usage = "Usage: %s [options]\n\
-\t-l X   -- listen on port X rather than the default \n";
+\t-p X   -- broadcast on port X rather than the default \n";
 
 
    for (i = 1; i < argc; i++) {
@@ -28,7 +29,7 @@ const char *usage = "Usage: %s [options]\n\
          return 1;
       }
       switch (argv[i][1]) {
-         case 'l' :
+         case 'p' :
             if (sscanf(argv[++i], "%i", &port) != 1) {
                fprintf(stderr,"Server-main() error: invalid argument (%i)\n", i);
                return 1;
@@ -62,6 +63,12 @@ const char *usage = "Usage: %s [options]\n\
       /*just exit  */
       return 1;
    }
+   if ((sender3 = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+      perror("Server-socket(3) error");
+
+      /*just exit  */
+      return 1;
+   }
 
    /* "address already in use" error message */
    if (setsockopt(sender1, SOL_SOCKET, SO_BROADCAST|SO_REUSEADDR, &yes, sizeof(int)) == -1) {
@@ -82,8 +89,15 @@ const char *usage = "Usage: %s [options]\n\
       perror("Server-setsockopt(2) BINDTO error");
       return 1;
    }
+   /* attempt connection on wifi, but don't fail if it doesn't work */
+   if (setsockopt(sender3, SOL_SOCKET, SO_BINDTODEVICE, "wlan0", 5) == -1) {
+      wifion = 0;
+   } else {
+      wifion = 1;
+   }
+   
 
-   /* set destination address */
+   /* set destination addresses */
    serveraddr.sin_family = AF_INET;
    serveraddr.sin_addr.s_addr = inet_addr("255.255.255.255");
    serveraddr.sin_port = htons(port);
@@ -93,6 +107,11 @@ const char *usage = "Usage: %s [options]\n\
    serveraddr_avahi.sin_addr.s_addr = inet_addr("169.254.255.255");
    serveraddr_avahi.sin_port = htons(port);
    memset(&(serveraddr_avahi.sin_zero), '\0', 8);
+
+   serveraddr_wifi.sin_family = AF_INET;
+   serveraddr_wifi.sin_addr.s_addr = inet_addr("255.255.255.255");
+   serveraddr_wifi.sin_port = htons(port);
+   memset(&(serveraddr_wifi.sin_zero), '\0', 8);
 
    /* prepare packet */
    packet_out.magic = MAGIC;
@@ -107,10 +126,20 @@ const char *usage = "Usage: %s [options]\n\
        if (sendto(sender2, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr_avahi, sizeof(serveraddr_avahi)) < 0) {
            perror("2:");
        }
+       if (wifion) {
+           if (sendto(sender3, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr_wifi, sizeof(serveraddr_wifi)) < 0) {
+               perror("2:");
+               wifion = 0;
+           }
+       } else {
+           /* reconnect wifi */
+           if (setsockopt(sender3, SOL_SOCKET, SO_BINDTODEVICE, "wlan0", 5) == -1) {
+               wifion = 1;
+           }
+       }
 
        /* wait to send again */
        sleep(DELAY);
    }
 
-   
 }
