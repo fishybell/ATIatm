@@ -48,9 +48,12 @@ int main(int argc, char *argv[]) {
 
    /* parse argv for command line arguments: */
    int port = PORT;
+   int number = 1;
+   int multiple = 0;
    
 const char *usage = "Usage: %s [options]\n\
-\t-l X   -- listen on port X rather than the default \n";
+\t-p X   -- listen on port X rather than the default \n\
+\t-n X   -- wait for X broadcasts rather than one \n";
 
 
    for (i = 1; i < argc; i++) {
@@ -59,11 +62,18 @@ const char *usage = "Usage: %s [options]\n\
          return 1;
       }
       switch (argv[i][1]) {
-         case 'l' :
+         case 'p' :
             if (sscanf(argv[++i], "%i", &port) != 1) {
                fprintf(stderr,"Client-main() error: invalid argument (%i)\n", i);
                return 1;
             }
+            break;
+         case 'n' :
+            if (sscanf(argv[++i], "%i", &number) != 1) {
+               fprintf(stderr,"Client-main() error: invalid argument (%i)\n", i);
+               return 1;
+            }
+            multiple = 1;
             break;
          case 'h' :
             printf(usage, argv[0]);
@@ -163,12 +173,20 @@ const char *usage = "Usage: %s [options]\n\
             /* check magic, print IP of sender */
             if (res == sizeof(packet_in) && packet_in.magic == MAGIC) {
                 printf("%s", inet_ntoa(from_addr.sin_addr));
+                /* if we're doing multiple, subdivide by lines */
+                if (multiple) {
+                   printf("\n");
+                   fflush(stdout); // print out what we've got now...
+                }
             } else {
                 printf("error");
             }
 
-            /* break out of loop */
-            close_nicely = 1;
+            /* check number to see if we should look for another */
+            if (--number == 0) {
+               /* break out of loop */
+               close_nicely = 1;
+            }
          }
       }
    }
