@@ -15,6 +15,8 @@
 
 #include "target_generic_output.h" /* for EVENT_### definitions */
 
+//#define TESTING_ON_EVAL
+
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
@@ -1193,11 +1195,13 @@ static int hardware_init(void)
     status = hardware_pwm_init();
 
     // install track sensor interrupts
+#ifndef TESTING_ON_EVAL
     if ((hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_HOME, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_home_int, "track_sensor_home_int") == FALSE) ||
         (hardware_set_gpio_input_irq(INPUT_MOVER_TRACK_END, INPUT_MOVER_END_OF_TRACK_PULLUP_STATE, track_sensor_end_int, "track_sensor_end_int") == FALSE))
         {
         return FALSE;
         }
+#endif
 
     // Configure leg sensor gpios for input and deglitch for interrupts
     at91_set_gpio_input(INPUT_MOVER_TRACK_SENSOR_2, INPUT_MOVER_TRACK_SENSOR_PULLUP_STATE); // other leg sensor is also an input, just no irq
@@ -1251,8 +1255,10 @@ static int hardware_exit(void)
     del_timer(&position_timer_list);
     del_timer(&velocity_timer_list);
 
+#ifndef TESTING_ON_EVAL
     free_irq(INPUT_MOVER_TRACK_HOME, NULL);
     free_irq(INPUT_MOVER_TRACK_END, NULL);
+#endif
     free_irq(INPUT_MOVER_TRACK_SENSOR_1, NULL);
 
     hardware_pwm_exit();
