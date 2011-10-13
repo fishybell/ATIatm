@@ -153,7 +153,7 @@ inline int myfprintf(_IO_FILE* file, const char *fmt, ...) {
        myfprintf(stdout, "\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
        char *_data = (char*)data; \
        for (int _i=0; _i<size; _i++) myfprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
-       myfprintf(stdout, "\n"); \
+       myfprintf(stdout, "\x1B[3%d;%dm\n",EC&7,(EC>>3)&1); \
 }; fflush(stdout); }}
    
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
