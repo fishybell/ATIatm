@@ -241,6 +241,7 @@ enum {
     NL_C_DMSG,       /* debug message (reply) (generic string) */
     NL_C_CMD_EVENT,  /* command event (command) (command event structure) */
     NL_C_SCENARIO,   /* run scenario message (reply) (generic string) */
+    NL_C_EVENT_REF,  /* reflected event (command) (generic 8-bit int) */
     __NL_C_MAX,
 };
 #define NL_C_MAX (__NL_C_MAX - 1)
@@ -254,7 +255,7 @@ enum {
 #define HIT_REQ 255
 
 #define VELOCITY_STOP 65535
-#define VELOCITY_COAST 32678
+#define VELOCITY_COAST 32768
 #define VELOCITY_REQ 0
 
 #define BATTERY_REQUEST 1
