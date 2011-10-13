@@ -200,7 +200,10 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
 
          // handle generic output event from kernel
          if (attrs[GEN_INT8_A_MSG]) {
+            // grab data
             u8 data = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+            // reflect back to kernel
+            queueMsgU8(NL_C_EVENT_REF, data);
             // create an event structure and pass to tcp handler for transmission
             kern_go_event_t event;
             event.start = GO_START;
