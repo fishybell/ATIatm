@@ -15,7 +15,22 @@ extern void scenario_kill(void);
 //-------------------------------------------------
 
 // helper function to properly escape a function call within a function call
-extern char* escape_scen_call(char *call);
+void escape_scen_call(char *call, int length, char *dest) {
+   int i, j = 0;
+   char c;
+   dest[j++] = '"'; // start with a quote
+   for (i=0; i<length; i++) {
+      c = call[i];
+      // look at characters to escape
+      if (c == '{' || c == '}' || c == '"' || c == '\\') {
+         dest[j++] = '\\'; // copy escape character first
+      }
+      // copy original character
+      dest[j++] = c;
+   }
+   dest[j++] = '"'; // end with a quote
+   dest[j++] = '\0'; // null terminate
+}
 
 // helper function to properly hex-encode attribute data (dest_buf should be 2*size+1 big)
 void hex_encode_attr(const char *attr, int size, char *dest_buf) {
@@ -30,6 +45,7 @@ void hex_encode_attr(const char *attr, int size, char *dest_buf) {
 
 // helper function to properly hex-decode attribute data (dest_buf should be length/2 big)
 #if 0
+// can't do this method, as apparently sscanf doesn't work the same way in the kernel
 void hex_decode_attr(char *hex, int length, char *dest_buf) {
    int i, j;
    int size = length/2;
@@ -136,39 +152,24 @@ void hex_decode_attr(char *hex, int length, char *dest_buf) {
  *                                        // if milliseconds "time" has passed, "timeout_cmd"
  *                                           is ran before moving on
  *
- * {DoWhen;cmd;when;var;junk}     // runs command "cmd" when event "when" is received
- *                                // the value of the event parameter is saved in the register
- *                                   variable "var" (hex encoded, up to 16 bytes), if given
- *                                // the command is only called once, so if 2 events are received,
- *                                   command will only trigger on the first one
- *
- * {DoWhenVar;cmd;when;junk;junk} // runs command "cmd" when register variable (0-9) is "value"
- *                                // if the variable is already "value," "cmd" runs immediately
- *                                // the command is only called once, so if the variable changes
- *                                   to "value," then something else, then back to "value" "cmd" is
- *                                   only called on the first change
- *
+ * Not Yet Implimented:
+ *  -- SetVar
+ *  -- End
+ *  -- If
+ *  -- DoWaitVar
  *
  * Notes:
  *  -- Events, for the purpose of scenarios are defined as Netlink Commands and their corresponding
  *     attributes AND Netlink Commands of type "NL_C_EVENT" (without any attribute value)
  *  -- Events are given as the string representation as defined in netlink_shared.h and
  *     target_generic_output.h
- *  -- If a DoWait and a DoWhen are called on the same event, both will be ran, in order of when
- *     they were called to watch for the event
- *  -- The same applies to DoWaitVar and DoWhenVar for watching variables
- *  -- Only one DoWait and one DoWhen can be set for each event number. The last DoWait or DoWhen
- *     called is the one that is ran
- *  -- The same applies to DoWaitVar and DoWhenVar for watching variables
+ *  -- Commands ran from DoWait and DoWaitVar can not call DoWait, DoWaitVar, or Delay 
  *  -- The entire scenario has a maximum length of 65536 bytes, but scenarios that long may well
  *     run out of memory well before completion, depending on the complexity of the scenario
  *  -- A more general rule-of-thumb for scenario size should be no more than 4 layers deep on
  *     function calls and no more than 200 top-level function calls
  *  -- If a scenario contains a syntax error, the scenario may either have unexpected results, or
  *     end silently
- *  -- There is always an implied {DoWhen;"{END;;;;}";EVENT_ERROR;;} that can not be overwritten
- *  -- There is always an implied {DoWhen;"{END;;;;}";NL_C_STOP;;} that can not be overwritten
- *  -- There is always an implied {DoWhen;"{END;;;;}";NL_C_FAILURE;;} that can not be overwritten
  *
  *------------------------------------------------------------------------------------------------*/
 

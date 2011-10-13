@@ -58,7 +58,7 @@ static char *scen_buffer; // start of scenario buffer
 int scen_length; // length of scenario buffer
 static struct work_struct scenario_work;
 static struct work_struct end_scenario_work;
-typedef void (*scenario_function)(char*,int,char*,int,char*,int,char*,int); // function typedef for scenario prebuilt functions (four parameters given as pointers and lengths)
+typedef int (*scenario_function)(char*,int,char*,int,char*,int,char*,int); // function typedef for scenario prebuilt functions (four parameters given as pointers and lengths) (return 1 for resume later, 0 for continue)
 typedef struct string_match {
    const char * string;
    int number;
@@ -98,6 +98,7 @@ static string_match_t string_table[] = {
    {"NL_C_DMSG", NL_C_DMSG},       /* debug message (reply) (generic string) */
    {"NL_C_CMD_EVENT", NL_C_CMD_EVENT},  /* command event (command) (command event structure) */
    {"NL_C_SCENARIO", NL_C_SCENARIO},   /* run scenario message (reply) (generic string) */
+   {"NL_C_EVENT_REF", NL_C_EVENT_REF},      /* reflected event (command) (generic 8-bit int) */
    {"R_UNSPECIFIED", R_UNSPECIFIED}, // no role specified
    {"R_LIFTER", R_LIFTER},      // lifting device
    {"R_MOVER", R_MOVER},       // moving device
@@ -108,14 +109,19 @@ static string_match_t string_table[] = {
 typedef struct command_handler {
    const char* name; // name of function
    scenario_function handler; // function pointer
+   scenario_function resume_handler; // resume function pointer
 } command_handler_t;
+typedef enum {
+   WATCHER_NONE,     /* no effect on running scenario */
+   WATCHER_RESUME,   /* resume running scenario if sleeping */
+   WATCHER_KILL,     /* kill running scenario */
+} watcher_cmd_t;
 typedef struct wait_watcher {
    const char* name; // name of event to watch
    int nl_cmd;       // netlink command to watch
    int go_event;     // generic output event to watch
    int timeout;      // milliseconds remaining until timeout
-   char *timeout_buf;// buffer to run when timeout occurs
-   int buf_len;      // length of timeout buffer
+   watcher_cmd_t cmd;// action to take at event
    int ro;           // read only? set to 1 if can't be overwritten
 } wait_watcher_t;
 typedef struct wait_var_watcher {
@@ -123,118 +129,55 @@ typedef struct wait_var_watcher {
    char *value_buf;  // buffer to match variable to
    int val_len;      // length of value buffer
    int timeout;      // milliseconds remaining until timeout
-   char *timeout_buf;// buffer to run when timeout occurs
-   int buf_len;      // length of timeout buffer
+   watcher_cmd_t cmd;// action to take at event
    int ro;           // read only? set to 1 if can't be overwritten
 } wait_var_watcher_t;
-typedef struct when_watcher {
-   const char* name; // name of event to watch
-   int nl_cmd;       // netlink command to watch
-   int go_event;     // generic output event to watch
-   int variable;     // register variable to set value (if any) into
-   char *cmd_buf;    // buffer to run when event occurs
-   int buf_len;      // length of command buffer
-   int ro;           // read only? set to 1 if can't be overwritten
-} when_watcher_t;
-typedef struct when_var_watcher {
-   int variable;     // register variable to watch
-   char *value_buf;  // buffer to match variable to
-   int val_len;      // length of value buffer
-   char *cmd_buf;    // buffer to run when event occurs
-   int buf_len;      // length of command buffer
-   int ro;           // read only? set to 1 if can't be overwritten
-} when_var_watcher_t;
 static wait_watcher_t wait_watchers[] = {
-   {"NL_C_FAILURE",  NL_C_FAILURE,  -1, 0, NULL, 0, 0},
-   {"NL_C_BATTERY",  NL_C_BATTERY,  -1, 0, NULL, 0, 0},
-   {"NL_C_EXPOSE",   NL_C_EXPOSE,   -1, 0, NULL, 0, 0},
-   {"NL_C_MOVE",     NL_C_MOVE,     -1, 0, NULL, 0, 0},
-   {"NL_C_POSITION", NL_C_POSITION, -1, 0, NULL, 0, 0},
-   {"NL_C_STOP",     NL_C_STOP,     -1, 0, NULL, 0, 0},
-   {"NL_C_HITS",     NL_C_HITS,     -1, 0, NULL, 0, 0},
-   {"NL_C_HIT_LOG",  NL_C_HIT_LOG,  -1, 0, NULL, 0, 0},
-   {"NL_C_HIT_CAL",  NL_C_HIT_CAL,  -1, 0, NULL, 0, 0},
-   {"NL_C_BIT",      NL_C_BIT,      -1, 0, NULL, 0, 0},
-   {"NL_C_ACCESSORY",NL_C_ACCESSORY,-1, 0, NULL, 0, 0},
-   {"NL_C_GPS",      NL_C_GPS,      -1, 0, NULL, 0, 0},
-   {"NL_C_EVENT",    NL_C_EVENT,    -1, 0, NULL, 0, 0},
-   {"NL_C_SLEEP",    NL_C_SLEEP,    -1, 0, NULL, 0, 0},
-   {"NL_C_DMSG",     NL_C_DMSG,     -1, 0, NULL, 0, 0},
-   {"NL_C_CMD_EVENT",NL_C_CMD_EVENT,-1, 0, NULL, 0, 0},
-   {"EVENT_RAISE",   -1, EVENT_RAISE,   0, NULL, 0, 0},
-   {"EVENT_UP",      -1, EVENT_UP,      0, NULL, 0, 0},
-   {"EVENT_LOWER",   -1, EVENT_LOWER,   0, NULL, 0, 0},
-   {"EVENT_DOWN",    -1, EVENT_DOWN,    0, NULL, 0, 0},
-   {"EVENT_MOVE",    -1, EVENT_MOVE,    0, NULL, 0, 0},
-   {"EVENT_MOVING",  -1, EVENT_MOVING,  0, NULL, 0, 0},
-   {"EVENT_POSITION",-1, EVENT_POSITION,0, NULL, 0, 0},
-   {"EVENT_COAST",   -1, EVENT_COAST,   0, NULL, 0, 0},
-   {"EVENT_STOP",    -1, EVENT_STOP,    0, NULL, 0, 0},
-   {"EVENT_STOPPED", -1, EVENT_STOPPED, 0, NULL, 0, 0},
-   {"EVENT_HIT",     -1, EVENT_HIT,     0, NULL, 0, 0},
-   {"EVENT_KILL",    -1, EVENT_KILL,    0, NULL, 0, 0},
-   {"EVENT_SHUTDOWN",-1, EVENT_SHUTDOWN,0, NULL, 0, 0},
-   {"EVENT_SLEEP",   -1, EVENT_SLEEP,   0, NULL, 0, 0},
-   {"EVENT_WAKE",    -1, EVENT_WAKE,    0, NULL, 0, 0},
-   {"EVENT_ERROR",   -1, EVENT_ERROR,   0, NULL, 0, 0},
+   {"NL_C_FAILURE",  NL_C_FAILURE,  -1, 0, WATCHER_KILL, 1},
+   {"NL_C_BATTERY",  NL_C_BATTERY,  -1, 0, WATCHER_NONE, 0},
+   {"NL_C_EXPOSE",   NL_C_EXPOSE,   -1, 0, WATCHER_NONE, 0},
+   {"NL_C_MOVE",     NL_C_MOVE,     -1, 0, WATCHER_NONE, 0},
+   {"NL_C_POSITION", NL_C_POSITION, -1, 0, WATCHER_NONE, 0},
+   {"NL_C_STOP",     NL_C_STOP,     -1, 0, WATCHER_NONE, 0},
+   {"NL_C_HITS",     NL_C_HITS,     -1, 0, WATCHER_NONE, 0},
+   {"NL_C_HIT_LOG",  NL_C_HIT_LOG,  -1, 0, WATCHER_NONE, 0},
+   {"NL_C_HIT_CAL",  NL_C_HIT_CAL,  -1, 0, WATCHER_NONE, 0},
+   {"NL_C_BIT",      NL_C_BIT,      -1, 0, WATCHER_NONE, 0},
+   {"NL_C_ACCESSORY",NL_C_ACCESSORY,-1, 0, WATCHER_NONE, 0},
+   {"NL_C_GPS",      NL_C_GPS,      -1, 0, WATCHER_NONE, 0},
+   {"NL_C_EVENT",    NL_C_EVENT,    -1, 0, WATCHER_NONE, 0},
+   {"NL_C_SLEEP",    NL_C_SLEEP,    -1, 0, WATCHER_NONE, 0},
+   {"NL_C_DMSG",     NL_C_DMSG,     -1, 0, WATCHER_NONE, 0},
+   {"NL_C_CMD_EVENT",NL_C_CMD_EVENT,-1, 0, WATCHER_NONE, 0},
+   {"NL_C_EVENT_REF",NL_C_EVENT_REF,-1, 0, WATCHER_NONE, 0},
+   {"EVENT_RAISE",   -1, EVENT_RAISE,   0, WATCHER_NONE, 0},
+   {"EVENT_UP",      -1, EVENT_UP,      0, WATCHER_NONE, 0},
+   {"EVENT_LOWER",   -1, EVENT_LOWER,   0, WATCHER_NONE, 0},
+   {"EVENT_DOWN",    -1, EVENT_DOWN,    0, WATCHER_NONE, 0},
+   {"EVENT_MOVE",    -1, EVENT_MOVE,    0, WATCHER_NONE, 0},
+   {"EVENT_MOVING",  -1, EVENT_MOVING,  0, WATCHER_NONE, 0},
+   {"EVENT_POSITION",-1, EVENT_POSITION,0, WATCHER_NONE, 0},
+   {"EVENT_COAST",   -1, EVENT_COAST,   0, WATCHER_NONE, 0},
+   {"EVENT_STOP",    -1, EVENT_STOP,    0, WATCHER_NONE, 0},
+   {"EVENT_STOPPED", -1, EVENT_STOPPED, 0, WATCHER_NONE, 0},
+   {"EVENT_HIT",     -1, EVENT_HIT,     0, WATCHER_NONE, 0},
+   {"EVENT_KILL",    -1, EVENT_KILL,    0, WATCHER_NONE, 0},
+   {"EVENT_SHUTDOWN",-1, EVENT_SHUTDOWN,0, WATCHER_NONE, 0},
+   {"EVENT_SLEEP",   -1, EVENT_SLEEP,   0, WATCHER_NONE, 0},
+   {"EVENT_WAKE",    -1, EVENT_WAKE,    0, WATCHER_NONE, 0},
+   {"EVENT_ERROR",   -1, EVENT_ERROR,   0, WATCHER_KILL, 1},
 };
 static wait_var_watcher_t wait_var_watchers[] = {
-   {0, NULL, 0, 0, NULL, 0, 0},
-   {1, NULL, 0, 0, NULL, 0, 0},
-   {2, NULL, 0, 0, NULL, 0, 0},
-   {3, NULL, 0, 0, NULL, 0, 0},
-   {4, NULL, 0, 0, NULL, 0, 0},
-   {5, NULL, 0, 0, NULL, 0, 0},
-   {6, NULL, 0, 0, NULL, 0, 0},
-   {7, NULL, 0, 0, NULL, 0, 0},
-   {8, NULL, 0, 0, NULL, 0, 0},
-   {9, NULL, 0, 0, NULL, 0, 0},
-};
-static when_watcher_t when_watchers[] = {
-   {"NL_C_FAILURE",  NL_C_FAILURE,  -1, -1, "{END;;;;}", 9, 1},
-   {"NL_C_BATTERY",  NL_C_BATTERY,  -1, -1, NULL, 0, 0},
-   {"NL_C_EXPOSE",   NL_C_EXPOSE,   -1, -1, NULL, 0, 0},
-   {"NL_C_MOVE",     NL_C_MOVE,     -1, -1, NULL, 0, 0},
-   {"NL_C_POSITION", NL_C_POSITION, -1, -1, NULL, 0, 0},
-   {"NL_C_STOP",     NL_C_STOP,     -1, -1, "{END;;;;}", 9, 1},
-   {"NL_C_HITS",     NL_C_HITS,     -1, -1, NULL, 0, 0},
-   {"NL_C_HIT_LOG",  NL_C_HIT_LOG,  -1, -1, NULL, 0, 0},
-   {"NL_C_HIT_CAL",  NL_C_HIT_CAL,  -1, -1, NULL, 0, 0},
-   {"NL_C_BIT",      NL_C_BIT,      -1, -1, NULL, 0, 0},
-   {"NL_C_ACCESSORY",NL_C_ACCESSORY,-1, -1, NULL, 0, 0},
-   {"NL_C_GPS",      NL_C_GPS,      -1, -1, NULL, 0, 0},
-   {"NL_C_EVENT",    NL_C_EVENT,    -1, -1, NULL, 0, 0},
-   {"NL_C_SLEEP",    NL_C_SLEEP,    -1, -1, NULL, 0, 0},
-   {"NL_C_DMSG",     NL_C_DMSG,     -1, -1, NULL, 0, 0},
-   {"NL_C_CMD_EVENT",NL_C_CMD_EVENT,-1, -1, NULL, 0, 0},
-   {"EVENT_RAISE",   -1, EVENT_RAISE,   -1, NULL, 0, 0},
-   {"EVENT_UP",      -1, EVENT_UP,      -1, NULL, 0, 0},
-   {"EVENT_LOWER",   -1, EVENT_LOWER,   -1, NULL, 0, 0},
-   {"EVENT_DOWN",    -1, EVENT_DOWN,    -1, NULL, 0, 0},
-   {"EVENT_MOVE",    -1, EVENT_MOVE,    -1, NULL, 0, 0},
-   {"EVENT_MOVING",  -1, EVENT_MOVING,  -1, NULL, 0, 0},
-   {"EVENT_POSITION",-1, EVENT_POSITION,-1, NULL, 0, 0},
-   {"EVENT_COAST",   -1, EVENT_COAST,   -1, NULL, 0, 0},
-   {"EVENT_STOP",    -1, EVENT_STOP,    -1, NULL, 0, 0},
-   {"EVENT_STOPPED", -1, EVENT_STOPPED, -1, NULL, 0, 0},
-   {"EVENT_HIT",     -1, EVENT_HIT,     -1, NULL, 0, 0},
-   {"EVENT_KILL",    -1, EVENT_KILL,    -1, NULL, 0, 0},
-   {"EVENT_SHUTDOWN",-1, EVENT_SHUTDOWN,-1, NULL, 0, 0},
-   {"EVENT_SLEEP",   -1, EVENT_SLEEP,   -1, NULL, 0, 0},
-   {"EVENT_WAKE",    -1, EVENT_WAKE,    -1, NULL, 0, 0},
-   {"EVENT_ERROR",   -1, EVENT_ERROR,   -1, "{END;;;;}", 9, 1},
-};
-static when_var_watcher_t when_var_watchers[] = {
-   {0, NULL, 0, NULL, 0, 0},
-   {1, NULL, 0, NULL, 0, 0},
-   {2, NULL, 0, NULL, 0, 0},
-   {3, NULL, 0, NULL, 0, 0},
-   {4, NULL, 0, NULL, 0, 0},
-   {5, NULL, 0, NULL, 0, 0},
-   {6, NULL, 0, NULL, 0, 0},
-   {7, NULL, 0, NULL, 0, 0},
-   {8, NULL, 0, NULL, 0, 0},
-   {9, NULL, 0, NULL, 0, 0},
+   {0, NULL, 0, 0, WATCHER_NONE, 0},
+   {1, NULL, 0, 0, WATCHER_NONE, 0},
+   {2, NULL, 0, 0, WATCHER_NONE, 0},
+   {3, NULL, 0, 0, WATCHER_NONE, 0},
+   {4, NULL, 0, 0, WATCHER_NONE, 0},
+   {5, NULL, 0, 0, WATCHER_NONE, 0},
+   {6, NULL, 0, 0, WATCHER_NONE, 0},
+   {7, NULL, 0, 0, WATCHER_NONE, 0},
+   {8, NULL, 0, 0, WATCHER_NONE, 0},
+   {9, NULL, 0, 0, WATCHER_NONE, 0},
 };
 #define MAX_TEMP_BUFFERS 250
 static char *temp_buffers[MAX_TEMP_BUFFERS]; // 250 temporary buffers
@@ -243,7 +186,6 @@ static char *register_vars[10] = { // register variables
    NULL, NULL, NULL, NULL, NULL,
    NULL, NULL, NULL, NULL, NULL,
 }; // 10 variables for scenario use
-struct task_struct *sleeping_task = NULL; // remember sleeping tasks
 typedef enum {
    INITIALIZE,             /* Initialize state machine */
    FIND_CMD_START,         /* Looking for the start character of the next command */
@@ -260,6 +202,7 @@ typedef enum {
    FIND_PARAM4_START_AFTER_QUOTE, /* Looking for the start character of the fourth parameter, after a quoted third parameter*/
    FIND_PARAM4_END,        /* Looking for the end character of the fourth parameter */
    RUN_CMD,                /* Run the found command */
+   RESUME_CMD,             /* Resume the found command */
    FIND_CMD_START_ESCAPED, /* Looking for start character, but ignore the next one */
    FIND_CMD_END_ESCAPED,   /* Looking for end character, but ignore the next one */
    FIND_PARAM1_END_ESCAPED,/* Looking for end character, but ignore the next one */
@@ -275,56 +218,80 @@ typedef enum {
    FIND_PARAM3_END_QUOTED_ESCAPED, /* Looking for end quote only, but ignore the next one */
    FIND_PARAM4_END_QUOTED_ESCAPED, /* Looking for end quote only, but ignore the next one */
 } scen_state_t;
+typedef struct state_data {
+   char *cmd_buffer; int cmd_length;
+   char *param1; int param1_len;
+   char *param2; int param2_len;
+   char *param3; int param3_len;
+   char *param4; int param4_len;
+} state_data_t;
+scen_state_t g_state = INITIALIZE;
+state_data_t g_data;
+int g_place = 0;
+static void sleep_done(unsigned long data); // forward declaration
+static struct timer_list sleep_timer = TIMER_INITIALIZER(sleep_done, 0, 0);
+atomic_t sleep_time = ATOMIC_INIT(0); // sleep forever
+atomic_t sleep_acc = ATOMIC_INIT(0); // time slept
+struct timespec sleep_start; // time sleep started at
 
 //---------------------------------------------------------------------------
 // Scenario functions forward declarations
 //---------------------------------------------------------------------------
-void Scen_SetVar(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_SetVar(char *param1, int param1_len, char *param2, int param2_len,
                  char *param3, int param3_len, char *param4, int param4_len);
 
-void Scen_End(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_End(char *param1, int param1_len, char *param2, int param2_len,
               char *param3, int param3_len, char *param4, int param4_len);
 
-void Scen_Send(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_Send(char *param1, int param1_len, char *param2, int param2_len,
                char *param3, int param3_len, char *param4, int param4_len);
 
-void Scen_Nothing(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_Nothing(char *param1, int param1_len, char *param2, int param2_len,
                   char *param3, int param3_len, char *param4, int param4_len);
 
-void Scen_Delay(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_Delay(char *param1, int param1_len, char *param2, int param2_len,
                 char *param3, int param3_len, char *param4, int param4_len);
 
-void Scen_If(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_If(char *param1, int param1_len, char *param2, int param2_len,
              char *param3, int param3_len, char *param4, int param4_len);
 
-void Scen_DoWait(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_DoWait(char *param1, int param1_len, char *param2, int param2_len,
                  char *param3, int param3_len, char *param4, int param4_len);
 
-void Scen_DoWaitVar(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_DoWait_Resume(char *param1, int param1_len, char *param2, int param2_len,
+                        char *param3, int param3_len, char *param4, int param4_len);
+
+int Scen_DoWaitVar(char *param1, int param1_len, char *param2, int param2_len,
                     char *param3, int param3_len, char *param4, int param4_len);
 
-void Scen_DoWhen(char *param1, int param1_len, char *param2, int param2_len,
-                 char *param3, int param3_len, char *param4, int param4_len);
+int Scen_DoWaitVar_Resume(char *param1, int param1_len, char *param2, int param2_len,
+                           char *param3, int param3_len, char *param4, int param4_len);
 
-void Scen_DoWhenVar(char *param1, int param1_len, char *param2, int param2_len,
-                    char *param3, int param3_len, char *param4, int param4_len);
 
 static command_handler_t cmd_handlers[] = { // prebuilt command table
-   {"SetVar", Scen_SetVar},
-   {"End", Scen_End},
-   {"Send", Scen_Send},
-   {"Nothing", Scen_Nothing},
-   {"Delay", Scen_Delay},
-   {"If", Scen_If},
-   {"DoWait", Scen_DoWait},
-   {"DoWaitVar", Scen_DoWaitVar},
-   {"DoWhen", Scen_DoWhen},
-   {"DoWhenVar", Scen_DoWhenVar},
+   {"SetVar", Scen_SetVar, Scen_Nothing},  // no resume function
+   {"End", Scen_End, Scen_Nothing},        // no resume function
+   {"Send", Scen_Send, Scen_Nothing},      // no resume function
+   {"Nothing", Scen_Nothing, Scen_Nothing},// no resume function
+   {"Delay", Scen_Delay, Scen_Nothing},    // no resume function
+   {"If", Scen_If, Scen_Nothing},          // no resume function
+   {"DoWait", Scen_DoWait, Scen_DoWait_Resume},
+   {"DoWaitVar", Scen_DoWaitVar, Scen_DoWaitVar_Resume},
 };
 
 //---------------------------------------------------------------------------
 // Internal functions
 //---------------------------------------------------------------------------
+
+// The sleep has finished, resume work
+static void sleep_done(unsigned long data) {
+   struct timespec time = timespec_sub(current_kernel_time(), sleep_start); // time since start
+   atomic_set(&sleep_acc, (time.tv_sec * 1000) + (time.tv_nsec / 1000000));
+   delay_printk("Slept for %i milliseconds\n", atomic_read(&sleep_acc));
+
+   // schedule work to do actual scenario resume
+   schedule_work(&scenario_work);
+}
 
 // Message filler handler for command event messages
 int cmd_event_mfh(struct sk_buff *skb, void *data) {
@@ -336,8 +303,13 @@ int cmd_event_mfh(struct sk_buff *skb, void *data) {
 static int string_to_constant(char *string, int length, int *constant) {
    long tval;
    int i;
+   char *p; // Ignore me!
+   char buf[256];
+   memcpy(buf, string, min(length,255)); // make a copy
+   buf[min(length,255)] = '\0'; // null terminate the copy
    // try converting to integer directly first
-   if (strict_strtol(string, 10, &tval) == 0) { // base 10
+   tval = simple_strtol(buf, &p, 10); // test copy, base 10
+   if (*p == 0) { // did tval get parsed?
       (*constant) = tval & 0xffffffff;
       return 1;
    }
@@ -398,26 +370,25 @@ static char *unescape_buffer(char *buffer, int *length) {
    }
 }
 
-static int scen_sleep(int milliseconds) { // sleeps for up to X milliseconds, returning how many milliseconds remain
-   long jremain;
-   // remember my task in case I need to sleep or wakeup
-   sleeping_task = current; // "current" is a kernel defined macro
-   set_current_state(TASK_INTERRUPTIBLE); // allow task to sleep
-   jremain = schedule_timeout(jiffies+((milliseconds*HZ)/1000)); // sleep for up-to X milliseconds
-   return ((jremain * 1000) / HZ);
+static void scen_sleep(int milliseconds) { // sleeps for up to X milliseconds (the caling function will need to return 1 for resume later)
+   sleep_start = current_kernel_time(); // sleep started now
+   atomic_set(&sleep_time,milliseconds);
+   delay_printk("Attempting to sleep for %i milliseconds\n", milliseconds);
 }
 
-static void scen_sleep_forever(void) { // sleep indefinitely (will be woken up later presumably)
-   // remember my task in case I need to sleep or wakeup
-   sleeping_task = current; // "current" is a kernel defined macro
-   set_current_state(TASK_INTERRUPTIBLE); // allow task to sleep
-   schedule_timeout(MAX_SCHEDULE_TIMEOUT);
+static void scen_sleep_forever(void) { // sleep indefinitely (the caling function will need to return 1 for resume later)
+   sleep_start = current_kernel_time(); // sleep started now
+   atomic_set(&sleep_time,0);
 }
 
 static void scen_wake(void) {
-   // wake task
-   if (sleeping_task != NULL) {
-      wake_up_process(sleeping_task);
+   struct timespec time = timespec_sub(current_kernel_time(), sleep_start); // time since start
+   // wake scenario from slumber
+   if (g_state == RESUME_CMD) { // check that we're sleeping
+      atomic_set(&sleep_acc, (time.tv_sec * 1000) + (time.tv_nsec / 1000000));
+      delay_printk("Slept for %i milliseconds\n", atomic_read(&sleep_acc));
+	   del_timer(&sleep_timer); // cancel wakeup timer
+      schedule_work(&scenario_work); // wake up
    }
 }
 
@@ -439,14 +410,14 @@ static void do_end_scenario(struct work_struct * work) {
 }
 
 // run a chunk of the scenario buffer
-static void run_buffer_chunk(char *cmd, int cmd_length, char *param1, int param1_len, char *param2, int param2_len, char *param3, int param3_len, char *param4, int param4_len) {
+static int run_buffer_chunk(char *cmd, int cmd_length, char *param1, int param1_len, char *param2, int param2_len, char *param3, int param3_len, char *param4, int param4_len, int resume_now) {
 #if DEBUG
    char output_buf[1024];
 #endif
-   int i;
+   int i, resume_later = 0;
    // first check runability
    if (!check_running()) {
-      return;
+      return 0; // if we can't run, don't resume
    }
 
    // re-map buffers to temp buffers 
@@ -478,24 +449,31 @@ delay_printk("Param 4 %s : %i\n", output_buf, param4_len);
 
    // re-check runability
    if (!check_running()) {
-      return;
+      return 0; // if we can't run, don't resume
    }
 
    // find command to run and run it
    for (i=0; i<sizeof(cmd_handlers)/sizeof(command_handler_t); i++) {
       if (strncmp(cmd_handlers[i].name, temp_buffers[buffer_pos-4], cmd_length) == 0) {
          // found matching handler
-         cmd_handlers[i].handler(temp_buffers[buffer_pos-3], param1_len,
-                                 temp_buffers[buffer_pos-2], param2_len,
-                                 temp_buffers[buffer_pos-1], param3_len,
-                                 temp_buffers[buffer_pos-0], param4_len); // use temp buffers
+         if (resume_now) {
+            resume_later = cmd_handlers[i].resume_handler(temp_buffers[buffer_pos-3], param1_len,
+               temp_buffers[buffer_pos-2], param2_len,
+               temp_buffers[buffer_pos-1], param3_len,
+               temp_buffers[buffer_pos-0], param4_len); // use temp buffers
+         } else {
+            resume_later = cmd_handlers[i].handler(temp_buffers[buffer_pos-3], param1_len,
+               temp_buffers[buffer_pos-2], param2_len,
+               temp_buffers[buffer_pos-1], param3_len,
+               temp_buffers[buffer_pos-0], param4_len); // use temp buffers
+         }
          break; // don't check any more
       }
    }
 
    // re-check runability
    if (!check_running()) {
-      return;
+      return 0; // if we can't run, don't resume
    }
 
    // clear temp buffers
@@ -514,6 +492,8 @@ delay_printk("Param 4 %s : %i\n", output_buf, param4_len);
    if (temp_buffers[buffer_pos--] != cmd) { // test to see if we allocated a new buffer
       kfree(temp_buffers[buffer_pos+1]);
    }
+
+   return resume_later;
 }
 
 // called to free all allocated buffers
@@ -543,25 +523,35 @@ static void scenario_cleanup(void) {
          register_vars[i] = NULL;
       }
    }
+
+   // reset watchers
+   for (i=0; i<sizeof(wait_watchers)/sizeof(wait_watcher_t); i++) {
+      if (!wait_watchers[i].ro) {
+         // if not read-only, overwrite
+         wait_watchers[i].cmd = WATCHER_NONE;
+      }
+   }
+   for (i=0; i<sizeof(wait_var_watchers)/sizeof(wait_var_watcher_t); i++) {
+      if (!wait_var_watchers[i].ro) {
+         // if not read-only, overwrite
+         wait_var_watchers[i].cmd = WATCHER_NONE;
+         wait_var_watchers[i].value_buf = NULL;
+         wait_var_watchers[i].val_len = 0;
+      }
+   }
 }
 
 // run the scenario state machine on a given buffer
-typedef struct state_data {
-   char *cmd_buffer; int cmd_length;
-   char *param1; int param1_len;
-   char *param2; int param2_len;
-   char *param3; int param3_len;
-   char *param4; int param4_len;
-} state_data_t;
-static void scenario_state(char *buffer, int *place, scen_state_t *state, state_data_t *d) {
+static int scenario_state(char *buffer, int *place, scen_state_t *state, state_data_t *d) {
+   int resume_later = 0;
    // first check runability
    if (!check_running()) {
-      return;
+      return 0; // don't resume on kill
    }
 
-//#if DEBUG
+#if DEBUG
 //   delay_printk("%i\t%c\t%i\n", *place, buffer[*place], *state);
-//#endif
+#endif
 
    // run state machine one iteration
    switch (*state) {
@@ -923,32 +913,93 @@ static void scenario_state(char *buffer, int *place, scen_state_t *state, state_
       } break;
       case RUN_CMD : {
          // run the found buffer chunks
-         run_buffer_chunk(d->cmd_buffer, d->cmd_length,
-                          d->param1, d->param1_len,
-                          d->param2, d->param2_len,
-                          d->param3, d->param3_len,
-                          d->param4, d->param4_len);
-         (*state) = INITIALIZE; // start over
+         resume_later = run_buffer_chunk(d->cmd_buffer, d->cmd_length,
+            d->param1, d->param1_len,
+            d->param2, d->param2_len,
+            d->param3, d->param3_len,
+            d->param4, d->param4_len, 0); // don't resume
+         if (resume_later) {
+            (*state) = RESUME_CMD; // start over on next command
+         } else {
+            (*state) = INITIALIZE; // start over on next command
+         }
+      } break;
+      case RESUME_CMD : {
+         // run the found buffer chunks
+         resume_later = run_buffer_chunk(d->cmd_buffer, d->cmd_length,
+            d->param1, d->param1_len,
+            d->param2, d->param2_len,
+            d->param3, d->param3_len,
+            d->param4, d->param4_len, 1); // resume
+         if (resume_later) {
+            (*state) = RESUME_CMD; // start over on next command
+         } else {
+            (*state) = INITIALIZE; // start over on next command
+         }
+      } break;
+      default : {
+#if DEBUG
+         delay_printk("MAJOR ERROR!!!\n");
+#endif
+         scenario_kill();
       } break;
    }
+   return resume_later;
+}
+
+// run a sub-scenario
+static void run_sub_command(char *buffer, int buf_len) {
+   int resume_later = 0;
+   // prepare for initial state machine run
+   scen_state_t state = INITIALIZE;
+   int place = 0;
+   state_data_t data;
+   memset(&data, 0, sizeof(state_data_t));
+
+   // run scenario until buffer empty or need to sleep
+   while (place <= buf_len && resume_later == 0 && check_running()) {
+      // run scenario state machine
+      resume_later = scenario_state(buffer, &place, &state, &data);
+   }
+
+   // can't resume, and don't do cleanup here, so just return
 }
 
 // run the scenario in userspace
 static void do_scenario(struct work_struct * work) {
-   // prepare for initial state machine run
-   scen_state_t state = INITIALIZE;
-   int scen_at = 0;
-   state_data_t data;
-   memset(&data, 0, sizeof(state_data_t));
-
-   // run scenario
-   while (scen_at <= scen_length) {
-      // run scenario state machine
-      scenario_state(scen_buffer, &scen_at, &state, &data);
+   int resume_later = 0, sleep_t;
+   // check to see if we're shutting down
+   if (!check_running()) {
+      scenario_cleanup();
+      return;
+   }
+   // check to see if we're resuming work
+   if (g_state != RESUME_CMD) {
+      // prepare for initial state machine run
+      g_state = INITIALIZE;
+      g_place = 0;
+      memset(&g_data, 0, sizeof(state_data_t));
    }
 
-   // clean up scenario
-   scenario_cleanup();
+   // run scenario until buffer empty or need to sleep
+   while (g_place <= scen_length && resume_later == 0 && check_running()) {
+      // run scenario state machine
+      resume_later = scenario_state(scen_buffer, &g_place, &g_state, &g_data);
+   }
+
+   // are we coming back?
+   if (resume_later) {
+      // set timer appropriately
+      sleep_t = atomic_read(&sleep_time);
+      if (sleep_t > 0) {
+         delay_printk("Sleeping for %i milliseconds\n", sleep_t);
+         mod_timer(&sleep_timer, jiffies+((sleep_t*HZ)/1000)); // blank for X milliseconds
+      }
+   } else {
+      // clean up scenario
+      scenario_cleanup();
+   }
+delay_printk("Scenario done for now...\n");
 }
 
 //---------------------------------------------------------------------------
@@ -958,9 +1009,15 @@ static void do_scenario(struct work_struct * work) {
 int scenario_run(char *scen) {
    // can we run a scenario now?
    if (!atomic_read(&full_init)) { // not fully initiliazed?
+#if DEBUG
+      delay_printk("Error! not fully initialized!\n");
+#endif
       return 0;
    } else if (atomic_inc_return(&scenario_running) != 1) { // scenario was already running?
       atomic_dec(&scenario_running); // revert atomic position
+#if DEBUG
+      delay_printk("Error! already running!\n");
+#endif
       return 0;
    }
 #if DEBUG
@@ -976,7 +1033,7 @@ int scenario_run(char *scen) {
    scen_buffer = memcpy(scen_buffer, scen, scen_length); // copy original data
 #if DEBUG
    delay_printk("Scenario Length: %i\n", scen_length);
-   delay_printk("Scenario Data: %s\n", scen_buffer);
+   //delay_printk("Scenario Data: %s\n", scen_buffer);
 #endif
 
    // schedule work
@@ -989,59 +1046,82 @@ EXPORT_SYMBOL(scenario_run);
 
 // kills running scenario, if any
 void scenario_kill(void) {
-   // stop the scenario as quickly as possible
-   atomic_set(&scenario_stopping, 1);
+   // only kill if we're running
+   if (atomic_read(&scenario_running) == 1) {
+      // stop the scenario as quickly as possible
+      atomic_set(&scenario_stopping, 1);
+
+      // if we're not shutting down, and we're sleeping, wake up to stop and clean
+      if (g_state == RESUME_CMD && atomic_read(&full_init)) {
+         // fix state to not resume
+         g_state = INITIALIZE;
+         // wake up
+         schedule_work(&scenario_work);
+      }
+      
+      // cancel timers if timers are running
+      del_timer(&sleep_timer);
+   }
 }
 EXPORT_SYMBOL(scenario_kill);
 
 //---------------------------------------------------------------------------
 // Scenario functions definitions
 //---------------------------------------------------------------------------
-void Scen_SetVar(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_SetVar(char *param1, int param1_len, char *param2, int param2_len,
                  char *param3, int param3_len, char *param4, int param4_len) {
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
 #endif
+   return 0;
 }
 
-void Scen_End(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_End(char *param1, int param1_len, char *param2, int param2_len,
               char *param3, int param3_len, char *param4, int param4_len) {
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
 #endif
+   return 0;
 }
 
-void Scen_Send(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_Send(char *param1, int param1_len, char *param2, int param2_len,
                char *param3, int param3_len, char *param4, int param4_len) {
    int role, id, attribute;
    cmd_event_t nl_cmd;
 #if DEBUG
-   char output_buf[1024];
    delay_printk("%s(...)\n",__func__);
 #endif
 
    // check payload length
    if (param4_len > 32) {
-      // couldn't decode payload parameter
+#if DEBUG
+      delay_printk("ERROR: couldn't decode payload parameter\n");
+#endif
       scenario_kill();
-      return;
+      return 0;
    }
 
    // find role, id, and attribute
    if (!string_to_constant(param1, param1_len, &role)) {
-      // couldn't decode role parameter
+#if DEBUG
+      delay_printk("ERROR: couldn't decode role parameter\n");
+#endif
       scenario_kill();
-      return;
+      return 0;
    }
    if (!string_to_constant(param2, param2_len, &id)) {
-      // couldn't decode id parameter
+#if DEBUG
+      delay_printk("ERROR: couldn't decode id parameter\n");
+#endif
       scenario_kill();
-      return;
+      return 0;
    }
-   if (!string_to_constant(param1, param1_len, &attribute)) {
-      // couldn't decode attribute parameter
+   if (!string_to_constant(param3, param3_len, &attribute)) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode attribute parameter\n");
+#endif
       scenario_kill();
-      return;
+      return 0;
    }
 
 #if DEBUG
@@ -1059,55 +1139,157 @@ void Scen_Send(char *param1, int param1_len, char *param2, int param2_len,
 
    // send netlink message
    send_nl_message_multi(&nl_cmd, cmd_event_mfh, NL_C_CMD_EVENT);
+   return 0;
 }
 
-void Scen_Nothing(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_Nothing(char *param1, int param1_len, char *param2, int param2_len,
                   char *param3, int param3_len, char *param4, int param4_len) {
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
 #endif
+   return 0;
 }
 
-void Scen_Delay(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_Delay(char *param1, int param1_len, char *param2, int param2_len,
                 char *param3, int param3_len, char *param4, int param4_len) {
+   int time;
 #if DEBUG
+   char output_buf[1024];
    delay_printk("%s(...)\n",__func__);
 #endif
+
+#if DEBUG
+   memcpy(output_buf, param1, min(param1_len, 1023));
+   output_buf[min(param1_len,1023)] = '\0';
+delay_printk("Trying %s as time parameter\n", output_buf);
+#endif
+   // find time
+   if (!string_to_constant(param1, param1_len, &time)) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode time parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   }
+   
+   // sleep for the given time
+   scen_sleep(time);
+
+   return 1; // will resume later
 }
 
-void Scen_If(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_If(char *param1, int param1_len, char *param2, int param2_len,
              char *param3, int param3_len, char *param4, int param4_len) {
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
 #endif
+   return 0;
 }
 
-void Scen_DoWait(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_DoWait(char *param1, int param1_len, char *param2, int param2_len,
                  char *param3, int param3_len, char *param4, int param4_len) {
+   int time, i;
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
 #endif
+   // find time
+   if (!string_to_constant(param3, param3_len, &time)) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode time parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   }
+
+   // run command
+   run_sub_command(param1, param1_len);
+
+   // re-check runability
+   if (!check_running()) {
+      return 0; // if we can't run, don't resume
+   }
+
+   // install watcher
+   for (i=0; i<sizeof(wait_watchers)/sizeof(wait_watcher_t); i++) {
+      if (strncmp(wait_watchers[i].name, param2, param2_len) == 0) {
+         // found it!
+         if (!wait_watchers[i].ro) {
+            // not read-only, overwrite
+delay_printk("INSTALLING RESUME for @ %i\n", i);
+            wait_watchers[i].cmd = WATCHER_RESUME; // resume state machine on timeout
+         }
+         // sleep for the given time
+         scen_sleep(time);
+
+         return 1; // will resume later
+      }
+   }
+
+   // could not install watcher...broken script...kill
+#if DEBUG
+      delay_printk("ERROR: couldn't decode until parameter\n");
+#endif
+   scenario_kill();
+   return 0;
 }
 
-void Scen_DoWaitVar(char *param1, int param1_len, char *param2, int param2_len,
+int Scen_DoWait_Resume(char *param1, int param1_len, char *param2, int param2_len,
+                        char *param3, int param3_len, char *param4, int param4_len) {
+   int time, i, sleep_t;
+#if DEBUG
+   delay_printk("%s(...)\n",__func__);
+#endif
+
+   // find time
+   if (!string_to_constant(param3, param3_len, &time)) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode time parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   }
+
+   // remove watcher
+   for (i=0; i<sizeof(wait_watchers)/sizeof(wait_watcher_t); i++) {
+      if (strncmp(wait_watchers[i].name, param1, param1_len) == 0) {
+         // found it!
+         if (!wait_watchers[i].ro) {
+            // not read-only, overwrite
+            wait_watchers[i].cmd = WATCHER_NONE; // no watcher
+         }
+         break;
+      }
+   }
+
+   // check time slept vs. timeout time
+   sleep_t = atomic_read(&sleep_acc);
+   if (abs(sleep_t - time) < 100) { // timed out if less than 100 milliseconds left
+      // run timeout command
+      run_sub_command(param4, param4_len);
+   }
+
+   // re-check runability
+   if (!check_running()) {
+      return 0; // if we can't run, don't resume
+   }
+
+   return 0;
+}
+
+int Scen_DoWaitVar(char *param1, int param1_len, char *param2, int param2_len,
                     char *param3, int param3_len, char *param4, int param4_len) {
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
 #endif
+   return 0;
 }
 
-void Scen_DoWhen(char *param1, int param1_len, char *param2, int param2_len,
-                 char *param3, int param3_len, char *param4, int param4_len) {
+int Scen_DoWaitVar_Resume(char *param1, int param1_len, char *param2, int param2_len,
+                           char *param3, int param3_len, char *param4, int param4_len) {
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
 #endif
-}
-
-void Scen_DoWhenVar(char *param1, int param1_len, char *param2, int param2_len,
-                    char *param3, int param3_len, char *param4, int param4_len) {
-#if DEBUG
-   delay_printk("%s(...)\n",__func__);
-#endif
+   return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -1170,12 +1352,87 @@ int nl_scenario_handler(struct genl_info *info, struct sk_buff *skb, int cmd, vo
       value = (char*) nla_data(na);
 
       // run the scenario
-      delay_printk("found data: <<%s>>\n", value);
+      //delay_printk("found data: <<%s>>\n", value);
       scenario_run(value);
 
       rc = HANDLE_SUCCESS_NO_REPLY;
    } else {
       rc = HANDLE_FAILURE;
+   }
+
+   // return to let provider send message back
+   return rc;
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for scenario events (every netlink message)
+//---------------------------------------------------------------------------
+int nl_default_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+   struct nlattr *na;
+   int rc = HANDLE_SUCCESS_NO_REPLY;
+   int value, i;
+   delay_printk("%s(%i)\n",__func__, cmd);
+
+   // handle "netlink command" events
+   if (atomic_read(&scenario_running) == 1) {
+#if DEBUG
+      delay_printk("HANDLING CMD %i!\n", cmd);
+#endif
+      // look for appropriate watcher
+      for (i=0; i<sizeof(wait_watchers)/sizeof(wait_watcher_t); i++) {
+         // look for netlink commands
+         if (wait_watchers[i].nl_cmd == cmd) {
+            // take action!
+            switch(wait_watchers[i].cmd) {
+               case WATCHER_NONE: break; /* no action */
+               case WATCHER_KILL: 
+delay_printk("KILLING!!!\n");
+                  scenario_kill();
+                  break;
+               case WATCHER_RESUME:
+delay_printk("RESUMING!!!\n");
+                  scen_wake();
+                  break;
+            }
+            break;
+         }
+      }
+   }
+
+   if (cmd == NL_C_EVENT || cmd == NL_C_EVENT_REF) {
+      // get attribute from message
+      na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+      if (na) {
+         // grab value from attribute
+         value = nla_get_u8(na); // value is ignored
+
+         // handle "generic output event" events
+         if (atomic_read(&scenario_running) == 1) {
+#if DEBUG
+            delay_printk("HANDLING EVENT %i!\n", value);
+#endif
+
+            // look for appropriate watcher
+            for (i=0; i<sizeof(wait_watchers)/sizeof(wait_watcher_t); i++) {
+               // look for generic output events
+               if (wait_watchers[i].go_event == value) {
+                  // take action!
+                  switch(wait_watchers[i].cmd) {
+                     case WATCHER_NONE: break; /* no action */
+                     case WATCHER_KILL: 
+delay_printk("KILLING!!!\n");
+                        scenario_kill();
+                        break;
+                     case WATCHER_RESUME:
+delay_printk("RESUMING!!!\n");
+                        scen_wake();
+                        break;
+                  }
+                  break;
+               }
+            }
+         }
+      }
    }
 
    // return to let provider send message back
@@ -1189,6 +1446,22 @@ static int __init Scenario_init(void) {
    int retval = 0, d_id;
    struct driver_command commands[] = {
         {NL_C_SCENARIO,      nl_scenario_handler},
+        {NL_C_FAILURE,       nl_default_handler},
+        {NL_C_BATTERY,       nl_default_handler},
+        {NL_C_EXPOSE,        nl_default_handler},
+        {NL_C_MOVE,          nl_default_handler},
+        {NL_C_POSITION,      nl_default_handler},
+        {NL_C_STOP,          nl_default_handler},
+        {NL_C_HITS,          nl_default_handler},
+        {NL_C_HIT_LOG,       nl_default_handler},
+        {NL_C_HIT_CAL,       nl_default_handler},
+        {NL_C_BIT,           nl_default_handler},
+        {NL_C_ACCESSORY,     nl_default_handler},
+        {NL_C_GPS,           nl_default_handler},
+        {NL_C_EVENT,         nl_default_handler},
+        {NL_C_SLEEP,         nl_default_handler},
+        {NL_C_CMD_EVENT,     nl_default_handler},
+        {NL_C_EVENT_REF,     nl_default_handler},
    };
    struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 
@@ -1209,11 +1482,12 @@ static int __init Scenario_init(void) {
 // exit handler for the module
 //---------------------------------------------------------------------------
 static void __exit Scenario_exit(void) {
-   scenario_kill(); // stop running scenarios
    atomic_set(&full_init, FALSE);
+   scenario_kill(); // stop running scenarios
    uninstall_nl_driver(atomic_read(&driver_id));
    ati_flush_work(&scenario_work); // close any open work queue items
    ati_flush_work(&end_scenario_work); // close any open work queue items
+   scenario_cleanup(); // clean up scenario allocations
 }
 
 
