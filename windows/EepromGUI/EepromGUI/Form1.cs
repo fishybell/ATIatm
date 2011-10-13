@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using System.Text.RegularExpressions;
 
 namespace EepromGUI
 {
@@ -13,24 +14,32 @@ namespace EepromGUI
     {
         String machine = "sam5";
         String macPassword = "change MAC";
-        Server conn;
-        Server listener;
+        Eeprom conn;
         public delegate void serviceGUIDelegate();
         public Form1()
         {
-            conn = new Server();
+            //Start listener
+            conn = new Eeprom(
+                this,
+                delegate(string message, int status)
+                {
+                    //Populate the other parts of the GUI with updates
+                    String[] group = Regex.Split(message, "\n");
+                    foreach (var item in group)
+                    {
+                        if (item != "")
+                        {
+                            this.logTB.AppendText(item + "\n");
+                            parseIncoming(item + "\n");
+                        }
+                    }
+                });
+            conn.StartProcess(machine);
+            //conn = new Eeprom();
             conn.StartConnection(machine);
             InitializeComponent();
             //targetCB.SelectedItem = machine;
             disableEnable(getBoardType());
-            //Start listener
-            listener = new Server(
-                this,
-                delegate(string message, int status)
-                {
-                    this.logTB.AppendText(message);
-                });
-            listener.StartProcess(machine);
         }
 
         private void targetCB_SelectedIndexChanged(object sender, EventArgs e)
@@ -43,27 +52,33 @@ namespace EepromGUI
 
         private void batGetButton_Click(object sender, EventArgs e)
         {
-            //String battery = Server.ConnectEeprom("B", machine);
             String battery = conn.sendMessage("B");
             if (battery.StartsWith("B"))
             {
-                int newline = battery.IndexOf("\n");
-                battery = battery.Substring(2, newline-2);  // grab just the battery value of the string
-                batTB.Text = battery;
+                batTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                batTB.Text = getMessageValue(battery, 2);
             }
         }
 
         private void concealButton_Click(object sender, EventArgs e)
         {
-            //Server.ConnectEeprom("C", machine);
-            conn.sendMessage("C");
+            String conceal = conn.sendMessage("C");
+            String[] group = Regex.Split(conceal, "\n");
+            foreach (var item in group)
+            {
+                parseIncoming(item + "\n");
+            }
         }
 
         // Expose the device
         private void exposeButton_Click(object sender, EventArgs e)
         {
-            //Server.ConnectEeprom("E", machine);
-            conn.sendMessage("E");
+            String expose = conn.sendMessage("E");
+            String[] group = Regex.Split(expose, "\n");
+            foreach (var item in group)
+            {
+                parseIncoming(item + "\n");
+            }
         }
 
         // Shutdown Device
@@ -126,20 +141,17 @@ namespace EepromGUI
         {
             String hit_data = hitDTB.Text;
             // Set the hit_data
-            //Server.ConnectEeprom("H " + hit_data, machine);
             conn.sendMessage("H " + hit_data);
         }
 
         private void toggleButton_Click(object sender, EventArgs e)
         {
-            //Server.ConnectEeprom("T", machine);
             conn.sendMessage("T");
         }
 
         // Show the sleep status
         private void sleepShowButton_Click(object sender, EventArgs e)
         {
-            //String sleep = Server.ConnectEeprom("P", machine);
             String sleep = conn.sendMessage("P");
             if (sleep.StartsWith("P"))
             {
@@ -154,7 +166,6 @@ namespace EepromGUI
         {
             int sleep = sleepCB.SelectedIndex;
             // Set the sleep type
-            //Server.ConnectEeprom("P " + sleep, machine);
             conn.sendMessage("P");
         }
 
@@ -166,7 +177,6 @@ namespace EepromGUI
 
         private String getBoardType()
         {
-            //String board = Server.ConnectEeprom("I B", machine);
             String board = conn.sendMessage("I B");
             if (board.StartsWith("I B"))
             {
@@ -360,8 +370,13 @@ namespace EepromGUI
         private void eventButton_Click(object sender, EventArgs e)
         {
             int sendEvent = eventCB.SelectedIndex;
-            //Server.ConnectEeprom("V " + sendEvent, machine);
             conn.sendMessage("V " + sendEvent);
+        }
+
+        // The drop down of the event combo box is exposed
+        private void dropDown_shown(object sender, EventArgs e)
+        {
+            eventCB.ForeColor = System.Drawing.SystemColors.WindowText;
         }
 
         // Show the hit sensor settings
@@ -491,6 +506,7 @@ namespace EepromGUI
             {
                 int newline = status.IndexOf("\n");
                 status = status.Substring(2, newline - 2);  // grab just the status value of the string
+                expSTB.ForeColor = System.Drawing.SystemColors.WindowText;
                 if (Convert.ToInt32(status) == 0)
                 {
                     expSTB.Text = "concealed";
@@ -780,28 +796,51 @@ namespace EepromGUI
             expSShowButton.Enabled = true;
         }
 
-        public void logData(String data) {
-            //logTB.AppendText(data);
-            data = data.Replace("\n", "");
-            logTB.Text = "Hello";
-        }
 
         private void form_closed(object sender, FormClosedEventArgs e)
         {
             conn.CloseConnection();
         }
 
-        private void click_Click(object sender, EventArgs e)
+        private void parseIncoming(String message)
         {
-            Server tool = new Server(
-                this,
-                delegate(string message, int status)
-                {
-                    //this.logTB.Text = message;
-                    this.logTB.AppendText(message);
-                });
-            tool.StartProcess(machine);
-            //tool.StartConnection(machine);
+            char first = message.ElementAt(0);
+            switch (first)
+            {
+                case 'B':
+                    batTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    batTB.Text = getMessageValue(message, 2);
+                    break;
+                case 'S':
+                    expSTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    String status = getMessageValue(message, 2);
+                    if (Convert.ToInt32(status) == 0)
+                    {
+                        expSTB.Text = "concealed";
+                    }
+                    else if (Convert.ToInt32(status) == 1)
+                    {
+                        expSTB.Text = "exposed";
+                    }
+                    else
+                    {
+                        expSTB.Text = "moving";
+                    }
+                    break;
+                case 'V':
+                    eventCB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    eventCB.SelectedIndex = Convert.ToInt32(getMessageValue(message, 2));
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private String getMessageValue(String message, int charIn)
+        {
+            int newline = message.IndexOf("\n");
+            String value = message.Substring(charIn, newline - charIn);
+            return value;
         }
 
     }

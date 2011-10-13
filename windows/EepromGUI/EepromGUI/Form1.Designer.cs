@@ -148,7 +148,6 @@
             this.modeShowButton = new System.Windows.Forms.Button();
             this.modeSetButton = new System.Windows.Forms.Button();
             this.tabPage4 = new System.Windows.Forms.TabPage();
-            this.click = new System.Windows.Forms.Button();
             this.logTB = new System.Windows.Forms.TextBox();
             this.showAllButton = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
@@ -172,9 +171,9 @@
             // 
             // batTB
             // 
+            this.batTB.ForeColor = System.Drawing.SystemColors.WindowText;
             this.batTB.Location = new System.Drawing.Point(456, 9);
             this.batTB.Name = "batTB";
-            this.batTB.ReadOnly = true;
             this.batTB.Size = new System.Drawing.Size(75, 20);
             this.batTB.TabIndex = 1;
             // 
@@ -742,6 +741,7 @@
             this.eventCB.Name = "eventCB";
             this.eventCB.Size = new System.Drawing.Size(131, 21);
             this.eventCB.TabIndex = 60;
+            this.eventCB.DropDown += new System.EventHandler(this.dropDown_shown);
             // 
             // eventButton
             // 
@@ -1139,7 +1139,6 @@
             // 
             this.expSTB.Location = new System.Drawing.Point(456, 67);
             this.expSTB.Name = "expSTB";
-            this.expSTB.ReadOnly = true;
             this.expSTB.Size = new System.Drawing.Size(75, 20);
             this.expSTB.TabIndex = 94;
             // 
@@ -1455,7 +1454,6 @@
             // 
             // tabPage4
             // 
-            this.tabPage4.Controls.Add(this.click);
             this.tabPage4.Controls.Add(this.logTB);
             this.tabPage4.Location = new System.Drawing.Point(4, 22);
             this.tabPage4.Name = "tabPage4";
@@ -1465,23 +1463,13 @@
             this.tabPage4.Text = "Logs";
             this.tabPage4.UseVisualStyleBackColor = true;
             // 
-            // click
-            // 
-            this.click.Location = new System.Drawing.Point(500, 24);
-            this.click.Name = "click";
-            this.click.Size = new System.Drawing.Size(75, 23);
-            this.click.TabIndex = 1;
-            this.click.Text = "Click";
-            this.click.UseVisualStyleBackColor = true;
-            this.click.Click += new System.EventHandler(this.click_Click);
-            // 
             // logTB
             // 
             this.logTB.Location = new System.Drawing.Point(31, 24);
             this.logTB.Multiline = true;
             this.logTB.Name = "logTB";
             this.logTB.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.logTB.Size = new System.Drawing.Size(445, 203);
+            this.logTB.Size = new System.Drawing.Size(565, 203);
             this.logTB.TabIndex = 0;
             // 
             // showAllButton
@@ -1666,7 +1654,6 @@
         private System.Windows.Forms.Label passLabel2;
         private System.Windows.Forms.Button cancelButton;
         private System.Windows.Forms.TextBox logTB;
-        private System.Windows.Forms.Button click;
     }
 }
 
