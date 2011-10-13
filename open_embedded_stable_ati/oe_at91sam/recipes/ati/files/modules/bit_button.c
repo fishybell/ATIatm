@@ -18,23 +18,29 @@ static void quitproc() {
 // global family id for ATI netlink family
 int family;
 
-// bit button has been pressed (long-press)
-void handle_bit_test_long(struct nl_handle *handle, int is_on) {
+// global role identifier
+static int ROLE = R_LIFTER;
+
+// bit test long for lifter
+void handle_bit_test_long_lifter(struct nl_handle *handle, int is_on) {
     // build scenario
     // Step 1 - Conceal
     // Step 2 - Wait for Concealed
     // Step 3 - Enable MFS in burst mode
     // Step 4 - Expose
-    // Step 5 - Wait 3 seconds
+    // Step 5 - Wait 10 seconds
     // Step 6 - Conceal
     const char *scen = "{Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
-                        {DoWait;Nothing;EVENT_DOWN;15000;Nothing} -- Wait 15 seconds for conceal \
+                        {DoWait;%s;EVENT_DOWN;15000;%s} -- Wait 15 seconds for conceal (installed below) \
                         {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} -- Enable MFS (data installed below) \
                         {Send;R_LIFTER;NL_C_EXPOSE;1;01} -- Send Expose to lifter \
-                        {Delay;3000;;;} -- Wait 3 seconds \
+                        {Delay;10000;;;} -- Wait 10 seconds \
                         {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter";
     char scen_buf[1024];
     char hex_buf[1024];
+    char nothing_buf[1024];
+    // build internal "Nothing" message
+    escape_scen_call("{Nothing;;;;}", 13, nothing_buf);
     // build accessory configuration message
     struct accessory_conf acc_c;
     acc_c.acc_type  = ACC_NES_MFS;
@@ -49,7 +55,7 @@ void handle_bit_test_long(struct nl_handle *handle, int is_on) {
     acc_c.repeat = 63;     // infinite repeat
     acc_c.start_delay = 2 * 1;   // start after 2 half-seconds
     hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf); // use helper function to build scenario
-    snprintf(scen_buf, 1024, scen, hex_buf); // format scenario
+    snprintf(scen_buf, 1024, scen, nothing_buf, nothing_buf, hex_buf); // format scenario with nothing and hex buffers
 
 //printf("BIT: sending NL_C_SCENARIO: %s\n", scen_buf);
     // send scenario
@@ -63,6 +69,80 @@ void handle_bit_test_long(struct nl_handle *handle, int is_on) {
 
     // Free message
     nlmsg_free(msg);
+}
+
+// bit test long for mover
+void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
+    // build scenario
+    // TODO -- thermals
+    // Step 1  - Move @ 1.5 mph
+    // Step 2  - Wait for stopped
+    // Step 3  - Enable MFS in burst mode
+    // Step 4  - Expose
+    // Step 5  - Wait for exposed
+    // Step 6  - Move @ -3 mph
+    // Step 7  - Wait for stopped
+    // Step 8  - Conceal
+    // Step 9  - Move @ 3 mph
+    // Step 10 - Wait for stopped
+    const char *scen = "\
+     {Send;R_MOVER;NL_C_MOVE;1;0F80}    -- Move @ 1.5 mph \
+     {DoWait;%s;EVENT_STOPPED;15000;%s} -- Wait 15 seconds for stop (cmd installed below)\
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s}-- Enable MFS (data installed below) \
+     {Send;R_LIFTER;NL_C_EXPOSE;1;01}   -- Send Expose to lifter \
+     {DoWait;%s;EVENT_UP;15000;%s}      -- Wait 15 seconds for expose (cmd installed below) \
+     {Send;R_MOVER;NL_C_MOVE;1;E27F}    -- Move @ -3 mph \
+     {DoWait;%s;EVENT_STOPPED;15000;%s} -- Wait 15 seconds for stop (cmd installed below)\
+     {Send;R_LIFTER;NL_C_EXPOSE;1;00}   -- Send Conceal to lifter \
+     {Send;R_MOVER;NL_C_MOVE;1;1E80}    -- Move @ 3 mph \
+     {DoWait;%s;EVENT_STOPPED;15000;%s} -- Wait 15 seconds for stop (cmd installed below)\
+     ";
+    char scen_buf[1024];
+    char hex_buf[1024];
+    char nothing_buf[1024];
+    // build internal "Nothing" message
+    escape_scen_call("{Nothing;;;;}", 13, nothing_buf);
+    // build accessory configuration message
+    struct accessory_conf acc_c;
+    acc_c.acc_type  = ACC_NES_MFS;
+    acc_c.request = 0;     // not a request
+    acc_c.on_exp = 1;      // on
+    acc_c.on_kill = 2;     // 2 = deactivate on kill
+    acc_c.ex_data1 = 1;    // do burst
+    acc_c.ex_data2 = 5;    // burst 5 times
+    acc_c.on_time = 50;    // on 50 milliseconds
+    acc_c.off_time = 100;  // off 100 milliseconds
+    acc_c.repeat_delay = 2 * 3;  // when burst, burst every 6 half-seconds
+    acc_c.repeat = 63;     // infinite repeat
+    acc_c.start_delay = 2 * 1;   // start after 2 half-seconds
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf); // use helper function to build scenario
+    snprintf(scen_buf, 1024, scen, nothing_buf, nothing_buf, hex_buf,
+       nothing_buf, nothing_buf, nothing_buf, nothing_buf, nothing_buf, nothing_buf); // format scenario with 2 nothings, hex buffer and 4 more nothings
+
+//printf("BIT: sending NL_C_SCENARIO: %s\n", scen_buf);
+    // send scenario
+    struct nl_msg *msg;
+    msg = nlmsg_alloc();
+    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_SCENARIO, 1);
+    nla_put_string(msg, GEN_STRING_A_MSG, scen_buf);
+
+    // Send message over netlink handle
+    nl_send_auto_complete(handle, msg);
+
+    // Free message
+    nlmsg_free(msg);
+}
+
+// bit button has been pressed (long-press)
+void handle_bit_test_long(struct nl_handle *handle, int is_on) {
+   switch (ROLE) {
+      case R_LIFTER:
+         handle_bit_test_long_lifter(handle, is_on);
+         break;
+      case R_MOVER:
+         handle_bit_test_long_mover(handle, is_on);
+         break;
+   }
 }
 
 // bit button might have been pressed, move the lifter up or down
@@ -182,7 +262,65 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
 
 int main(int argc, char **argv) {
     struct nl_handle *handle;
-    int retval, yes=1;
+    int retval, yes=1, i, j, found;
+
+    const char *roles[] = {
+       "UNSPECIFIED",
+       "LIFTER",
+       "MOVER",
+       "SOUND",
+       "GUNNER",
+       "DRIVER",
+    };
+
+const char *usage = "Usage: %s [options]\n\
+\t-r X   -- handling role X\n\
+\t-h     -- print out usage information\n";
+
+
+   for (i = 1; i < argc; i++) {
+      if (argv[i][0] != '-') {
+         fprintf(stderr, "invalid argument (%i)\n", i);
+         return 1;
+      }
+      switch (argv[i][1]) {
+         case 'r' :
+            // check integer value first
+            if (sscanf(argv[++i], "%i", &ROLE) != 1) {
+               found = 0;
+               // check string value second
+               for (j=0; j<sizeof(roles)/sizeof(char*); j++) {
+                  if (strncmp(roles[j], argv[i], strlen(roles[j])) == 0) {
+                     found = 1;
+                     ROLE = j;
+                     break;
+                  }
+               }
+               if (!found) {
+                  ROLE = R_MAX;
+               }
+            }
+            // verify valid number last
+            if (ROLE == 0 || ROLE >= R_MAX) {
+               fprintf(stderr, "invalid argument (%s)\n", argv[i]);
+               return 1;
+            }
+            printf("Found Role: %s\n", roles[ROLE]);
+            break;
+         case 'h' :
+            printf(usage, argv[0]);
+            return 0;
+            break;
+         case '-' : // for --help
+            if (argv[i][2] == 'h') {
+               printf(usage, argv[0]);
+               return 0;
+            } // fall through
+         default :
+            fprintf(stderr, "invalid argument (%i)\n", i);
+            return 1;
+      }
+   }
 
     // install signal handlers
     signal(SIGINT, quitproc);
