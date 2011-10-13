@@ -465,6 +465,13 @@ struct genl_ops provider_gnl_ops_scenario = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
+struct genl_ops provider_gnl_ops_event_ref = {
+    .cmd = NL_C_EVENT_REF,
+    .flags = 0,
+    .policy = generic_int8_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
 
 static struct genl_ops *command_op_map[] = {
     /* NL_C_UNSPEC */		NULL,
@@ -485,6 +492,7 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_DMSG */		&provider_gnl_ops_dmsg,
     /* NL_C_CMD_EVENT */	&provider_gnl_ops_cmd_event,
     /* NL_C_SCENARIO */		&provider_gnl_ops_scenario,
+    /* NL_C_EVENT_REF */	&provider_gnl_ops_event_ref,
 };
 
 typedef struct hb_obj_list {
