@@ -149,17 +149,22 @@ const char *usage = "Usage: %s [options]\n\
          case 'r' :
             // check integer value first
             if (sscanf(argv[++i], "%i", &KERN_ROLE) != 1) {
+               int found = 0;
                // check string value second
                for (int j=0; j<sizeof(roles)/sizeof(char*); j++) {
                   if (strncmp(roles[j], argv[i], strlen(roles[j])) == 0) {
+                     found = 1;
                      KERN_ROLE = j;
                      break;
                   }
                }
+               if (!found) {
+                  KERN_ROLE = R_MAX;
+               }
             }
             // verify valid number last
             if (KERN_ROLE == 0 || KERN_ROLE >= R_MAX) {
-               IERROR("invalid argument (%i)\n", i)
+               IERROR("invalid argument (%s)\n", argv[i])
                return 1;
             }
             DMSG("Found Role: %s\n", roles[KERN_ROLE]);
