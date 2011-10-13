@@ -891,6 +891,7 @@ void SIT_Client::didConceal() {
     // send status message to FASIT server
     DCOLOR(RED) ; // change color
     sendStatus2102(0);
+    DCOLOR(black);
 
     FUNCTION_END("::didConceal()");
 }
@@ -915,6 +916,7 @@ void SIT_Client::didExpose() {
     DCOLOR(RED) ; // change color
     // send status message to FASIT server
     sendStatus2102(0);
+    DCOLOR(black);
 
     FUNCTION_END("::didExpose()");
 }

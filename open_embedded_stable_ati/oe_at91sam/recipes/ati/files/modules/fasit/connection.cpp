@@ -262,7 +262,6 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
 
    DCMSG(BLUE,"fd %i wrote %i bytes with 'write(fd, fwbuf, fwsize)': ", fd, s);
    CPRINT_HEXB(BLUE,fwbuf, s);
-   DCOLOR(black);
 
    // copy what we did write to the "last write buffer"
    if (lwbuf != NULL) { delete [] lwbuf; } // clear out old buffer

@@ -98,7 +98,6 @@ FUNCTION_START("Process::handleWrite(const epoll_event *ev)");
 
    DCMSG(BLUE,"pipe 0x%08x wrote %i bytes with 'fwrite(fwbuf, sizeof(char), fwsize, pipe)': ", pipe, s);
    CPRINT_HEXB(BLUE,fwbuf, s);
-   DCOLOR(black);
 
    // copy what we did write to the "last write buffer"
    if (lwbuf != NULL) { delete [] lwbuf; } // clear out old buffer
