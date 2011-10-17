@@ -1,0 +1,12 @@
+if ({TARGETSTART.TARGET} = "Table 1 Task 5") and (DateTimeValue ({HIT.TIMESTAMP}) > DateTimeValue ({TARGETSTART.TIMESTAMP})) and (DateTimeValue ({HIT.TIMESTAMP}) < DateTimeValue ({TARGETEND.TIMESTAMP})) and ({ID.LANE} = {HIT.LANE})
+then 1
+else 0
+
+
+Sum ({@Table1 Task 5})
+
+
+
+
+SHOOTER: NAME(fred), IDCODE(9738905), LANE(Lane 3);
+SHOOTER: NAME(jason), IDCODE(9738904), LANE(Lane 3);

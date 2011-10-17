@@ -1,1 +1,53 @@
-Step 1 - ...
+Installing and setting up your environment
+
+Step 1 - ... Install Visual Studio 2010 from the CD
+Step 2 - ... Enter in product key
+Step 3 - ... Install full version unless told otherwise to save space
+Step 4 - ... Before running VS for the first time install Crystal Reports.
+Step 5 - ... This can be done in one of two ways.
+             1. Go to http://go.microsoft.com/fwlink/?LinkID=159919
+                a. Select START YOUR FREE DOWNLOAD
+                b. Select "SAP Crystal Reports, version for Visual Studio 2010 - Standard"
+                c. Run the .exe once downloaded
+             2. Create a new project that uses Crystal Reports Application.
+                a. It will take you to the same website as step 1.
+                b. Follow the same steps
+Step 6 - ... When you run Visual Studio for the first time it will ask you what development
+             environment you will want to use.  Choose C# development environment.
+Step 7 - ... Open an existing Crystal Reports application or create a new one.
+
+
+Making the project be able to install onto other computers
+
+Step 1 - ... Make sure you have a copy of the crystal reports runtime engine.
+             1. In the same location you downloaded the SAP Crystal Reports download
+                "SAP Crystal Reports runtime engine for .NET Framework 4 (32-bit)"
+                (Above - Step 5.1).
+             2. You will have to give this .msi to the computer that will install your program.
+                This will have to be installed first before your program.
+Step 2 - ... With your crystal reports project open go to File -> Add -> New Project
+Step 3 - ... Under "Other Project Types -> Setup and Deployment -> Visual Studio Installer"
+Step 4 - ... Give it a name and press OK.
+Step 5 - ... You will see 3 folders: Application Folder, User's Desktop, and User's Programs 
+             Menu. Right click on Application Folder -> Add -> Project Output.
+Step 6 - ... Highlight Primary Output and press OK.
+Step 7 - ... Right click on the your setup project and go to properties.
+Step 8 - ... click on Prerequisities...
+Step 9 - ... Make sure only Microsoft .NET Framework 4 (x86 and x64) and one of the Windows 
+             Installers are selected.
+Step 10 -... Build -> Build <project name>
+Step 11 -... Change Where it says "Debug" in the drop down box in the menu bar to "Release".
+Step 12 -... Repeat Step 10
+Step 13 -... Right click on the setup project and View -> Custom Actions
+Step 14 -... Right click on Custom Actions -> Add Custom Action...
+Step 15 -... Double click on Application Folder and leave the primary output highlighted and
+             press OK.
+Step 16 -... Repeat steps 10-12 (Not sure if this necessary, I do it to be safe)
+Step 17 -... Inside your project folder is the name of your setup project.  Copy the files 
+             from either debug or release inside of the setup project folder.  This should
+             contain .msi and .exe files.  
+Step 18 -... Give the newly created .msi and the Crystal Reports runtime engine .msi to the
+             computer you wish to install the program.
+Step 19 -... The computer that's installing the program should install the runtime .msi first
+             and then the project .msi.
+         

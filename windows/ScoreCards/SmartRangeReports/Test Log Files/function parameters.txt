@@ -1,0 +1,37 @@
+if cfCalculate ("Table 1 Task 5", {TARGETSTART.TASK}, {TARGETEND.TASK}, {HIT.TIMESTAMP}, {TARGETSTART.TIMESTAMP}, {TARGETEND.TIMESTAMP}) = 1
+then 1
+else 0
+
+
+
+
+
+if ({TARGETSTART.TABLE} = "2") and ({TARGETSTART.TASK} = "2") and ({TARGETSTART.RANGE} = "10") and ({TARGETSTART.QUALIFY} = "YES") and ({TARGETEND.TABLE} = "2") and ({TARGETEND.TASK} = "2") and ({TARGETEND.RANGE} = "10") and ({TARGETEND.QUALIFY} = "YES") and (DateTimeValue ({HIT.TIMESTAMP}) > DateTimeValue ({TARGETSTART.TIMESTAMP})) and (DateTimeValue ({HIT.TIMESTAMP}) < DateTimeValue ({TARGETEND.TIMESTAMP}) and 
+{TARGET.RANGE} = "10") 
+then 1
+else 0
+
+v1 = Table
+v2 = Task
+v3 = Range
+v4 = Qualify
+v5 = {TARGETSTART.TABLE}
+v6 = {TARGETSTART.TASK}
+v7 = {TARGETSTART.RANGE}
+v8 = {TARGETSTART.QUALIFY}
+v9 = {TARGETEND.TABLE}
+v10 = {TARGETEND.TASK}
+v11 = {TARGETEND.RANGE}
+v12 = {TARGETEND.QUALIFY}
+v13 = {HIT.TIMESTAMP}
+v14 = {TARGETSTART.TIMESTAMP}
+v15 = {TARGETEND.TIMESTAMP}
+v16 = {TARGET.RANGE}
+
+
+CFC Caluculate:
+Function  (stringVar v1, stringVar v2, stringVar v3, stringVar v4, stringVar v5, stringVar v6, stringVar v7, stringVar v8, stringVar v9, stringVar v10, stringVar v11, stringVar v12, stringVar v13, stringVar v14, stringVar v15, stringVar v16)
+if (v5 = v1) and (v6 = v2) and (v7 = v3) and (v8 = v4) and (v9 = v1) and (v10 = v2) and (v11 = v3) and (v12 = v4) and (DateTimeValue (v13) > DateTimeValue (v14)) and (DateTimeValue (v13) < DateTimeValue (v15) and 
+v16 = v3) 
+then 1
+else 0
