@@ -52,6 +52,12 @@ SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
         // initial hit calibration settings
         fake_sens = 1;
         lastHitCal.seperation = 250;
+#if 0 -- CODE FOR SHELLY
+        char *buf = readeeprom(0x240,0x10);
+        if (sscanf(buf, "%i", &temp) == 1) {
+           lastHitCal.seperation = temp;
+        }
+#endif
         lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
         lastHitCal.blank_time = 50; // half a second blanking
         lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
