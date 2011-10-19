@@ -13,30 +13,28 @@ set timeout 3.5
 while 1 {
     expect {
         -re {.*word:.*} {
-            send "\r"
+            send "shoot\r"
         }
         -re {.*yes/no.*} {
             send "yes\r"
         }
-        default {
+        eof {
             break
         }
     }
 }
-sleep 1
 eval spawn scp -r files/fasit root@sam$num:/home/root/
 set timeout 3.5
 while 1 {
     expect {
         -re {.*word:.*} {
-            send "\r"
+            send "shoot\r"
         }
         -re {.*yes/no.*} {
             send "yes\r"
         }
-        default {
+        eof {
             break
         }
     }
 }
-sleep 10
