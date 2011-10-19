@@ -1,0 +1,25 @@
+#ifndef __DEFAULTS_H__
+#define __DEFAULTS_H
+
+// Hit calibration defaults
+#define HIT_MSECS_BETWEEN 250
+#define HIT_MSECS_BETWEEN_LOC 0x100
+#define HIT_MSECS_BETWEEN_SIZE 0x10
+
+#define HIT_DESENSITIVITY 4
+#define HIT_DESENSITIVITY_LOC 0x110
+#define HIT_DESENSITIVITY_SIZE 0x10
+
+#define HIT_START_BLANKING 650
+#define HIT_START_BLANKING_LOC 0x120
+#define HIT_START_BLANKING_SIZE 0x10
+
+#define HIT_ENABLE_ON 4
+#define HIT_ENABLE_ON_LOC 0x130
+#define HIT_ENABLE_ON_SIZE 0x10
+
+
+// ,.. defaults
+
+
+#endif
