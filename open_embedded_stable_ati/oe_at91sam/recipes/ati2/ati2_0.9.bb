@@ -15,6 +15,9 @@ SRC_URI += "file://*.fw"
 #SRC_URI += "file://*.tcl"
 SRC_URI += "file://*.bin"
 SRC_URI += "file://start_up"
+SRC_URI += "file://start"
+SRC_URI += "file://stop"
+SRC_URI += "file://restart"
 SRC_URI += "file://interfaces"
 SRC_URI += "file://load_network"
 SRC_URI += "file://load_modules"
@@ -30,6 +33,7 @@ SRC_URI += "file://TTMT"
 SRC_URI += "file://SES"
 SRC_URI += "file://BASE"
 SRC_URI += "file://HHC"
+SRC_URI += "file://none"
 #SRC_URI += "file://fasit/*.py"
 SRC_URI += "file://fasit/sounds/*.mp3"
 #SRC_URI += "file://fasit/sounds/*.wav"
@@ -65,6 +69,9 @@ do_install () {
 #    install -m 644 ${WORKDIR}/fasit/*.py ${D}/home/root/fasit
     install -m 644 ${WORKDIR}/fasit/*.mp3 ${D}/home/root/sounds
     install -m 755 ${WORKDIR}/start_up ${D}/etc/init.d
+    install -m 755 ${WORKDIR}/start ${D}/usr/bin
+    install -m 755 ${WORKDIR}/stop ${D}/usr/bin
+    install -m 755 ${WORKDIR}/restart ${D}/usr/bin
     install -m 644 ${WORKDIR}/load_network ${D}/usr/bin
     install -m 755 ${WORKDIR}/load_modules ${D}/usr/bin
     install -m 755 ${WORKDIR}/unload ${D}/usr/bin
@@ -76,6 +83,8 @@ do_install () {
     install -m 644 ${WORKDIR}/MAT ${D}/usr/bin
     install -m 644 ${WORKDIR}/SES ${D}/usr/bin
     install -m 644 ${WORKDIR}/BASE ${D}/usr/bin
+    install -m 644 ${WORKDIR}/HHC ${D}/usr/bin
+    install -m 644 ${WORKDIR}/none ${D}/usr/bin
 #    install -m 755 ${WORKDIR}/*.tcl ${D}/usr/bin
     install -m 644 ${WORKDIR}/*.fw ${D}/lib/firmware
     install -m 644 ${WORKDIR}/*.bin ${D}/lib/firmware
