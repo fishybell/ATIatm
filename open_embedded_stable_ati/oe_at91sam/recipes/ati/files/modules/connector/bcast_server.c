@@ -79,6 +79,10 @@ const char *usage = "Usage: %s [options]\n\
       perror("Server-setsockopt(2) error");
       return 1;
    }
+   if (setsockopt(sender3, SOL_SOCKET, SO_BROADCAST|SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+      perror("Server-setsockopt(3) error");
+      return 1;
+   }
 
    /* use only the local ethernet link, not wifi, etc. */
    if (setsockopt(sender1, SOL_SOCKET, SO_BINDTODEVICE, "eth0", 5) == -1) {
@@ -90,7 +94,7 @@ const char *usage = "Usage: %s [options]\n\
       return 1;
    }
    /* attempt connection on wifi, but don't fail if it doesn't work */
-   if (setsockopt(sender3, SOL_SOCKET, SO_BINDTODEVICE, "wlan0", 5) == -1) {
+   if (setsockopt(sender3, SOL_SOCKET, SO_BINDTODEVICE, "wlan0", 6) == -1) {
       wifion = 0;
    } else {
       wifion = 1;
@@ -128,12 +132,12 @@ const char *usage = "Usage: %s [options]\n\
        }
        if (wifion) {
            if (sendto(sender3, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr_wifi, sizeof(serveraddr_wifi)) < 0) {
-               perror("2:");
+               perror("3:");
                wifion = 0;
            }
        } else {
            /* reconnect wifi */
-           if (setsockopt(sender3, SOL_SOCKET, SO_BINDTODEVICE, "wlan0", 5) == -1) {
+           if (setsockopt(sender3, SOL_SOCKET, SO_BINDTODEVICE, "wlan0", 6) != -1) {
                wifion = 1;
            }
        }
