@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# overwrite start routine...
+start () {
+   # load network
+   source /usr/bin/load_network
+
+   # start the default programs
+   def_progs
+
+   # load modules
+   load_modules "target_battery.ko minvoltval=12"
+}
+
+# overwrite stop routine...
+stop () {
+   # unload everything we loaded
+   unload
+}
