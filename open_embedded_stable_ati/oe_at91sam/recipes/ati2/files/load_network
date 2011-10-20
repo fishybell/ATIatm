@@ -4,11 +4,45 @@
 def_progs() {
    # start the "early" programs
    user_conn &
-   bit_button &
+   case $board in
+      TTMT|MIT|MAT)
+         bit_button -r MOVER &
+         ;;
+      SIT|LSAT|HSAT|SAT)
+         bit_button -r LIFTER &
+         ;;
+      EIM|SES)
+         bit_button -r SOUND &
+         ;;
+      *)
+         bit_button &
+         ;;
+   esac
+         
 
    # find auto ip, if necessary
    if [ "$ip" == "auto" ] ; then
+      # start event_conn early if we're auto-ip
+      case $board in
+         TTMT|MIT|MAT)
+            # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
+            # always start stand-alone (will also act as server)
+            event_conn -S -vv -k -r MOVER &
+            ;;
+         SIT|LSAT|HSAT|SAT)
+            # start stand-alone
+            event_conn -S -vv -k -r LIFTER &
+            ;;
+         EIM|SES)
+            # start stand-alone
+            event_conn -S -vv -k -r SOUND &
+            ;;
+      esac
+
       ip=`bcast_client`
+
+      # restart event_conn to connect them together
+      killall -q -9 event_conn
    fi
 
    # connect event_conns together
@@ -24,7 +58,7 @@ def_progs() {
             event_conn -i $ip -C -vv -k -r LIFTER &
          else
             # start stand-alone
-            event_conn -i $ip -S -vv -k -r LIFTER &
+            event_conn -S -vv -k -r LIFTER &
          fi
          ;;
       EIM|SES)
@@ -33,10 +67,13 @@ def_progs() {
             event_conn -i $ip -C -vv -k -r SOUND &
          else
             # start stand-alone
-            event_conn -i $ip -S -vv -k -r SOUND &
+            event_conn -S -vv -k -r SOUND &
          fi
          ;;
    esac
+
+   # start the non-standard broadcast server on everyone, everytime to help with runtime autodetection of connected computers
+   bcast_server -p 4227 &
 
    # start auto ip server
    case $board in
