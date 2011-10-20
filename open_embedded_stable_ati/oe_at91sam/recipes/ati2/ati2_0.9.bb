@@ -34,6 +34,7 @@ SRC_URI += "file://SES"
 SRC_URI += "file://BASE"
 SRC_URI += "file://HHC"
 SRC_URI += "file://none"
+SRC_URI += "file://clients"
 #SRC_URI += "file://fasit/*.py"
 SRC_URI += "file://fasit/sounds/*.mp3"
 #SRC_URI += "file://fasit/sounds/*.wav"
@@ -85,6 +86,7 @@ do_install () {
     install -m 644 ${WORKDIR}/BASE ${D}/usr/bin
     install -m 644 ${WORKDIR}/HHC ${D}/usr/bin
     install -m 644 ${WORKDIR}/none ${D}/usr/bin
+    install -m 644 ${WORKDIR}/clients ${D}/usr/bin
 #    install -m 755 ${WORKDIR}/*.tcl ${D}/usr/bin
     install -m 644 ${WORKDIR}/*.fw ${D}/lib/firmware
     install -m 644 ${WORKDIR}/*.bin ${D}/lib/firmware

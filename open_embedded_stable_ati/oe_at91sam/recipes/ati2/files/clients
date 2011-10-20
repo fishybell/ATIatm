@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# default to find up to 5 clients
+num=$1
+if [ ! -n "$num" ] ; then
+   num=5
+fi
+
+# find local addresses
+addr0=`ifconfig eth0 | grep -o "addr:[0-9\.]*" | cut -f2 -d:`
+if [ ! -n "$addr0" ] ; then addr0=nothing ; fi
+addr1=`ifconfig eth0:avahi | grep -o "addr:[0-9\.]*" | cut -f2 -d:`
+if [ ! -n "$addr1" ] ; then addr1=nothing ; fi
+addr2=`ifconfig wlan0 | grep -o "addr:[0-9\.]*" | cut -f2 -d:`
+if [ ! -n "$addr2" ] ; then addr2=nothing ; fi
+addr3=`ifconfig wlan0:avahi | grep -o "addr:[0-9\.]*" | cut -f2 -d:`
+if [ ! -n "$addr3" ] ; then addr3=nothing ; fi
+
+echo "Please wait..."
+
+# find connected clients
+/usr/bin/bcast_client -p 4227 -n $num | sort -u | grep -v $addr0 | grep -v $addr1 | grep -v $addr2 | grep -v $addr3 
