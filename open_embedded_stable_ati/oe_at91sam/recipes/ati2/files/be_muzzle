@@ -1,0 +1,4 @@
+echo -n "Is there a MFS (0-no, 1-yes)?: "
+read mfs
+size=$(echo $mfs | wc -c)
+echo -n $mac_address | /usr/bin/eeprom_rw write -addr 0x184 -size $size -blank 0x04
