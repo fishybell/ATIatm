@@ -1,2 +1,2 @@
-/usr/bin/eeprom_rw read -addr 0x184
+/usr/bin/eeprom_rw read -addr 0x184 -size 0x04
 echo

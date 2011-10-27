@@ -1,0 +1,4 @@
+echo -n "Is there a Moon Glow (0-no, 1-yes)?: "
+read moon
+size=$(echo $moon | wc -c)
+echo -n $moon | /usr/bin/eeprom_rw write -addr 0x340 -size $size -blank 0x04
