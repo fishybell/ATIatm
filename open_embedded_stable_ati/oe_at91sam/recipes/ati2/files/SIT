@@ -5,11 +5,23 @@ start () {
    # load network
    source /usr/bin/load_network
 
+   mfs=$(has_muzzle)
+   moon=$(has_moon)
+   phi=$(has_phi)
+   if [ "$mfs" == "" ] ; then                       
+      mfs=0                                         
+   fi 
+   if [ "$moon" == "" ] ; then                       
+      moon=0                                         
+   fi
+   if [ "$phi" == "" ] ; then                       
+      phi=0                                         
+   fi
    # load modules
    load_modules "target_user_interface.ko mover=0" \
                 "target_battery.ko minvoltval=12" \
                 "target_hit_poll.ko line=0" \
-                "target_generic_output.ko has_muzzle=1 has_moon=1 has_phi=1" \
+                "target_generic_output.ko has_muzzle=$mfs has_moon=$moon has_phi=$phi" \
                 "target_lifter_infantry.ko" \
                 "lifter.ko"
 

@@ -24,6 +24,7 @@ SRC_URI += "file://load_modules"
 SRC_URI += "file://unload"
 SRC_URI += "file://be_*"
 SRC_URI += "file://is_*"
+SRC_URI += "file://has_*"
 SRC_URI += "file://EIM"
 SRC_URI += "file://SIT"
 SRC_URI += "file://SAT"
@@ -78,6 +79,7 @@ do_install () {
     install -m 755 ${WORKDIR}/unload ${D}/usr/bin
     install -m 755 ${WORKDIR}/is_* ${D}/usr/bin
     install -m 755 ${WORKDIR}/be_* ${D}/usr/bin
+    install -m 755 ${WORKDIR}/has_* ${D}/usr/bin
     install -m 644 ${WORKDIR}/SIT ${D}/usr/bin
     install -m 644 ${WORKDIR}/SAT ${D}/usr/bin
     install -m 644 ${WORKDIR}/MIT ${D}/usr/bin
