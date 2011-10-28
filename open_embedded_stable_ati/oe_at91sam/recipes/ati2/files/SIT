@@ -8,6 +8,7 @@ start () {
    mfs=$(has_muzzle)
    moon=$(has_moon)
    phi=$(has_phi)
+   sitb = $(has_sit_battery)
    if [ "$mfs" == "" ] ; then                       
       mfs=0                                         
    fi 
@@ -17,9 +18,12 @@ start () {
    if [ "$phi" == "" ] ; then                       
       phi=0                                         
    fi
+   if [ "$sitb" == "" ] ; then                       
+      sitb=12                                         
+   fi
    # load modules
    load_modules "target_user_interface.ko mover=0" \
-                "target_battery.ko minvoltval=12" \
+                "target_battery.ko minvoltval=$sitb" \
                 "target_hit_poll.ko line=0" \
                 "target_generic_output.ko has_muzzle=$mfs has_moon=$moon has_phi=$phi" \
                 "target_lifter_infantry.ko" \

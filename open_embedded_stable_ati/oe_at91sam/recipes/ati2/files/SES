@@ -5,9 +5,14 @@ start () {
    # load network
    source /usr/bin/load_network
 
+   sesb = $(has_ses_battery)
+   if [ "$sesb" == "" ] ; then                       
+      sesb=12                                         
+   fi 
+
    # load modules
    load_modules "target_user_interface.ko mover=0" \
-                "target_battery.ko minvoltval=12" \
+                "target_battery.ko minvoltval=$sesb" \
                 "target_ses_interface.ko"
 
    # check to see if default audio files need to be copied over
