@@ -1,0 +1,2 @@
+/usr/bin/eeprom_rw read -addr 0x418 -size 0x08
+echo

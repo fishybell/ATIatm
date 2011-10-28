@@ -1,0 +1,4 @@
+echo -n "Enter MAT battery default: "
+read matb
+size=$(echo $matb | wc -c)
+echo -n $matb | /usr/bin/eeprom_rw write -addr 0x420 -size $size -blank 0x08

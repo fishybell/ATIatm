@@ -1,0 +1,4 @@
+echo -n "Enter MAT mover type (0|1): "
+read matt
+size=$(echo $matt | wc -c)
+echo -n $matt | /usr/bin/eeprom_rw write -addr 0x430 -size $size -blank 0x04

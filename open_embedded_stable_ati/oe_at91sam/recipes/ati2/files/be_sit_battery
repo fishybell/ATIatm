@@ -1,0 +1,4 @@
+echo -n "Enter SIT battery default: "
+read sitb
+size=$(echo $sitb | wc -c)
+echo -n $sitb | /usr/bin/eeprom_rw write -addr 0x400 -size $size -blank 0x08

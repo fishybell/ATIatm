@@ -1,0 +1,4 @@
+echo -n "Enter MIT Mover Type (0|1): "
+read mitm
+size=$(echo $mitm | wc -c)
+echo -n $mitm | /usr/bin/eeprom_rw write -addr 0x428 -size $size -blank 0x04
