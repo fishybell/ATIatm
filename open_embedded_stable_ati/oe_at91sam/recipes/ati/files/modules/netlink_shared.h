@@ -246,6 +246,34 @@ enum {
 };
 #define NL_C_MAX (__NL_C_MAX - 1)
 
+typedef struct nl_attr_size {
+    int cmd;
+    int size;
+    struct nla_policy *policy;
+} nl_attr_size_t;
+static nl_attr_size_t nl_attr_sizes[] = {
+   {NL_C_UNSPEC, 0, NULL},
+   {NL_C_FAILURE, -1, generic_string_policy},
+   {NL_C_BATTERY, sizeof(u8), generic_int8_policy},
+   {NL_C_EXPOSE, sizeof(u8), generic_int8_policy},
+   {NL_C_MOVE, sizeof(u16), generic_int16_policy},
+   {NL_C_POSITION, sizeof(u16), generic_int16_policy},
+   {NL_C_STOP, sizeof(u8), generic_int8_policy},
+   {NL_C_HITS, sizeof(u8), generic_int8_policy},
+   {NL_C_HIT_LOG, -1, generic_string_policy},
+   {NL_C_HIT_CAL, sizeof(hit_calibration_t), hit_calibration_policy},
+   {NL_C_BIT, sizeof(bit_event_t), bit_event_policy},
+   {NL_C_ACCESSORY, sizeof(accessory_conf_t), accessory_conf_policy},
+   {NL_C_GPS, sizeof(gps_t), gps_conf_policy},
+   {NL_C_EVENT, sizeof(u8), generic_int8_policy},
+   {NL_C_SLEEP, sizeof(u8), generic_int8_policy},
+   {NL_C_DMSG, -1, generic_string_policy},
+   {NL_C_CMD_EVENT, sizeof(cmd_event_t), cmd_event_policy},
+   {NL_C_SCENARIO, -1, generic_string_policy},
+   {NL_C_EVENT_REF, sizeof(u8), generic_int8_policy},
+   {__NL_C_MAX, 0, NULL},
+};
+
 #define CONCEAL 0
 #define EXPOSE 1
 #define LIFTING 2
