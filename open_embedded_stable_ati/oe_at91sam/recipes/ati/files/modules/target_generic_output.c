@@ -535,7 +535,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_RAISE) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_SOON; // started, so soon
                     }
                     break;
                 case EVENT_UP:		// finished raising
@@ -543,7 +543,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_UP) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_IMMEDIATE; // finished, so immediate
                     }
                     break;
                 case EVENT_LOWER:	// start of lower
@@ -551,7 +551,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_LOWER) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_SOON; // started, so soon
                     }
                     break;
                 case EVENT_DOWN:	// finished lowering
@@ -559,7 +559,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_DOWN) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_IMMEDIATE; // finished, so immediate
                     }
                     break;
                 case EVENT_MOVE:	// start of move
@@ -567,7 +567,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_MOVE) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_SOON; // started, so soon
                     }
                     break;
                 case EVENT_MOVING:	// reached target speed
@@ -575,7 +575,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_MOVING) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_IMMEDIATE; // finished, so immediate
                     }
                     break;
                 case EVENT_COAST:	// started coast
@@ -583,7 +583,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_COAST) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_SOON; // started, so soon
                     }
                     break;
                 case EVENT_STOP:	// started stopping
@@ -591,7 +591,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_STOP) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_SOON; // started, so soon
                     }
                     break;
                 case EVENT_STOPPED:	// finished stopping
@@ -599,7 +599,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_STOPPED) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_IMMEDIATE; // finished, so immediate
                     }
                     break;
                 case EVENT_HIT:		// hit
@@ -607,7 +607,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_HIT) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_IMMEDIATE; // immediate action is better
                     }
                     break;
                 case EVENT_KILL:	// kill
@@ -615,7 +615,7 @@ delay_printk("%s(): %i\n",__func__, type);
                         state = ON_SOON;
                     }
                     if (output_table[i].active_on & UNACTIVE_KILL) { // don't do as else: overwrite to off if both are set
-                        state = OFF_SOON;
+                        state = OFF_IMMEDIATE; // immediate action is better
                     }
                     break;
                 case EVENT_ERROR:	// error with one of the above
@@ -724,7 +724,7 @@ static void state_run(unsigned long index) {
     struct generic_output *this = &output_table[index];
     int add_delay = 0; // additional delay to add to timer
 
-delay_printk("%s(): %i\n",__func__, index);
+// delay_printk("%s(): %i\n",__func__, index);
     // lock as read/write
     write_lock(&this->lock);
 // delay_printk("i %i\ns %i\nn %i\nm %i\n", index, this->state, this->next_state, this->mode);
@@ -807,15 +807,15 @@ delay_printk("%s(): %i\n",__func__, index);
                     if (do_repeat(this->onoff_repeat_count, &this->onoff_repeat_at)) {
                         // do on/off repeat: next state is off, then on again
                         if (this->state == S_FIRE_OFF) {
-delay_printk("burst repeating %i\n", this->onoff_repeat_at);
+// delay_printk("burst repeating %i\n", this->onoff_repeat_at);
                             this->next_state = S_FIRE_ON; // is off, next on
                         } else {
                             // on stop condition, let it follow through but cancel infinite repeat
                             if (this->onoff_repeat_count == -1) {
-delay_printk("burst infinite repeat stopped\n");
+// delay_printk("burst infinite repeat stopped\n");
                                 this->next_state = S_WAITING; // is off, next off (stay off)
                             } else {
-delay_printk("burst repeating %i\n", this->onoff_repeat_at);
+// delay_printk("burst repeating %i\n", this->onoff_repeat_at);
                                 this->next_state = S_STOP_ON; // is off, next on
                             }
                         }
@@ -825,16 +825,16 @@ delay_printk("burst repeating %i\n", this->onoff_repeat_at);
                         if (do_repeat(this->repeat_count, &this->repeat_at)) {
                             // do normal repeat: next state is on, then off again
                             if (this->state == S_FIRE_OFF) {
-delay_printk("repeating %i\n", this->repeat_at);
+// delay_printk("repeating %i\n", this->repeat_at);
                                 this->next_state = S_FIRE_ON; // is off, next on
                                 add_delay = this->rdelay; // add repeat delay to delay time
                             } else {
                                 // on stop condition, let it follow through but cancel infinite repeat
                                 if (this->repeat_count == -1) {
-delay_printk("infinite repeat stopped\n");
+// delay_printk("infinite repeat stopped\n");
                                     this->next_state = S_WAITING; // is off, next off (stay off)
                                 } else {
-delay_printk("repeating %i\n", this->repeat_at);
+// delay_printk("repeating %i\n", this->repeat_at);
                                     this->next_state = S_STOP_ON; // is off, next on
                                     add_delay = this->rdelay; // add repeat delay to delay time
 
@@ -852,16 +852,16 @@ delay_printk("repeating %i\n", this->repeat_at);
                     if (do_repeat(this->repeat_count, &this->repeat_at)) {
                         // do repeat: next state is on, then off again
                         if (this->state == S_FIRE_OFF) {
-delay_printk("repeating %i\n", this->repeat_at);
+// delay_printk("repeating %i\n", this->repeat_at);
                             this->next_state = S_FIRE_ON; // is off, next on
                             add_delay = this->rdelay; // add repeat delay to delay time
                         } else {
                             // on stop condition, let it follow through but cancel infinite repeat
                             if (this->repeat_count == -1) {
-delay_printk("infinite repeat stopped\n");
+// delay_printk("infinite repeat stopped\n");
                                 this->next_state = S_WAITING; // is off, next off (stay off)
                             } else {
-delay_printk("repeating %i\n", this->repeat_at);
+// delay_printk("repeating %i\n", this->repeat_at);
                                 this->next_state = S_STOP_ON; // is off, next on
                                 add_delay = this->rdelay; // add repeat delay to delay time
                             }
