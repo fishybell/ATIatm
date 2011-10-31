@@ -159,9 +159,10 @@ FUNCTION_END("::~Kern_Conn()")
 
 int Kern_Conn::parseData(struct nl_msg *msg) {
 FUNCTION_START("::parseData(struct nl_msg *msg)")
-    struct nlattr *attrs[NL_A_MAX+1];
+   struct nlattr *attrs[NL_A_MAX+1];
    struct nlmsghdr *nlh = nlmsg_hdr(msg);
    struct genlmsghdr *ghdr = static_cast<genlmsghdr*>(nlmsg_data(nlh));
+   struct nlattr *na;
 
    // parse message and call individual commands as needed
    switch (ghdr->cmd) {
@@ -213,7 +214,6 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
          }
          break;
       case NL_C_CMD_EVENT:
-         struct nlattr *na;
          genlmsg_parse(nlh, 0, attrs, CMD_EVENT_A_MAX, cmd_event_policy);
 
          // handle command event from kernel
@@ -238,7 +238,23 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
          }
          break;
       default:
-         DMSG("Ignoring NL command %i\n", ghdr->cmd);
+         // reflect all other messages (only care about replies though) back to kernel
+         genlmsg_parse(nlh, 0, attrs, 1, nl_attr_sizes[ghdr->cmd].policy); // use 1st attribute only
+         na = attrs[1]; // use 1st attribute only
+         if (na) {
+            cmd_event_t msg; // encapsulate in command event
+            memset(&msg, 0, sizeof(cmd_event_t)); // everything 0...
+            msg.role = KERN_ROLE;
+            msg.cmd = ghdr->cmd;
+            int s = nl_attr_sizes[ghdr->cmd].size;
+            if (s == -1) {
+               s = nla_len(na);
+            }
+            msg.payload_size = min(16, s); // maximum of 16 for size
+            msg.attribute = 1;
+            memcpy(msg.payload, nla_data(na), msg.payload_size);
+            outgoingCmdEvent(&msg);
+         }
          break;
    }
  
@@ -265,3 +281,14 @@ FUNCTION_START("::incomingCmdEvent(kern_cmd_event_t *event)")
 
 FUNCTION_END("::incomingCmdEvent(kern_cmd_event_t *event)")
 }
+
+// send a command event to the kernel
+void Kern_Conn::outgoingCmdEvent(cmd_event_t *event) {
+FUNCTION_START("::outgoingCmdEvent(kern_cmd_event_t *event)")
+
+    // queue message to kernel
+    queueMsg(NL_C_CMD_EVENT, CMD_EVENT_A_MSG, sizeof(cmd_event_t), event);
+
+FUNCTION_END("::outgoingCmdEvent(kern_cmd_event_t *event)")
+}
+

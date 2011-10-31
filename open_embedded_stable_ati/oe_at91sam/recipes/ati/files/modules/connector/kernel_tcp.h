@@ -59,9 +59,10 @@ public:
 
    void incomingGOEvent(kern_go_event_t *event); // send a generic output event to the kernel
 
-   void incomingCmdEvent(kern_cmd_event_t *event); // send a command event to the kernel
+   void incomingCmdEvent(kern_cmd_event_t *event); // send a command event to the kernel (send data)
 
 private:
+   void outgoingCmdEvent(cmd_event_t *event); // send a command event to the kernel (send object)
    Kernel_TCP *kern_tcp;
 };
 
