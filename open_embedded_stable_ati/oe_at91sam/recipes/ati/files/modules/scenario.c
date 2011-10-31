@@ -63,7 +63,18 @@ typedef struct string_match {
    const char * string;
    int number;
 } string_match_t;
+#define REG_VAR_CONSTANT 0x1234
 static string_match_t string_table[] = {
+   {"REG_0", REG_VAR_CONSTANT + 0},	// register variable 0
+   {"REG_1", REG_VAR_CONSTANT + 1},	// register variable 1
+   {"REG_2", REG_VAR_CONSTANT + 2},	// register variable 2
+   {"REG_3", REG_VAR_CONSTANT + 3},	// register variable 3
+   {"REG_4", REG_VAR_CONSTANT + 4},	// register variable 4
+   {"REG_5", REG_VAR_CONSTANT + 5},	// register variable 5
+   {"REG_6", REG_VAR_CONSTANT + 6},	// register variable 6
+   {"REG_7", REG_VAR_CONSTANT + 7},	// register variable 7
+   {"REG_8", REG_VAR_CONSTANT + 8},	// register variable 8
+   {"REG_9", REG_VAR_CONSTANT + 9},	// register variable 9
    {"EVENT_RAISE", EVENT_RAISE},	// start of raise
    {"EVENT_UP", EVENT_UP},		// finished raising
    {"EVENT_LOWER", EVENT_LOWER},	// start of lower
@@ -96,7 +107,6 @@ static string_match_t string_table[] = {
    {"NL_C_EVENT", NL_C_EVENT},      /* mover/lifter event (command/reply) (generic 8-bit int) */
    {"NL_C_SLEEP", NL_C_SLEEP},      /* sleep/wake command (command) (generic 8-bit int) */
    {"NL_C_DMSG", NL_C_DMSG},       /* debug message (reply) (generic string) */
-   {"NL_C_CMD_EVENT", NL_C_CMD_EVENT},  /* command event (command) (command event structure) */
    {"NL_C_SCENARIO", NL_C_SCENARIO},   /* run scenario message (reply) (generic string) */
    {"NL_C_EVENT_REF", NL_C_EVENT_REF},      /* reflected event (command) (generic 8-bit int) */
    {"R_UNSPECIFIED", R_UNSPECIFIED}, // no role specified
@@ -106,6 +116,7 @@ static string_match_t string_table[] = {
    {"R_GUNNER", R_GUNNER},      // lifting device in a TTMT that acts as the gunner
    {"R_DRIVER", R_DRIVER},      // lifting device in a TTMT that acts as the driver
 };
+// don't support -- {"NL_C_CMD_EVENT", NL_C_CMD_EVENT},  /* command event (command) (command event structure) */
 typedef struct command_handler {
    const char* name; // name of function
    scenario_function handler; // function pointer
@@ -114,6 +125,7 @@ typedef struct command_handler {
 typedef enum {
    WATCHER_NONE,     /* no effect on running scenario */
    WATCHER_RESUME,   /* resume running scenario if sleeping */
+   WATCHER_RESUME_2, /* after another event, resume running scenario if sleeping */
    WATCHER_KILL,     /* kill running scenario */
 } watcher_cmd_t;
 typedef struct wait_watcher {
@@ -148,7 +160,6 @@ static wait_watcher_t wait_watchers[] = {
    {"NL_C_EVENT",    NL_C_EVENT,    -1, 0, WATCHER_NONE, 0},
    {"NL_C_SLEEP",    NL_C_SLEEP,    -1, 0, WATCHER_NONE, 0},
    {"NL_C_DMSG",     NL_C_DMSG,     -1, 0, WATCHER_NONE, 0},
-   {"NL_C_CMD_EVENT",NL_C_CMD_EVENT,-1, 0, WATCHER_NONE, 0},
    {"NL_C_EVENT_REF",NL_C_EVENT_REF,-1, 0, WATCHER_NONE, 0},
    {"EVENT_RAISE",   -1, EVENT_RAISE,   0, WATCHER_NONE, 0},
    {"EVENT_UP",      -1, EVENT_UP,      0, WATCHER_NONE, 0},
@@ -167,6 +178,7 @@ static wait_watcher_t wait_watchers[] = {
    {"EVENT_WAKE",    -1, EVENT_WAKE,    0, WATCHER_NONE, 0},
    {"EVENT_ERROR",   -1, EVENT_ERROR,   0, WATCHER_KILL, 1},
 };
+// don't support -- {"NL_C_CMD_EVENT",NL_C_CMD_EVENT,-1, 0, WATCHER_NONE, 0},
 static wait_var_watcher_t wait_var_watchers[] = {
    {0, NULL, 0, 0, WATCHER_NONE, 0},
    {1, NULL, 0, 0, WATCHER_NONE, 0},
@@ -182,8 +194,8 @@ static wait_var_watcher_t wait_var_watchers[] = {
 #define MAX_TEMP_BUFFERS 250
 static char *temp_buffers[MAX_TEMP_BUFFERS]; // 250 temporary buffers
 static int buffer_pos = -1;
-static char *register_vars[10] = { // register variables
-   NULL, NULL, NULL, NULL, NULL,
+static char *register_vars[11] = { // register variables (10 = reservered, 0-9 = avail for use by scenario)
+   NULL, NULL, NULL, NULL, NULL, NULL,
    NULL, NULL, NULL, NULL, NULL,
 }; // 10 variables for scenario use
 typedef enum {
@@ -225,9 +237,14 @@ typedef struct state_data {
    char *param3; int param3_len;
    char *param4; int param4_len;
 } state_data_t;
+// main scenario data
 scen_state_t g_state = INITIALIZE;
 state_data_t g_data;
 int g_place = 0;
+// branched sub-scenario data
+scen_state_t sub_state = INITIALIZE;
+state_data_t sub_data;
+int sub_place = 0;
 static void sleep_done(unsigned long data); // forward declaration
 static struct timer_list sleep_timer = TIMER_INITIALIZER(sleep_done, 0, 0);
 atomic_t sleep_time = ATOMIC_INIT(0); // sleep forever
@@ -240,11 +257,20 @@ struct timespec sleep_start; // time sleep started at
 int Scen_SetVar(char *param1, int param1_len, char *param2, int param2_len,
                  char *param3, int param3_len, char *param4, int param4_len);
 
+int Scen_SetVarLast(char *param1, int param1_len, char *param2, int param2_len,
+                    char *param3, int param3_len, char *param4, int param4_len);
+
 int Scen_End(char *param1, int param1_len, char *param2, int param2_len,
               char *param3, int param3_len, char *param4, int param4_len);
 
 int Scen_Send(char *param1, int param1_len, char *param2, int param2_len,
                char *param3, int param3_len, char *param4, int param4_len);
+
+int Scen_SendWait(char *param1, int param1_len, char *param2, int param2_len,
+                   char *param3, int param3_len, char *param4, int param4_len);
+
+int Scen_SendWait_Resume(char *param1, int param1_len, char *param2, int param2_len,
+                          char *param3, int param3_len, char *param4, int param4_len);
 
 int Scen_Nothing(char *param1, int param1_len, char *param2, int param2_len,
                   char *param3, int param3_len, char *param4, int param4_len);
@@ -261,22 +287,17 @@ int Scen_DoWait(char *param1, int param1_len, char *param2, int param2_len,
 int Scen_DoWait_Resume(char *param1, int param1_len, char *param2, int param2_len,
                         char *param3, int param3_len, char *param4, int param4_len);
 
-int Scen_DoWaitVar(char *param1, int param1_len, char *param2, int param2_len,
-                    char *param3, int param3_len, char *param4, int param4_len);
 
-int Scen_DoWaitVar_Resume(char *param1, int param1_len, char *param2, int param2_len,
-                           char *param3, int param3_len, char *param4, int param4_len);
-
-
-static command_handler_t cmd_handlers[] = { // prebuilt command table
-   {"SetVar", Scen_SetVar, Scen_Nothing},  // no resume function
-   {"End", Scen_End, Scen_Nothing},        // no resume function
-   {"Send", Scen_Send, Scen_Nothing},      // no resume function
-   {"Nothing", Scen_Nothing, Scen_Nothing},// no resume function
-   {"Delay", Scen_Delay, Scen_Nothing},    // no resume function
-   {"If", Scen_If, Scen_Nothing},          // no resume function
-   {"DoWait", Scen_DoWait, Scen_DoWait_Resume},
-   {"DoWaitVar", Scen_DoWaitVar, Scen_DoWaitVar_Resume},
+static command_handler_t cmd_handlers[] = {            // prebuilt command table
+   {"SetVar", Scen_SetVar, Scen_Nothing},              // no resume function
+   {"SetVarLast", Scen_SetVarLast, Scen_Nothing},      // no resume function
+   {"End", Scen_End, Scen_Nothing},                    // no resume function
+   {"Send", Scen_Send, Scen_Nothing},                  // no resume function
+   {"SendWait", Scen_SendWait, Scen_SendWait_Resume},  // has resume function
+   {"Nothing", Scen_Nothing, Scen_Nothing},            // no resume function
+   {"Delay", Scen_Delay, Scen_Nothing},                // no resume function
+   {"If", Scen_If, Scen_If},                           // resume function is same as main function
+   {"DoWait", Scen_DoWait, Scen_DoWait_Resume},        // has resume function
 };
 
 //---------------------------------------------------------------------------
@@ -288,6 +309,7 @@ static void sleep_done(unsigned long data) {
    struct timespec time = timespec_sub(current_kernel_time(), sleep_start); // time since start
    atomic_set(&sleep_acc, (time.tv_sec * 1000) + (time.tv_nsec / 1000000));
    delay_printk("Slept for %i milliseconds\n", atomic_read(&sleep_acc));
+   atomic_set(&sleep_time,10); // sleep for 10 milliseconds maximum now
 
    // schedule work to do actual scenario resume
    schedule_work(&scenario_work);
@@ -373,12 +395,9 @@ static char *unescape_buffer(char *buffer, int *length) {
 static void scen_sleep(int milliseconds) { // sleeps for up to X milliseconds (the caling function will need to return 1 for resume later)
    sleep_start = current_kernel_time(); // sleep started now
    atomic_set(&sleep_time,milliseconds);
+#ifdef DEBUG
    delay_printk("Attempting to sleep for %i milliseconds\n", milliseconds);
-}
-
-static void scen_sleep_forever(void) { // sleep indefinitely (the caling function will need to return 1 for resume later)
-   sleep_start = current_kernel_time(); // sleep started now
-   atomic_set(&sleep_time,0);
+#endif
 }
 
 static void scen_wake(void) {
@@ -517,7 +536,7 @@ static void scenario_cleanup(void) {
    }
 
    // clear register variables
-   for (i=0; i<10; i++) {
+   for (i=0; i<11; i++) {
       if (register_vars[i] != NULL) {
          kfree(register_vars[i]);
          register_vars[i] = NULL;
@@ -947,7 +966,27 @@ static int scenario_state(char *buffer, int *place, scen_state_t *state, state_d
    return resume_later;
 }
 
-// run a sub-scenario
+// run a branched sub-scenario (may resume)
+static int run_sub_command_branch(char *buffer, int buf_len) {
+   int resume_later = 0;
+   // check to see if we're resuming work
+   if (sub_state != RESUME_CMD) {
+      // prepare for initial state machine run
+      sub_state = INITIALIZE;
+      sub_place = 0;
+      memset(&sub_data, 0, sizeof(state_data_t));
+   }
+
+   // run scenario until buffer empty or need to sleep
+   while (sub_place <= buf_len && resume_later == 0 && check_running()) {
+      // run scenario state machine
+      resume_later = scenario_state(buffer, &sub_place, &sub_state, &sub_data);
+   }
+
+   return resume_later; 
+}
+
+// run a sub-scenario (can't resume)
 static void run_sub_command(char *buffer, int buf_len) {
    int resume_later = 0;
    // prepare for initial state machine run
@@ -1013,6 +1052,11 @@ int scenario_run(char *scen) {
       delay_printk("Error! not fully initialized!\n");
 #endif
       return 0;
+   } else if (scen == NULL) {
+#if DEBUG
+      delay_printk("Error! scenario is null!\n");
+#endif
+      return 0;
    } else if (atomic_inc_return(&scenario_running) != 1) { // scenario was already running?
       atomic_dec(&scenario_running); // revert atomic position
 #if DEBUG
@@ -1070,10 +1114,60 @@ EXPORT_SYMBOL(scenario_kill);
 //---------------------------------------------------------------------------
 int Scen_SetVar(char *param1, int param1_len, char *param2, int param2_len,
                  char *param3, int param3_len, char *param4, int param4_len) {
+   int variable;
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
 #endif
+
+   // find variable
+   if (!string_to_constant(param1, param1_len, &variable)) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode variable parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   }
+
+   // check variable
+   if (variable < 0 || variable > 9) {
+#if DEBUG
+      delay_printk("ERROR: variable parameter (%i) invalid\n", variable);
+#endif
+      scenario_kill();
+      return 0;
+   }
+
+   // reset register variable
+   if (register_vars[variable] != NULL) {
+      kfree(register_vars[variable]);
+      register_vars[variable] = NULL;
+   }
+
+   // set register variable
+   register_vars[variable] = kmalloc(param2_len+1, GFP_KERNEL); // allocate (len + 1)
+   memcpy(register_vars[variable], param2, param2_len); // copy
+   register_vars[variable][param2_len] = '\0'; // double-check it is null terminated
+#if DEBUG
+   delay_printk("---> Saved reg %i: %s\n", variable, register_vars[variable]);
+#endif
+   
    return 0;
+}
+
+int Scen_SetVarLast(char *param1, int param1_len, char *param2, int param2_len,
+                    char *param3, int param3_len, char *param4, int param4_len) {
+#if DEBUG
+   delay_printk("%s(...)\n",__func__);
+#endif
+
+   // check the last (reserved) variable
+   if (register_vars[10] == NULL) {
+      // it was blank, send a blank string
+      return Scen_SetVar(param1, param1_len, "", 0, NULL, 0, NULL, 0);
+   } else {
+      // send the last (reserved) variable to Scen_SetVar
+      return Scen_SetVar(param1, param1_len, register_vars[10], strlen(register_vars[10]), NULL, 0, NULL, 0);
+   }
 }
 
 int Scen_End(char *param1, int param1_len, char *param2, int param2_len,
@@ -1081,12 +1175,15 @@ int Scen_End(char *param1, int param1_len, char *param2, int param2_len,
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
 #endif
+
+   // just end the scenario
+   scenario_kill();
    return 0;
 }
 
 int Scen_Send(char *param1, int param1_len, char *param2, int param2_len,
                char *param3, int param3_len, char *param4, int param4_len) {
-   int role, id, attribute;
+   int role, id, attribute, reg_var;
    cmd_event_t nl_cmd;
 #if DEBUG
    delay_printk("%s(...)\n",__func__);
@@ -1129,16 +1226,179 @@ int Scen_Send(char *param1, int param1_len, char *param2, int param2_len,
 #endif
 
    // convert payload to binary blob
-   hex_decode_attr(param4, param4_len, nl_cmd.payload);
+   if (string_to_constant(param4, param4_len, &reg_var)) {
+      // was it a register variable?
+      reg_var -= REG_VAR_CONSTANT; // convert to 0-9 value
+      if (reg_var >= 0 && reg_var <= 9) {
+         // check that register variable is valid
+         if (register_vars[reg_var] == NULL) {
+#if DEBUG
+            delay_printk("ERROR: register %i is null\n", reg_var);
+#endif
+            scenario_kill();
+            return 0;
+         }
+         // it is a register variable, use the correct one
+#if DEBUG
+   delay_printk("---> Parsed reg %i: %s\n", reg_var, register_vars[reg_var]);
+#endif
+         hex_decode_attr(register_vars[reg_var], strlen(register_vars[reg_var]), nl_cmd.payload);
+         nl_cmd.payload_size = strlen(register_vars[reg_var]);
+      } else {
+         // it's a hex encoded blob
+         hex_decode_attr(param4, param4_len, nl_cmd.payload);
+         nl_cmd.payload_size = param4_len/2;
+      }
+   } else {
+      // it's a hex encoded blob
+      hex_decode_attr(param4, param4_len, nl_cmd.payload);
+      nl_cmd.payload_size = param4_len/2;
+   }
 
    // build netlink message
    nl_cmd.role = role;
    nl_cmd.cmd = id;
-   nl_cmd.payload_size = param4_len/2;
    nl_cmd.attribute = attribute;
 
    // send netlink message
    send_nl_message_multi(&nl_cmd, cmd_event_mfh, NL_C_CMD_EVENT);
+   return 0;
+}
+
+int Scen_SendWait(char *param1, int param1_len, char *param2, int param2_len,
+                   char *param3, int param3_len, char *param4, int param4_len) {
+   int role, id, time, reg_var, retval, i;
+   cmd_event_t nl_cmd;
+#if DEBUG
+   delay_printk("%s(...)\n",__func__);
+#endif
+
+   // check payload length
+   if (param4_len > 32) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode payload parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   }
+
+   // find role, id, and time
+   if (!string_to_constant(param1, param1_len, &role)) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode role parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   }
+   if (!string_to_constant(param2, param2_len, &id)) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode id parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   }
+   if (!string_to_constant(param4, param4_len, &time)) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode time parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   }
+
+#if DEBUG
+   delay_printk("%s(%i, %i, 0x...(%i), %i)\n",__func__, role, id, param3_len/2, time);
+#endif
+
+   // convert payload to binary blob
+   if (string_to_constant(param3, param3_len, &reg_var)) {
+      // was it a register variable?
+      reg_var -= REG_VAR_CONSTANT; // convert to 0-9 value
+      if (reg_var >= 0 && reg_var <= 9) {
+         // check that register variable is valid
+         if (register_vars[reg_var] == NULL) {
+#if DEBUG
+            delay_printk("ERROR: register %i is null\n", reg_var);
+#endif
+            scenario_kill();
+            return 0;
+         }
+         // it is a register variable, use the correct one
+#if DEBUG
+   delay_printk("---> Parsed reg %i: %s\n", reg_var, register_vars[reg_var]);
+#endif
+         hex_decode_attr(register_vars[reg_var], strlen(register_vars[reg_var]), nl_cmd.payload);
+         nl_cmd.payload_size = strlen(register_vars[reg_var]);
+      } else {
+         // it's a hex encoded blob
+         hex_decode_attr(param3, param3_len, nl_cmd.payload);
+         nl_cmd.payload_size = param3_len/2;
+      }
+   } else {
+      // it's a hex encoded blob
+      hex_decode_attr(param3, param3_len, nl_cmd.payload);
+      nl_cmd.payload_size = param3_len/2;
+   }
+
+   // build netlink message
+   nl_cmd.role = role;
+   nl_cmd.cmd = id;
+   nl_cmd.attribute = 1; // assumed to be 1 for SendWait function
+
+   // install watcher based on return of same command as sent command
+   retval = 0;
+   for (i=0; i<sizeof(wait_watchers)/sizeof(wait_watcher_t); i++) {
+      if (strncmp(wait_watchers[i].name, param2, param2_len) == 0) {
+         // found it!
+         if (!wait_watchers[i].ro) {
+            // not read-only, overwrite
+#if DEBUG
+   delay_printk("INSTALLING RESUME for @ %i\n", i);
+#endif
+            wait_watchers[i].cmd = WATCHER_RESUME_2; // resume state machine on timeout
+         }
+         // sleep for the given time
+         scen_sleep(time);
+
+         retval = 1; // will resume later
+      }
+   }
+
+   if (!retval) {
+   // could not install watcher...broken script...kill
+#if DEBUG
+      delay_printk("ERROR: couldn't decode until parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   } else {
+      // send netlink message
+      send_nl_message_multi(&nl_cmd, cmd_event_mfh, NL_C_CMD_EVENT);
+      return retval;
+   }
+}
+
+int Scen_SendWait_Resume(char *param1, int param1_len, char *param2, int param2_len,
+                          char *param3, int param3_len, char *param4, int param4_len) {
+   int i;
+#if DEBUG
+   delay_printk("%s(...)\n",__func__);
+#endif
+
+   // remove watcher
+   for (i=0; i<sizeof(wait_watchers)/sizeof(wait_watcher_t); i++) {
+      if (strncmp(wait_watchers[i].name, param2, param2_len) == 0) {
+         // found it!
+         if (!wait_watchers[i].ro) {
+            // not read-only, overwrite
+#if DEBUG
+   delay_printk("REMOVING RESUME for @ %i\n", i);
+#endif
+            wait_watchers[i].cmd = WATCHER_NONE; // no watcher
+         }
+         break;
+      }
+   }
+
    return 0;
 }
 
@@ -1180,10 +1440,43 @@ delay_printk("Trying %s as time parameter\n", output_buf);
 
 int Scen_If(char *param1, int param1_len, char *param2, int param2_len,
              char *param3, int param3_len, char *param4, int param4_len) {
+   int variable;
 #if DEBUG
+   char output_buf[1024];
    delay_printk("%s(...)\n",__func__);
 #endif
-   return 0;
+
+   // find variable
+   if (!string_to_constant(param1, param1_len, &variable)) {
+#if DEBUG
+      delay_printk("ERROR: couldn't decode variable parameter\n");
+#endif
+      scenario_kill();
+      return 0;
+   }
+
+   // check variable
+   if (variable < 0 || variable > 9) {
+#if DEBUG
+      delay_printk("ERROR: variable parameter (%i) invalid\n", variable);
+#endif
+      scenario_kill();
+      return 0;
+   }
+
+   // compare to value
+#if DEBUG
+   memcpy(output_buf, param2, min(param2_len, 1023));
+   output_buf[min(param2_len,1023)] = '\0';
+   delay_printk("---> Compare reg %i: %s to value: %s\n", variable, register_vars[variable], output_buf);
+#endif
+   if (memcmp(param2, register_vars[variable], param2_len) == 0) {
+      // run true cmd
+      return run_sub_command_branch(param3, param3_len);
+   } else {
+      // run false cmd
+      return run_sub_command_branch(param4, param4_len);
+   }
 }
 
 int Scen_DoWait(char *param1, int param1_len, char *param2, int param2_len,
@@ -1215,7 +1508,9 @@ int Scen_DoWait(char *param1, int param1_len, char *param2, int param2_len,
          // found it!
          if (!wait_watchers[i].ro) {
             // not read-only, overwrite
-delay_printk("INSTALLING RESUME for @ %i\n", i);
+#if DEBUG
+   delay_printk("INSTALLING RESUME for @ %i\n", i);
+#endif
             wait_watchers[i].cmd = WATCHER_RESUME; // resume state machine on timeout
          }
          // sleep for the given time
@@ -1251,10 +1546,13 @@ int Scen_DoWait_Resume(char *param1, int param1_len, char *param2, int param2_le
 
    // remove watcher
    for (i=0; i<sizeof(wait_watchers)/sizeof(wait_watcher_t); i++) {
-      if (strncmp(wait_watchers[i].name, param1, param1_len) == 0) {
+      if (strncmp(wait_watchers[i].name, param2, param2_len) == 0) {
          // found it!
          if (!wait_watchers[i].ro) {
             // not read-only, overwrite
+#if DEBUG
+   delay_printk("REMOVING RESUME for @ %i\n", i);
+#endif
             wait_watchers[i].cmd = WATCHER_NONE; // no watcher
          }
          break;
@@ -1275,66 +1573,6 @@ int Scen_DoWait_Resume(char *param1, int param1_len, char *param2, int param2_le
 
    return 0;
 }
-
-int Scen_DoWaitVar(char *param1, int param1_len, char *param2, int param2_len,
-                    char *param3, int param3_len, char *param4, int param4_len) {
-#if DEBUG
-   delay_printk("%s(...)\n",__func__);
-#endif
-   return 0;
-}
-
-int Scen_DoWaitVar_Resume(char *param1, int param1_len, char *param2, int param2_len,
-                           char *param3, int param3_len, char *param4, int param4_len) {
-#if DEBUG
-   delay_printk("%s(...)\n",__func__);
-#endif
-   return 0;
-}
-
-//---------------------------------------------------------------------------
-// netlink command handler for stop commands
-//---------------------------------------------------------------------------
-#if 0
-int nl_stop_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
-    struct nlattr *na;
-    int rc, value = 0;
-    delay_printk("Lifter: handling stop command\n");
-
-    // get attribute from message
-    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
-    if (na) {
-        // grab value from attribute
-        value = nla_get_u8(na); // value is ignored
-        delay_printk("Lifter: received value: %i\n", value);
-
-        // stop motor wherever it is
-        lifter_position_set(LIFTER_POSITION_ERROR_NEITHER);
-        enable_battery_check(1); // enable battery checking while motor is off
-
-        // Stop accessories (will disable them as well)
-        generic_output_event(EVENT_ERROR);
-
-        // prepare response
-        rc = nla_put_u8(skb, GEN_INT8_A_MSG, 1); // value is ignored
-
-        // message creation success?
-        if (rc == 0) {
-            rc = HANDLE_SUCCESS;
-        } else {
-            delay_printk("Lifter: could not create return message\n");
-            rc = HANDLE_FAILURE;
-        }
-    } else {
-        delay_printk("Lifter: could not get attribute\n");
-        rc = HANDLE_FAILURE;
-    }
-    delay_printk("Lifter: returning rc: %i\n", rc);
-
-    // return to let provider send message back
-    return rc;
-}
-#endif
 
 //---------------------------------------------------------------------------
 // netlink command handler for scenario messages
@@ -1364,19 +1602,18 @@ int nl_scenario_handler(struct genl_info *info, struct sk_buff *skb, int cmd, vo
    return rc;
 }
 
-//---------------------------------------------------------------------------
-// netlink command handler for scenario events (every netlink message)
-//---------------------------------------------------------------------------
-int nl_default_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
-   struct nlattr *na;
-   int rc = HANDLE_SUCCESS_NO_REPLY;
-   int value, i;
+void handle_watchers(int cmd, void *data, int data_len) {
+   int i, value;
+#if DEBUG
+   struct timespec time = timespec_sub(current_kernel_time(), sleep_start); // time since start
+   int s = (time.tv_sec * 1000) + (time.tv_nsec / 1000000);
    delay_printk("%s(%i)\n",__func__, cmd);
+#endif
 
-   // handle "netlink command" events
    if (atomic_read(&scenario_running) == 1) {
 #if DEBUG
-      delay_printk("HANDLING CMD %i!\n", cmd);
+      delay_printk("HANDLING CMD %i, with data len %i!\n", cmd, data_len);
+      delay_printk("So far slept for %i milliseconds\n", s);
 #endif
       // look for appropriate watcher
       for (i=0; i<sizeof(wait_watchers)/sizeof(wait_watcher_t); i++) {
@@ -1386,25 +1623,47 @@ int nl_default_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
             switch(wait_watchers[i].cmd) {
                case WATCHER_NONE: break; /* no action */
                case WATCHER_KILL: 
+#if DEBUG
 delay_printk("KILLING!!!\n");
+#endif
                   scenario_kill();
                   break;
                case WATCHER_RESUME:
+#if DEBUG
 delay_printk("RESUMING!!!\n");
+#endif
+                  // reset reserved register variable
+                  if (register_vars[10] != NULL) {
+                     kfree(register_vars[10]);
+                     register_vars[10] = NULL;
+                  }
+                  if (data) {
+                     // set reserved register variable to value from command
+                     register_vars[10] = kmalloc(data_len*2+1, GFP_KERNEL); // allocate twice the space + 1
+                     hex_encode_attr(data, data_len, register_vars[10]); // hex encode
+                     register_vars[10][data_len*2] = '\0'; // double-check it is null terminated
+#if DEBUG
+   delay_printk("---> Saved reg %i: %s\n", 10, register_vars[10]);
+#endif
+                  }
+                  // wake up scenario
                   scen_wake();
                   break;
+               case WATCHER_RESUME_2:
+#if DEBUG
+delay_printk("SLEEPING!!!\n");
+#endif
+                  // keep sleeping once more...
+                  wait_watchers[i].cmd = WATCHER_RESUME; // ... by resuming later
+                  break;
             }
-            break;
+            break; // stop looking for watcher
          }
       }
-   }
 
-   if (cmd == NL_C_EVENT || cmd == NL_C_EVENT_REF) {
-      // get attribute from message
-      na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
-      if (na) {
-         // grab value from attribute
-         value = nla_get_u8(na); // value is ignored
+      if (cmd == NL_C_EVENT || cmd == NL_C_EVENT_REF) {
+         // convert data to u8
+         value = *(u8*) data;
 
          // handle "generic output event" events
          if (atomic_read(&scenario_running) == 1) {
@@ -1420,20 +1679,82 @@ delay_printk("RESUMING!!!\n");
                   switch(wait_watchers[i].cmd) {
                      case WATCHER_NONE: break; /* no action */
                      case WATCHER_KILL: 
+#if DEBUG
 delay_printk("KILLING!!!\n");
+#endif
                         scenario_kill();
                         break;
                      case WATCHER_RESUME:
+#if DEBUG
 delay_printk("RESUMING!!!\n");
+#endif
+                        // no value for events (reset reserved register variable)
+                        if (register_vars[10] != NULL) {
+                           kfree(register_vars[10]);
+                           register_vars[10] = NULL;
+                        }
+                        // wake up scenario
                         scen_wake();
                         break;
+                     case WATCHER_RESUME_2:
+#if DEBUG
+delay_printk("SLEEPING!!!\n");
+#endif
+                        // keep sleeping once more...
+                        wait_watchers[i].cmd = WATCHER_RESUME; // ... by resuming later
+                        break;
                   }
-                  break;
+                  break; // stop looking for watcher
                }
             }
          }
       }
+
    }
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for command events (reflected replies to cmd events)
+//---------------------------------------------------------------------------
+int nl_cmd_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+   struct nlattr *na;
+   int rc = HANDLE_SUCCESS_NO_REPLY;
+   cmd_event_t *cmd_ev;
+#if DEBUG
+   delay_printk("%s(%i)\n",__func__, cmd);
+#endif
+
+   // get attribute from message
+   na = info->attrs[CMD_EVENT_A_MSG]; // accessory message
+   if (na) {
+      // grab actual command from attribute
+      cmd_ev = (cmd_event_t*)nla_data(na);
+      if (cmd_ev != NULL) {
+         handle_watchers(cmd_ev->cmd, cmd_ev->payload, cmd_ev->payload_size);
+      }
+   }
+
+   // return to let provider send message back
+   return rc;
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for scenario events (every netlink message)
+//---------------------------------------------------------------------------
+int nl_default_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+   struct nlattr *na;
+   int rc = HANDLE_SUCCESS_NO_REPLY, s;
+#if DEBUG
+   delay_printk("%s(%i)\n",__func__, cmd);
+#endif
+
+   // handle "netlink command" events
+   na = info->attrs[1]; // first attribute only
+   s = nl_attr_sizes[cmd].size;
+   if (s == -1) {
+      s = nla_len(na);
+   }
+   handle_watchers(cmd, nla_data(na), s);
 
    // return to let provider send message back
    return rc;
@@ -1460,7 +1781,7 @@ static int __init Scenario_init(void) {
         {NL_C_GPS,           nl_default_handler},
         {NL_C_EVENT,         nl_default_handler},
         {NL_C_SLEEP,         nl_default_handler},
-        {NL_C_CMD_EVENT,     nl_default_handler},
+        {NL_C_CMD_EVENT,     nl_cmd_event_handler},
         {NL_C_EVENT_REF,     nl_default_handler},
    };
    struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure

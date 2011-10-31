@@ -128,6 +128,9 @@ void hex_decode_attr(char *hex, int length, char *dest_buf) {
  * Built-in functions:
  * {SetVar;variable;value;junk;junk} // sets a register variable (0-9) to the given string value
  *
+ * {SetVarLast;variable;junk;junk;junk} // sets a register variable (0-9) to the last value received
+ *                                         from an event (will be hex encoded data)
+ *
  * {End;junk;junk;junk;junk}      // ends the scenario (and clears all variables, watchers, etc.)
  *
  * {Send;role;id;attribute;payload}  // sends a netlink command to the given role (1 to R_MAX-1)
@@ -135,6 +138,19 @@ void hex_decode_attr(char *hex, int length, char *dest_buf) {
  *                                   // the attribute is the netlink attribute
  *                                   // the payload is hex encoded (no 0x at the beginning), and has
  *                                      a maximum size of 16 bytes before encoding
+ *                                   // the payload can be be REG_# to use a value from a register
+ *                                      variable rather than a string
+ *
+ * {SendWait;role;id;payload;time}   // sends a netlink command to the given role (1 to R_MAX-1)
+ *                                   // the command id is the netlink command id
+ *                                   // the payload is hex encoded (no 0x at the beginning), and has
+ *                                      a maximum size of 16 bytes before encoding
+ *                                   // the payload can be be REG_# to use a value from a register
+ *                                      variable rather than a string
+ *                                   // the time is the timeout value
+ *                                   // the attribute is the netlink attribute
+ *                                   // the attribute is assumed to be 1
+ *                                   // nothing happens on timeout
  *
  * {Nothing;junk;junk;junk;junk}  // does nothing
  *
@@ -147,23 +163,17 @@ void hex_decode_attr(char *hex, int length, char *dest_buf) {
  *                                        "until" is received or "time" in milliseconds has passed
  *                                     // if milliseconds "time" has passed, command "timeout_cmd"
  *                                        is ran before moving on
- * {DoWaitVar;var;value;time;timeout_cmd} // does nothing until register variable "var" is "value"
- *                                           or "time" in milliseconds has passed
- *                                        // if milliseconds "time" has passed, "timeout_cmd"
- *                                           is ran before moving on
  *
- * Not Yet Implimented:
- *  -- SetVar
- *  -- End
- *  -- If
- *  -- DoWaitVar
  *
  * Notes:
  *  -- Events, for the purpose of scenarios are defined as Netlink Commands and their corresponding
  *     attributes AND Netlink Commands of type "NL_C_EVENT" (without any attribute value)
  *  -- Events are given as the string representation as defined in netlink_shared.h and
  *     target_generic_output.h
- *  -- Commands ran from DoWait and DoWaitVar can not call DoWait, DoWaitVar, or Delay 
+ *  -- Commands ran from ScenWait and DoWait can not call ScenWait, DoWait or Delay 
+ *  -- Commands ran from If can not call If
+ *  -- Commands ran from If should not change the value of the register variable compared when
+ *     a sub command sleeps
  *  -- The entire scenario has a maximum length of 65536 bytes, but scenarios that long may well
  *     run out of memory well before completion, depending on the complexity of the scenario
  *  -- A more general rule-of-thumb for scenario size should be no more than 4 layers deep on
