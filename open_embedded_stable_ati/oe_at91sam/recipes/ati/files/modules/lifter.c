@@ -587,6 +587,7 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
                         delay_printk("Lifter: Couldn't fill in s*** for MILES data\n");
                         break;
                 }
+                acc_c->request=0; // not a request anymore
 
                 delay_printk("Lifter: Returning Accessory data\n");
                 nla_put(skb, ACC_A_MSG, sizeof(struct accessory_conf), acc_c);
