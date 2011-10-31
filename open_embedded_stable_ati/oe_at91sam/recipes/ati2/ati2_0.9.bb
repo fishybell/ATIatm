@@ -88,7 +88,7 @@ do_install () {
     install -m 644 ${WORKDIR}/BASE ${D}/usr/bin
     install -m 644 ${WORKDIR}/HHC ${D}/usr/bin
     install -m 644 ${WORKDIR}/none ${D}/usr/bin
-    install -m 644 ${WORKDIR}/clients ${D}/usr/bin
+    install -m 755 ${WORKDIR}/clients ${D}/usr/bin
 #    install -m 755 ${WORKDIR}/*.tcl ${D}/usr/bin
     install -m 644 ${WORKDIR}/*.fw ${D}/lib/firmware
     install -m 644 ${WORKDIR}/*.bin ${D}/lib/firmware
