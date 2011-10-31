@@ -40,17 +40,19 @@ int main(int argc, char *argv[]) {
       char control[512];
    } control;
    int res;
+   int timeout = -1;
+
+
+   int port = PORT;
+   int number = 1;
+   int multiple = 0;
 
    /* install signal handlers */
    signal(SIGINT, quitproc);
    signal(SIGQUIT, quitproc);
 
-
-   /* parse argv for command line arguments: */
-   int port = PORT;
-   int number = 1;
-   int multiple = 0;
    
+   /* parse argv for command line arguments: */
 const char *usage = "Usage: %s [options]\n\
 \t-p X   -- listen on port X rather than the default \n\
 \t-n X   -- wait for X broadcasts rather than one \n";
@@ -74,6 +76,7 @@ const char *usage = "Usage: %s [options]\n\
                return 1;
             }
             multiple = 1;
+            timeout = 4000 * number; // wait 4 seconds for each client
             break;
          case 'h' :
             printf(usage, argv[0]);
@@ -147,7 +150,13 @@ const char *usage = "Usage: %s [options]\n\
 
    /* poll once */
    while(!close_nicely) {
-      nfds = epoll_wait(kdpfd, events, MAX_EVENTS, -1);
+      nfds = epoll_wait(kdpfd, events, MAX_EVENTS, timeout);
+
+      /* timed out? */
+      if (nfds == 0) {
+         /* break out of loop */
+         close_nicely = 1;
+      }
        
       /* check all ready sockets */
       for(i = 0; i < nfds && !close_nicely; ++i) {
@@ -186,6 +195,8 @@ const char *usage = "Usage: %s [options]\n\
             if (--number == 0) {
                /* break out of loop */
                close_nicely = 1;
+            } else if (multiple) {
+               timeout -= 4000; // one less to worry about, wait 4 seconds less
             }
          }
       }
