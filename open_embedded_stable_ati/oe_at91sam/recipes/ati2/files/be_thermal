@@ -1,0 +1,4 @@
+echo -n "Are there thermals (0-no, 1-yes)?: "
+read thm
+size=$(echo $thm | wc -c)
+echo -n $thm | /usr/bin/eeprom_rw write -addr 0x3C0 -size $size -blank 0x04
