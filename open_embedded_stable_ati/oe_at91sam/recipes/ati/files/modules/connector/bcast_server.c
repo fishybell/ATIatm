@@ -125,14 +125,15 @@ const char *usage = "Usage: %s [options]\n\
    {
        /* send packet on both address, ignoring failures */
        if (sendto(sender1, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0) {
-           perror("1:");
+           //perror("1:");
        }
        if (sendto(sender2, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr_avahi, sizeof(serveraddr_avahi)) < 0) {
-           perror("2:");
+           //perror("2:");
        }
        if (wifion) {
            if (sendto(sender3, &packet_out, sizeof(packet_out), 0,(struct sockaddr *) &serveraddr_wifi, sizeof(serveraddr_wifi)) < 0) {
-               perror("3:");
+               //perror("3:");
+
                wifion = 0;
            }
        } else {

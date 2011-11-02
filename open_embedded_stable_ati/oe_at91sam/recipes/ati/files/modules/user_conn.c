@@ -387,15 +387,15 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     // default parameters
     int param1, param2, param3, param4, fparam1, fparam2, sparam1, sparam2;
     int nparam1, nparam2, nparam3, nparam4, nparam5, nparam6, nparam7, nparam8;
-    int nparam9, nparam10, nparam11, nparam12;
+    int nparam9, nparam10, nparam11, nparam12, nexists;
     int gparam1, gparam2, gparam3, gparam4, gparam5, gparam6, gparam7, gparam8;
-    int gparam9, gparam10, gparam11, gparam12;
+    int gparam9, gparam10, gparam11, gparam12, gexists;
     int pparam1, pparam2, pparam3, pparam4, pparam5, pparam6, pparam7, pparam8;
-    int pparam9, pparam10, pparam11, pparam12;
+    int pparam9, pparam10, pparam11, pparam12, pexists;
     int kparam1, kparam2, kparam3, kparam4, kparam5, kparam6, kparam7, kparam8;
-    int kparam9, kparam10, kparam11, kparam12;
+    int kparam9, kparam10, kparam11, kparam12, kexists;
     int tparam1, tparam2, tparam3, tparam4, tparam5, tparam6, tparam7, tparam8;
-    int tparam9, tparam10, tparam11, tparam12;
+    int tparam9, tparam10, tparam11, tparam12, texists;
     int eparam1, eparam2;
     char eparam3[5];
 	int farg1;
@@ -535,31 +535,31 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         sprintf(ebuf2, "%i", eparam2);
                         switch (eparam1) {
                            case 1:	// SIT
-                              snprintf(wbuf, 1024, "I E %s\n", writeEeprom(SIT_BATTERY_LOC, strlen(ebuf2)+1, SIT_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E SIT %s\n", writeEeprom(SIT_BATTERY_LOC, strlen(ebuf2)+1, SIT_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 2:	// SAT
-                              snprintf(wbuf, 1024, "I E %s\n", writeEeprom(SAT_BATTERY_LOC, strlen(ebuf2)+1, SAT_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E SAT %s\n", writeEeprom(SAT_BATTERY_LOC, strlen(ebuf2)+1, SAT_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 3:	// SES
-                              snprintf(wbuf, 1024, "I E %s\n", writeEeprom(SES_BATTERY_LOC, strlen(ebuf2)+1, SES_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E SES %s\n", writeEeprom(SES_BATTERY_LOC, strlen(ebuf2)+1, SES_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 4:	// MIT
-                              snprintf(wbuf, 1024, "I E %s\n", writeEeprom(MIT_BATTERY_LOC, strlen(ebuf2)+1, MIT_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E MIT %s\n", writeEeprom(MIT_BATTERY_LOC, strlen(ebuf2)+1, MIT_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 5:	// MAT
-                              snprintf(wbuf, 1024, "I E %s\n", writeEeprom(MAT_BATTERY_LOC, strlen(ebuf2)+1, MAT_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E MAT %s\n", writeEeprom(MAT_BATTERY_LOC, strlen(ebuf2)+1, MAT_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 6:	// MIT Mover Type
-                              snprintf(wbuf, 1024, "I E %s\n", writeEeprom(MIT_MOVER_TYPE_LOC, strlen(ebuf2)+1, MIT_MOVER_TYPE_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E MIT TYPE %s\n", writeEeprom(MIT_MOVER_TYPE_LOC, strlen(ebuf2)+1, MIT_MOVER_TYPE_SIZE, ebuf2)); 
                               break;
                            case 7:	// MIT Reverse
-                              snprintf(wbuf, 1024, "I E %s\n", writeEeprom(MIT_REVERSE_LOC, strlen(ebuf2)+1, MIT_REVERSE_SIZE, ebuf2));
+                              snprintf(wbuf, 1024, "I E MIT REVERSE %s\n", writeEeprom(MIT_REVERSE_LOC, strlen(ebuf2)+1, MIT_REVERSE_SIZE, ebuf2));
                               break;
                            case 8:	// MAT Mover Type
-                              snprintf(wbuf, 1024, "I E %s\n", writeEeprom(MAT_MOVER_TYPE_LOC, strlen(ebuf2)+1, MAT_MOVER_TYPE_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E MAT TYPE %s\n", writeEeprom(MAT_MOVER_TYPE_LOC, strlen(ebuf2)+1, MAT_MOVER_TYPE_SIZE, ebuf2)); 
                               break;
                            case 9:	// MAT Reverse
-                              snprintf(wbuf, 1024, "I E %s\n", writeEeprom(MAT_REVERSE_LOC, strlen(ebuf2)+1, MAT_REVERSE_SIZE, ebuf2));
+                              snprintf(wbuf, 1024, "I E MAT REVERSE %s\n", writeEeprom(MAT_REVERSE_LOC, strlen(ebuf2)+1, MAT_REVERSE_SIZE, ebuf2));
                               break;
                            default:
                               snprintf(wbuf, 1024, "Please choose a correct parameter\n(1-SIT|2-SAT|3-SES|4-MIT|5-MAT|6-MIT Mover Type|7-MIT Reverse|8-MAT Mover Type|9-MAT Reverse\n");
@@ -575,63 +575,63 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                            if (!isNumber(bat1)) {  //revert to default value
                               sprintf(bat1, "%i", SIT_BATTERY);
                            }
-                           snprintf(wbuf, 1024, "I E %s\n", bat1);
+                           snprintf(wbuf, 1024, "I E SIT %s\n", bat1);
                         } else if (memcmp(eparam3, "sat", 3)==0 || memcmp(eparam3, "SAT", 3)==0) {	// read SAT battery default
                            memset(bat2, 0, BATTERY_SIZE+1);
                            memcpy(bat2,readEeprom(SAT_BATTERY_LOC, SAT_BATTERY_SIZE), BATTERY_SIZE);
                            if (!isNumber(bat2)) {  //revert to default value
                               sprintf(bat2, "%i", SAT_BATTERY);
                            }
-                           snprintf(wbuf, 1024, "I E %s\n", bat2);
+                           snprintf(wbuf, 1024, "I E SAT %s\n", bat2);
                         } else if (memcmp(eparam3, "ses", 3)==0 || memcmp(eparam3, "SES", 3)==0) {	// read SES battery default
                            memset(bat3, 0, BATTERY_SIZE+1);
                            memcpy(bat3,readEeprom(SES_BATTERY_LOC, SES_BATTERY_SIZE), BATTERY_SIZE);
                            if (!isNumber(bat3)) {  //revert to default value
                               sprintf(bat3, "%i", SES_BATTERY);
                            }
-                           snprintf(wbuf, 1024, "I E %s\n", bat3);
+                           snprintf(wbuf, 1024, "I E SES %s\n", bat3);
                         } else if (memcmp(eparam3, "mit", 3)==0 || memcmp(eparam3, "MIT", 3)==0) {	// read MIT battery default
                            memset(bat4, 0, BATTERY_SIZE+1);
                            memcpy(bat4,readEeprom(MIT_BATTERY_LOC, MIT_BATTERY_SIZE), BATTERY_SIZE);
                            if (!isNumber(bat4)) {  //revert to default value
                               sprintf(bat4, "%i", MIT_BATTERY);
                            }
-                           snprintf(wbuf, 1024, "I E %s\n", bat4);
+                           snprintf(wbuf, 1024, "I E MIT %s\n", bat4);
                         } else if (memcmp(eparam3, "mat", 3)==0 || memcmp(eparam3, "MAT", 3)==0) {	// read MAT battery default
                            memset(bat5, 0, BATTERY_SIZE+1);
                            memcpy(bat5,readEeprom(MAT_BATTERY_LOC, MAT_BATTERY_SIZE), BATTERY_SIZE);
                            if (!isNumber(bat5)) {  //revert to default value
                               sprintf(bat5, "%i", MAT_BATTERY);
                            }
-                           snprintf(wbuf, 1024, "I E %s\n", bat5);
-                        } else if (memcmp(eparam3, "type_mit", 8)==0 || memcmp(eparam3, "type_mit", 8)==0) {// read MIT mover type
+                           snprintf(wbuf, 1024, "I E MAT %s\n", bat5);
+                        } else if (memcmp(eparam3, "TYPE_MIT", 8)==0 || memcmp(eparam3, "type_mit", 8)==0) {// read MIT mover type
                            memset(bat6, 0, MOVER_SIZE+1);
                            memcpy(bat6,readEeprom(MIT_MOVER_TYPE_LOC, MIT_MOVER_TYPE_SIZE), MOVER_SIZE);
                            if (!isNumber(bat6)) {  //revert to default value
                               sprintf(bat6, "%i", MIT_MOVER_TYPE);
                            }
-                           snprintf(wbuf, 1024, "I E %s\n", bat6);
+                           snprintf(wbuf, 1024, "I E MIT TYPE %s\n", bat6);
                         } else if (memcmp(eparam3, "reverse_mit", 11)==0 || memcmp(eparam3, "REVERSE_MIT", 11)==0) {	// read MIT reverse
                           memset(bat7, 0, MOVER_SIZE+1);
                            memcpy(bat7,readEeprom(MIT_REVERSE_LOC, MIT_REVERSE_SIZE), MOVER_SIZE);
                            if (!isNumber(bat7)) {  //revert to default value
                               sprintf(bat7, "%i", MIT_REVERSE);
                            }
-                           snprintf(wbuf, 1024, "I E %s\n", bat7);
+                           snprintf(wbuf, 1024, "I E MIT REVERSE %s\n", bat7);
                         } else if (memcmp(eparam3, "type_mat", 8)==0 || memcmp(eparam3, "TYPE_MAT", 8)==0) {// read MAT mover type
                            memset(bat8, 0, MOVER_SIZE+1);
                            memcpy(bat8,readEeprom(MAT_MOVER_TYPE_LOC, MAT_MOVER_TYPE_SIZE), MOVER_SIZE);
                            if (!isNumber(bat8)) {  //revert to default value
                               sprintf(bat8, "%i", MAT_MOVER_TYPE);
                            }
-                           snprintf(wbuf, 1024, "I E %s\n", bat8);
+                           snprintf(wbuf, 1024, "I E MAT TYPE %s\n", bat8);
                         } else if (memcmp(eparam3, "reverse_mat", 11)==0 || memcmp(eparam3, "REVERSE_MAT", 11)==0) {	// read MAT reverse
                           memset(bat9, 0, MOVER_SIZE+1);
                            memcpy(bat9,readEeprom(MAT_REVERSE_LOC, MAT_REVERSE_SIZE), MOVER_SIZE);
                            if (!isNumber(bat9)) {  //revert to default value
                               sprintf(bat9, "%i", MAT_REVERSE);
                            }
-                           snprintf(wbuf, 1024, "I E %s\n", bat9);
+                           snprintf(wbuf, 1024, "I E MAT REVERSE %s\n", bat9);
                         } else {
                            snprintf(wbuf, 1024, "I E Incorrect Format\n");
                         }
@@ -663,10 +663,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      }
                      break;
                   case 'G': case 'g':	   // Moon Glow defaults
-                        if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i", &gparam1, &gparam2, &gparam3, &gparam4, &gparam5, &gparam6, &gparam7, &gparam8, &gparam9, &gparam10, &gparam11, &gparam12) == 12) {        // write
-                        char gbuf1[5], gbuf2[5], gbuf3[5], gbuf4[5];  
+                        if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &gexists, &gparam1, &gparam2, &gparam3, &gparam4, &gparam5, &gparam6, &gparam7, &gparam8, &gparam9, &gparam10, &gparam11, &gparam12) == 13) {        // write
+                        char mglExist[5], gbuf1[5], gbuf2[5], gbuf3[5], gbuf4[5];  
                         char gbuf5[5], gbuf6[5], gbuf7[5], gbuf8[5];    
-                        char gbuf9[5], gbuf10[5], gbuf11[5], gbuf12[5];                      
+                        char gbuf9[5], gbuf10[5], gbuf11[5], gbuf12[5];
+						//exists
+						sprintf(mglExist, "%i", gexists);                      
                         // activate
                         sprintf(gbuf1, "%i", gparam1);
                         // activate on what kind of exposure
@@ -692,7 +694,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         // ex3
                         sprintf(gbuf12, "%i", gparam12);
 						// write all the mfs defaults
-                        snprintf(wbuf, 1024, "I G %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+                        snprintf(wbuf, 1024, "I G %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
+    writeEeprom(MGL_EXISTS_LOC, strlen(mglExist)+1, MGL_EXISTS_SIZE, mglExist), 
 	writeEeprom(MGL_ACTIVATE_LOC, strlen(gbuf1)+1, MGL_ACTIVATE_SIZE, gbuf1),
     writeEeprom(MGL_ACTIVATE_EXPOSE_LOC, strlen(gbuf2)+1, MGL_ACTIVATE_EXPOSE_SIZE, gbuf2), 
     writeEeprom(MGL_ACTIVATE_ON_HIT_LOC, strlen(gbuf3)+1, MGL_ACTIVATE_ON_HIT_SIZE, gbuf3), 
@@ -706,7 +709,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     writeEeprom(MGL_EX2_LOC, strlen(gbuf11)+1, MGL_EX2_SIZE, gbuf11),
     writeEeprom(MGL_EX3_LOC, strlen(gbuf12)+1, MGL_EX3_SIZE, gbuf12));
                      } else {	// read
-						char mgl1[MGL_SIZE+1], mgl2[MGL_SIZE+1], mgl3[MGL_SIZE+1], mgl4[MGL_SIZE+1], mgl5[MGL_SIZE+1], mgl6[MGL_SIZE+1], mgl7[MGL_SIZE+1], mgl8[MGL_SIZE+1], mgl9[MGL_SIZE+1], mgl10[MGL_SIZE+1], mgl11[MGL_SIZE+1], mgl12[MGL_SIZE+1];
+						char mglExists[MGL_SIZE+1], mgl1[MGL_SIZE+1], mgl2[MGL_SIZE+1], mgl3[MGL_SIZE+1], mgl4[MGL_SIZE+1], mgl5[MGL_SIZE+1], mgl6[MGL_SIZE+1], mgl7[MGL_SIZE+1], mgl8[MGL_SIZE+1], mgl9[MGL_SIZE+1], mgl10[MGL_SIZE+1], mgl11[MGL_SIZE+1], mgl12[MGL_SIZE+1];
+                        memset(mglExists, 0, MGL_SIZE+1);
+						memcpy(mglExists,readEeprom(MGL_EXISTS_LOC, MGL_EXISTS_SIZE), MGL_SIZE);
+                        if (!isNumber(mglExists)) {  //revert to default value
+                           sprintf(mglExists, "%i", MGL_EXISTS);
+                        }
 						memset(mgl1, 0, MGL_SIZE+1);
 						memcpy(mgl1,readEeprom(MGL_ACTIVATE_LOC, MGL_ACTIVATE_SIZE), MGL_SIZE);
                         if (!isNumber(mgl1)) {  //revert to default value
@@ -767,7 +775,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         if (!isNumber(mgl12)) {  //revert to default value
                            sprintf(mgl12, "%i", MGL_EX3);
                         }
-                        snprintf(wbuf, 1024, "I G %s %s %s %s %s %s %s %s %s %s %s %s\n", mgl1, mgl2, mgl3, mgl4, mgl5, mgl6, mgl7, mgl8, mgl9, mgl10, mgl11, mgl12);
+                        snprintf(wbuf, 1024, "I G %s %s %s %s %s %s %s %s %s %s %s %s %s\n", mglExists, mgl1, mgl2, mgl3, mgl4, mgl5, mgl6, mgl7, mgl8, mgl9, mgl10, mgl11, mgl12);
                         
                      }
                      break;
@@ -818,10 +826,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      }
                      break;
                   case 'K': case 'k':	   // SMK (smoke) defaults
-                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i", &kparam1, &kparam2, &kparam3, &kparam4, &kparam5, &kparam6, &kparam7, &kparam8, &kparam9, &kparam10, &kparam11, &kparam12) == 12) {        // write
-                        char kbuf1[5], kbuf2[5], kbuf3[5], kbuf4[5];  
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &kexists, &kparam1, &kparam2, &kparam3, &kparam4, &kparam5, &kparam6, &kparam7, &kparam8, &kparam9, &kparam10, &kparam11, &kparam12) == 13) {        // write
+                        char smkExist[5], kbuf1[5], kbuf2[5], kbuf3[5], kbuf4[5];  
                         char kbuf5[5], kbuf6[5], kbuf7[5], kbuf8[5];    
-                        char kbuf9[5], kbuf10[5], kbuf11[5], kbuf12[5];                      
+                        char kbuf9[5], kbuf10[5], kbuf11[5], kbuf12[5];  
+                        // exists
+                        sprintf(smkExist, "%i", kexists);                    
                         // activate
                         sprintf(kbuf1, "%i", kparam1);
                         // activate on what kind of exposure
@@ -847,7 +857,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         // ex3
                         sprintf(kbuf12, "%i", kparam12);
 						// write all the mfs defaults
-                        snprintf(wbuf, 1024, "I K %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+                        snprintf(wbuf, 1024, "I K %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+    writeEeprom(SMK_EXISTS_LOC, strlen(smkExist)+1, SMK_EXISTS_SIZE, smkExist),
 	writeEeprom(SMK_ACTIVATE_LOC, strlen(kbuf1)+1, SMK_ACTIVATE_SIZE, kbuf1),
     writeEeprom(SMK_ACTIVATE_EXPOSE_LOC, strlen(kbuf2)+1, SMK_ACTIVATE_EXPOSE_SIZE, kbuf2), 
     writeEeprom(SMK_ACTIVATE_ON_HIT_LOC, strlen(kbuf3)+1, SMK_ACTIVATE_ON_HIT_SIZE, kbuf3), 
@@ -861,7 +872,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     writeEeprom(SMK_EX2_LOC, strlen(kbuf11)+1, SMK_EX2_SIZE, kbuf11),
     writeEeprom(SMK_EX3_LOC, strlen(kbuf12)+1, SMK_EX3_SIZE, kbuf12));
                      } else {	// read
-						char smk1[SMK_SIZE+1], smk2[SMK_SIZE+1], smk3[SMK_SIZE+1], smk4[SMK_SIZE+1], smk5[SMK_SIZE+1], smk6[SMK_SIZE+1], smk7[SMK_SIZE+1], smk8[SMK_SIZE+1], smk9[SMK_SIZE+1], smk10[SMK_SIZE+1], smk11[SMK_SIZE+1], smk12[MFS_SIZE+1];
+						char smkExists[SMK_SIZE+1], smk1[SMK_SIZE+1], smk2[SMK_SIZE+1], smk3[SMK_SIZE+1], smk4[SMK_SIZE+1], smk5[SMK_SIZE+1], smk6[SMK_SIZE+1], smk7[SMK_SIZE+1], smk8[SMK_SIZE+1], smk9[SMK_SIZE+1], smk10[SMK_SIZE+1], smk11[SMK_SIZE+1], smk12[MFS_SIZE+1];
+                        memset(smkExists, 0, SMK_SIZE+1);
+						memcpy(smkExists,readEeprom(SMK_EXISTS_LOC, SMK_EXISTS_SIZE), SMK_SIZE);
+                        if (!isNumber(smkExists)) {  //revert to default value
+                           sprintf(smkExists, "%i", SMK_EXISTS);
+                        }
 						memset(smk1, 0, SMK_SIZE+1);
 						memcpy(smk1,readEeprom(SMK_ACTIVATE_LOC, SMK_ACTIVATE_SIZE), SMK_SIZE);
                         if (!isNumber(smk1)) {  //revert to default value
@@ -922,7 +938,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         if (!isNumber(smk12)) {  //revert to default value
                            sprintf(smk12, "%i", SMK_EX3);
                         }
-                        snprintf(wbuf, 1024, "I K %s %s %s %s %s %s %s %s %s %s %s %s\n", smk1, smk2, smk3, smk4, smk5, smk6, smk7, smk8, smk9, smk10, smk11, smk12);
+                        snprintf(wbuf, 1024, "I K %s %s %s %s %s %s %s %s %s %s %s %s %s\n", smkExists, smk1, smk2, smk3, smk4, smk5, smk6, smk7, smk8, smk9, smk10, smk11, smk12);
                         
                      }
                      break;
@@ -945,10 +961,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      }
                      break;
                   case 'N': case 'n':	   // MFS defaults
-                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i", &nparam1, &nparam2, &nparam3, &nparam4, &nparam5, &nparam6, &nparam7, &nparam8, &nparam9, &nparam10, &nparam11, &nparam12) == 12) {        // write
-                        char nbuf1[5], nbuf2[5], nbuf3[5], nbuf4[5];  
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &nexists, &nparam1, &nparam2, &nparam3, &nparam4, &nparam5, &nparam6, &nparam7, &nparam8, &nparam9, &nparam10, &nparam11, &nparam12) == 13) {        // write
+                        char mfsExist[5], nbuf1[5], nbuf2[5], nbuf3[5], nbuf4[5];  
                         char nbuf5[5], nbuf6[5], nbuf7[5], nbuf8[5];    
-                        char nbuf9[5], nbuf10[5], nbuf11[5], nbuf12[5];                      
+                        char nbuf9[5], nbuf10[5], nbuf11[5], nbuf12[5];  
+                        // exists
+                        sprintf(mfsExist, "%i", nexists);                
                         // activate
                         sprintf(nbuf1, "%i", nparam1);
                         // activate on what kind of exposure
@@ -974,7 +992,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         // ex3
                         sprintf(nbuf12, "%i", nparam12);
 						// write all the mfs defaults
-                        snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+                        snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+    writeEeprom(MFS_EXISTS_LOC, strlen(mfsExist)+1, MFS_EXISTS_SIZE, mfsExist),
 	writeEeprom(MFS_ACTIVATE_LOC, strlen(nbuf1)+1, MFS_ACTIVATE_SIZE, nbuf1),
     writeEeprom(MFS_ACTIVATE_EXPOSE_LOC, strlen(nbuf2)+1, MFS_ACTIVATE_EXPOSE_SIZE, nbuf2), 
     writeEeprom(MFS_ACTIVATE_ON_HIT_LOC, strlen(nbuf3)+1, MFS_ACTIVATE_ON_HIT_SIZE, nbuf3), 
@@ -988,7 +1007,13 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     writeEeprom(MFS_EX2_LOC, strlen(nbuf11)+1, MFS_EX2_SIZE, nbuf11),
     writeEeprom(MFS_EX3_LOC, strlen(nbuf12)+1, MFS_EX3_SIZE, nbuf12));
                      } else {	// read
-						char mfs1[MFS_SIZE+1], mfs2[MFS_SIZE+1], mfs3[MFS_SIZE+1], mfs4[MFS_SIZE+1], mfs5[MFS_SIZE+1], mfs6[MFS_SIZE+1], mfs7[MFS_SIZE+1], mfs8[MFS_SIZE+1], mfs9[MFS_SIZE+1], mfs10[MFS_SIZE+1], mfs11[MFS_SIZE+1], mfs12[MFS_SIZE+1];
+						char mfsExists[MFS_SIZE+1], mfs1[MFS_SIZE+1], mfs2[MFS_SIZE+1], mfs3[MFS_SIZE+1], mfs4[MFS_SIZE+1], mfs5[MFS_SIZE+1], mfs6[MFS_SIZE+1], mfs7[MFS_SIZE+1], mfs8[MFS_SIZE+1], mfs9[MFS_SIZE+1], mfs10[MFS_SIZE+1], mfs11[MFS_SIZE+1], mfs12[MFS_SIZE+1];
+						// exists
+						memset(mfsExists, 0, MFS_SIZE+1);
+						memcpy(mfsExists,readEeprom(MFS_EXISTS_LOC, MFS_EXISTS_SIZE), MFS_SIZE);
+						if (!isNumber(mfsExists)) {  //revert to default value
+                           sprintf(mfsExists, "%i", MFS_EXISTS);
+                        }
 						memset(mfs1, 0, MFS_SIZE+1);
 						memcpy(mfs1,readEeprom(MFS_ACTIVATE_LOC, MFS_ACTIVATE_SIZE), MFS_SIZE);
                         if (!isNumber(mfs1)) {  //revert to default value
@@ -1049,15 +1074,17 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         if (!isNumber(mfs12)) {  //revert to default value
                            sprintf(mfs12, "%i", MFS_EX3);
                         }
-                        snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s\n", mfs1, mfs2, mfs3, mfs4, mfs5, mfs6, mfs7, mfs8, mfs9, mfs10, mfs11, mfs12);
+                        snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s %s\n", mfsExists, mfs1, mfs2, mfs3, mfs4, mfs5, mfs6, mfs7, mfs8, mfs9, mfs10, mfs11, mfs12);
                         
                      }
                      break;
                   case 'P': case 'p':      // PHI defaults
-                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i", &pparam1, &pparam2, &pparam3, &pparam4, &pparam5, &pparam6, &pparam7, &pparam8, &pparam9, &pparam10, &pparam11, &pparam12) == 12) {        // write
-                        char pbuf1[5], pbuf2[5], pbuf3[5], pbuf4[5];  
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &pexists, &pparam1, &pparam2, &pparam3, &pparam4, &pparam5, &pparam6, &pparam7, &pparam8, &pparam9, &pparam10, &pparam11, &pparam12) == 13) {        // write
+                        char phiExist[5], pbuf1[5], pbuf2[5], pbuf3[5], pbuf4[5];  
                         char pbuf5[5], pbuf6[5], pbuf7[5], pbuf8[5];    
-                        char pbuf9[5], pbuf10[5], pbuf11[5], pbuf12[5];                      
+                        char pbuf9[5], pbuf10[5], pbuf11[5], pbuf12[5];  
+                        // exists
+                        sprintf(phiExist, "%i", pexists);                    
                         // activate
                         sprintf(pbuf1, "%i", pparam1);
                         // activate on what kind of exposure
@@ -1083,7 +1110,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         // ex3
                         sprintf(pbuf12, "%i", pparam12);
 						// write all the phi defaults
-                        snprintf(wbuf, 1024, "I P %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+                        snprintf(wbuf, 1024, "I P %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+    writeEeprom(PHI_EXISTS_LOC, strlen(phiExist)+1, PHI_EXISTS_SIZE, phiExist),
 	writeEeprom(PHI_ACTIVATE_LOC, strlen(pbuf1)+1, PHI_ACTIVATE_SIZE, pbuf1),
     writeEeprom(PHI_ACTIVATE_EXPOSE_LOC, strlen(pbuf2)+1, PHI_ACTIVATE_EXPOSE_SIZE, pbuf2), 
     writeEeprom(PHI_ACTIVATE_ON_HIT_LOC, strlen(pbuf3)+1, PHI_ACTIVATE_ON_HIT_SIZE, pbuf3), 
@@ -1097,7 +1125,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     writeEeprom(PHI_EX2_LOC, strlen(pbuf11)+1, PHI_EX2_SIZE, pbuf11),
     writeEeprom(PHI_EX3_LOC, strlen(pbuf12)+1, PHI_EX3_SIZE, pbuf12));
                      } else {	// read
-						char phi1[PHI_SIZE+1], phi2[PHI_SIZE+1], phi3[PHI_SIZE+1], phi4[PHI_SIZE+1], phi5[PHI_SIZE+1], phi6[PHI_SIZE+1], phi7[PHI_SIZE+1], phi8[PHI_SIZE+1], phi9[PHI_SIZE+1], phi10[PHI_SIZE+1], phi11[PHI_SIZE+1], phi12[PHI_SIZE+1];
+						char phiExists[PHI_SIZE+1], phi1[PHI_SIZE+1], phi2[PHI_SIZE+1], phi3[PHI_SIZE+1], phi4[PHI_SIZE+1], phi5[PHI_SIZE+1], phi6[PHI_SIZE+1], phi7[PHI_SIZE+1], phi8[PHI_SIZE+1], phi9[PHI_SIZE+1], phi10[PHI_SIZE+1], phi11[PHI_SIZE+1], phi12[PHI_SIZE+1];
+                        memset(phiExists, 0, PHI_SIZE+1);
+						memcpy(phiExists,readEeprom(PHI_EXISTS_LOC, PHI_EXISTS_SIZE), PHI_SIZE);
+                        if (!isNumber(phiExists)) {  //revert to default value
+                           sprintf(phiExists, "%i", PHI_EXISTS);
+                        }
 						memset(phi1, 0, PHI_SIZE+1);
 						memcpy(phi1,readEeprom(PHI_ACTIVATE_LOC, PHI_ACTIVATE_SIZE), PHI_SIZE);
                         if (!isNumber(phi1)) {  //revert to default value
@@ -1158,7 +1191,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         if (!isNumber(phi12)) {  //revert to default value
                            sprintf(phi12, "%i", PHI_EX3);
                         }
-                        snprintf(wbuf, 1024, "I P %s %s %s %s %s %s %s %s %s %s %s %s\n", phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9, phi10, phi11, phi12);
+                        snprintf(wbuf, 1024, "I P %s %s %s %s %s %s %s %s %s %s %s %s %s\n", phiExists, phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9, phi10, phi11, phi12);
                         
                      }
                      break;
@@ -1193,10 +1226,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      }
                      break;
                   case 'T': case 't':	   // Thermal defaults
-                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i", &tparam1, &tparam2, &tparam3, &tparam4, &tparam5, &tparam6, &tparam7, &tparam8, &tparam9, &tparam10, &tparam11, &tparam12) == 12) {        // write
-                        char tbuf1[5], tbuf2[5], tbuf3[5], tbuf4[5];  
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &texists, &tparam1, &tparam2, &tparam3, &tparam4, &tparam5, &tparam6, &tparam7, &tparam8, &tparam9, &tparam10, &tparam11, &tparam12) == 13) {        // write
+                        char thmExist[5], tbuf1[5], tbuf2[5], tbuf3[5], tbuf4[5];  
                         char tbuf5[5], tbuf6[5], tbuf7[5], tbuf8[5];    
-                        char tbuf9[5], tbuf10[5], tbuf11[5], tbuf12[5];                      
+                        char tbuf9[5], tbuf10[5], tbuf11[5], tbuf12[5]; 
+                        // exists
+                        sprintf(thmExist, "%i", texists);                     
                         // activate
                         sprintf(tbuf1, "%i", tparam1);
                         // activate on what kind of exposure
@@ -1222,7 +1257,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         // ex3
                         sprintf(tbuf12, "%i", tparam12);
 						// write all the thm defaults
-                        snprintf(wbuf, 1024, "I T %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+                        snprintf(wbuf, 1024, "I T %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+    writeEeprom(THM_EXISTS_LOC, strlen(thmExist)+1, THM_EXISTS_SIZE, thmExist),
 	writeEeprom(THM_ACTIVATE_LOC, strlen(tbuf1)+1, THM_ACTIVATE_SIZE, tbuf1),
     writeEeprom(THM_ACTIVATE_EXPOSE_LOC, strlen(tbuf2)+1, THM_ACTIVATE_EXPOSE_SIZE, tbuf2), 
     writeEeprom(THM_ACTIVATE_ON_HIT_LOC, strlen(tbuf3)+1, THM_ACTIVATE_ON_HIT_SIZE, tbuf3), 
@@ -1236,7 +1272,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     writeEeprom(THM_EX2_LOC, strlen(tbuf11)+1, THM_EX2_SIZE, tbuf11),
     writeEeprom(THM_EX3_LOC, strlen(tbuf12)+1, THM_EX3_SIZE, tbuf12));
                      } else {	// read
-						char thm1[THM_SIZE+1], thm2[THM_SIZE+1], thm3[THM_SIZE+1], thm4[THM_SIZE+1], thm5[THM_SIZE+1], thm6[THM_SIZE+1], thm7[THM_SIZE+1], thm8[THM_SIZE+1], thm9[THM_SIZE+1], thm10[THM_SIZE+1], thm11[THM_SIZE+1], thm12[THM_SIZE+1];
+						char thmExists[THM_SIZE+1], thm1[THM_SIZE+1], thm2[THM_SIZE+1], thm3[THM_SIZE+1], thm4[THM_SIZE+1], thm5[THM_SIZE+1], thm6[THM_SIZE+1], thm7[THM_SIZE+1], thm8[THM_SIZE+1], thm9[THM_SIZE+1], thm10[THM_SIZE+1], thm11[THM_SIZE+1], thm12[THM_SIZE+1];
+                        memset(thmExists, 0, THM_SIZE+1);
+						memcpy(thmExists,readEeprom(THM_EXISTS_LOC, THM_EXISTS_SIZE), THM_SIZE);
+                        if (!isNumber(thmExists)) {  //revert to default value
+                           sprintf(thmExists, "%i", THM_EXISTS);
+                        }
 						memset(thm1, 0, THM_SIZE+1);
 						memcpy(thm1,readEeprom(THM_ACTIVATE_LOC, THM_ACTIVATE_SIZE), THM_SIZE);
                         if (!isNumber(thm1)) {  //revert to default value
@@ -1297,7 +1338,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         if (!isNumber(thm12)) {  //revert to default value
                            sprintf(thm12, "%i", THM_EX3);
                         }
-                        snprintf(wbuf, 1024, "I T %s %s %s %s %s %s %s %s %s %s %s %s\n", thm1, thm2, thm3, thm4, thm5, thm6, thm7, thm8, thm9, thm10, thm11, thm12);
+                        snprintf(wbuf, 1024, "I T %s %s %s %s %s %s %s %s %s %s %s %s %s\n", thmExists, thm1, thm2, thm3, thm4, thm5, thm6, thm7, thm8, thm9, thm10, thm11, thm12);
                      }
                      break; 
                   case 'X': case 'x':      // Sets and Reads the serial number
@@ -1379,7 +1420,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Request MGL defaults\nFormat: I G\nChange MGL defaults\nFormat: I G (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
                                 break;
                             case 'H': case 'h':
-                                snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: H\nChange hit calibration parameters\nFormat: H (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-5)enable_on_value\n");
+                                snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: H\nChange hit calibration parameters\nFormat: H (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose 0-4)enable_on_value (0-blank_on_concealed, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_always)\n");
                                 break;
                             case 'K': case 'k':
                                 snprintf(wbuf, 1024, "Request SMK defaults\nFormat: I N\nChange SMK defaults\nFormat: I N (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
@@ -1417,7 +1458,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Shutdown device\nFormat: K\n");
                         break;
                     case 'L': case 'l':
-                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-5)enable_on_value\n");
+                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_on_concealed, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_always)\n");
                         break;
                     case 'M': case 'm':
                         snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-32767 to 32766)speed_in_mph\n");

@@ -2,12 +2,17 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sstream>
 
 using namespace std;
 
 #include "sit_client.h"
 #include "common.h"
 #include "timers.h"
+#include "eeprom.h"
+#include "defaults.h"
 
 
 // setup calibration table
@@ -42,6 +47,9 @@ SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
          * define TESTING_ON_EVAL to enable the muzzle flash to use one of the LEDs on the dev board.
          */
 
+		/*int whatIsRead = Eeprom::ReadEeprom(MFS_EXISTS_LOC, MFS_EXISTS_SIZE, MFS_EXISTS);
+        //DCMSG(GREEN,"Test: %i", whatIsRead.c_str());
+        DCMSG(GREEN,"Test: %i", whatIsRead);*/
         if (start_config&PD_NES){
             doMFS(0,0,0,0); // on when fully exposed, burst, no delay, 2 seconds between bursts
         } else {
@@ -52,20 +60,20 @@ SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
         // initial hit calibration settings
         fake_sens = 1;
         lastHitCal.seperation = 250;
-#if 0 
--- CODE FOR SHELLY
-        char *buf = readeeprom(0x240,0x10);
-        if (sscanf(buf, "%i", &temp) == 1) {
-           lastHitCal.seperation = temp;
-        }
-#endif
+
+//if 0 -- CODE FOR SHELLY
+        //char *buf = readeeprom(0x240,0x10);
+        //if (sscanf(buf, "%i", &temp) == 1) {
+        //   lastHitCal.seperation = temp;
+        //}
+//endif
         lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
         lastHitCal.blank_time = 50; // half a second blanking
         lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
 //        lastHitCal.hits_to_kill = 1; // kill on first hit
         lastHitCal.hits_to_kill = 0; // infinite hits to kill
         lastHitCal.after_kill = 0; // 0 for fall
-        lastHitCal.type = 1; // mechanical sensor
+        lastHitCal.type = 0; // mechanical sensor
         lastHitCal.invert = 0; // don't invert sensor input line
         lastHitCal.set = HIT_OVERWRITE_ALL;   // nothing will change without this
         nl_conn->doHitCal(lastHitCal); // tell kernel

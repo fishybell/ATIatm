@@ -2188,7 +2188,7 @@ static void pid_step(int delta_t) {
     // read input speed (adjust speed10 value to 1000*percent)
     //input_speed = (523 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type];
     input_speed = (1000 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type]; // absolute velocity, no direction
-    delay_printk("s:%i; i:%i;", new_speed, input_speed);
+    //delay_printk("s:%i; i:%i;", new_speed, input_speed);
 
     // We have just a few microseconds to complete operations, so die if we can't lock
     if (!spin_trylock(&pid_lock)) {
@@ -2304,10 +2304,10 @@ delay_printk("CLAMPED!");
                  PID_GAIN_MULT[mover_type], PID_GAIN_DIV[mover_type], PID_TI_MULT[mover_type], PID_TI_DIV[mover_type], PID_TD_MULT[mover_type], PID_TD_DIV[mover_type]);
 #endif
 // new method
-    delay_printk(" n:%i; u:%i; e:%i; p:%i:%i/%i; i:%i:%i/%i; d:%i:%i/%i\n", new_speed, pid_effort, pid_error,
-                 pid_p, PID_KP_MULT[mover_type], PID_KP_DIV[mover_type],
-                 pid_i, PID_KI_MULT[mover_type], PID_KI_DIV[mover_type],
-                 pid_d, PID_KD_MULT[mover_type], PID_KD_DIV[mover_type]);
+    //delay_printk(" n:%i; u:%i; e:%i; p:%i:%i/%i; i:%i:%i/%i; d:%i:%i/%i\n", new_speed, pid_effort, pid_error,
+                 //pid_p, PID_KP_MULT[mover_type], PID_KP_DIV[mover_type],
+                 //pid_i, PID_KI_MULT[mover_type], PID_KI_DIV[mover_type],
+                 //pid_d, PID_KD_MULT[mover_type], PID_KD_DIV[mover_type]);
 }
 
 
