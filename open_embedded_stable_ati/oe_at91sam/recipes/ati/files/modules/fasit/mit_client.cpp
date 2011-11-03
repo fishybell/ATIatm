@@ -9,6 +9,8 @@ using namespace std;
 #include "mit_client.h"
 #include "common.h"
 #include "timers.h"
+#include "eeprom.h"
+#include "defaults.h"
 
 
 /***********************************************************

@@ -22,7 +22,6 @@ int Eeprom::ReadEeprom(int address, int size, int default_int) {
    ostringstream s1;
    s1 << "/usr/bin/eeprom_rw read -addr 0x" << hex << address << " -size 0x" << hex << size << endl;
    //string s2 = s1.str();
-   DCMSG(GREEN,"Test: %s", s1.str().c_str()); 
    return Eeprom::runCMD(s1.str().c_str(), 1, default_int); // 1 == read
 }
 
@@ -35,7 +34,6 @@ string Eeprom::ReadEeprom(int address, int size, string default_string) {
    ostringstream s1;
    s1 << "/usr/bin/eeprom_rw read -addr 0x" << hex << address << " -size 0x" << hex << size << endl;
    //string s2 = s1.str();
-   DCMSG(GREEN,"Test: %s", s1.str().c_str()); 
    return Eeprom::runCMD(s1.str().c_str(), 1, default_string); // 1 == read
 }
 

@@ -9,6 +9,8 @@ using namespace std;
 #include "ses_client.h"
 #include "common.h"
 #include "timers.h"
+#include "eeprom.h"
+#include "defaults.h"
 
 #include "target_ses_interface.h"
 
@@ -24,10 +26,10 @@ FUNCTION_START("::SES_Client(int fd, int tnum) : Connection(fd)")
       deleteLater();
    } else {
       // initialize default settings
-      loop = NO_LOOP; // no looping
+      loop = Eeprom::ReadEeprom(SES_LOOP_LOC, SES_LOOP_SIZE, SES_LOOP); // no looping
       copyfile = NULL; // ready for copying
       knob = 0; // unknown knob value, will retrieve later
-      didMode(MODE_MAINTENANCE); // defalt mode
+      didMode(Eeprom::ReadEeprom(SES_MODE_LOC, SES_MODE_SIZE, SES_MODE)); // defalt mode
       strncpy(track, "/media/sda1/audio/builtin/0.mp3", SES_BUFFER_SIZE); // first built-in track
       memset(uri, 0, SES_BUFFER_SIZE); // no default stream uri
       lastBatteryVal = MAX_BATTERY_VAL;

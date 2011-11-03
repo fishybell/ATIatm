@@ -387,7 +387,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     // default parameters
     int param1, param2, param3, param4, fparam1, fparam2, sparam1, sparam2;
     int nparam1, nparam2, nparam3, nparam4, nparam5, nparam6, nparam7, nparam8;
-    int nparam9, nparam10, nparam11, nparam12, nexists;
+    int nparam9, nparam10, nparam11, nparam12, nparam13, nexists;
     int gparam1, gparam2, gparam3, gparam4, gparam5, gparam6, gparam7, gparam8;
     int gparam9, gparam10, gparam11, gparam12, gexists;
     int pparam1, pparam2, pparam3, pparam4, pparam5, pparam6, pparam7, pparam8;
@@ -396,7 +396,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     int kparam9, kparam10, kparam11, kparam12, kexists;
     int tparam1, tparam2, tparam3, tparam4, tparam5, tparam6, tparam7, tparam8;
     int tparam9, tparam10, tparam11, tparam12, texists;
-    int eparam1, eparam2;
+    int eparam1, eparam2, jparam1, jparam2;
     char eparam3[5];
 	int farg1;
     // read as many commands out of the buffer as possible
@@ -825,6 +825,35 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "I I %s\n", readEeprom(0xC0, 0x40)); // reads and prints out what it read
                      }
                      break;
+                  case 'J': case 'j':      // Sets and reads SES defaults
+                     if (sscanf(cmd+arg2, "%i %i", &jparam1, &jparam2) == 2) {  
+                        //write
+                        char jbuf1[5], jbuf2[5];
+                        // no loop or infinite loop
+                        sprintf(jbuf1, "%i", jparam1);
+                        // mode
+                        sprintf(jbuf2, "%i", jparam2);
+                        // write out the hit calibration parameters
+                        if (memcmp(jbuf1, "0", 1)==1) {	// no loop
+                           snprintf(wbuf, 1024, "I J %s %s\n", writeEeprom(SES_LOOP_LOC, strlen(jbuf1)+1, SES_LOOP_SIZE, "1"), writeEeprom(SES_MODE_LOC, strlen(jbuf2)+1, SES_MODE_SIZE, jbuf2));
+                        } else {	// infinite loop
+                           snprintf(wbuf, 1024, "I J %s %s\n", writeEeprom(SES_LOOP_LOC, 11, SES_LOOP_SIZE, "0xFFFFFFFF"), writeEeprom(SES_MODE_LOC, strlen(jbuf2)+1, SES_MODE_SIZE, jbuf2));
+                        }
+                     } else {   // read
+                        char loop[SES_SIZE+1], mode[SES_SIZE+1];
+                        memset(loop, 0, SES_SIZE+1);
+                        memcpy(loop, readEeprom(SES_LOOP_LOC, SES_LOOP_SIZE), SES_SIZE);
+                        if (memcmp(loop, "", 1)==0) {  //revert to default value
+                           sprintf(loop, "%i", SES_LOOP);
+                        }
+                        memset(mode, 0, SES_SIZE+1);
+                        memcpy(mode, readEeprom(SES_MODE_LOC, SES_MODE_SIZE), SES_SIZE);
+                        if (!isNumber(mode)) {  //revert to default value
+                           sprintf(mode, "%i", SES_MODE);
+                        }
+                        snprintf(wbuf, 1024, "I J %s %s\n", loop, mode);
+                     }
+                     break;
                   case 'K': case 'k':	   // SMK (smoke) defaults
                      if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &kexists, &kparam1, &kparam2, &kparam3, &kparam4, &kparam5, &kparam6, &kparam7, &kparam8, &kparam9, &kparam10, &kparam11, &kparam12) == 13) {        // write
                         char smkExist[5], kbuf1[5], kbuf2[5], kbuf3[5], kbuf4[5];  
@@ -961,10 +990,10 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      }
                      break;
                   case 'N': case 'n':	   // MFS defaults
-                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &nexists, &nparam1, &nparam2, &nparam3, &nparam4, &nparam5, &nparam6, &nparam7, &nparam8, &nparam9, &nparam10, &nparam11, &nparam12) == 13) {        // write
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i %i", &nexists, &nparam1, &nparam2, &nparam3, &nparam4, &nparam5, &nparam6, &nparam7, &nparam8, &nparam9, &nparam10, &nparam11, &nparam12, &nparam13) == 14) {        // write
                         char mfsExist[5], nbuf1[5], nbuf2[5], nbuf3[5], nbuf4[5];  
                         char nbuf5[5], nbuf6[5], nbuf7[5], nbuf8[5];    
-                        char nbuf9[5], nbuf10[5], nbuf11[5], nbuf12[5];  
+                        char nbuf9[5], nbuf10[5], nbuf11[5], nbuf12[5], nbuf13[5];  
                         // exists
                         sprintf(mfsExist, "%i", nexists);                
                         // activate
@@ -991,8 +1020,10 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         sprintf(nbuf11, "%i", nparam11);
                         // ex3
                         sprintf(nbuf12, "%i", nparam12);
+                        // mode
+                        sprintf(nbuf13, "%i", nparam13);
 						// write all the mfs defaults
-                        snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+                        snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
     writeEeprom(MFS_EXISTS_LOC, strlen(mfsExist)+1, MFS_EXISTS_SIZE, mfsExist),
 	writeEeprom(MFS_ACTIVATE_LOC, strlen(nbuf1)+1, MFS_ACTIVATE_SIZE, nbuf1),
     writeEeprom(MFS_ACTIVATE_EXPOSE_LOC, strlen(nbuf2)+1, MFS_ACTIVATE_EXPOSE_SIZE, nbuf2), 
@@ -1005,9 +1036,10 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     writeEeprom(MFS_REPEAT_COUNT_LOC, strlen(nbuf9)+1, MFS_REPEAT_COUNT_SIZE, nbuf9),
     writeEeprom(MFS_EX1_LOC, strlen(nbuf10)+1, MFS_EX1_SIZE, nbuf10),
     writeEeprom(MFS_EX2_LOC, strlen(nbuf11)+1, MFS_EX2_SIZE, nbuf11),
-    writeEeprom(MFS_EX3_LOC, strlen(nbuf12)+1, MFS_EX3_SIZE, nbuf12));
+    writeEeprom(MFS_EX3_LOC, strlen(nbuf12)+1, MFS_EX3_SIZE, nbuf12),
+    writeEeprom(MFS_MODE_LOC, strlen(nbuf13)+1, MFS_MODE_SIZE, nbuf13));
                      } else {	// read
-						char mfsExists[MFS_SIZE+1], mfs1[MFS_SIZE+1], mfs2[MFS_SIZE+1], mfs3[MFS_SIZE+1], mfs4[MFS_SIZE+1], mfs5[MFS_SIZE+1], mfs6[MFS_SIZE+1], mfs7[MFS_SIZE+1], mfs8[MFS_SIZE+1], mfs9[MFS_SIZE+1], mfs10[MFS_SIZE+1], mfs11[MFS_SIZE+1], mfs12[MFS_SIZE+1];
+						char mfsExists[MFS_SIZE+1], mfs1[MFS_SIZE+1], mfs2[MFS_SIZE+1], mfs3[MFS_SIZE+1], mfs4[MFS_SIZE+1], mfs5[MFS_SIZE+1], mfs6[MFS_SIZE+1], mfs7[MFS_SIZE+1], mfs8[MFS_SIZE+1], mfs9[MFS_SIZE+1], mfs10[MFS_SIZE+1], mfs11[MFS_SIZE+1], mfs12[MFS_SIZE+1], mfs13[MFS_SIZE+1];
 						// exists
 						memset(mfsExists, 0, MFS_SIZE+1);
 						memcpy(mfsExists,readEeprom(MFS_EXISTS_LOC, MFS_EXISTS_SIZE), MFS_SIZE);
@@ -1074,7 +1106,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         if (!isNumber(mfs12)) {  //revert to default value
                            sprintf(mfs12, "%i", MFS_EX3);
                         }
-                        snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s %s\n", mfsExists, mfs1, mfs2, mfs3, mfs4, mfs5, mfs6, mfs7, mfs8, mfs9, mfs10, mfs11, mfs12);
+                        memset(mfs13, 0, MFS_SIZE+1);
+                        memcpy(mfs13,readEeprom(MFS_MODE_LOC, MFS_MODE_SIZE), MFS_SIZE);
+                        if (!isNumber(mfs13)) {  //revert to default value
+                           sprintf(mfs13, "%i", MFS_MODE);
+                        }
+                        snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n", mfsExists, mfs1, mfs2, mfs3, mfs4, mfs5, mfs6, mfs7, mfs8, mfs9, mfs10, mfs11, mfs12, mfs13);
                         
                      }
                      break;
@@ -1345,7 +1382,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      if (arg3 > 1) { // are they passing in information?
                         snprintf(wbuf, 1024, "I X %s\n", writeEeprom(SERIAL_NUMBER_LOC, arg3, SERIAL_NUMBER_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        char* serial_holder[SERIAL_SIZE+1];
+                        char serial_holder[SERIAL_SIZE+1];
                         memset(serial_holder, 0 , SERIAL_SIZE+1);
                         memcpy(serial_holder, readEeprom(SERIAL_NUMBER_LOC, SERIAL_NUMBER_SIZE), SERIAL_SIZE);
                         if (memcmp(serial_holder, "", 1)==0) { //use default value
@@ -1422,8 +1459,11 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'H': case 'h':
                                 snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: H\nChange hit calibration parameters\nFormat: H (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose 0-4)enable_on_value (0-blank_on_concealed, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_always)\n");
                                 break;
+                            case 'J': case 'j':
+                                snprintf(wbuf, 1024, "Request SES defaults\nFormat: I J\nChange SES defaults\nFormat: I J (1-No Loop|0xFFFFFFFF-Infinite Loop) (0-maintenance|1-testing|2-record|3-lifefire|4-Error|5-Stop|6-record started|7-encoding started|8-recording/encoding finished|9-copying)\n");
+                                break;
                             case 'K': case 'k':
-                                snprintf(wbuf, 1024, "Request SMK defaults\nFormat: I N\nChange SMK defaults\nFormat: I N (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
+                                snprintf(wbuf, 1024, "Request SMK defaults\nFormat: I K\nChange SMK defaults\nFormat: I K (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
 								break;
 							case 'L': case 'l':
                         		snprintf(wbuf, 1024, "Get/Set listen port number\nFormat: I L <lport>\n");		
@@ -1432,7 +1472,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         		snprintf(wbuf, 1024, "Get/Set current mac address\nFormat: I M <mac>\n");	
                                 break;	
                             case 'N': case 'n':
-                                snprintf(wbuf, 1024, "Request MFS defaults\nFormat: I N\nChange MFS defaults\nFormat: I N (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
+                                snprintf(wbuf, 1024, "Request MFS defaults\nFormat: I N\nChange MFS defaults\nFormat: I N (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3 (0|1)mode single_or_burst\n");
 								break;
                             case 'P': case 'p':
                                 snprintf(wbuf, 1024, "Request PHI defaults\nFormat: I P\nChange PHI defaults\nFormat: I P (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
@@ -1450,7 +1490,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                snprintf(wbuf, 1024, "Request Serial Number\nFormat: I X\nChange Serial Number\nFormat: I X <xxxxx-x-x>\n");
                                 break;
                             default:
-                                snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI P: PHI defaults\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI X: Serial Number\n");
+                                snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI J: SES defaults\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI P: PHI defaults\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI X: Serial Number\n");
                                 break;
 						}
                         break; 

@@ -47,11 +47,8 @@ SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
          * define TESTING_ON_EVAL to enable the muzzle flash to use one of the LEDs on the dev board.
          */
 
-		/*int whatIsRead = Eeprom::ReadEeprom(MFS_EXISTS_LOC, MFS_EXISTS_SIZE, MFS_EXISTS);
-        //DCMSG(GREEN,"Test: %i", whatIsRead.c_str());
-        DCMSG(GREEN,"Test: %i", whatIsRead);*/
         if (start_config&PD_NES){
-            doMFS(0,0,0,0); // on when fully exposed, burst, no delay, 2 seconds between bursts
+            doMFS(Eeprom::ReadEeprom(MFS_ACTIVATE_EXPOSE_LOC, MFS_ACTIVATE_EXPOSE_SIZE, MFS_ACTIVATE_EXPOSE),Eeprom::ReadEeprom(MFS_MODE_LOC, MFS_MODE_SIZE, MFS_MODE),Eeprom::ReadEeprom(MFS_START_DELAY_LOC, MFS_START_DELAY_SIZE, MFS_START_DELAY),Eeprom::ReadEeprom(MFS_REPEAT_DELAY_LOC, MFS_REPEAT_DELAY_SIZE, MFS_REPEAT_DELAY)); // on when fully exposed, burst, no delay, 2 seconds between bursts
         } else {
             // doMFS(0, 0, 0, 0); // Hopefully turns it of completely, or maybe we just don't call it
         }
@@ -59,7 +56,7 @@ SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
 
         // initial hit calibration settings
         fake_sens = 1;
-        lastHitCal.seperation = 250;
+        lastHitCal.seperation = Eeprom::ReadEeprom(HIT_MSECS_BETWEEN_LOC, HIT_MSECS_BETWEEN_SIZE, HIT_MSECS_BETWEEN);
 
 //if 0 -- CODE FOR SHELLY
         //char *buf = readeeprom(0x240,0x10);
@@ -67,14 +64,13 @@ SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
         //   lastHitCal.seperation = temp;
         //}
 //endif
-        lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
-        lastHitCal.blank_time = 50; // half a second blanking
-        lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
-//        lastHitCal.hits_to_kill = 1; // kill on first hit
-        lastHitCal.hits_to_kill = 0; // infinite hits to kill
-        lastHitCal.after_kill = 0; // 0 for fall
-        lastHitCal.type = 0; // mechanical sensor
-        lastHitCal.invert = 0; // don't invert sensor input line
+        lastHitCal.sensitivity = Eeprom::ReadEeprom(HIT_DESENSITIVITY_LOC, HIT_DESENSITIVITY_SIZE, HIT_DESENSITIVITY); // fairly sensitive, but not max
+        lastHitCal.blank_time = Eeprom::ReadEeprom(HIT_START_BLANKING_LOC, HIT_START_BLANKING_SIZE, HIT_START_BLANKING); // half a second blanking
+        lastHitCal.enable_on = Eeprom::ReadEeprom(HIT_ENABLE_ON_LOC, HIT_ENABLE_ON_SIZE, HIT_ENABLE_ON); // hit sensor off
+        lastHitCal.hits_to_kill = Eeprom::ReadEeprom(FALL_KILL_AT_X_HITS_LOC, FALL_KILL_AT_X_HITS_SIZE, FALL_KILL_AT_X_HITS); // kill on first hit
+        lastHitCal.after_kill = Eeprom::ReadEeprom(FALL_AT_FALL_LOC, FALL_AT_FALL_SIZE, FALL_AT_FALL); // 0 for fall
+        lastHitCal.type = Eeprom::ReadEeprom(HIT_SENSOR_TYPE_LOC, HIT_SENSOR_TYPE_SIZE, HIT_SENSOR_TYPE); // mechanical sensor
+        lastHitCal.invert = Eeprom::ReadEeprom(HIT_SENSOR_INVERT_LOC, HIT_SENSOR_INVERT_SIZE, HIT_SENSOR_INVERT); // don't invert sensor input line
         lastHitCal.set = HIT_OVERWRITE_ALL;   // nothing will change without this
         nl_conn->doHitCal(lastHitCal); // tell kernel
 
