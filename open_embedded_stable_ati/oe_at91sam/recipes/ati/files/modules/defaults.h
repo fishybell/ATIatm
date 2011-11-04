@@ -101,7 +101,7 @@
 #define SES_SIZE 10
 
 // MFS defaults (Muzzle Flash Simulator)
-#define MFS_EXISTS 0
+#define MFS_EXISTS 1
 #define MFS_EXISTS_LOC 0x180
 #define MFS_EXISTS_SIZE 0x04
 
@@ -160,7 +160,7 @@
 #define MFS_SIZE 4
 
 // MGL defaults (Moon Glow Simulator)
-#define MGL_EXISTS 0
+#define MGL_EXISTS 1
 #define MGL_EXISTS_LOC 0x340
 #define MGL_EXISTS_SIZE 0x04
 
@@ -215,7 +215,7 @@
 #define MGL_SIZE 4
 
 // PHI defaults (Positive Hit Indicator)
-#define PHI_EXISTS 0
+#define PHI_EXISTS 1
 #define PHI_EXISTS_LOC 0x380
 #define PHI_EXISTS_SIZE 0x04
 
