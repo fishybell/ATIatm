@@ -5,7 +5,7 @@ start () {
    # load network
    source /usr/bin/load_network
 
-   sesb = $(has_ses_battery)
+   sesb=$(has_ses_battery)
    if [ "$sesb" == "" ] ; then                       
       sesb=12                                         
    fi 

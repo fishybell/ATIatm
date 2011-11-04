@@ -5,9 +5,9 @@ start () {
    # load network
    source /usr/bin/load_network
 
-   matb = $(has_mat_battery)
-   matm = $(has_mat_mover)
-   matr = $(has_mat_reverse)
+   matb=$(has_mat_battery)
+   matm=$(has_mat_mover)
+   matr=$(has_mat_reverse)
    if [ "$matb" == "" ] ; then                       
       matb=48                                         
    fi 

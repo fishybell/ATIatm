@@ -5,7 +5,7 @@ start () {
    # load network
    source /usr/bin/load_network
 
-   satb = $(has_sat_battery)
+   satb=$(has_sat_battery)
    if [ "$satb" == "" ] ; then                       
       satb=12                                         
    fi 

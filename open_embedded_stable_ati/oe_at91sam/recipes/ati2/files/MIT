@@ -5,9 +5,9 @@ start () {
    # load network
    source /usr/bin/load_network
 
-   mitb = $(has_mit_battery)
-   mitm = $(has_mit_mover)
-   mitr = $(has_mit_reverse)
+   mitb=$(has_mit_battery)
+   mitm=$(has_mit_mover)
+   mitr=$(has_mit_reverse)
    if [ "$mitb" == "" ] ; then                       
       mitb=24                                         
    fi 

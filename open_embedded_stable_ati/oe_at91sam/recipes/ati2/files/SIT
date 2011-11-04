@@ -8,7 +8,7 @@ start () {
    mfs=$(has_muzzle)
    moon=$(has_moon)
    phi=$(has_phi)
-   sitb = $(has_sit_battery)
+   sitb=$(has_sit_battery)
    if [ "$mfs" == "" ] ; then                       
       mfs=0                                         
    fi 
