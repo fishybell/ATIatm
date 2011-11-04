@@ -1,10 +1,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <string.h>
 #include <errno.h>
 #include <sys/time.h>
-#include <sstream>
 #include <stdio.h>
 
 using namespace std;
@@ -19,22 +17,20 @@ using namespace std;
 /* Returns an int.
 /*************************************************************/
 int Eeprom::ReadEeprom(int address, int size, int default_int) {
-   ostringstream s1;
-   s1 << "/usr/bin/eeprom_rw read -addr 0x" << hex << address << " -size 0x" << hex << size << endl;
-   //string s2 = s1.str();
-   return Eeprom::runCMD(s1.str().c_str(), 1, default_int); // 1 == read
+   char wbuf[1024];
+   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%02X -size 0x%02X\n", address, size);
+   return Eeprom::runCMD(wbuf, 1, default_int); // 1 == read
 }
 
 /*************************************************************
 /* Reads data from the specified address at the specified size.
 /* If the memory location is blank then return the default_string.
-/* Returns a string.
+/* Sets dest_buf to the resulting string
 /*************************************************************/
-string Eeprom::ReadEeprom(int address, int size, string default_string) {
-   ostringstream s1;
-   s1 << "/usr/bin/eeprom_rw read -addr 0x" << hex << address << " -size 0x" << hex << size << endl;
-   //string s2 = s1.str();
-   return Eeprom::runCMD(s1.str().c_str(), 1, default_string); // 1 == read
+void Eeprom::ReadEeprom(int address, int size, char* default_string, char *dest_buf) {
+   char wbuf[1024];
+   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%02X -size 0x%02X\n", address, size);
+   Eeprom::runCMD(wbuf, 1, default_string, dest_buf); // 1 == read
 }
 
 /*************************************************************
@@ -43,24 +39,24 @@ string Eeprom::ReadEeprom(int address, int size, string default_string) {
 /* if the location is blank.
 /* Returns an int.
 /*************************************************************/
-int Eeprom::runCMD(string cmd, int read, int default_int) {
+int Eeprom::runCMD(char *cmd, int read, int default_int) {
 FUNCTION_START("::runCMD");
-   string data;
+   char data[1024];
    int output;
    FILE *fp;
    int buffer_max = 256;
-   char buffer[buffer_max];
+   int index = 0;
    int status;
 
    // open pipe
-   fp = popen(cmd.c_str(), read?"r":"w");
+   fp = popen(cmd, read?"r":"w");
    if (fp == NULL) {
       //return "Error: fp is NULL";
    }
 
    // read/write
-   while (fgets(buffer, buffer_max, fp) != NULL) {
-      data.append(buffer);
+   while (index < 1024) {
+      index += fread(data + index, buffer_max, sizeof(char), fp);
    }
 
    // close pipe
@@ -68,12 +64,10 @@ FUNCTION_START("::runCMD");
    if (status == -1) {
       //return "Error: could not close";
    }
-   // if the memory location is blank use the default value
-   if (data.length() <= 0) {
-      output = default_int;
-   } else {
-	  // convert the data to an int
-	  output = atoi(data.c_str());
+	// convert the data to an int
+   if (sscanf(data, "%i", &output) != 1) {
+     // if the memory location is blank or invalid use the default value
+	  output = default_int;
    }
    return output;	
 FUNCTION_END("::runCMD()")
@@ -83,37 +77,41 @@ FUNCTION_END("::runCMD()")
 /* Opens up the memory location for reading or writing.
 /* Returns either the data at the location or the default value
 /* if the location is blank.
-/* Returns a string.
+/* Sets dest_buf to the resulting string
 /*************************************************************/
-string Eeprom::runCMD(string cmd, int read, string default_string) {
+void Eeprom::runCMD(char *cmd, int read, char *default_string, char *dest_buf) {
 FUNCTION_START("::runCMD");
-   string data;
+   char data[1024];
    FILE *fp;
    int buffer_max = 256;
    char buffer[buffer_max];
+   int index = 0;
    int status;
 
    // open pipe
-   fp = popen(cmd.c_str(), read?"r":"w");
+   fp = popen(cmd, read?"r":"w");
    if (fp == NULL) {
-      return "Error: fp is NULL";
+      IERROR("Error: fp is NULL");
+      return;
    }
 
    // read/write
-   while (fgets(buffer, buffer_max, fp) != NULL) {
-      data.append(buffer);
+   while (index < 1024) {
+      index += fread(data + index, buffer_max, sizeof(char), fp);
    }
 
    // close pipe
    status = pclose(fp);
    if (status == -1) {
-      return "Error: could not close";
+      IERROR("Error: could not close");
+      return;
    }
    // if the memory location is blank use the default value
-   if (data.length() <= 0) {
-      data = default_string;
+   if (strnlen(data, 1024) <= 0) {
+      memcpy(dest_buf, default_string, strnlen(default_string,1024));
+   } else {
+      memcpy(dest_buf, data, strnlen(data,1024));
    }
-   return data;	
 FUNCTION_END("::runCMD()")
 }
 

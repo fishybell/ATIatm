@@ -2,9 +2,7 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <string.h>
 #include <stdlib.h>
-#include <sstream>
 
 using namespace std;
 
