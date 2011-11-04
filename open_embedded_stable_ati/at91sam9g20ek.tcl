@@ -160,7 +160,7 @@ lappend eeprom_variables \
     "0x1C0 none" \
     "0x200 none" \
     "0x240 none" \
-    "0x400" ;# fill up to <-- with zeroes
+    "0x4000" ;# fill up to <-- with zeroes
 
 
 puts "-I- === Initialize the EEPROM access ==="
