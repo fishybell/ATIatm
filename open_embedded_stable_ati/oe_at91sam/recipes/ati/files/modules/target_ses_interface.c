@@ -314,22 +314,14 @@ static void mode_timeout_fire(unsigned long data)
 
 //   delay_printk("%s - %s\n",TARGET_NAME,__func__);
 
-    // change value, if we're allowed
-    if (atomic_read(&knob_value_atomic) == KNOB_LIVEFIRE)
+    // rotate value
+    value = atomic_read(&mode_value_atomic);
+    value++;
+    if (value == MODE_ERROR)
         {
-        atomic_set(&mode_value_atomic, MODE_LIVEFIRE);
+        value = MODE_MAINTENANCE;
         }
-    else
-        {
-        // rotate value
-        value = atomic_read(&mode_value_atomic);
-        value++;
-        if (value == MODE_ERROR)
-            {
-            value = MODE_MAINTENANCE;
-            }
-        atomic_set(&mode_value_atomic, value);
-        }
+    atomic_set(&mode_value_atomic, value);
 
     // change indicators
     do_mode();
@@ -363,39 +355,16 @@ irqreturn_t knob_int(int irq, void *dev_id, struct pt_regs *regs)
 static void knob_timeout_fire(unsigned long data)
     {
     // read value from gpio
-    int value, ovalue;
-    ovalue = atomic_read(&knob_value_atomic);
+    int value;
     value = knob_read();
 
 //   delay_printk("%s - %s : value %i\n",TARGET_NAME,__func__,value);
 
     // change value
-    if (value == KNOB_LIVEFIRE)
-        {
-        // changed to livefire on the knob, change the mode
-        atomic_set(&mode_value_atomic, MODE_LIVEFIRE);
-
-        // notify user-space
-        schedule_work(&mode_work);
-        }
-    else if (ovalue == KNOB_LIVEFIRE)
-        {
-        // changed away from livefire on the knob, change the mode
-        atomic_set(&mode_value_atomic, MODE_MAINTENANCE);
-
-        // notify user-space
-        schedule_work(&mode_work);
-        }
     atomic_set(&knob_value_atomic, value);
 
     // notify user-space
     schedule_work(&knob_work);
-
-    // change indicators
-    do_mode();
-
-    // notify user-space
-    schedule_work(&mode_work);
     }
 
 //---------------------------------------------------------------------------
@@ -427,12 +396,6 @@ static int hardware_init(void)
     at91_set_gpio_output(OUTPUT_SES_AMPLIFIER_ON, OUTPUT_SES_AMPLIFIER_ACTIVE_STATE);
 
     // set initial value of knob/mode
-    value = knob_read();
-    atomic_set(&knob_value_atomic, value);
-    if (value == KNOB_LIVEFIRE)
-        {
-        atomic_set(&mode_value_atomic, MODE_LIVEFIRE);
-        }
     do_mode();
 
     // setup interrupts

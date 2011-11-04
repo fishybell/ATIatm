@@ -3,7 +3,6 @@
 
 #include "target_hardware.h"
 
-#define KNOB_LIVEFIRE		15
 #define KNOB_MAX			15
 
 #define MODE_MAINTENANCE	0
