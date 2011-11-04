@@ -45,7 +45,7 @@ FUNCTION_START("::runCMD");
    int output;
    FILE *fp;
    int buffer_max = 256;
-   int index = 0;
+   int index = 0, r = 1;
    int status;
 
    // open pipe
@@ -55,8 +55,9 @@ FUNCTION_START("::runCMD");
    }
 
    // read/write
-   while (index < 1024) {
-      index += fread(data + index, buffer_max, sizeof(char), fp);
+   while (index < 1024 && r > 0) {
+      r = fread(data + index, buffer_max, sizeof(char), fp);
+      index += r;
    }
 
    // close pipe
@@ -85,7 +86,7 @@ FUNCTION_START("::runCMD");
    FILE *fp;
    int buffer_max = 256;
    char buffer[buffer_max];
-   int index = 0;
+   int index = 0, r = 1;
    int status;
 
    // open pipe
@@ -96,8 +97,9 @@ FUNCTION_START("::runCMD");
    }
 
    // read/write
-   while (index < 1024) {
-      index += fread(data + index, buffer_max, sizeof(char), fp);
+   while (index < 1024 && r > 0) {
+      r = fread(data + index, buffer_max, sizeof(char), fp);
+      index += r;
    }
 
    // close pipe
