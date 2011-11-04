@@ -128,9 +128,9 @@ module_param(minvoltval, int, S_IRUGO);
 
 // these lists go 12, 24, 48, error
 const int BATTERY_NORMAL[] = {50, 104, 202, 255};	// at or above this value is considered normal
-const int BATTERY_LOW[] = {49, 100, 196, 4};		// at or above this value (and below above) is considered low
-const int BATTERY_CRIT[] = {48, 99, 195, 3};		// at or above this value (and below above) is considered critical
-const int BATTERY_HALT[] = {45, 94, 188, 2};		// at or below this value (and above below) requires immediate halt of device
+const int BATTERY_LOW[] = {45, 100, 196, 4};		// at or above this value (and below above) is considered low
+const int BATTERY_CRIT[] = {43, 99, 195, 3};		// at or above this value (and below above) is considered critical
+const int BATTERY_HALT[] = {41, 94, 188, 2};		// at or below this value (and above below) requires immediate halt of device
 const int BATTERY_WAIT[] = {5, 5, 5, 1};			// at or below this value signifies an invalid battery value...ignore
 
 //---------------------------------------------------------------------------
