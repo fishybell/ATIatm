@@ -530,42 +530,42 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      if (sscanf(cmd+arg2, "%i %i", &eparam1, &eparam2) == 2) {        // write
                         char ebuf1[5], ebuf2[5];
                         // target type or mover type or reverse
-                        sprintf(ebuf1, "%i", eparam1);
+                        snprintf(ebuf1, 5, "%i", eparam1);
                         // default
-                        sprintf(ebuf2, "%i", eparam2);
+                        snprintf(ebuf2, 5, "%i", eparam2);
                         switch (eparam1) {
                            case 1:	// SIT
-                              snprintf(wbuf, 1024, "I E SIT %s\n", writeEeprom(SIT_BATTERY_LOC, strlen(ebuf2)+1, SIT_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E SIT %s\n", writeEeprom(SIT_BATTERY_LOC, strnlen(ebuf2, 5), SIT_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 2:	// SAT
-                              snprintf(wbuf, 1024, "I E SAT %s\n", writeEeprom(SAT_BATTERY_LOC, strlen(ebuf2)+1, SAT_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E SAT %s\n", writeEeprom(SAT_BATTERY_LOC, strnlen(ebuf2, 5), SAT_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 3:	// SES
-                              snprintf(wbuf, 1024, "I E SES %s\n", writeEeprom(SES_BATTERY_LOC, strlen(ebuf2)+1, SES_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E SES %s\n", writeEeprom(SES_BATTERY_LOC, strnlen(ebuf2, 5), SES_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 4:	// MIT
-                              snprintf(wbuf, 1024, "I E MIT %s\n", writeEeprom(MIT_BATTERY_LOC, strlen(ebuf2)+1, MIT_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E MIT %s\n", writeEeprom(MIT_BATTERY_LOC, strnlen(ebuf2, 5), MIT_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 5:	// MAT
-                              snprintf(wbuf, 1024, "I E MAT %s\n", writeEeprom(MAT_BATTERY_LOC, strlen(ebuf2)+1, MAT_BATTERY_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E MAT %s\n", writeEeprom(MAT_BATTERY_LOC, strnlen(ebuf2, 5), MAT_BATTERY_SIZE, ebuf2)); 
                               break;
                            case 6:	// MIT Mover Type
-                              snprintf(wbuf, 1024, "I E MIT TYPE %s\n", writeEeprom(MIT_MOVER_TYPE_LOC, strlen(ebuf2)+1, MIT_MOVER_TYPE_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E MIT TYPE %s\n", writeEeprom(MIT_MOVER_TYPE_LOC, strnlen(ebuf2, 5), MIT_MOVER_TYPE_SIZE, ebuf2)); 
                               break;
                            case 7:	// MIT Reverse
-                              snprintf(wbuf, 1024, "I E MIT REVERSE %s\n", writeEeprom(MIT_REVERSE_LOC, strlen(ebuf2)+1, MIT_REVERSE_SIZE, ebuf2));
+                              snprintf(wbuf, 1024, "I E MIT REVERSE %s\n", writeEeprom(MIT_REVERSE_LOC, strnlen(ebuf2, 5), MIT_REVERSE_SIZE, ebuf2));
                               break;
                            case 8:	// MAT Mover Type
-                              snprintf(wbuf, 1024, "I E MAT TYPE %s\n", writeEeprom(MAT_MOVER_TYPE_LOC, strlen(ebuf2)+1, MAT_MOVER_TYPE_SIZE, ebuf2)); 
+                              snprintf(wbuf, 1024, "I E MAT TYPE %s\n", writeEeprom(MAT_MOVER_TYPE_LOC, strnlen(ebuf2, 5), MAT_MOVER_TYPE_SIZE, ebuf2)); 
                               break;
                            case 9:	// MAT Reverse
-                              snprintf(wbuf, 1024, "I E MAT REVERSE %s\n", writeEeprom(MAT_REVERSE_LOC, strlen(ebuf2)+1, MAT_REVERSE_SIZE, ebuf2));
+                              snprintf(wbuf, 1024, "I E MAT REVERSE %s\n", writeEeprom(MAT_REVERSE_LOC, strnlen(ebuf2, 5), MAT_REVERSE_SIZE, ebuf2));
                               break;
                            default:
                               snprintf(wbuf, 1024, "Please choose a correct parameter\n(1-SIT|2-SAT|3-SES|4-MIT|5-MAT|6-MIT Mover Type|7-MIT Reverse|8-MAT Mover Type|9-MAT Reverse\n");
                               break;
                         }
-                     } else {
+                     } else {	// read
                         sscanf(cmd+arg2, "%s", &eparam3);
                         char bat1[BATTERY_SIZE+1], bat2[BATTERY_SIZE+1], bat3[BATTERY_SIZE+1], bat4[BATTERY_SIZE+1], bat5[BATTERY_SIZE+1], bat6[MOVER_SIZE+1], bat7[MOVER_SIZE+1], bat8[MOVER_SIZE+1], bat9[MOVER_SIZE+1];
                         
@@ -573,63 +573,63 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                            memset(bat1, 0, BATTERY_SIZE+1);
                            memcpy(bat1,readEeprom(SIT_BATTERY_LOC, SIT_BATTERY_SIZE), BATTERY_SIZE);
                            if (!isNumber(bat1)) {  //revert to default value
-                              sprintf(bat1, "%i", SIT_BATTERY);
+                              snprintf(bat1, BATTERY_SIZE, "%i", SIT_BATTERY);
                            }
                            snprintf(wbuf, 1024, "I E SIT %s\n", bat1);
                         } else if (memcmp(eparam3, "sat", 3)==0 || memcmp(eparam3, "SAT", 3)==0) {	// read SAT battery default
                            memset(bat2, 0, BATTERY_SIZE+1);
                            memcpy(bat2,readEeprom(SAT_BATTERY_LOC, SAT_BATTERY_SIZE), BATTERY_SIZE);
                            if (!isNumber(bat2)) {  //revert to default value
-                              sprintf(bat2, "%i", SAT_BATTERY);
+                              snprintf(bat2, BATTERY_SIZE, "%i", SAT_BATTERY);
                            }
                            snprintf(wbuf, 1024, "I E SAT %s\n", bat2);
                         } else if (memcmp(eparam3, "ses", 3)==0 || memcmp(eparam3, "SES", 3)==0) {	// read SES battery default
                            memset(bat3, 0, BATTERY_SIZE+1);
                            memcpy(bat3,readEeprom(SES_BATTERY_LOC, SES_BATTERY_SIZE), BATTERY_SIZE);
                            if (!isNumber(bat3)) {  //revert to default value
-                              sprintf(bat3, "%i", SES_BATTERY);
+                              snprintf(bat3, BATTERY_SIZE, "%i", SES_BATTERY);
                            }
                            snprintf(wbuf, 1024, "I E SES %s\n", bat3);
                         } else if (memcmp(eparam3, "mit", 3)==0 || memcmp(eparam3, "MIT", 3)==0) {	// read MIT battery default
                            memset(bat4, 0, BATTERY_SIZE+1);
                            memcpy(bat4,readEeprom(MIT_BATTERY_LOC, MIT_BATTERY_SIZE), BATTERY_SIZE);
                            if (!isNumber(bat4)) {  //revert to default value
-                              sprintf(bat4, "%i", MIT_BATTERY);
+                              snprintf(bat4, BATTERY_SIZE, "%i", MIT_BATTERY);
                            }
                            snprintf(wbuf, 1024, "I E MIT %s\n", bat4);
                         } else if (memcmp(eparam3, "mat", 3)==0 || memcmp(eparam3, "MAT", 3)==0) {	// read MAT battery default
                            memset(bat5, 0, BATTERY_SIZE+1);
                            memcpy(bat5,readEeprom(MAT_BATTERY_LOC, MAT_BATTERY_SIZE), BATTERY_SIZE);
                            if (!isNumber(bat5)) {  //revert to default value
-                              sprintf(bat5, "%i", MAT_BATTERY);
+                              snprintf(bat5, BATTERY_SIZE, "%i", MAT_BATTERY);
                            }
                            snprintf(wbuf, 1024, "I E MAT %s\n", bat5);
                         } else if (memcmp(eparam3, "TYPE_MIT", 8)==0 || memcmp(eparam3, "type_mit", 8)==0) {// read MIT mover type
                            memset(bat6, 0, MOVER_SIZE+1);
                            memcpy(bat6,readEeprom(MIT_MOVER_TYPE_LOC, MIT_MOVER_TYPE_SIZE), MOVER_SIZE);
                            if (!isNumber(bat6)) {  //revert to default value
-                              sprintf(bat6, "%i", MIT_MOVER_TYPE);
+                              snprintf(bat6, BATTERY_SIZE, "%i", MIT_MOVER_TYPE);
                            }
                            snprintf(wbuf, 1024, "I E MIT TYPE %s\n", bat6);
                         } else if (memcmp(eparam3, "reverse_mit", 11)==0 || memcmp(eparam3, "REVERSE_MIT", 11)==0) {	// read MIT reverse
                           memset(bat7, 0, MOVER_SIZE+1);
                            memcpy(bat7,readEeprom(MIT_REVERSE_LOC, MIT_REVERSE_SIZE), MOVER_SIZE);
                            if (!isNumber(bat7)) {  //revert to default value
-                              sprintf(bat7, "%i", MIT_REVERSE);
+                              snprintf(bat7, BATTERY_SIZE, "%i", MIT_REVERSE);
                            }
                            snprintf(wbuf, 1024, "I E MIT REVERSE %s\n", bat7);
                         } else if (memcmp(eparam3, "type_mat", 8)==0 || memcmp(eparam3, "TYPE_MAT", 8)==0) {// read MAT mover type
                            memset(bat8, 0, MOVER_SIZE+1);
                            memcpy(bat8,readEeprom(MAT_MOVER_TYPE_LOC, MAT_MOVER_TYPE_SIZE), MOVER_SIZE);
                            if (!isNumber(bat8)) {  //revert to default value
-                              sprintf(bat8, "%i", MAT_MOVER_TYPE);
+                              snprintf(bat8, BATTERY_SIZE, "%i", MAT_MOVER_TYPE);
                            }
                            snprintf(wbuf, 1024, "I E MAT TYPE %s\n", bat8);
                         } else if (memcmp(eparam3, "reverse_mat", 11)==0 || memcmp(eparam3, "REVERSE_MAT", 11)==0) {	// read MAT reverse
                           memset(bat9, 0, MOVER_SIZE+1);
                            memcpy(bat9,readEeprom(MAT_REVERSE_LOC, MAT_REVERSE_SIZE), MOVER_SIZE);
                            if (!isNumber(bat9)) {  //revert to default value
-                              sprintf(bat9, "%i", MAT_REVERSE);
+                              snprintf(bat9, BATTERY_SIZE, "%i", MAT_REVERSE);
                            }
                            snprintf(wbuf, 1024, "I E MAT REVERSE %s\n", bat9);
                         } else {
@@ -642,22 +642,22 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         //write
                         char fbuf1[5], fbuf2[5];
                         // kill at X hits
-                        sprintf(fbuf1, "%i", fparam1);
+                        snprintf(fbuf1, 5, "%i", fparam1);
                         // at fall do what?
-                        sprintf(fbuf2, "%i", fparam2);
+                        snprintf(fbuf2, 5, "%i", fparam2);
                         // write out the hit calibration parameters
-                        snprintf(wbuf, 1024, "I F %s %s\n", writeEeprom(FALL_KILL_AT_X_HITS_LOC, strlen(fbuf1)+1, FALL_KILL_AT_X_HITS_SIZE, fbuf1), writeEeprom(FALL_AT_FALL_LOC, strlen(fbuf2)+1, FALL_AT_FALL_SIZE, fbuf2));
+                        snprintf(wbuf, 1024, "I F %s %s\n", writeEeprom(FALL_KILL_AT_X_HITS_LOC, strnlen(fbuf1, 5), FALL_KILL_AT_X_HITS_SIZE, fbuf1), writeEeprom(FALL_AT_FALL_LOC, strnlen(fbuf2, 5), FALL_AT_FALL_SIZE, fbuf2));
                      } else {   // read
                         char hkr[33], afr[33];
                         memset(hkr, 0, 33);
                         memcpy(hkr, readEeprom(FALL_KILL_AT_X_HITS_LOC, FALL_KILL_AT_X_HITS_SIZE), 32);
                         if (!isNumber(hkr)) {  //revert to default value
-                           sprintf(hkr, "%i", FALL_KILL_AT_X_HITS);
+                           snprintf(hkr, 5, "%i", FALL_KILL_AT_X_HITS);
                         }
                         memset(afr, 0, 33);
                         memcpy(afr, readEeprom(FALL_AT_FALL_LOC, FALL_AT_FALL_SIZE), 32);
                         if (!isNumber(afr)) {  //revert to default value
-                           sprintf(afr, "%i", FALL_AT_FALL);
+                           snprintf(afr, 5, "%i", FALL_AT_FALL);
                         }
                         snprintf(wbuf, 1024, "I F %s %s\n", hkr, afr);
                      }
@@ -668,112 +668,112 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         char gbuf5[5], gbuf6[5], gbuf7[5], gbuf8[5];    
                         char gbuf9[5], gbuf10[5], gbuf11[5], gbuf12[5];
 						//exists
-						sprintf(mglExist, "%i", gexists);                      
+						snprintf(mglExist, 5, "%i", gexists);                      
                         // activate
-                        sprintf(gbuf1, "%i", gparam1);
+                        snprintf(gbuf1, 5, "%i", gparam1);
                         // activate on what kind of exposure
-                        sprintf(gbuf2, "%i", gparam2);
+                        snprintf(gbuf2, 5, "%i", gparam2);
                         // activate on hit
-                        sprintf(gbuf3, "%i", gparam3);
+                        snprintf(gbuf3, 5, "%i", gparam3);
                         // activate on kill
-                        sprintf(gbuf4, "%i", gparam4);
+                        snprintf(gbuf4, 5, "%i", gparam4);
                         // milliseconds on time
-                        sprintf(gbuf5, "%i", gparam5);
+                        snprintf(gbuf5, 5, "%i", gparam5);
                         // milliseconds off time
-                        sprintf(gbuf6, "%i", gparam6);
+                        snprintf(gbuf6, 5, "%i", gparam6);
                         // start delay
-                        sprintf(gbuf7, "%i", gparam7);
+                        snprintf(gbuf7, 5, "%i", gparam7);
                         // repeat delay
-                        sprintf(gbuf8, "%i", gparam8);
+                        snprintf(gbuf8, 5, "%i", gparam8);
                         // repeat count
-                        sprintf(gbuf9, "%i", gparam9);
+                        snprintf(gbuf9, 5, "%i", gparam9);
                         // ex1
-                        sprintf(gbuf10, "%i", gparam10);
+                        snprintf(gbuf10, 5, "%i", gparam10);
                         // ex2
-                        sprintf(gbuf11, "%i", gparam11);
+                        snprintf(gbuf11, 5, "%i", gparam11);
                         // ex3
-                        sprintf(gbuf12, "%i", gparam12);
+                        snprintf(gbuf12, 5, "%i", gparam12);
 						// write all the mfs defaults
                         snprintf(wbuf, 1024, "I G %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
-    writeEeprom(MGL_EXISTS_LOC, strlen(mglExist)+1, MGL_EXISTS_SIZE, mglExist), 
-	writeEeprom(MGL_ACTIVATE_LOC, strlen(gbuf1)+1, MGL_ACTIVATE_SIZE, gbuf1),
-    writeEeprom(MGL_ACTIVATE_EXPOSE_LOC, strlen(gbuf2)+1, MGL_ACTIVATE_EXPOSE_SIZE, gbuf2), 
-    writeEeprom(MGL_ACTIVATE_ON_HIT_LOC, strlen(gbuf3)+1, MGL_ACTIVATE_ON_HIT_SIZE, gbuf3), 
-    writeEeprom(MGL_ACTIVATE_ON_KILL_LOC, strlen(gbuf4)+1, MGL_ACTIVATE_ON_KILL_SIZE, gbuf4),
-    writeEeprom(MGL_MS_ON_TIME_LOC, strlen(gbuf5)+1, MGL_MS_ON_TIME_SIZE, gbuf5),
-    writeEeprom(MGL_MS_OFF_TIME_LOC, strlen(gbuf6)+1, MGL_MS_OFF_TIME_SIZE, gbuf6),
-    writeEeprom(MGL_START_DELAY_LOC, strlen(gbuf7)+1, MGL_START_DELAY_SIZE, gbuf7),
-    writeEeprom(MGL_REPEAT_DELAY_LOC, strlen(gbuf8)+1, MGL_REPEAT_DELAY_SIZE, gbuf8),
-    writeEeprom(MGL_REPEAT_COUNT_LOC, strlen(gbuf9)+1, MGL_REPEAT_COUNT_SIZE, gbuf9),
-    writeEeprom(MGL_EX1_LOC, strlen(gbuf10)+1, MGL_EX1_SIZE, gbuf10),
-    writeEeprom(MGL_EX2_LOC, strlen(gbuf11)+1, MGL_EX2_SIZE, gbuf11),
-    writeEeprom(MGL_EX3_LOC, strlen(gbuf12)+1, MGL_EX3_SIZE, gbuf12));
+    writeEeprom(MGL_EXISTS_LOC, strnlen(mglExist, 5), MGL_EXISTS_SIZE, mglExist), 
+	writeEeprom(MGL_ACTIVATE_LOC, strnlen(gbuf1, 5), MGL_ACTIVATE_SIZE, gbuf1),
+    writeEeprom(MGL_ACTIVATE_EXPOSE_LOC, strnlen(gbuf2, 5), MGL_ACTIVATE_EXPOSE_SIZE, gbuf2), 
+    writeEeprom(MGL_ACTIVATE_ON_HIT_LOC, strnlen(gbuf3, 5), MGL_ACTIVATE_ON_HIT_SIZE, gbuf3), 
+    writeEeprom(MGL_ACTIVATE_ON_KILL_LOC, strnlen(gbuf4, 5), MGL_ACTIVATE_ON_KILL_SIZE, gbuf4),
+    writeEeprom(MGL_MS_ON_TIME_LOC, strnlen(gbuf5, 5), MGL_MS_ON_TIME_SIZE, gbuf5),
+    writeEeprom(MGL_MS_OFF_TIME_LOC, strnlen(gbuf6, 5), MGL_MS_OFF_TIME_SIZE, gbuf6),
+    writeEeprom(MGL_START_DELAY_LOC, strnlen(gbuf7, 5), MGL_START_DELAY_SIZE, gbuf7),
+    writeEeprom(MGL_REPEAT_DELAY_LOC, strnlen(gbuf8, 5), MGL_REPEAT_DELAY_SIZE, gbuf8),
+    writeEeprom(MGL_REPEAT_COUNT_LOC, strnlen(gbuf9, 5), MGL_REPEAT_COUNT_SIZE, gbuf9),
+    writeEeprom(MGL_EX1_LOC, strnlen(gbuf10, 5), MGL_EX1_SIZE, gbuf10),
+    writeEeprom(MGL_EX2_LOC, strnlen(gbuf11, 5), MGL_EX2_SIZE, gbuf11),
+    writeEeprom(MGL_EX3_LOC, strnlen(gbuf12, 5), MGL_EX3_SIZE, gbuf12));
                      } else {	// read
 						char mglExists[MGL_SIZE+1], mgl1[MGL_SIZE+1], mgl2[MGL_SIZE+1], mgl3[MGL_SIZE+1], mgl4[MGL_SIZE+1], mgl5[MGL_SIZE+1], mgl6[MGL_SIZE+1], mgl7[MGL_SIZE+1], mgl8[MGL_SIZE+1], mgl9[MGL_SIZE+1], mgl10[MGL_SIZE+1], mgl11[MGL_SIZE+1], mgl12[MGL_SIZE+1];
                         memset(mglExists, 0, MGL_SIZE+1);
 						memcpy(mglExists,readEeprom(MGL_EXISTS_LOC, MGL_EXISTS_SIZE), MGL_SIZE);
                         if (!isNumber(mglExists)) {  //revert to default value
-                           sprintf(mglExists, "%i", MGL_EXISTS);
+                           snprintf(mglExists, MGL_SIZE, "%i", MGL_EXISTS);
                         }
 						memset(mgl1, 0, MGL_SIZE+1);
 						memcpy(mgl1,readEeprom(MGL_ACTIVATE_LOC, MGL_ACTIVATE_SIZE), MGL_SIZE);
                         if (!isNumber(mgl1)) {  //revert to default value
-                           sprintf(mgl1, "%i", MGL_ACTIVATE);
+                           snprintf(mgl1, MGL_SIZE, "%i", MGL_ACTIVATE);
                         }
                         memset(mgl2, 0, MGL_SIZE+1);
                         memcpy(mgl2,readEeprom(MGL_ACTIVATE_EXPOSE_LOC, MGL_ACTIVATE_EXPOSE_SIZE), MGL_SIZE);
                         if (!isNumber(mgl2)) {  //revert to default value
-                           sprintf(mgl2, "%i", MGL_ACTIVATE_EXPOSE);
+                           snprintf(mgl2, MGL_SIZE, "%i", MGL_ACTIVATE_EXPOSE);
                         }
                         memset(mgl3, 0, MGL_SIZE+1);
                         memcpy(mgl3,readEeprom(MGL_ACTIVATE_ON_HIT_LOC, MGL_ACTIVATE_ON_HIT_SIZE), MGL_SIZE);
                         if (!isNumber(mgl3)) {  //revert to default value
-                           sprintf(mgl3, "%i", MGL_ACTIVATE_ON_HIT);
+                           snprintf(mgl3, MGL_SIZE, "%i", MGL_ACTIVATE_ON_HIT);
                         }
                         memset(mgl4, 0, MGL_SIZE+1);
                         memcpy(mgl4,readEeprom(MGL_ACTIVATE_ON_KILL_LOC, MGL_ACTIVATE_ON_KILL_SIZE), MGL_SIZE);
                         if (!isNumber(mgl4)) {  //revert to default value
-                           sprintf(mgl4, "%i", MGL_ACTIVATE_ON_KILL);
+                           snprintf(mgl4, MGL_SIZE, "%i", MGL_ACTIVATE_ON_KILL);
                         }
                         memset(mgl5, 0, MGL_SIZE+1);
                         memcpy(mgl5,readEeprom(MGL_MS_ON_TIME_LOC, MGL_MS_ON_TIME_SIZE), MGL_SIZE);
                         if (!isNumber(mgl5)) {  //revert to default value
-                           sprintf(mgl5, "%i", MGL_MS_ON_TIME);
+                           snprintf(mgl5, MGL_SIZE, "%i", MGL_MS_ON_TIME);
                         }
                         memset(mgl6, 0, MGL_SIZE+1);
                         memcpy(mgl6,readEeprom(MGL_MS_OFF_TIME_LOC, MGL_MS_OFF_TIME_SIZE), MGL_SIZE);
                         if (!isNumber(mgl6)) {  //revert to default value
-                           sprintf(mgl6, "%i", MGL_MS_OFF_TIME);
+                           snprintf(mgl6, MGL_SIZE, "%i", MGL_MS_OFF_TIME);
                         }
                         memset(mgl7, 0, MGL_SIZE+1);
                         memcpy(mgl7,readEeprom(MGL_START_DELAY_LOC, MGL_START_DELAY_SIZE), MGL_SIZE);
                         if (!isNumber(mgl7)) {  //revert to default value
-                           sprintf(mgl7, "%i", MGL_START_DELAY);
+                           snprintf(mgl7, MGL_SIZE, "%i", MGL_START_DELAY);
                         }
                         memset(mgl8, 0, MGL_SIZE+1);
                         memcpy(mgl8,readEeprom(MGL_REPEAT_DELAY_LOC, MGL_REPEAT_DELAY_SIZE), MGL_SIZE);
                         if (!isNumber(mgl8)) {  //revert to default value
-                           sprintf(mgl8, "%i", MGL_REPEAT_DELAY);
+                           snprintf(mgl8, MGL_SIZE, "%i", MGL_REPEAT_DELAY);
                         }
                         memset(mgl9, 0, MGL_SIZE+1);
                         memcpy(mgl9,readEeprom(MGL_REPEAT_COUNT_LOC, MGL_REPEAT_COUNT_SIZE), MGL_SIZE);
                         if (!isNumber(mgl9)) {  //revert to default value
-                           sprintf(mgl9, "%i", MGL_REPEAT_COUNT);
+                           snprintf(mgl9, MGL_SIZE, "%i", MGL_REPEAT_COUNT);
                         }
                         memset(mgl10, 0, MGL_SIZE+1);
                         memcpy(mgl10,readEeprom(MGL_EX1_LOC, MGL_EX1_SIZE), MGL_SIZE);
                         if (!isNumber(mgl10)) {  //revert to default value
-                           sprintf(mgl10, "%i", MGL_EX1);
+                           snprintf(mgl10, MGL_SIZE, "%i", MGL_EX1);
                         }
                         memset(mgl11, 0, MGL_SIZE+1);
                         memcpy(mgl11,readEeprom(MGL_EX2_LOC, MGL_EX2_SIZE), MGL_SIZE);
                         if (!isNumber(mgl11)) {  //revert to default value
-                           sprintf(mgl11, "%i", MGL_EX2);
+                           snprintf(mgl11, MGL_SIZE, "%i", MGL_EX2);
                         }
                         memset(mgl12, 0, MGL_SIZE+1);
                         memcpy(mgl12,readEeprom(MGL_EX3_LOC, MGL_EX3_SIZE), MGL_SIZE);
                         if (!isNumber(mgl12)) {  //revert to default value
-                           sprintf(mgl12, "%i", MGL_EX3);
+                           snprintf(mgl12, MGL_SIZE, "%i", MGL_EX3);
                         }
                         snprintf(wbuf, 1024, "I G %s %s %s %s %s %s %s %s %s %s %s %s %s\n", mglExists, mgl1, mgl2, mgl3, mgl4, mgl5, mgl6, mgl7, mgl8, mgl9, mgl10, mgl11, mgl12);
                         
@@ -783,36 +783,36 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      if (sscanf(cmd+arg2, "%i %i %i %i", &param1, &param2, &param3, &param4) == 4) {        // write
                         char hbuf1[5], hbuf2[5], hbuf3[5], hbuf4[5];                    
                         // milliseconds between hits
-                        sprintf(hbuf1, "%i", param1);
+                        snprintf(hbuf1, 5, "%i", param1);
                         // hit desensitivity
-                        sprintf(hbuf2, "%i", param2);
+                        snprintf(hbuf2, 5, "%i", param2);
                         // milliseconds blanking time from start expose
-                        sprintf(hbuf3, "%i", param3);
+                        snprintf(hbuf3, 5, "%i", param3);
                         // enable on value
-                        sprintf(hbuf4, "%i", param4);
+                        snprintf(hbuf4, 5, "%i", param4);
 						// write all the hit calabration parameters
-                        snprintf(wbuf, 1024, "I H %s %s %s %s\n", writeEeprom(HIT_MSECS_BETWEEN_LOC, strlen(hbuf1)+1, HIT_MSECS_BETWEEN_SIZE, hbuf1), writeEeprom(HIT_DESENSITIVITY_LOC, strlen(hbuf2)+1, HIT_DESENSITIVITY_SIZE, hbuf2), writeEeprom(HIT_START_BLANKING_LOC, strlen(hbuf3)+1, HIT_START_BLANKING_SIZE, hbuf3), writeEeprom(HIT_ENABLE_ON_LOC, strlen(hbuf4)+1, HIT_ENABLE_ON_SIZE, hbuf4));
+                        snprintf(wbuf, 1024, "I H %s %s %s %s\n", writeEeprom(HIT_MSECS_BETWEEN_LOC, strnlen(hbuf1, 5), HIT_MSECS_BETWEEN_SIZE, hbuf1), writeEeprom(HIT_DESENSITIVITY_LOC, strnlen(hbuf2, 5), HIT_DESENSITIVITY_SIZE, hbuf2), writeEeprom(HIT_START_BLANKING_LOC, strnlen(hbuf3, 5), HIT_START_BLANKING_SIZE, hbuf3), writeEeprom(HIT_ENABLE_ON_LOC, strnlen(hbuf4, 5), HIT_ENABLE_ON_SIZE, hbuf4));
                      } else {	// read
-						char msr[9], hdr[9], btr[9], evr[9], hbuf1[9];
-						memset(msr, 0, 9);
-						memcpy(msr,readEeprom(HIT_MSECS_BETWEEN_LOC, HIT_MSECS_BETWEEN_SIZE), 8);
+						char msr[HIT_MSECS_BETWEEN_SIZE+1], hdr[HIT_DESENSITIVITY_SIZE+1], btr[HIT_START_BLANKING_SIZE+1], evr[HIT_ENABLE_ON_SIZE+1], hbuf1[9];
+						memset(msr, 0, HIT_MSECS_BETWEEN_SIZE+1);
+						memcpy(msr,readEeprom(HIT_MSECS_BETWEEN_LOC, HIT_MSECS_BETWEEN_SIZE), HIT_MSECS_BETWEEN_SIZE);
                         if (!isNumber(msr)) {  //revert to default value
-                           sprintf(msr, "%i", HIT_MSECS_BETWEEN);
+                           snprintf(msr, HIT_MSECS_BETWEEN_SIZE, "%i", HIT_MSECS_BETWEEN);
                         }
-                        memset(hdr, 0, 9);
-                        memcpy(hdr,readEeprom(HIT_DESENSITIVITY_LOC, HIT_DESENSITIVITY_SIZE), 8);
+                        memset(hdr, 0, HIT_DESENSITIVITY_SIZE+1);
+                        memcpy(hdr,readEeprom(HIT_DESENSITIVITY_LOC, HIT_DESENSITIVITY_SIZE), HIT_DESENSITIVITY_SIZE);
                         if (!isNumber(hdr)) {  //revert to default value
-                           sprintf(hdr, "%i", HIT_DESENSITIVITY);
+                           snprintf(hdr, HIT_DESENSITIVITY_SIZE, "%i", HIT_DESENSITIVITY);
                         }
-                        memset(btr, 0, 9);
-                        memcpy(btr,readEeprom(HIT_START_BLANKING_LOC, HIT_START_BLANKING_SIZE), 8);
+                        memset(btr, 0, HIT_START_BLANKING_SIZE+1);
+                        memcpy(btr,readEeprom(HIT_START_BLANKING_LOC, HIT_START_BLANKING_SIZE), HIT_START_BLANKING_SIZE);
                         if (!isNumber(btr)) {  //revert to default value
-                           sprintf(btr, "%i", HIT_START_BLANKING);
+                           snprintf(btr, HIT_START_BLANKING_SIZE, "%i", HIT_START_BLANKING);
                         }
-                        memset(evr, 0, 9);
-                        memcpy(evr,readEeprom(HIT_ENABLE_ON_LOC, HIT_ENABLE_ON_SIZE), 8);
+                        memset(evr, 0, HIT_ENABLE_ON_SIZE+1);
+                        memcpy(evr,readEeprom(HIT_ENABLE_ON_LOC, HIT_ENABLE_ON_SIZE), HIT_ENABLE_ON_SIZE);
                         if (!isNumber(evr)) {  //revert to default value
-                           sprintf(evr, "%i", HIT_ENABLE_ON);
+                           snprintf(evr, HIT_ENABLE_ON_SIZE, "%i", HIT_ENABLE_ON);
                         }
                         snprintf(wbuf, 1024, "I H %s %s %s %s\n", msr, hdr, btr, evr);
                         
@@ -830,26 +830,26 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         //write
                         char jbuf1[5], jbuf2[5];
                         // no loop or infinite loop
-                        sprintf(jbuf1, "%i", jparam1);
+                        snprintf(jbuf1, 5, "%i", jparam1);
                         // mode
-                        sprintf(jbuf2, "%i", jparam2);
+                        snprintf(jbuf2, 5, "%i", jparam2);
                         // write out the hit calibration parameters
                         if (memcmp(jbuf1, "0", 1)==1) {	// no loop
-                           snprintf(wbuf, 1024, "I J %s %s\n", writeEeprom(SES_LOOP_LOC, strlen(jbuf1)+1, SES_LOOP_SIZE, "1"), writeEeprom(SES_MODE_LOC, strlen(jbuf2)+1, SES_MODE_SIZE, jbuf2));
+                           snprintf(wbuf, 1024, "I J %s %s\n", writeEeprom(SES_LOOP_LOC, strnlen(jbuf1, 5), SES_LOOP_SIZE, "1"), writeEeprom(SES_MODE_LOC, strnlen(jbuf2, 5), SES_MODE_SIZE, jbuf2));
                         } else {	// infinite loop
-                           snprintf(wbuf, 1024, "I J %s %s\n", writeEeprom(SES_LOOP_LOC, 11, SES_LOOP_SIZE, "0xFFFFFFFF"), writeEeprom(SES_MODE_LOC, strlen(jbuf2)+1, SES_MODE_SIZE, jbuf2));
+                           snprintf(wbuf, 1024, "I J %s %s\n", writeEeprom(SES_LOOP_LOC, 11, SES_LOOP_SIZE, "0xFFFFFFFF"), writeEeprom(SES_MODE_LOC, strnlen(jbuf2, 5), SES_MODE_SIZE, jbuf2));
                         }
                      } else {   // read
                         char loop[SES_SIZE+1], mode[SES_SIZE+1];
                         memset(loop, 0, SES_SIZE+1);
                         memcpy(loop, readEeprom(SES_LOOP_LOC, SES_LOOP_SIZE), SES_SIZE);
                         if (memcmp(loop, "", 1)==0) {  //revert to default value
-                           sprintf(loop, "%i", SES_LOOP);
+                           snprintf(loop, SES_SIZE, "%i", SES_LOOP);
                         }
                         memset(mode, 0, SES_SIZE+1);
                         memcpy(mode, readEeprom(SES_MODE_LOC, SES_MODE_SIZE), SES_SIZE);
                         if (!isNumber(mode)) {  //revert to default value
-                           sprintf(mode, "%i", SES_MODE);
+                           snprintf(mode, SES_SIZE, "%i", SES_MODE);
                         }
                         snprintf(wbuf, 1024, "I J %s %s\n", loop, mode);
                      }
@@ -860,112 +860,112 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         char kbuf5[5], kbuf6[5], kbuf7[5], kbuf8[5];    
                         char kbuf9[5], kbuf10[5], kbuf11[5], kbuf12[5];  
                         // exists
-                        sprintf(smkExist, "%i", kexists);                    
+                        snprintf(smkExist, 5, "%i", kexists);                    
                         // activate
-                        sprintf(kbuf1, "%i", kparam1);
+                        snprintf(kbuf1, 5, "%i", kparam1);
                         // activate on what kind of exposure
-                        sprintf(kbuf2, "%i", kparam2);
+                        snprintf(kbuf2, 5, "%i", kparam2);
                         // activate on hit
-                        sprintf(kbuf3, "%i", kparam3);
+                        snprintf(kbuf3, 5, "%i", kparam3);
                         // activate on kill
-                        sprintf(kbuf4, "%i", kparam4);
+                        snprintf(kbuf4, 5, "%i", kparam4);
                         // milliseconds on time
-                        sprintf(kbuf5, "%i", kparam5);
+                        snprintf(kbuf5, 5, "%i", kparam5);
                         // milliseconds off time
-                        sprintf(kbuf6, "%i", kparam6);
+                        snprintf(kbuf6, 5, "%i", kparam6);
                         // start delay
-                        sprintf(kbuf7, "%i", kparam7);
+                        snprintf(kbuf7, 5, "%i", kparam7);
                         // repeat delay
-                        sprintf(kbuf8, "%i", kparam8);
+                        snprintf(kbuf8, 5, "%i", kparam8);
                         // repeat count
-                        sprintf(kbuf9, "%i", kparam9);
+                        snprintf(kbuf9, 5, "%i", kparam9);
                         // ex1
-                        sprintf(kbuf10, "%i", kparam10);
+                        snprintf(kbuf10, 5, "%i", kparam10);
                         // ex2
-                        sprintf(kbuf11, "%i", kparam11);
+                        snprintf(kbuf11, 5, "%i", kparam11);
                         // ex3
-                        sprintf(kbuf12, "%i", kparam12);
+                        snprintf(kbuf12, 5, "%i", kparam12);
 						// write all the mfs defaults
                         snprintf(wbuf, 1024, "I K %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
-    writeEeprom(SMK_EXISTS_LOC, strlen(smkExist)+1, SMK_EXISTS_SIZE, smkExist),
-	writeEeprom(SMK_ACTIVATE_LOC, strlen(kbuf1)+1, SMK_ACTIVATE_SIZE, kbuf1),
-    writeEeprom(SMK_ACTIVATE_EXPOSE_LOC, strlen(kbuf2)+1, SMK_ACTIVATE_EXPOSE_SIZE, kbuf2), 
-    writeEeprom(SMK_ACTIVATE_ON_HIT_LOC, strlen(kbuf3)+1, SMK_ACTIVATE_ON_HIT_SIZE, kbuf3), 
-    writeEeprom(SMK_ACTIVATE_ON_KILL_LOC, strlen(kbuf4)+1, SMK_ACTIVATE_ON_KILL_SIZE, kbuf4),
-    writeEeprom(SMK_MS_ON_TIME_LOC, strlen(kbuf5)+1, SMK_MS_ON_TIME_SIZE, kbuf5),
-    writeEeprom(SMK_MS_OFF_TIME_LOC, strlen(kbuf6)+1, SMK_MS_OFF_TIME_SIZE, kbuf6),
-    writeEeprom(SMK_START_DELAY_LOC, strlen(kbuf7)+1, SMK_START_DELAY_SIZE, kbuf7),
-    writeEeprom(SMK_REPEAT_DELAY_LOC, strlen(kbuf8)+1, SMK_REPEAT_DELAY_SIZE, kbuf8),
-    writeEeprom(SMK_REPEAT_COUNT_LOC, strlen(kbuf9)+1, SMK_REPEAT_COUNT_SIZE, kbuf9),
-    writeEeprom(SMK_EX1_LOC, strlen(kbuf10)+1, SMK_EX1_SIZE, kbuf10),
-    writeEeprom(SMK_EX2_LOC, strlen(kbuf11)+1, SMK_EX2_SIZE, kbuf11),
-    writeEeprom(SMK_EX3_LOC, strlen(kbuf12)+1, SMK_EX3_SIZE, kbuf12));
+    writeEeprom(SMK_EXISTS_LOC, strnlen(smkExist, 5), SMK_EXISTS_SIZE, smkExist),
+	writeEeprom(SMK_ACTIVATE_LOC, strnlen(kbuf1), SMK_ACTIVATE_SIZE, kbuf1),
+    writeEeprom(SMK_ACTIVATE_EXPOSE_LOC, strnlen(kbuf2, 5), SMK_ACTIVATE_EXPOSE_SIZE, kbuf2), 
+    writeEeprom(SMK_ACTIVATE_ON_HIT_LOC, strnlen(kbuf3, 5), SMK_ACTIVATE_ON_HIT_SIZE, kbuf3), 
+    writeEeprom(SMK_ACTIVATE_ON_KILL_LOC, strnlen(kbuf4, 5), SMK_ACTIVATE_ON_KILL_SIZE, kbuf4),
+    writeEeprom(SMK_MS_ON_TIME_LOC, strnlen(kbuf5, 5), SMK_MS_ON_TIME_SIZE, kbuf5),
+    writeEeprom(SMK_MS_OFF_TIME_LOC, strnlen(kbuf6, 5), SMK_MS_OFF_TIME_SIZE, kbuf6),
+    writeEeprom(SMK_START_DELAY_LOC, strnlen(kbuf7, 5), SMK_START_DELAY_SIZE, kbuf7),
+    writeEeprom(SMK_REPEAT_DELAY_LOC, strnlen(kbuf8, 5), SMK_REPEAT_DELAY_SIZE, kbuf8),
+    writeEeprom(SMK_REPEAT_COUNT_LOC, strnlen(kbuf9, 5), SMK_REPEAT_COUNT_SIZE, kbuf9),
+    writeEeprom(SMK_EX1_LOC, strnlen(kbuf10, 5), SMK_EX1_SIZE, kbuf10),
+    writeEeprom(SMK_EX2_LOC, strnlen(kbuf11, 5), SMK_EX2_SIZE, kbuf11),
+    writeEeprom(SMK_EX3_LOC, strnlen(kbuf12, 5), SMK_EX3_SIZE, kbuf12));
                      } else {	// read
 						char smkExists[SMK_SIZE+1], smk1[SMK_SIZE+1], smk2[SMK_SIZE+1], smk3[SMK_SIZE+1], smk4[SMK_SIZE+1], smk5[SMK_SIZE+1], smk6[SMK_SIZE+1], smk7[SMK_SIZE+1], smk8[SMK_SIZE+1], smk9[SMK_SIZE+1], smk10[SMK_SIZE+1], smk11[SMK_SIZE+1], smk12[MFS_SIZE+1];
                         memset(smkExists, 0, SMK_SIZE+1);
 						memcpy(smkExists,readEeprom(SMK_EXISTS_LOC, SMK_EXISTS_SIZE), SMK_SIZE);
                         if (!isNumber(smkExists)) {  //revert to default value
-                           sprintf(smkExists, "%i", SMK_EXISTS);
+                           snprintf(smkExists, SMK_SIZE, "%i", SMK_EXISTS);
                         }
 						memset(smk1, 0, SMK_SIZE+1);
 						memcpy(smk1,readEeprom(SMK_ACTIVATE_LOC, SMK_ACTIVATE_SIZE), SMK_SIZE);
                         if (!isNumber(smk1)) {  //revert to default value
-                           sprintf(smk1, "%i", SMK_ACTIVATE);
+                           snprintf(smk1, SMK_SIZE, "%i", SMK_ACTIVATE);
                         }
                         memset(smk2, 0, SMK_SIZE+1);
                         memcpy(smk2,readEeprom(SMK_ACTIVATE_EXPOSE_LOC, SMK_ACTIVATE_EXPOSE_SIZE), SMK_SIZE);
                         if (!isNumber(smk2)) {  //revert to default value
-                           sprintf(smk2, "%i", SMK_ACTIVATE_EXPOSE);
+                           snprintf(smk2, SMK_SIZE, "%i", SMK_ACTIVATE_EXPOSE);
                         }
                         memset(smk3, 0, MFS_SIZE+1);
                         memcpy(smk3,readEeprom(SMK_ACTIVATE_ON_HIT_LOC, SMK_ACTIVATE_ON_HIT_SIZE), SMK_SIZE);
                         if (!isNumber(smk3)) {  //revert to default value
-                           sprintf(smk3, "%i", SMK_ACTIVATE_ON_HIT);
+                           snprintf(smk3, SMK_SIZE, "%i", SMK_ACTIVATE_ON_HIT);
                         }
                         memset(smk4, 0, SMK_SIZE+1);
                         memcpy(smk4,readEeprom(SMK_ACTIVATE_ON_KILL_LOC, SMK_ACTIVATE_ON_KILL_SIZE), SMK_SIZE);
                         if (!isNumber(smk4)) {  //revert to default value
-                           sprintf(smk4, "%i", SMK_ACTIVATE_ON_KILL);
+                           snprintf(smk4, SMK_SIZE, "%i", SMK_ACTIVATE_ON_KILL);
                         }
                         memset(smk5, 0, SMK_SIZE+1);
                         memcpy(smk5,readEeprom(SMK_MS_ON_TIME_LOC, SMK_MS_ON_TIME_SIZE), SMK_SIZE);
                         if (!isNumber(smk5)) {  //revert to default value
-                           sprintf(smk5, "%i", SMK_MS_ON_TIME);
+                           snprintf(smk5, SMK_SIZE, "%i", SMK_MS_ON_TIME);
                         }
                         memset(smk6, 0, SMK_SIZE+1);
                         memcpy(smk6,readEeprom(SMK_MS_OFF_TIME_LOC, SMK_MS_OFF_TIME_SIZE), SMK_SIZE);
                         if (!isNumber(smk6)) {  //revert to default value
-                           sprintf(smk6, "%i", MFS_MS_OFF_TIME);
+                           snprintf(smk6, SMK_SIZE, "%i", MFS_MS_OFF_TIME);
                         }
                         memset(smk7, 0, SMK_SIZE+1);
                         memcpy(smk7,readEeprom(SMK_START_DELAY_LOC, SMK_START_DELAY_SIZE), SMK_SIZE);
                         if (!isNumber(smk7)) {  //revert to default value
-                           sprintf(smk7, "%i", SMK_START_DELAY);
+                           snprintf(smk7, SMK_SIZE, "%i", SMK_START_DELAY);
                         }
                         memset(smk8, 0, SMK_SIZE+1);
                         memcpy(smk8,readEeprom(SMK_REPEAT_DELAY_LOC, SMK_REPEAT_DELAY_SIZE), SMK_SIZE);
                         if (!isNumber(smk8)) {  //revert to default value
-                           sprintf(smk8, "%i", SMK_REPEAT_DELAY);
+                           snprintf(smk8, SMK_SIZE, "%i", SMK_REPEAT_DELAY);
                         }
                         memset(smk9, 0, SMK_SIZE+1);
                         memcpy(smk9,readEeprom(SMK_REPEAT_COUNT_LOC, SMK_REPEAT_COUNT_SIZE), SMK_SIZE);
                         if (!isNumber(smk9)) {  //revert to default value
-                           sprintf(smk9, "%i", SMK_REPEAT_COUNT);
+                           snprintf(smk9, SMK_SIZE, "%i", SMK_REPEAT_COUNT);
                         }
                         memset(smk10, 0, SMK_SIZE+1);
                         memcpy(smk10,readEeprom(SMK_EX1_LOC, SMK_EX1_SIZE), SMK_SIZE);
                         if (!isNumber(smk10)) {  //revert to default value
-                           sprintf(smk10, "%i", SMK_EX1);
+                           snprintf(smk10, SMK_SIZE, "%i", SMK_EX1);
                         }
                         memset(smk11, 0, SMK_SIZE+1);
                         memcpy(smk11,readEeprom(SMK_EX2_LOC, SMK_EX2_SIZE), SMK_SIZE);
                         if (!isNumber(smk11)) {  //revert to default value
-                           sprintf(smk11, "%i", SMK_EX2);
+                           snprintf(smk11, SMK_SIZE, "%i", SMK_EX2);
                         }
                         memset(smk12, 0, SMK_SIZE+1);
                         memcpy(smk12,readEeprom(SMK_EX3_LOC, SMK_EX3_SIZE), SMK_SIZE);
                         if (!isNumber(smk12)) {  //revert to default value
-                           sprintf(smk12, "%i", SMK_EX3);
+                           snprintf(smk12, SMK_SIZE, "%i", SMK_EX3);
                         }
                         snprintf(wbuf, 1024, "I K %s %s %s %s %s %s %s %s %s %s %s %s %s\n", smkExists, smk1, smk2, smk3, smk4, smk5, smk6, smk7, smk8, smk9, smk10, smk11, smk12);
                         
@@ -995,121 +995,121 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         char nbuf5[5], nbuf6[5], nbuf7[5], nbuf8[5];    
                         char nbuf9[5], nbuf10[5], nbuf11[5], nbuf12[5], nbuf13[5];  
                         // exists
-                        sprintf(mfsExist, "%i", nexists);                
+                        snprintf(mfsExist, 5, "%i", nexists);                
                         // activate
-                        sprintf(nbuf1, "%i", nparam1);
+                        snprintf(nbuf1, 5, "%i", nparam1);
                         // activate on what kind of exposure
-                        sprintf(nbuf2, "%i", nparam2);
+                        snprintf(nbuf2, 5, "%i", nparam2);
                         // activate on hit
-                        sprintf(nbuf3, "%i", nparam3);
+                        snprintf(nbuf3, 5, "%i", nparam3);
                         // activate on kill
-                        sprintf(nbuf4, "%i", nparam4);
+                        snprintf(nbuf4, 5, "%i", nparam4);
                         // milliseconds on time
-                        sprintf(nbuf5, "%i", nparam5);
+                        snprintf(nbuf5, 5, "%i", nparam5);
                         // milliseconds off time
-                        sprintf(nbuf6, "%i", nparam6);
+                        snprintf(nbuf6, 5, "%i", nparam6);
                         // start delay
-                        sprintf(nbuf7, "%i", nparam7);
+                        snprintf(nbuf7, 5, "%i", nparam7);
                         // repeat delay
-                        sprintf(nbuf8, "%i", nparam8);
+                        snprintf(nbuf8, 5, "%i", nparam8);
                         // repeat count
-                        sprintf(nbuf9, "%i", nparam9);
+                        snprintf(nbuf9, 5, "%i", nparam9);
                         // ex1
-                        sprintf(nbuf10, "%i", nparam10);
+                        snprintf(nbuf10, 5, "%i", nparam10);
                         // ex2
-                        sprintf(nbuf11, "%i", nparam11);
+                        snprintf(nbuf11, 5, "%i", nparam11);
                         // ex3
-                        sprintf(nbuf12, "%i", nparam12);
+                        snprintf(nbuf12, 5, "%i", nparam12);
                         // mode
-                        sprintf(nbuf13, "%i", nparam13);
+                        snprintf(nbuf13, 5, "%i", nparam13);
 						// write all the mfs defaults
                         snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
-    writeEeprom(MFS_EXISTS_LOC, strlen(mfsExist)+1, MFS_EXISTS_SIZE, mfsExist),
-	writeEeprom(MFS_ACTIVATE_LOC, strlen(nbuf1)+1, MFS_ACTIVATE_SIZE, nbuf1),
-    writeEeprom(MFS_ACTIVATE_EXPOSE_LOC, strlen(nbuf2)+1, MFS_ACTIVATE_EXPOSE_SIZE, nbuf2), 
-    writeEeprom(MFS_ACTIVATE_ON_HIT_LOC, strlen(nbuf3)+1, MFS_ACTIVATE_ON_HIT_SIZE, nbuf3), 
-    writeEeprom(MFS_ACTIVATE_ON_KILL_LOC, strlen(nbuf4)+1, MFS_ACTIVATE_ON_KILL_SIZE, nbuf4),
-    writeEeprom(MFS_MS_ON_TIME_LOC, strlen(nbuf5)+1, MFS_MS_ON_TIME_SIZE, nbuf5),
-    writeEeprom(MFS_MS_OFF_TIME_LOC, strlen(nbuf6)+1, MFS_MS_OFF_TIME_SIZE, nbuf6),
-    writeEeprom(MFS_START_DELAY_LOC, strlen(nbuf7)+1, MFS_START_DELAY_SIZE, nbuf7),
-    writeEeprom(MFS_REPEAT_DELAY_LOC, strlen(nbuf8)+1, MFS_REPEAT_DELAY_SIZE, nbuf8),
-    writeEeprom(MFS_REPEAT_COUNT_LOC, strlen(nbuf9)+1, MFS_REPEAT_COUNT_SIZE, nbuf9),
-    writeEeprom(MFS_EX1_LOC, strlen(nbuf10)+1, MFS_EX1_SIZE, nbuf10),
-    writeEeprom(MFS_EX2_LOC, strlen(nbuf11)+1, MFS_EX2_SIZE, nbuf11),
-    writeEeprom(MFS_EX3_LOC, strlen(nbuf12)+1, MFS_EX3_SIZE, nbuf12),
-    writeEeprom(MFS_MODE_LOC, strlen(nbuf13)+1, MFS_MODE_SIZE, nbuf13));
+    writeEeprom(MFS_EXISTS_LOC, strnlen(mfsExist, 5), MFS_EXISTS_SIZE, mfsExist),
+	writeEeprom(MFS_ACTIVATE_LOC, strnlen(nbuf1, 5), MFS_ACTIVATE_SIZE, nbuf1),
+    writeEeprom(MFS_ACTIVATE_EXPOSE_LOC, strnlen(nbuf2, 5), MFS_ACTIVATE_EXPOSE_SIZE, nbuf2), 
+    writeEeprom(MFS_ACTIVATE_ON_HIT_LOC, strnlen(nbuf3, 5), MFS_ACTIVATE_ON_HIT_SIZE, nbuf3), 
+    writeEeprom(MFS_ACTIVATE_ON_KILL_LOC, strnlen(nbuf4, 5), MFS_ACTIVATE_ON_KILL_SIZE, nbuf4),
+    writeEeprom(MFS_MS_ON_TIME_LOC, strnlen(nbuf5, 5), MFS_MS_ON_TIME_SIZE, nbuf5),
+    writeEeprom(MFS_MS_OFF_TIME_LOC, strnlen(nbuf6, 5), MFS_MS_OFF_TIME_SIZE, nbuf6),
+    writeEeprom(MFS_START_DELAY_LOC, strnlen(nbuf7, 5), MFS_START_DELAY_SIZE, nbuf7),
+    writeEeprom(MFS_REPEAT_DELAY_LOC, strnlen(nbuf8, 5), MFS_REPEAT_DELAY_SIZE, nbuf8),
+    writeEeprom(MFS_REPEAT_COUNT_LOC, strnlen(nbuf9, 5), MFS_REPEAT_COUNT_SIZE, nbuf9),
+    writeEeprom(MFS_EX1_LOC, strnlen(nbuf10, 5), MFS_EX1_SIZE, nbuf10),
+    writeEeprom(MFS_EX2_LOC, strnlen(nbuf11, 5), MFS_EX2_SIZE, nbuf11),
+    writeEeprom(MFS_EX3_LOC, strnlen(nbuf12, 5), MFS_EX3_SIZE, nbuf12),
+    writeEeprom(MFS_MODE_LOC, strnlen(nbuf13, 5), MFS_MODE_SIZE, nbuf13));
                      } else {	// read
 						char mfsExists[MFS_SIZE+1], mfs1[MFS_SIZE+1], mfs2[MFS_SIZE+1], mfs3[MFS_SIZE+1], mfs4[MFS_SIZE+1], mfs5[MFS_SIZE+1], mfs6[MFS_SIZE+1], mfs7[MFS_SIZE+1], mfs8[MFS_SIZE+1], mfs9[MFS_SIZE+1], mfs10[MFS_SIZE+1], mfs11[MFS_SIZE+1], mfs12[MFS_SIZE+1], mfs13[MFS_SIZE+1];
 						// exists
 						memset(mfsExists, 0, MFS_SIZE+1);
 						memcpy(mfsExists,readEeprom(MFS_EXISTS_LOC, MFS_EXISTS_SIZE), MFS_SIZE);
 						if (!isNumber(mfsExists)) {  //revert to default value
-                           sprintf(mfsExists, "%i", MFS_EXISTS);
+                           snprintf(mfsExists, MFS_SIZE, "%i", MFS_EXISTS);
                         }
 						memset(mfs1, 0, MFS_SIZE+1);
 						memcpy(mfs1,readEeprom(MFS_ACTIVATE_LOC, MFS_ACTIVATE_SIZE), MFS_SIZE);
                         if (!isNumber(mfs1)) {  //revert to default value
-                           sprintf(mfs1, "%i", MFS_ACTIVATE);
+                           snprintf(mfs1, MFS_SIZE, "%i", MFS_ACTIVATE);
                         }
                         memset(mfs2, 0, MFS_SIZE+1);
                         memcpy(mfs2,readEeprom(MFS_ACTIVATE_EXPOSE_LOC, MFS_ACTIVATE_EXPOSE_SIZE), MFS_SIZE);
                         if (!isNumber(mfs2)) {  //revert to default value
-                           sprintf(mfs2, "%i", MFS_ACTIVATE_EXPOSE);
+                           snprintf(mfs2, MFS_SIZE, "%i", MFS_ACTIVATE_EXPOSE);
                         }
                         memset(mfs3, 0, MFS_SIZE+1);
                         memcpy(mfs3,readEeprom(MFS_ACTIVATE_ON_HIT_LOC, MFS_ACTIVATE_ON_HIT_SIZE), MFS_SIZE);
                         if (!isNumber(mfs3)) {  //revert to default value
-                           sprintf(mfs3, "%i", MFS_ACTIVATE_ON_HIT);
+                           snprintf(mfs3, MFS_SIZE, "%i", MFS_ACTIVATE_ON_HIT);
                         }
                         memset(mfs4, 0, MFS_SIZE+1);
                         memcpy(mfs4,readEeprom(MFS_ACTIVATE_ON_KILL_LOC, MFS_ACTIVATE_ON_KILL_SIZE), MFS_SIZE);
                         if (!isNumber(mfs4)) {  //revert to default value
-                           sprintf(mfs4, "%i", MFS_ACTIVATE_ON_KILL);
+                           snprintf(mfs4, MFS_SIZE, "%i", MFS_ACTIVATE_ON_KILL);
                         }
                         memset(mfs5, 0, MFS_SIZE+1);
                         memcpy(mfs5,readEeprom(MFS_MS_ON_TIME_LOC, MFS_MS_ON_TIME_SIZE), MFS_SIZE);
                         if (!isNumber(mfs5)) {  //revert to default value
-                           sprintf(mfs5, "%i", MFS_MS_ON_TIME);
+                           snprintf(mfs5, MFS_SIZE, "%i", MFS_MS_ON_TIME);
                         }
                         memset(mfs6, 0, MFS_SIZE+1);
                         memcpy(mfs6,readEeprom(MFS_MS_OFF_TIME_LOC, MFS_MS_OFF_TIME_SIZE), MFS_SIZE);
                         if (!isNumber(mfs6)) {  //revert to default value
-                           sprintf(mfs6, "%i", MFS_MS_OFF_TIME);
+                           snprintf(mfs6, MFS_SIZE, "%i", MFS_MS_OFF_TIME);
                         }
                         memset(mfs7, 0, MFS_SIZE+1);
                         memcpy(mfs7,readEeprom(MFS_START_DELAY_LOC, MFS_START_DELAY_SIZE), MFS_SIZE);
                         if (!isNumber(mfs7)) {  //revert to default value
-                           sprintf(mfs7, "%i", MFS_START_DELAY);
+                           snprintf(mfs7, MFS_SIZE, "%i", MFS_START_DELAY);
                         }
                         memset(mfs8, 0, MFS_SIZE+1);
                         memcpy(mfs8,readEeprom(MFS_REPEAT_DELAY_LOC, MFS_REPEAT_DELAY_SIZE), MFS_SIZE);
                         if (!isNumber(mfs8)) {  //revert to default value
-                           sprintf(mfs8, "%i", MFS_REPEAT_DELAY);
+                           snprintf(mfs8, MFS_SIZE, "%i", MFS_REPEAT_DELAY);
                         }
                         memset(mfs9, 0, MFS_SIZE+1);
                         memcpy(mfs9,readEeprom(MFS_REPEAT_COUNT_LOC, MFS_REPEAT_COUNT_SIZE), MFS_SIZE);
                         if (!isNumber(mfs9)) {  //revert to default value
-                           sprintf(mfs9, "%i", MFS_REPEAT_COUNT);
+                           snprintf(mfs9, MFS_SIZE, "%i", MFS_REPEAT_COUNT);
                         }
                         memset(mfs10, 0, MFS_SIZE+1);
                         memcpy(mfs10,readEeprom(MFS_EX1_LOC, MFS_EX1_SIZE), MFS_SIZE);
                         if (!isNumber(mfs10)) {  //revert to default value
-                           sprintf(mfs10, "%i", MFS_EX1);
+                           snprintf(mfs10, MFS_SIZE, "%i", MFS_EX1);
                         }
                         memset(mfs11, 0, MFS_SIZE+1);
                         memcpy(mfs11,readEeprom(MFS_EX2_LOC, MFS_EX2_SIZE), MFS_SIZE);
                         if (!isNumber(mfs11)) {  //revert to default value
-                           sprintf(mfs11, "%i", MFS_EX2);
+                           snprintf(mfs11, MFS_SIZE, "%i", MFS_EX2);
                         }
                         memset(mfs12, 0, MFS_SIZE+1);
                         memcpy(mfs12,readEeprom(MFS_EX3_LOC, MFS_EX3_SIZE), MFS_SIZE);
                         if (!isNumber(mfs12)) {  //revert to default value
-                           sprintf(mfs12, "%i", MFS_EX3);
+                           snprintf(mfs12, MFS_SIZE, "%i", MFS_EX3);
                         }
                         memset(mfs13, 0, MFS_SIZE+1);
                         memcpy(mfs13,readEeprom(MFS_MODE_LOC, MFS_MODE_SIZE), MFS_SIZE);
                         if (!isNumber(mfs13)) {  //revert to default value
-                           sprintf(mfs13, "%i", MFS_MODE);
+                           snprintf(mfs13, MFS_SIZE, "%i", MFS_MODE);
                         }
                         snprintf(wbuf, 1024, "I N %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n", mfsExists, mfs1, mfs2, mfs3, mfs4, mfs5, mfs6, mfs7, mfs8, mfs9, mfs10, mfs11, mfs12, mfs13);
                         
@@ -1121,112 +1121,112 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         char pbuf5[5], pbuf6[5], pbuf7[5], pbuf8[5];    
                         char pbuf9[5], pbuf10[5], pbuf11[5], pbuf12[5];  
                         // exists
-                        sprintf(phiExist, "%i", pexists);                    
+                        snprintf(phiExist, 5, "%i", pexists);                    
                         // activate
-                        sprintf(pbuf1, "%i", pparam1);
+                        snprintf(pbuf1, 5, "%i", pparam1);
                         // activate on what kind of exposure
-                        sprintf(pbuf2, "%i", pparam2);
+                        snprintf(pbuf2, 5, "%i", pparam2);
                         // activate on hit
-                        sprintf(pbuf3, "%i", pparam3);
+                        snprintf(pbuf3, 5, "%i", pparam3);
                         // activate on kill
-                        sprintf(pbuf4, "%i", pparam4);
+                        snprintf(pbuf4, 5, "%i", pparam4);
                         // milliseconds on time
-                        sprintf(pbuf5, "%i", pparam5);
+                        snprintf(pbuf5, 5, "%i", pparam5);
                         // milliseconds off time
-                        sprintf(pbuf6, "%i", pparam6);
+                        snprintf(pbuf6, 5, "%i", pparam6);
                         // start delay
-                        sprintf(pbuf7, "%i", pparam7);
+                        snprintf(pbuf7, 5, "%i", pparam7);
                         // repeat delay
-                        sprintf(pbuf8, "%i", pparam8);
+                        snprintf(pbuf8, 5, "%i", pparam8);
                         // repeat count
-                        sprintf(pbuf9, "%i", pparam9);
+                        snprintf(pbuf9, 5, "%i", pparam9);
                         // ex1
-                        sprintf(pbuf10, "%i", pparam10);
+                        snprintf(pbuf10, 5, "%i", pparam10);
                         // ex2
-                        sprintf(pbuf11, "%i", pparam11);
+                        snprintf(pbuf11, 5, "%i", pparam11);
                         // ex3
-                        sprintf(pbuf12, "%i", pparam12);
+                        snprintf(pbuf12, 5, "%i", pparam12);
 						// write all the phi defaults
                         snprintf(wbuf, 1024, "I P %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
-    writeEeprom(PHI_EXISTS_LOC, strlen(phiExist)+1, PHI_EXISTS_SIZE, phiExist),
-	writeEeprom(PHI_ACTIVATE_LOC, strlen(pbuf1)+1, PHI_ACTIVATE_SIZE, pbuf1),
-    writeEeprom(PHI_ACTIVATE_EXPOSE_LOC, strlen(pbuf2)+1, PHI_ACTIVATE_EXPOSE_SIZE, pbuf2), 
-    writeEeprom(PHI_ACTIVATE_ON_HIT_LOC, strlen(pbuf3)+1, PHI_ACTIVATE_ON_HIT_SIZE, pbuf3), 
-    writeEeprom(PHI_ACTIVATE_ON_KILL_LOC, strlen(pbuf4)+1, PHI_ACTIVATE_ON_KILL_SIZE, pbuf4),
-    writeEeprom(PHI_MS_ON_TIME_LOC, strlen(pbuf5)+1, PHI_MS_ON_TIME_SIZE, pbuf5),
-    writeEeprom(PHI_MS_OFF_TIME_LOC, strlen(pbuf6)+1, PHI_MS_OFF_TIME_SIZE, pbuf6),
-    writeEeprom(PHI_START_DELAY_LOC, strlen(pbuf7)+1, PHI_START_DELAY_SIZE, pbuf7),
-    writeEeprom(PHI_REPEAT_DELAY_LOC, strlen(pbuf8)+1, PHI_REPEAT_DELAY_SIZE, pbuf8),
-    writeEeprom(PHI_REPEAT_COUNT_LOC, strlen(pbuf9)+1, PHI_REPEAT_COUNT_SIZE, pbuf9),
-    writeEeprom(PHI_EX1_LOC, strlen(pbuf10)+1, PHI_EX1_SIZE, pbuf10),
-    writeEeprom(PHI_EX2_LOC, strlen(pbuf11)+1, PHI_EX2_SIZE, pbuf11),
-    writeEeprom(PHI_EX3_LOC, strlen(pbuf12)+1, PHI_EX3_SIZE, pbuf12));
+    writeEeprom(PHI_EXISTS_LOC, strnlen(phiExist, 5), PHI_EXISTS_SIZE, phiExist),
+	writeEeprom(PHI_ACTIVATE_LOC, strnlen(pbuf1, 5), PHI_ACTIVATE_SIZE, pbuf1),
+    writeEeprom(PHI_ACTIVATE_EXPOSE_LOC, strnlen(pbuf2, 5), PHI_ACTIVATE_EXPOSE_SIZE, pbuf2), 
+    writeEeprom(PHI_ACTIVATE_ON_HIT_LOC, strnlen(pbuf3, 5), PHI_ACTIVATE_ON_HIT_SIZE, pbuf3), 
+    writeEeprom(PHI_ACTIVATE_ON_KILL_LOC, strnlen(pbuf4, 5), PHI_ACTIVATE_ON_KILL_SIZE, pbuf4),
+    writeEeprom(PHI_MS_ON_TIME_LOC, strnlen(pbuf5, 5), PHI_MS_ON_TIME_SIZE, pbuf5),
+    writeEeprom(PHI_MS_OFF_TIME_LOC, strnlen(pbuf6, 5), PHI_MS_OFF_TIME_SIZE, pbuf6),
+    writeEeprom(PHI_START_DELAY_LOC, strnlen(pbuf7, 5), PHI_START_DELAY_SIZE, pbuf7),
+    writeEeprom(PHI_REPEAT_DELAY_LOC, strnlen(pbuf8, 5), PHI_REPEAT_DELAY_SIZE, pbuf8),
+    writeEeprom(PHI_REPEAT_COUNT_LOC, strnlen(pbuf9, 5), PHI_REPEAT_COUNT_SIZE, pbuf9),
+    writeEeprom(PHI_EX1_LOC, strnlen(pbuf10, 5), PHI_EX1_SIZE, pbuf10),
+    writeEeprom(PHI_EX2_LOC, strnlen(pbuf11, 5), PHI_EX2_SIZE, pbuf11),
+    writeEeprom(PHI_EX3_LOC, strnlen(pbuf12, 5), PHI_EX3_SIZE, pbuf12));
                      } else {	// read
 						char phiExists[PHI_SIZE+1], phi1[PHI_SIZE+1], phi2[PHI_SIZE+1], phi3[PHI_SIZE+1], phi4[PHI_SIZE+1], phi5[PHI_SIZE+1], phi6[PHI_SIZE+1], phi7[PHI_SIZE+1], phi8[PHI_SIZE+1], phi9[PHI_SIZE+1], phi10[PHI_SIZE+1], phi11[PHI_SIZE+1], phi12[PHI_SIZE+1];
                         memset(phiExists, 0, PHI_SIZE+1);
 						memcpy(phiExists,readEeprom(PHI_EXISTS_LOC, PHI_EXISTS_SIZE), PHI_SIZE);
                         if (!isNumber(phiExists)) {  //revert to default value
-                           sprintf(phiExists, "%i", PHI_EXISTS);
+                           snprintf(phiExists, PHI_SIZE, "%i", PHI_EXISTS);
                         }
 						memset(phi1, 0, PHI_SIZE+1);
 						memcpy(phi1,readEeprom(PHI_ACTIVATE_LOC, PHI_ACTIVATE_SIZE), PHI_SIZE);
                         if (!isNumber(phi1)) {  //revert to default value
-                           sprintf(phi1, "%i", PHI_ACTIVATE);
+                           snprintf(phi1, PHI_SIZE, "%i", PHI_ACTIVATE);
                         }
                         memset(phi2, 0, PHI_SIZE+1);
                         memcpy(phi2,readEeprom(PHI_ACTIVATE_EXPOSE_LOC, PHI_ACTIVATE_EXPOSE_SIZE), PHI_SIZE);
                         if (!isNumber(phi2)) {  //revert to default value
-                           sprintf(phi2, "%i", PHI_ACTIVATE_EXPOSE);
+                           snprintf(phi2, PHI_SIZE, "%i", PHI_ACTIVATE_EXPOSE);
                         }
                         memset(phi3, 0, PHI_SIZE+1);
                         memcpy(phi3,readEeprom(PHI_ACTIVATE_ON_HIT_LOC, PHI_ACTIVATE_ON_HIT_SIZE), PHI_SIZE);
                         if (!isNumber(phi3)) {  //revert to default value
-                           sprintf(phi3, "%i", PHI_ACTIVATE_ON_HIT);
+                           snprintf(phi3, PHI_SIZE, "%i", PHI_ACTIVATE_ON_HIT);
                         }
                         memset(phi4, 0, PHI_SIZE+1);
                         memcpy(phi4,readEeprom(PHI_ACTIVATE_ON_KILL_LOC, PHI_ACTIVATE_ON_KILL_SIZE), PHI_SIZE);
                         if (!isNumber(phi4)) {  //revert to default value
-                           sprintf(phi4, "%i", PHI_ACTIVATE_ON_KILL);
+                           snprintf(phi4, PHI_SIZE, "%i", PHI_ACTIVATE_ON_KILL);
                         }
                         memset(phi5, 0, PHI_SIZE+1);
                         memcpy(phi5,readEeprom(PHI_MS_ON_TIME_LOC, PHI_MS_ON_TIME_SIZE), PHI_SIZE);
                         if (!isNumber(phi5)) {  //revert to default value
-                           sprintf(phi5, "%i", PHI_MS_ON_TIME);
+                           snprintf(phi5, PHI_SIZE, "%i", PHI_MS_ON_TIME);
                         }
                         memset(phi6, 0, PHI_SIZE+1);
                         memcpy(phi6,readEeprom(PHI_MS_OFF_TIME_LOC, PHI_MS_OFF_TIME_SIZE), PHI_SIZE);
                         if (!isNumber(phi6)) {  //revert to default value
-                           sprintf(phi6, "%i", PHI_MS_OFF_TIME);
+                           snprintf(phi6, PHI_SIZE, "%i", PHI_MS_OFF_TIME);
                         }
                         memset(phi7, 0, PHI_SIZE+1);
                         memcpy(phi7,readEeprom(PHI_START_DELAY_LOC, PHI_START_DELAY_SIZE), PHI_SIZE);
                         if (!isNumber(phi7)) {  //revert to default value
-                           sprintf(phi7, "%i", PHI_START_DELAY);
+                           snprintf(phi7, PHI_SIZE, "%i", PHI_START_DELAY);
                         }
                         memset(phi8, 0, PHI_SIZE+1);
                         memcpy(phi8,readEeprom(PHI_REPEAT_DELAY_LOC, PHI_REPEAT_DELAY_SIZE), PHI_SIZE);
                         if (!isNumber(phi8)) {  //revert to default value
-                           sprintf(phi8, "%i", PHI_REPEAT_DELAY);
+                           snprintf(phi8, PHI_SIZE, "%i", PHI_REPEAT_DELAY);
                         }
                         memset(phi9, 0, PHI_SIZE+1);
                         memcpy(phi9,readEeprom(PHI_REPEAT_COUNT_LOC, PHI_REPEAT_COUNT_SIZE), PHI_SIZE);
                         if (!isNumber(phi9)) {  //revert to default value
-                           sprintf(phi9, "%i", PHI_REPEAT_COUNT);
+                           snprintf(phi9, PHI_SIZE, "%i", PHI_REPEAT_COUNT);
                         }
                         memset(phi10, 0, PHI_SIZE+1);
                         memcpy(phi10,readEeprom(PHI_EX1_LOC, PHI_EX1_SIZE), PHI_SIZE);
                         if (!isNumber(phi10)) {  //revert to default value
-                           sprintf(phi10, "%i", PHI_EX1);
+                           snprintf(phi10, PHI_SIZE, "%i", PHI_EX1);
                         }
                         memset(phi11, 0, PHI_SIZE+1);
                         memcpy(phi11,readEeprom(PHI_EX2_LOC, PHI_EX2_SIZE), PHI_SIZE);
                         if (!isNumber(phi11)) {  //revert to default value
-                           sprintf(phi11, "%i", PHI_EX2);
+                           snprintf(phi11, PHI_SIZE, "%i", PHI_EX2);
                         }
                         memset(phi12, 0, PHI_SIZE+1);
                         memcpy(phi12,readEeprom(PHI_EX3_LOC, PHI_EX3_SIZE), PHI_SIZE);
                         if (!isNumber(phi12)) {  //revert to default value
-                           sprintf(phi12, "%i", PHI_EX3);
+                           snprintf(phi12, PHI_SIZE, "%i", PHI_EX3);
                         }
                         snprintf(wbuf, 1024, "I P %s %s %s %s %s %s %s %s %s %s %s %s %s\n", phiExists, phi1, phi2, phi3, phi4, phi5, phi6, phi7, phi8, phi9, phi10, phi11, phi12);
                         
@@ -1242,22 +1242,22 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         //write
                         char sbuf1[5], sbuf2[5];
                         // hit sensor type
-                        sprintf(sbuf1, "%i", sparam1);
+                        snprintf(sbuf1, 5, "%i", sparam1);
                         // Invert sensor input line
-                        sprintf(sbuf2, "%i", sparam2);
+                        snprintf(sbuf2, 5, "%i", sparam2);
                         // write out the hit sensor defaults
                         snprintf(wbuf, 1024, "I S %s %s\n", writeEeprom(HIT_SENSOR_TYPE_LOC, strlen(sbuf1)+1, HIT_SENSOR_TYPE_SIZE, sbuf1), writeEeprom(HIT_SENSOR_INVERT_LOC, strlen(sbuf2)+1, HIT_SENSOR_TYPE_SIZE, sbuf2));
                      } else {   // read
-                        char str[9], isr[9];
-                        memset(str, 0, 9);
-                        memcpy(str, readEeprom(HIT_SENSOR_TYPE_LOC, HIT_SENSOR_TYPE_SIZE), 8);
+                        char str[HIT_SENSOR_TYPE_SIZE+1], isr[HIT_SENSOR_TYPE_SIZE+1];
+                        memset(str, 0, HIT_SENSOR_TYPE_SIZE+1);
+                        memcpy(str, readEeprom(HIT_SENSOR_TYPE_LOC, HIT_SENSOR_TYPE_SIZE), HIT_SENSOR_TYPE_SIZE);
                         if (!isNumber(str)) {  //revert to default value
-                           sprintf(str, "%i", HIT_SENSOR_TYPE);
+                           snprintf(str, HIT_SENSOR_TYPE_SIZE, "%i", HIT_SENSOR_TYPE);
                         }
-                        memset(isr, 0, 9);
-                        memcpy(isr, readEeprom(HIT_SENSOR_INVERT_LOC, HIT_SENSOR_TYPE_SIZE), 8);
+                        memset(isr, 0, HIT_SENSOR_TYPE_SIZE+1);
+                        memcpy(isr, readEeprom(HIT_SENSOR_INVERT_LOC, HIT_SENSOR_TYPE_SIZE), HIT_SENSOR_TYPE_SIZE);
                         if (!isNumber(isr)) {  //revert to default value
-                           sprintf(isr, "%i", HIT_SENSOR_INVERT);
+                           snprintf(isr, HIT_SENSOR_TYPE_SIZE, "%i", HIT_SENSOR_INVERT);
                         }
                         snprintf(wbuf, 1024, "I S %s %s\n", str, isr);
                      }
@@ -1268,112 +1268,112 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         char tbuf5[5], tbuf6[5], tbuf7[5], tbuf8[5];    
                         char tbuf9[5], tbuf10[5], tbuf11[5], tbuf12[5]; 
                         // exists
-                        sprintf(thmExist, "%i", texists);                     
+                        snprintf(thmExist, 5, "%i", texists);                     
                         // activate
-                        sprintf(tbuf1, "%i", tparam1);
+                        snprintf(tbuf1, 5, "%i", tparam1);
                         // activate on what kind of exposure
-                        sprintf(tbuf2, "%i", tparam2);
+                        snprintf(tbuf2, 5, "%i", tparam2);
                         // activate on hit
-                        sprintf(tbuf3, "%i", tparam3);
+                        snprintf(tbuf3, 5, "%i", tparam3);
                         // activate on kill
-                        sprintf(tbuf4, "%i", tparam4);
+                        snprintf(tbuf4, 5, "%i", tparam4);
                         // milliseconds on time
-                        sprintf(tbuf5, "%i", tparam5);
+                        snprintf(tbuf5, 5, "%i", tparam5);
                         // milliseconds off time
-                        sprintf(tbuf6, "%i", tparam6);
+                        snprintf(tbuf6, 5, "%i", tparam6);
                         // start delay
-                        sprintf(tbuf7, "%i", tparam7);
+                        snprintf(tbuf7, 5, "%i", tparam7);
                         // repeat delay
-                        sprintf(tbuf8, "%i", tparam8);
+                        snprintf(tbuf8, 5, "%i", tparam8);
                         // repeat count
-                        sprintf(tbuf9, "%i", tparam9);
+                        snprintf(tbuf9, 5, "%i", tparam9);
                         // ex1
-                        sprintf(tbuf10, "%i", tparam10);
+                        snprintf(tbuf10, 5, "%i", tparam10);
                         // ex2
-                        sprintf(tbuf11, "%i", tparam11);
+                        snprintf(tbuf11, 5, "%i", tparam11);
                         // ex3
-                        sprintf(tbuf12, "%i", tparam12);
+                        snprintf(tbuf12, 5, "%i", tparam12);
 						// write all the thm defaults
                         snprintf(wbuf, 1024, "I T %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
-    writeEeprom(THM_EXISTS_LOC, strlen(thmExist)+1, THM_EXISTS_SIZE, thmExist),
-	writeEeprom(THM_ACTIVATE_LOC, strlen(tbuf1)+1, THM_ACTIVATE_SIZE, tbuf1),
-    writeEeprom(THM_ACTIVATE_EXPOSE_LOC, strlen(tbuf2)+1, THM_ACTIVATE_EXPOSE_SIZE, tbuf2), 
-    writeEeprom(THM_ACTIVATE_ON_HIT_LOC, strlen(tbuf3)+1, THM_ACTIVATE_ON_HIT_SIZE, tbuf3), 
-    writeEeprom(THM_ACTIVATE_ON_KILL_LOC, strlen(tbuf4)+1, THM_ACTIVATE_ON_KILL_SIZE, tbuf4),
-    writeEeprom(THM_MS_ON_TIME_LOC, strlen(tbuf5)+1, THM_MS_ON_TIME_SIZE, tbuf5),
-    writeEeprom(THM_MS_OFF_TIME_LOC, strlen(tbuf6)+1, THM_MS_OFF_TIME_SIZE, tbuf6),
-    writeEeprom(THM_START_DELAY_LOC, strlen(tbuf7)+1, THM_START_DELAY_SIZE, tbuf7),
-    writeEeprom(THM_REPEAT_DELAY_LOC, strlen(tbuf8)+1, THM_REPEAT_DELAY_SIZE, tbuf8),
-    writeEeprom(THM_REPEAT_COUNT_LOC, strlen(tbuf9)+1, THM_REPEAT_COUNT_SIZE, tbuf9),
-    writeEeprom(THM_EX1_LOC, strlen(tbuf10)+1, THM_EX1_SIZE, tbuf10),
-    writeEeprom(THM_EX2_LOC, strlen(tbuf11)+1, THM_EX2_SIZE, tbuf11),
-    writeEeprom(THM_EX3_LOC, strlen(tbuf12)+1, THM_EX3_SIZE, tbuf12));
+    writeEeprom(THM_EXISTS_LOC, strnlen(thmExist, 5), THM_EXISTS_SIZE, thmExist),
+	writeEeprom(THM_ACTIVATE_LOC, strnlen(tbuf1, 5), THM_ACTIVATE_SIZE, tbuf1),
+    writeEeprom(THM_ACTIVATE_EXPOSE_LOC, strnlen(tbuf2, 5), THM_ACTIVATE_EXPOSE_SIZE, tbuf2), 
+    writeEeprom(THM_ACTIVATE_ON_HIT_LOC, strnlen(tbuf3, 5), THM_ACTIVATE_ON_HIT_SIZE, tbuf3), 
+    writeEeprom(THM_ACTIVATE_ON_KILL_LOC, strnlen(tbuf4, 5), THM_ACTIVATE_ON_KILL_SIZE, tbuf4),
+    writeEeprom(THM_MS_ON_TIME_LOC, strnlen(tbuf5, 5), THM_MS_ON_TIME_SIZE, tbuf5),
+    writeEeprom(THM_MS_OFF_TIME_LOC, strnlen(tbuf6, 5), THM_MS_OFF_TIME_SIZE, tbuf6),
+    writeEeprom(THM_START_DELAY_LOC, strnlen(tbuf7, 5), THM_START_DELAY_SIZE, tbuf7),
+    writeEeprom(THM_REPEAT_DELAY_LOC, strnlen(tbuf8, 5), THM_REPEAT_DELAY_SIZE, tbuf8),
+    writeEeprom(THM_REPEAT_COUNT_LOC, strnlen(tbuf9, 5), THM_REPEAT_COUNT_SIZE, tbuf9),
+    writeEeprom(THM_EX1_LOC, strnlen(tbuf10, 5), THM_EX1_SIZE, tbuf10),
+    writeEeprom(THM_EX2_LOC, strnlen(tbuf11, 5), THM_EX2_SIZE, tbuf11),
+    writeEeprom(THM_EX3_LOC, strnlen(tbuf12, 5), THM_EX3_SIZE, tbuf12));
                      } else {	// read
 						char thmExists[THM_SIZE+1], thm1[THM_SIZE+1], thm2[THM_SIZE+1], thm3[THM_SIZE+1], thm4[THM_SIZE+1], thm5[THM_SIZE+1], thm6[THM_SIZE+1], thm7[THM_SIZE+1], thm8[THM_SIZE+1], thm9[THM_SIZE+1], thm10[THM_SIZE+1], thm11[THM_SIZE+1], thm12[THM_SIZE+1];
                         memset(thmExists, 0, THM_SIZE+1);
 						memcpy(thmExists,readEeprom(THM_EXISTS_LOC, THM_EXISTS_SIZE), THM_SIZE);
                         if (!isNumber(thmExists)) {  //revert to default value
-                           sprintf(thmExists, "%i", THM_EXISTS);
+                           snprintf(thmExists, THM_SIZE, "%i", THM_EXISTS);
                         }
 						memset(thm1, 0, THM_SIZE+1);
 						memcpy(thm1,readEeprom(THM_ACTIVATE_LOC, THM_ACTIVATE_SIZE), THM_SIZE);
                         if (!isNumber(thm1)) {  //revert to default value
-                           sprintf(thm1, "%i", THM_ACTIVATE);
+                           snprintf(thm1, THM_SIZE, "%i", THM_ACTIVATE);
                         }
                         memset(thm2, 0, THM_SIZE+1);
                         memcpy(thm2,readEeprom(THM_ACTIVATE_EXPOSE_LOC, THM_ACTIVATE_EXPOSE_SIZE), THM_SIZE);
                         if (!isNumber(thm2)) {  //revert to default value
-                           sprintf(thm2, "%i", THM_ACTIVATE_EXPOSE);
+                           snprintf(thm2, THM_SIZE, "%i", THM_ACTIVATE_EXPOSE);
                         }
                         memset(thm3, 0, THM_SIZE+1);
                         memcpy(thm3,readEeprom(THM_ACTIVATE_ON_HIT_LOC, THM_ACTIVATE_ON_HIT_SIZE), THM_SIZE);
                         if (!isNumber(thm3)) {  //revert to default value
-                           sprintf(thm3, "%i", THM_ACTIVATE_ON_HIT);
+                           snprintf(thm3, THM_SIZE, "%i", THM_ACTIVATE_ON_HIT);
                         }
                         memset(thm4, 0, THM_SIZE+1);
                         memcpy(thm4,readEeprom(THM_ACTIVATE_ON_KILL_LOC, THM_ACTIVATE_ON_KILL_SIZE), THM_SIZE);
                         if (!isNumber(thm4)) {  //revert to default value
-                           sprintf(thm4, "%i", THM_ACTIVATE_ON_KILL);
+                           snprintf(thm4, THM_SIZE, "%i", THM_ACTIVATE_ON_KILL);
                         }
                         memset(thm5, 0, THM_SIZE+1);
                         memcpy(thm5,readEeprom(THM_MS_ON_TIME_LOC, THM_MS_ON_TIME_SIZE), THM_SIZE);
                         if (!isNumber(thm5)) {  //revert to default value
-                           sprintf(thm5, "%i", THM_MS_ON_TIME);
+                           snprintf(thm5, THM_SIZE, "%i", THM_MS_ON_TIME);
                         }
                         memset(thm6, 0, THM_SIZE+1);
                         memcpy(thm6,readEeprom(THM_MS_OFF_TIME_LOC, THM_MS_OFF_TIME_SIZE), THM_SIZE);
                         if (!isNumber(thm6)) {  //revert to default value
-                           sprintf(thm6, "%i", THM_MS_OFF_TIME);
+                           snprintf(thm6, THM_SIZE, "%i", THM_MS_OFF_TIME);
                         }
                         memset(thm7, 0, THM_SIZE+1);
                         memcpy(thm7,readEeprom(THM_START_DELAY_LOC, THM_START_DELAY_SIZE), THM_SIZE);
                         if (!isNumber(thm7)) {  //revert to default value
-                           sprintf(thm7, "%i", THM_START_DELAY);
+                           snprintf(thm7, THM_SIZE, "%i", THM_START_DELAY);
                         }
                         memset(thm8, 0, THM_SIZE+1);
                         memcpy(thm8,readEeprom(THM_REPEAT_DELAY_LOC, THM_REPEAT_DELAY_SIZE), THM_SIZE);
                         if (!isNumber(thm8)) {  //revert to default value
-                           sprintf(thm8, "%i", THM_REPEAT_DELAY);
+                           snprintf(thm8, THM_SIZE, "%i", THM_REPEAT_DELAY);
                         }
                         memset(thm9, 0, THM_SIZE+1);
                         memcpy(thm9,readEeprom(THM_REPEAT_COUNT_LOC, THM_REPEAT_COUNT_SIZE), THM_SIZE);
                         if (!isNumber(thm9)) {  //revert to default value
-                           sprintf(thm9, "%i", THM_REPEAT_COUNT);
+                           snprintf(thm9, THM_SIZE, "%i", THM_REPEAT_COUNT);
                         }
                         memset(thm10, 0, THM_SIZE+1);
                         memcpy(thm10,readEeprom(THM_EX1_LOC, THM_EX1_SIZE), THM_SIZE);
                         if (!isNumber(thm10)) {  //revert to default value
-                           sprintf(thm10, "%i", THM_EX1);
+                           snprintf(thm10, THM_SIZE, "%i", THM_EX1);
                         }
                         memset(thm11, 0, THM_SIZE+1);
                         memcpy(thm11,readEeprom(THM_EX2_LOC, THM_EX2_SIZE), THM_SIZE);
                         if (!isNumber(thm11)) {  //revert to default value
-                           sprintf(thm11, "%i", THM_EX2);
+                           snprintf(thm11, THM_SIZE, "%i", THM_EX2);
                         }
                         memset(thm12, 0, THM_SIZE+1);
                         memcpy(thm12,readEeprom(THM_EX3_LOC, THM_EX3_SIZE), THM_SIZE);
                         if (!isNumber(thm12)) {  //revert to default value
-                           sprintf(thm12, "%i", THM_EX3);
+                           snprintf(thm12, THM_SIZE, "%i", THM_EX3);
                         }
                         snprintf(wbuf, 1024, "I T %s %s %s %s %s %s %s %s %s %s %s %s %s\n", thmExists, thm1, thm2, thm3, thm4, thm5, thm6, thm7, thm8, thm9, thm10, thm11, thm12);
                      }
@@ -1386,7 +1386,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         memset(serial_holder, 0 , SERIAL_SIZE+1);
                         memcpy(serial_holder, readEeprom(SERIAL_NUMBER_LOC, SERIAL_NUMBER_SIZE), SERIAL_SIZE);
                         if (memcmp(serial_holder, "", 1)==0) { //use default value
-                           sprintf(serial_holder, "%s", SERIAL_NUMBER);
+                           snprintf(serial_holder, SERIAL_SIZE, "%s", SERIAL_NUMBER);
                         }
                         snprintf(wbuf, 1024, "I X %s\n", serial_holder); 
                      }
@@ -1457,7 +1457,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Request MGL defaults\nFormat: I G\nChange MGL defaults\nFormat: I G (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
                                 break;
                             case 'H': case 'h':
-                                snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: H\nChange hit calibration parameters\nFormat: H (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose 0-4)enable_on_value (0-blank_on_concealed, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_always)\n");
+                                snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: I H\nChange hit calibration parameters\nFormat: I H (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_on_concealed, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_always)\n");
                                 break;
                             case 'J': case 'j':
                                 snprintf(wbuf, 1024, "Request SES defaults\nFormat: I J\nChange SES defaults\nFormat: I J (1-No Loop|0xFFFFFFFF-Infinite Loop) (0-maintenance|1-testing|2-record|3-lifefire|4-Error|5-Stop|6-record started|7-encoding started|8-recording/encoding finished|9-copying)\n");
