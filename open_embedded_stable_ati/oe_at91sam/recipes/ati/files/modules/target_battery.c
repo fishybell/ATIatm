@@ -18,7 +18,7 @@
 // and use of more than one ADC channel at a time.
 
 // various timer timeouts
-#define TIMEOUT_IN_SECONDS		30
+#define TIMEOUT_IN_SECONDS		10
 #define ADC_READ_DELAY_IN_MSECONDS	20
 #define LED_BLINK_ON_IN_MSECONDS	100
 #define LED_BLINK_COUNT			3
@@ -26,6 +26,7 @@
 #define LED_CHARGING_ON_IN_MSECONDS	500
 #define LED_CHARGING_OFF_IN_MSECONDS	500
 #define SHUTDOWN_IN_MSECONDS		250
+#define REENABLE_IN_SECONDS 20
 
 #define BATTERY_CHARGING_NO   		0
 #define BATTERY_CHARGING_YES    	1
@@ -127,11 +128,11 @@ static int minvoltval = 12;
 module_param(minvoltval, int, S_IRUGO);
 
 // these lists go 12, 24, 48, error
-const int BATTERY_NORMAL[] = {50, 104, 202, 255};	// at or above this value is considered normal
-const int BATTERY_LOW[] = {45, 100, 196, 4};		// at or above this value (and below above) is considered low
-const int BATTERY_CRIT[] = {43, 99, 195, 3};		// at or above this value (and below above) is considered critical
-const int BATTERY_HALT[] = {41, 94, 188, 2};		// at or below this value (and above below) requires immediate halt of device
-const int BATTERY_WAIT[] = {5, 5, 5, 1};			// at or below this value signifies an invalid battery value...ignore
+const int BATTERY_NORMAL[] = {45, 90, 180, 255};	// at or above this value is considered normal
+const int BATTERY_LOW[] =    {42, 84, 168, 4};		// at or above this value (and below above) is considered low
+const int BATTERY_CRIT[] =   {41, 82, 164, 3};		// at or above this value (and below above) is considered critical
+const int BATTERY_HALT[] =   {40, 80, 160, 2};		// at or below this value (and above below) requires immediate halt of device -- should be around 10v, 20v, 40v
+const int BATTERY_WAIT[] =   {5, 5, 5, 1};			// at or below this value signifies an invalid battery value...ignore
 
 //---------------------------------------------------------------------------
 // Declaration of the functions that gets called when the timers fire.
@@ -141,6 +142,7 @@ static void adc_read_fire(unsigned long data);
 static void led_blink_fire(unsigned long data);
 static void charging_fire(unsigned long data);
 static void shutdown_device(unsigned long data);
+static void reenable_fire(unsigned long data);
 
 //---------------------------------------------------------------------------
 // Kernel timers for the timeout, adc read delay, and various led blinks
@@ -150,6 +152,7 @@ static struct timer_list adc_read_timer_list = TIMER_INITIALIZER(adc_read_fire, 
 static struct timer_list led_blink_timer_list = TIMER_INITIALIZER(led_blink_fire, 0, 0);
 static struct timer_list charging_timer_list = TIMER_INITIALIZER(charging_fire, 0, 0);
 static struct timer_list shutdown_timer_list = TIMER_INITIALIZER(shutdown_device, 0, 0);
+static struct timer_list reenable_timer_list = TIMER_INITIALIZER(reenable_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Maps the battery charging state to state name.
@@ -198,6 +201,12 @@ static struct work_struct level_work;
 //---------------------------------------------------------------------------
 void enable_battery_check(int enable) {
    atomic_set(&check_atomic, enable);
+   // automatically reenable the battery check if the calling ko doesn't
+   if (enable == 0) {
+      mod_timer(&reenable_timer_list, jiffies+(REENABLE_IN_SECONDS*HZ));
+   } else {
+      del_timer(&reenable_timer_list);
+   }
 }
 EXPORT_SYMBOL(enable_battery_check);
 
@@ -300,7 +309,7 @@ static void adc_read_fire(unsigned long data)
 			schedule_work(&level_work);
 
 			// start blinking if we're too low
-			if (adc_val < minvoltval)
+			if (adc_val < BATTERY_NORMAL[minvoltval])
 				{
         			mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
 				}
@@ -360,6 +369,13 @@ irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
 //---------------------------------------------------------------------------
 // the charging led timer fired
 //---------------------------------------------------------------------------
+static void reenable_fire(unsigned long data){
+   // reenable the battery check
+   atomic_set(&check_atomic, 1);
+}
+//---------------------------------------------------------------------------
+// the charging led timer fired
+//---------------------------------------------------------------------------
 static void charging_fire(unsigned long data)
     {
     // if we disabled the charging pin, don't handle
@@ -392,7 +408,7 @@ static void led_blink_fire(unsigned long data)
 
     // are we still low?
     value = atomic_read(&adc_atomic);
-    if (value >= minvoltval)
+    if (value >= BATTERY_NORMAL[minvoltval])
         {
         // we're high, turn led on and return
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
@@ -528,6 +544,7 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
+   del_timer(&reenable_timer_list);
 	del_timer(&timeout_timer_list);
 	del_timer(&adc_read_timer_list);
 	del_timer(&led_blink_timer_list);
