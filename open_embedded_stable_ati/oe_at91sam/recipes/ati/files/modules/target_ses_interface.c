@@ -51,7 +51,6 @@
 #define OUTPUT_SES_MODE_TESTING_INDICATOR                       AT91_PIN_PB9
 #define OUTPUT_SES_MODE_RECORD_INDICATOR                        AT91_PIN_PB9
 #define OUTPUT_SES_MODE_LIVEFIRE_INDICATOR                      AT91_PIN_PB9
-#define OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG                  AT91_PIN_PB9
 
 #define INPUT_SELECTOR_KNOB_ACTIVE_STATE                        ACTIVE_LOW
 #define INPUT_SELECTOR_KNOB_PULLUP_STATE                        PULLUP_ON
@@ -172,7 +171,10 @@ static void do_mode(void)
     at91_set_gpio_value(OUTPUT_SES_MODE_TESTING_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_value(OUTPUT_SES_MODE_RECORD_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
-    at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // h-bridge off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);  // h-bridge off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // h-bridge off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);  // h-bridge off
 
     // turn on correct indicator
     switch (mode)
@@ -246,11 +248,13 @@ static void blink_timeout_fire(unsigned long data) {
         case MODE_LIVEFIRE:
             if (at91_get_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR) == OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE) {
                 at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED off
-                at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED off
+                at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // h-bridge on fwd
+                at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);  // h-bridge on fwd
                 mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_OFF_IN_MSECONDS*HZ/1000));
             } else {
                 at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED on
-                at91_set_gpio_value(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG, OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE); // Turn LED on
+                at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // h-bridge off fwd
+                at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);  // h-bridge off fwd
                 mod_timer(&blink_timeout_timer_list, jiffies+(BLINK_ON_IN_MSECONDS*HZ/1000));
             }
             break;
@@ -390,7 +394,6 @@ static int hardware_init(void)
     at91_set_gpio_output(OUTPUT_SES_MODE_TESTING_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_SES_MODE_RECORD_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_SES_MODE_LIVEFIRE_INDICATOR_BIG, !OUTPUT_SES_MODE_INDICATOR_ACTIVE_STATE);
 
     // turn amp up to 11
     at91_set_gpio_output(OUTPUT_SES_AMPLIFIER_ON, OUTPUT_SES_AMPLIFIER_ACTIVE_STATE);
