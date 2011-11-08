@@ -27,56 +27,7 @@ SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
     if (nl_conn == NULL) {
         deleteLater();
     } else {
-        // initialize default settings
-
-        // initial MFS settings
-        // this needs to change to something like what Nathan says here
-        // but for now my kludge of 'start_config' will hold a place
-        /*
-         * The correct method for determining if a MFS is available is to ask the kernel using the
-         * NL_C_ACCESSORY netlink command. If you set the accessory_conf "request" to 1 and
-         * the "acc_type" to ACC_NES_MFS you can expect a respone with the "exists" set correctly.
-         * The SIT_Conn::parseData function will need to be looking for the NL_C_ACCESSORY command.
-         *
-         * A clean way to do this is to send the request at the initializer of the SIT client class
-         * and then remember the value from parseData.
-         * To actually test this you'll need to add "insmod target_generic_output.ko has_muzzle=1"
-         * to your SIT script. You may want to look at target_generic_output.c and
-         * define TESTING_ON_EVAL to enable the muzzle flash to use one of the LEDs on the dev board.
-         */
-
-        if (start_config&PD_NES){
-            doMFS(Eeprom::ReadEeprom(MFS_ACTIVATE_EXPOSE_LOC, MFS_ACTIVATE_EXPOSE_SIZE, MFS_ACTIVATE_EXPOSE),Eeprom::ReadEeprom(MFS_MODE_LOC, MFS_MODE_SIZE, MFS_MODE),Eeprom::ReadEeprom(MFS_START_DELAY_LOC, MFS_START_DELAY_SIZE, MFS_START_DELAY),Eeprom::ReadEeprom(MFS_REPEAT_DELAY_LOC, MFS_REPEAT_DELAY_SIZE, MFS_REPEAT_DELAY)); // on when fully exposed, burst, no delay, 2 seconds between bursts
-        } else {
-            // doMFS(0, 0, 0, 0); // Hopefully turns it of completely, or maybe we just don't call it
-        }
-        // TODO -- MILES SDH
-
-        // initial hit calibration settings
-        fake_sens = 1;
-        lastHitCal.seperation = Eeprom::ReadEeprom(HIT_MSECS_BETWEEN_LOC, HIT_MSECS_BETWEEN_SIZE, HIT_MSECS_BETWEEN);
-
-//if 0 -- CODE FOR SHELLY
-        //char *buf = readeeprom(0x240,0x10);
-        //if (sscanf(buf, "%i", &temp) == 1) {
-        //   lastHitCal.seperation = temp;
-        //}
-//endif
-        lastHitCal.sensitivity = Eeprom::ReadEeprom(HIT_DESENSITIVITY_LOC, HIT_DESENSITIVITY_SIZE, HIT_DESENSITIVITY); // fairly sensitive, but not max
-        lastHitCal.blank_time = Eeprom::ReadEeprom(HIT_START_BLANKING_LOC, HIT_START_BLANKING_SIZE, HIT_START_BLANKING); // half a second blanking
-        lastHitCal.enable_on = Eeprom::ReadEeprom(HIT_ENABLE_ON_LOC, HIT_ENABLE_ON_SIZE, HIT_ENABLE_ON); // hit sensor off
-        lastHitCal.hits_to_kill = Eeprom::ReadEeprom(FALL_KILL_AT_X_HITS_LOC, FALL_KILL_AT_X_HITS_SIZE, FALL_KILL_AT_X_HITS); // kill on first hit
-        lastHitCal.after_kill = Eeprom::ReadEeprom(FALL_AT_FALL_LOC, FALL_AT_FALL_SIZE, FALL_AT_FALL); // 0 for fall
-        lastHitCal.type = Eeprom::ReadEeprom(HIT_SENSOR_TYPE_LOC, HIT_SENSOR_TYPE_SIZE, HIT_SENSOR_TYPE); // mechanical sensor
-        lastHitCal.invert = Eeprom::ReadEeprom(HIT_SENSOR_INVERT_LOC, HIT_SENSOR_INVERT_SIZE, HIT_SENSOR_INVERT); // don't invert sensor input line
-        lastHitCal.set = HIT_OVERWRITE_ALL;   // nothing will change without this
-        nl_conn->doHitCal(lastHitCal); // tell kernel
-
-        hits = 0;
-        doHits(-1); // get correct value from kernel
-
-        lastBatteryVal = MAX_BATTERY_VAL;
-        nl_conn->doBattery(); // get a correct battery value soon
+        reInit(); // initialize
     }
     FUNCTION_END("::SIT_Client(int fd, int tnum) : Connection(fd)");
 }
@@ -85,6 +36,61 @@ SIT_Client::~SIT_Client() {
     FUNCTION_START("::~SIT_Client()");
 
     FUNCTION_END("::~SIT_Client()");
+}
+
+void SIT_Client::reInit() {
+FUNCTION_START("::reInit()");
+     // initialize default settings
+
+     // initial MFS settings
+     // this needs to change to something like what Nathan says here
+     // but for now my kludge of 'start_config' will hold a place
+     /*
+      * The correct method for determining if a MFS is available is to ask the kernel using the
+      * NL_C_ACCESSORY netlink command. If you set the accessory_conf "request" to 1 and
+      * the "acc_type" to ACC_NES_MFS you can expect a respone with the "exists" set correctly.
+      * The SIT_Conn::parseData function will need to be looking for the NL_C_ACCESSORY command.
+      *
+      * A clean way to do this is to send the request at the initializer of the SIT client class
+      * and then remember the value from parseData.
+      * To actually test this you'll need to add "insmod target_generic_output.ko has_muzzle=1"
+      * to your SIT script. You may want to look at target_generic_output.c and
+      * define TESTING_ON_EVAL to enable the muzzle flash to use one of the LEDs on the dev board.
+      */
+
+     if (start_config&PD_NES){
+         doMFS(Eeprom::ReadEeprom(MFS_ACTIVATE_EXPOSE_LOC, MFS_ACTIVATE_EXPOSE_SIZE, MFS_ACTIVATE_EXPOSE),Eeprom::ReadEeprom(MFS_MODE_LOC, MFS_MODE_SIZE, MFS_MODE),Eeprom::ReadEeprom(MFS_START_DELAY_LOC, MFS_START_DELAY_SIZE, MFS_START_DELAY),Eeprom::ReadEeprom(MFS_REPEAT_DELAY_LOC, MFS_REPEAT_DELAY_SIZE, MFS_REPEAT_DELAY)); // on when fully exposed, burst, no delay, 2 seconds between bursts
+     } else {
+         // doMFS(0, 0, 0, 0); // Hopefully turns it of completely, or maybe we just don't call it
+     }
+     // TODO -- MILES SDH
+
+     // initial hit calibration settings
+     fake_sens = 1;
+     lastHitCal.seperation = Eeprom::ReadEeprom(HIT_MSECS_BETWEEN_LOC, HIT_MSECS_BETWEEN_SIZE, HIT_MSECS_BETWEEN);
+
+//if 0 -- CODE FOR SHELLY
+     //char *buf = readeeprom(0x240,0x10);
+     //if (sscanf(buf, "%i", &temp) == 1) {
+     //   lastHitCal.seperation = temp;
+     //}
+//endif
+     lastHitCal.sensitivity = Eeprom::ReadEeprom(HIT_DESENSITIVITY_LOC, HIT_DESENSITIVITY_SIZE, HIT_DESENSITIVITY); // fairly sensitive, but not max
+     lastHitCal.blank_time = Eeprom::ReadEeprom(HIT_START_BLANKING_LOC, HIT_START_BLANKING_SIZE, HIT_START_BLANKING); // half a second blanking
+     lastHitCal.enable_on = Eeprom::ReadEeprom(HIT_ENABLE_ON_LOC, HIT_ENABLE_ON_SIZE, HIT_ENABLE_ON); // hit sensor off
+     lastHitCal.hits_to_kill = Eeprom::ReadEeprom(FALL_KILL_AT_X_HITS_LOC, FALL_KILL_AT_X_HITS_SIZE, FALL_KILL_AT_X_HITS); // kill on first hit
+     lastHitCal.after_kill = Eeprom::ReadEeprom(FALL_AT_FALL_LOC, FALL_AT_FALL_SIZE, FALL_AT_FALL); // 0 for fall
+     lastHitCal.type = Eeprom::ReadEeprom(HIT_SENSOR_TYPE_LOC, HIT_SENSOR_TYPE_SIZE, HIT_SENSOR_TYPE); // mechanical sensor
+     lastHitCal.invert = Eeprom::ReadEeprom(HIT_SENSOR_INVERT_LOC, HIT_SENSOR_INVERT_SIZE, HIT_SENSOR_INVERT); // don't invert sensor input line
+     lastHitCal.set = HIT_OVERWRITE_ALL;   // nothing will change without this
+     nl_conn->doHitCal(lastHitCal); // tell kernel
+
+     hits = 0;
+     doHits(-1); // get correct value from kernel
+
+     lastBatteryVal = MAX_BATTERY_VAL;
+     nl_conn->doBattery(); // get a correct battery value soon
+FUNCTION_END("::reInit()");
 }
 
 // fill out 2102 status message
@@ -507,18 +513,7 @@ int SIT_Client::handle_2100(int start, int end) {
             send_2101_ACK(hdr,'S');
             // also supposed to reset all values to the 'initial exercise step value'
             //  which I am not sure if it is different than ordinary inital values 
-            fake_sens = 1;
-            lastHitCal.seperation = 250;   //250;
-            lastHitCal.sensitivity = cal_table[13]; // fairly sensitive, but not max
-            lastHitCal.blank_time = 50; // half a second blanking
-            lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
-            lastHitCal.hits_to_kill = 1; // kill on first hit
-            lastHitCal.after_kill = 0; // 0 for stay down
-            lastHitCal.type = 1; // mechanical sensor
-            lastHitCal.invert = 0; // don't invert sensor input line
-            lastHitCal.set = HIT_OVERWRITE_ALL;    // nothing will change without this
-            doHitCal(lastHitCal); // tell kernel
-            doHits(0); // set hit count to zero
+            reInit();
             break;
 
         case CID_Move_Request:

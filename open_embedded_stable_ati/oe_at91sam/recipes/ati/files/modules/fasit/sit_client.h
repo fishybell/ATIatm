@@ -85,6 +85,9 @@ protected:
 private:
    class SIT_Conn *nl_conn;
 
+   // re-initialize to default settings
+   void reInit();
+
    // helper functions for filling out a 2102 status message
    void fillStatus2102(FASIT_2102 *msg);
    void sendStatus2102(int force);
