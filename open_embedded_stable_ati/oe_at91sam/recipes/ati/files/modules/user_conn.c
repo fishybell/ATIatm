@@ -1498,7 +1498,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Shutdown device\nFormat: K\n");
                         break;
                     case 'L': case 'l':
-                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_on_concealed, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_always)\n");
+                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-1024)tenthseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_on_concealed, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_always)\n");
                         break;
                     case 'M': case 'm':
                         snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-32767 to 32766)speed_in_mph\n");

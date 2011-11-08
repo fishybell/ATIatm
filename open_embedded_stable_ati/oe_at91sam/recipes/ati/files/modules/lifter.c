@@ -622,7 +622,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                 case HIT_OVERWRITE_NONE: /* overwrite nothing (gets reply with current values) */
                     // fill in all data, the unused portions will be ignored
                     get_hit_calibration(&hit_c->seperation, &hit_c->sensitivity); // use existing hit_c structure
-                    hit_c->blank_time = atomic_read(&blank_time)/10; // convert from milliseconds
+                    hit_c->blank_time = atomic_read(&blank_time)/100; // convert from milliseconds
                     hit_c->enable_on = atomic_read(&enable_on);
                     hit_c->hits_to_kill = atomic_read(&hits_to_kill);
                     hit_c->after_kill = atomic_read(&after_kill);
@@ -637,7 +637,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     atomic_set(&after_kill, hit_c->after_kill);
                     atomic_set(&hit_type, hit_c->type);
                     set_hit_invert(hit_c->invert);
-                    atomic_set(&blank_time, hit_c->blank_time*10); // convert to milliseconds
+                    atomic_set(&blank_time, hit_c->blank_time*100); // convert to milliseconds
                     atomic_set(&enable_on, hit_c->enable_on);
                     atomic_set(&enable_doing, 2); // a calibration, not an action is changing the sensor
                     schedule_work(&hit_enable_work); // fix the hit sensor enabling soon
@@ -645,7 +645,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     break;
                 case HIT_OVERWRITE_CAL:   /* overwrites calibration values (sensitivity, seperation) */
                     set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
-                    atomic_set(&blank_time, hit_c->blank_time*10); // convert to milliseconds
+                    atomic_set(&blank_time, hit_c->blank_time*100); // convert to milliseconds
                     atomic_set(&enable_on, hit_c->enable_on);
                     atomic_set(&enable_doing, 2); // a calibration, not an action is changing the sensor
                     schedule_work(&hit_enable_work); // fix the hit sensor enabling soon

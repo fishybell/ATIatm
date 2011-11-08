@@ -59,7 +59,7 @@ static struct nla_policy generic_int8_policy[GEN_INT8_A_MAX + 1] = {
 typedef struct hit_calibration {
     u32 seperation __attribute__ ((packed));   /* seperation calibration value (in milliseconds) */
     u32 sensitivity __attribute__ ((packed));  /* sensitivity calibration value (lower value for less sensitive) */
-    u16 blank_time:10 __attribute__ ((packed));   /* blank time from start of exposure (in hudreths of seconds) */
+    u16 blank_time:10 __attribute__ ((packed));   /* blank time from start of exposure (in tenths of seconds) */
     u16 enable_on:3 __attribute__ ((packed));   /* blank when commanded (enumerated below) */
     u16 after_kill:3 __attribute__ ((packed));  /* after kill: 0 stay down, 1 bob, 2 bob/stop, 3 stop */
     u8 hits_to_kill;                         /* number of hits required to kill (0 for infinity) */
