@@ -2239,7 +2239,7 @@ static void pid_step(int delta_t) {
     if (pid_error == 0) {
        pid_correct_count++; // correct one more time
     } else if (pid_correct_count < SPEED_AFTER[mover_type] || abs(pid_error) >= SPEED_CHANGE[mover_type]) {
-delay_printk("UN-CLAMPED!");
+//delay_printk("UN-CLAMPED!");
        pid_correct_count = 0; // no longer correct
     }
 
@@ -2247,7 +2247,7 @@ delay_printk("UN-CLAMPED!");
     if (pid_correct_count >= SPEED_AFTER[mover_type] && abs(pid_error) < SPEED_CHANGE[mover_type]) {
        // clamp effort to same as last time
        pid_effort = pid_last_effort;
-delay_printk("CLAMPED!");
+//delay_printk("CLAMPED!");
     } else {
        // do the PID calculations
 
