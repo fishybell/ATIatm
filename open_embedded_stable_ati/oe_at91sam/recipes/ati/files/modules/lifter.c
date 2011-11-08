@@ -472,6 +472,9 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
                             delay_printk("MFS not bursting\n");
                             mode = TEMP_ON;
                         }
+                        // mfs has randomized delays
+                        generic_output_set_initial_delay_random(acc_c->acc_type, num, acc_c->start_delay*250); // convert to milliseconds and halve
+                        generic_output_set_repeat_delay_random(acc_c->acc_type, num, acc_c->repeat_delay*250); // convert to milliseconds and halve
                         break;
                     case ACC_MILES_SDH:
                         // TODO -- what to do with MILES data?
