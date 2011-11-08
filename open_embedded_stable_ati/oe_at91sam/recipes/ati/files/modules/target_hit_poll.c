@@ -15,6 +15,7 @@
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
+    #define FAKE_MS 100
     #undef INPUT_HIT_SENSOR
     #define	INPUT_HIT_SENSOR 					AT91_PIN_PB31
 #endif
@@ -95,6 +96,14 @@ static hit_sensor_t sensors[] = {{
 //---------------------------------------------------------------------------
 static void debug_out(unsigned long data);
 static struct timer_list debug_timer = TIMER_INITIALIZER(debug_out, 0, 0);
+
+#ifdef TESTING_ON_EVAL
+//---------------------------------------------------------------------------
+// Timer list for fake hit creation
+//---------------------------------------------------------------------------
+static void fake_run(unsigned long data);
+static struct timer_list fake_timer = TIMER_INITIALIZER(fake_run, 0, 0);
+#endif
 
 //---------------------------------------------------------------------------
 // Callback for hit events
@@ -333,6 +342,23 @@ static void debug_out(unsigned long data) {
     delay_printk("\n");
 }
 
+#ifdef TESTING_ON_EVAL
+//---------------------------------------------------------------------------
+// Timer function to create fake hit
+//---------------------------------------------------------------------------
+static void fake_run(unsigned long data) {
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
+    if (hit_callback != NULL) {
+        hit_callback(line); // the hit sensor polling will wait for this to finish
+    }
+    mod_timer(&fake_timer, jiffies+((FAKE_MS*HZ)/1000)); // create a fake hit every 100 ms
+}
+#endif
+
 //---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
@@ -356,6 +382,9 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     atomic_set(&driver_id, d_id);
 
     atomic_set(&full_init, TRUE);
+#ifdef TESTING_ON_EVAL
+    mod_timer(&fake_timer, jiffies+((FAKE_MS*HZ)/1000)); // create a fake hit every 100 ms
+#endif
     return 0;
 }
 
@@ -364,10 +393,13 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
 //---------------------------------------------------------------------------
 static void __exit target_hit_poll_exit(void) {
     atomic_set(&full_init, FALSE);
+    del_timer(&debug_timer);
+#ifdef TESTING_ON_EVAL
+    del_timer(&fake_timer);
+#endif
     ati_flush_work(&hit_work); // close any open work queue items
     uninstall_nl_driver(atomic_read(&driver_id));
     hardware_exit();
-    del_timer(&debug_timer);
 }
 
 
