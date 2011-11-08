@@ -66,10 +66,14 @@ extern void generic_output_set_mode(int type, int num, GO_mode_t value);
 // get/set routines for inital delay (used in all modes)
 extern int generic_output_get_initial_delay(int type, int num); // time before initial firing
 extern void generic_output_set_initial_delay(int type, int num, int msecs);
+extern int generic_output_get_initial_delay_random(int type, int num); // random time before initial firing
+extern void generic_output_set_initial_delay_random(int type, int num, int msecs);
 
 // get/set routines for repeat firings (only used when the mode uses repeats)
 extern int generic_output_get_repeat_delay(int type, int num); // time between repeats
 extern void generic_output_set_repeat_delay(int type, int num, int msecs);
+extern int generic_output_get_repeat_delay_random(int type, int num); // random time between repeats
+extern void generic_output_set_repeat_delay_random(int type, int num, int msecs);
 
 extern int generic_output_get_repeat_count(int type, int num); // repeat X times (-1 for infinity, 0 for never)
 extern void generic_output_set_repeat_count(int type, int num, int count);

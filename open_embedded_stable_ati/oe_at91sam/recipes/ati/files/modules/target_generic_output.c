@@ -4,6 +4,7 @@
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <mach/gpio.h>
+#include <linux/random.h>
 
 #include "target.h"
 #include "target_generic_output.h"
@@ -55,7 +56,9 @@ typedef struct generic_output {
     int active_on;
     GO_mode_t mode;
     int idelay;
+    int randomi; // random initial delay size
     int rdelay;
+    int randomr; // random repeat delay size
     int on_time;
     int off_time;
     int repeat_count; // number of times to repeat
@@ -99,7 +102,9 @@ struct generic_output output_table[] = {
         ACTIVE_ERROR,			// active_on (activate on error/deactivate otherwise)
         BURST_FIRE,				// mode (burst fire)
         0,						// initial delay
+        0,						// initial delay randomization
         1000,					// repeat delay (1 second delay)
+        0,						// repeat delay randomization
         75,						// on time (75 millisecond burst on)
         75,						// off time (75 millisecond burst off)
         10,						// repeat count (10 total fires)
@@ -122,7 +127,9 @@ struct generic_output output_table[] = {
         0,						// active_on
         CONSTANT_ON,			// mode
         0,						// initial delay
+        0,						// initial delay randomization
         0,						// repeat delay
+        0,						// repeat delay randomization
         0,						// on time
         0,						// off time
         0,						// repeat count
@@ -145,7 +152,9 @@ struct generic_output output_table[] = {
         0,						// active_on
         CONSTANT_ON,			// mode
         0,						// initial delay
+        0,						// initial delay randomization
         0,						// repeat delay
+        0,						// repeat delay randomization
         0,						// on time
         0,						// off time
         0,						// repeat count
@@ -168,7 +177,9 @@ struct generic_output output_table[] = {
         0,						// active_on
         CONSTANT_ON,			// mode
         0,						// initial delay
+        0,						// initial delay randomization
         0,						// repeat delay
+        0,						// repeat delay randomization
         0,						// on time
         0,						// off time
         0,						// repeat count
@@ -306,6 +317,16 @@ void generic_output_set_initial_delay(int type, int num, int msecs) {
 }
 EXPORT_SYMBOL(generic_output_set_initial_delay);
 
+int generic_output_get_initial_delay_random(int type, int num) { // random time before initial firing
+    GET_GO_VALUE(int, 0, randomi); // default to 0
+}
+EXPORT_SYMBOL(generic_output_get_initial_delay_random);
+
+void generic_output_set_initial_delay_random(int type, int num, int msecs) {
+    SET_GO_VALUE(randomi, msecs);
+}
+EXPORT_SYMBOL(generic_output_set_initial_delay_random);
+
 int generic_output_get_repeat_delay(int type, int num) { // time between repeats
     GET_GO_VALUE(int, 0, rdelay); // default to 0
 }
@@ -315,6 +336,16 @@ void generic_output_set_repeat_delay(int type, int num, int msecs) {
     SET_GO_VALUE(rdelay, msecs);
 }
 EXPORT_SYMBOL(generic_output_set_repeat_delay);
+
+int generic_output_get_repeat_delay_random(int type, int num) { // random time between repeats
+    GET_GO_VALUE(int, 0, randomr); // default to 0
+}
+EXPORT_SYMBOL(generic_output_get_repeat_delay_random);
+
+void generic_output_set_repeat_delay_random(int type, int num, int msecs) {
+    SET_GO_VALUE(randomr, msecs);
+}
+EXPORT_SYMBOL(generic_output_set_repeat_delay_random);
 
 int generic_output_get_repeat_count(int type, int num) { // repeat X times (-1 for infinity, 0 for never)
     GET_GO_VALUE(int, 0, repeat_count); // default to 0
@@ -405,6 +436,7 @@ inline void schedule_timer(int index, int msecs) {
 
 // helper function to change the internal state using GO_state_t values for a given index (assumes already locked)
 void index_set_state(int i, GO_state_t value) {
+    int rand = random32();
 //delay_printk("%s(%i): %i\n",__func__, i, value);
     // does this device exist and is it enabled?
     if (output_table[i].exists && output_table[i].enabled == ENABLED) {
@@ -419,7 +451,13 @@ void index_set_state(int i, GO_state_t value) {
                break;
            case   ON_SOON:		// manual on (uses initial delay)
                output_table[i].next_state = S_FIRE_ON; // turn on
-               schedule_timer(i, output_table[i].idelay); // after initial delay
+               if (output_table[i].randomi > 0) {
+                  rand = rand % output_table[i].randomi; // change to max out at randomi
+                  rand /= 2; // so we're plus/minus
+               } else {
+                  rand = 0;
+               }
+               schedule_timer(i, output_table[i].idelay + rand); // after initial delay
                break;
            case   OFF_SOON:		// manual off (waits for current burst, repeat, etc., cancels infinite repeat)
                if (output_table[i].mode == CONSTANT_ON) { // turn off immediately if we're constant on
@@ -723,6 +761,7 @@ int do_repeat(int count, int *at) {
 static void state_run(unsigned long index) {
     struct generic_output *this = &output_table[index];
     int add_delay = 0; // additional delay to add to timer
+    int rand = random32();
 
 // delay_printk("%s(): %i\n",__func__, index);
     // lock as read/write
@@ -731,6 +770,14 @@ static void state_run(unsigned long index) {
 
     // change current state to next state
     this->state = this->next_state;
+
+    // precalculate random delay
+    if (this->randomr > 0) {
+        rand = rand % this->randomr; // change to max out at randomr
+        rand /= 2; // so we're plus/minus
+    } else {
+        rand = 0;
+    }
 
     // ignore disabled/enabled, just do the current state actions
     switch (this->state) {
@@ -827,7 +874,7 @@ static void state_run(unsigned long index) {
                             if (this->state == S_FIRE_OFF) {
 // delay_printk("repeating %i\n", this->repeat_at);
                                 this->next_state = S_FIRE_ON; // is off, next on
-                                add_delay = this->rdelay; // add repeat delay to delay time
+                                add_delay = this->rdelay + rand; // add repeat delay to delay time
                             } else {
                                 // on stop condition, let it follow through but cancel infinite repeat
                                 if (this->repeat_count == -1) {
@@ -836,7 +883,7 @@ static void state_run(unsigned long index) {
                                 } else {
 // delay_printk("repeating %i\n", this->repeat_at);
                                     this->next_state = S_STOP_ON; // is off, next on
-                                    add_delay = this->rdelay; // add repeat delay to delay time
+                                    add_delay = this->rdelay + rand; // add repeat delay to delay time
 
                                 }
                             }
@@ -854,7 +901,7 @@ static void state_run(unsigned long index) {
                         if (this->state == S_FIRE_OFF) {
 // delay_printk("repeating %i\n", this->repeat_at);
                             this->next_state = S_FIRE_ON; // is off, next on
-                            add_delay = this->rdelay; // add repeat delay to delay time
+                            add_delay = this->rdelay + rand; // add repeat delay to delay time
                         } else {
                             // on stop condition, let it follow through but cancel infinite repeat
                             if (this->repeat_count == -1) {
@@ -863,7 +910,7 @@ static void state_run(unsigned long index) {
                             } else {
 // delay_printk("repeating %i\n", this->repeat_at);
                                 this->next_state = S_STOP_ON; // is off, next on
-                                add_delay = this->rdelay; // add repeat delay to delay time
+                                add_delay = this->rdelay + rand; // add repeat delay to delay time
                             }
                         }
                     } else {
