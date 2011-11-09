@@ -175,6 +175,11 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 atomic_t driver_id = ATOMIC_INIT(-1);
 
 //---------------------------------------------------------------------------
+// This atomic variable is used for counting shutdown messages
+//---------------------------------------------------------------------------
+atomic_t shutdown_msg = ATOMIC_INIT(0); // no shutdown messages so far
+
+//---------------------------------------------------------------------------
 // This atomic variable is used for battyer enable/disable checking
 //---------------------------------------------------------------------------
 atomic_t check_atomic = ATOMIC_INIT(1); // enabled
@@ -222,8 +227,10 @@ static void shutdown_soon(bool lowbat) {
     // let attached devices know that we're shutting down
     queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
 
-    // shutdown in a short period of time
-    mod_timer(&shutdown_timer_list, jiffies+((SHUTDOWN_IN_MSECONDS*HZ)/1000));
+    if (atomic_inc_return(&shutdown_msg) < 3) {
+        // shutdown in a short period of time
+        mod_timer(&shutdown_timer_list, jiffies+((SHUTDOWN_IN_MSECONDS*HZ)/1000));
+    }
 }
 
 static void shutdown_device(unsigned long data) {
