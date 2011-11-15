@@ -145,7 +145,7 @@ static int TICKS_PER_LEG[] = {2292, 1833, 2292, 0}; // 5:1 ratio 10 inch wheel 6
 // static in MOVER0_PWM_TABLE = ?
 // static in MOVER1_PWM_TABLE = ?
 // static int MOVER2_PWM_TABLE[] = {0, 1100, 1550, 1975, 2375, 2800, 3325, 3900, 5000, 7000, 10000}; // -- first stab
-static int MOVER2_PWM_TABLE[] = {0, 1350, 1800, 2300, 2700, 3200, 3700, 4500, 5500, 7500, 12000}; // -- second stab
+// static int MOVER2_PWM_TABLE[] = {0, 1350, 1800, 2300, 2700, 3200, 3700, 4500, 5500, 7500, 12000}; // -- second stab
 
 
 
@@ -293,8 +293,8 @@ static void horn_off_fire(unsigned long data);
 //---------------------------------------------------------------------------
 // Declaration of functions related to pwm/speed conversion
 //---------------------------------------------------------------------------
-static int speed_from_pwm(int ra);		// absolute velocity, calculated
-static int pwm_from_speed(int speed);	// best-guess pwm, calculated
+//static int speed_from_pwm(int ra);		// absolute velocity, calculated
+//static int pwm_from_speed(int speed);	// best-guess pwm, calculated
 //static int current_speed(void);			// velocity/direction, measured
 static int current_speed10(void);		// 10 * velocity/direction, measured
 
@@ -1392,6 +1392,7 @@ static int pwm_from_effort(int effort) {
 //---------------------------------------------------------------------------
 // Helper function to map pwm values to speed values
 //---------------------------------------------------------------------------
+#if 0
 static int pwm_from_speed(int speed) {
     delay_printk("pwm_from_speed(%i)\n", speed);
     // limit to max speed
@@ -1413,10 +1414,12 @@ static int pwm_from_speed(int speed) {
     }
     return MOTOR_PWM_RB_DEFAULT[mover_type];
 }
+#endif
 
 //---------------------------------------------------------------------------
 // Helper function to map speed values to pwm values
 //---------------------------------------------------------------------------
+#if 0
 static int speed_from_pwm(int ra) {
     int i;
     delay_printk("speed_from_pwm(%i)\n", ra);
@@ -1444,6 +1447,7 @@ static int speed_from_pwm(int ra) {
     }
     return 0;
 }
+#endif
 
 //---------------------------------------------------------------------------
 // Helper function to get current measured speed (slight lag behind actual speed)
