@@ -79,9 +79,9 @@ void handle_bit_test_long_lifter(struct nl_handle *handle, int is_on) {
     acc_c.on_kill = 2;      // 2 = deactivate on kill
     acc_c.ex_data1 = 1;     // do burst
     acc_c.ex_data2 = 5;     // burst 5 times
-    acc_c.on_time = 50;     // on 50 milliseconds
-    acc_c.off_time = 100;   // off 100 milliseconds
-    acc_c.repeat_delay = 3; // when burst, burst every 3 half-seconds
+    acc_c.on_time = 15;     // on 15 milliseconds
+    acc_c.off_time = 85;    // off 85 milliseconds
+    acc_c.repeat_delay = 5; // when burst, burst every 5 half-seconds
     acc_c.repeat = 63;      // infinite repeat
     acc_c.start_delay = 1;  // start after 1 half-seconds
     hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_2); // use helper function to build scenario
@@ -142,11 +142,11 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
     acc_c.on_kill = 2;     // 2 = deactivate on kill
     acc_c.ex_data1 = 1;    // do burst
     acc_c.ex_data2 = 5;    // burst 5 times
-    acc_c.on_time = 50;    // on 50 milliseconds
-    acc_c.off_time = 100;  // off 100 milliseconds
-    acc_c.repeat_delay = 2 * 3;  // when burst, burst every 6 half-seconds
+    acc_c.on_time = 15;    // on 15 milliseconds
+    acc_c.off_time = 85;   // off 85 milliseconds
+    acc_c.repeat_delay = 5; // when burst, burst every 5 half-seconds
     acc_c.repeat = 63;     // infinite repeat
-    acc_c.start_delay = 2 * 1;   // start after 2 half-seconds
+    acc_c.start_delay = 1;   // start after 1 half-seconds
     hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf); // use helper function to build scenario
     snprintf(scen_buf, 1024, scen, nothing_buf, nothing_buf, hex_buf,
        nothing_buf, nothing_buf, nothing_buf, nothing_buf, nothing_buf, nothing_buf); // format scenario with 2 nothings, hex buffer and 4 more nothings

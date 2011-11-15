@@ -1548,13 +1548,13 @@ void SIT_Conn::doMFS(int on, int mode, int idelay, int rdelay) {
     if (mode == 1) {
         acc_c.ex_data1 = 1; // do burst
         acc_c.ex_data2 = 5; // burst 5 times
-        acc_c.on_time = 50; // on 50 milliseconds
-        acc_c.off_time = 100; // off 100 milliseconds
-        acc_c.repeat_delay = 2 * rdelay; // when burst, burst every rdelay*2 half-seconds
-        acc_c.repeat = 63; // infinite repeat
+        acc_c.on_time = 15; // on 15 milliseconds
+        acc_c.off_time = 85; // off 85 milliseconds
     } else {
-        acc_c.on_time = 75; // on 75 milliseconds
+        acc_c.on_time = 15; // on 15 milliseconds
     }
+    acc_c.repeat_delay = 2 * rdelay; // repeat every rdelay*2 half-seconds
+    acc_c.repeat = 63; // infinite repeat
     acc_c.start_delay = 2 * idelay; // start after idelay*2 half-seconds
 
     // Queue command
