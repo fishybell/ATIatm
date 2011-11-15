@@ -8,14 +8,14 @@ start () {
    mitb=$(has_mit_battery)
    mitm=$(has_mit_mover)
    mitr=$(has_mit_reverse)
-   if [ "$mitb" == "" ] ; then                       
-      mitb=24                                         
-   fi 
-   if [ "$mitm" == "" ] ; then                       
-      mitm=0                                         
+   if [ "$mitb" == "" ] ; then
+      mitb=24
    fi
-   if [ "$mitr" == "" ] ; then                       
-      mitr=0                                         
+   if [ "$mitm" == "" ] ; then
+      mitm=0
+   fi
+   if [ "$mitr" == "" ] ; then
+      mitr=0
    fi
 
    # load modules

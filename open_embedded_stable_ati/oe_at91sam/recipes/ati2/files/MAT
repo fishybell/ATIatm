@@ -8,14 +8,14 @@ start () {
    matb=$(has_mat_battery)
    matm=$(has_mat_mover)
    matr=$(has_mat_reverse)
-   if [ "$matb" == "" ] ; then                       
-      matb=48                                         
-   fi 
-   if [ "$matm" == "" ] ; then                       
-      matm=1                                         
+   if [ "$matb" == "" ] ; then
+      matb=48
    fi
-   if [ "$matr" == "" ] ; then                       
-      matr=0                                         
+   if [ "$matm" == "" ] ; then
+      matm=1
+   fi
+   if [ "$matr" == "" ] ; then
+      matr=0
    fi
 
    # load modules

@@ -6,9 +6,9 @@ start () {
    source /usr/bin/load_network
 
    satb=$(has_sat_battery)
-   if [ "$satb" == "" ] ; then                       
-      satb=12                                         
-   fi 
+   if [ "$satb" == "" ] ; then
+      satb=12
+   fi
 
    # load modules
    load_modules "target_user_interface.ko mover=0" \
