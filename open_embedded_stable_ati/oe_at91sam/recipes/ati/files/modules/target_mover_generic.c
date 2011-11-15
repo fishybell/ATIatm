@@ -16,6 +16,7 @@
 #include "target_generic_output.h" /* for EVENT_### definitions */
 
 //#define TESTING_ON_EVAL
+//#define TESTING_MAX
 
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
@@ -83,7 +84,11 @@ static int PID_KI_MULT[]   = {1, 1, 2, 0}; // integral gain numerator
 static int PID_KI_DIV[]    = {73725, 1, 73725, 0}; // integral gain denominator
 static int PID_KD_MULT[]   = {5898, 1, 5898, 0}; // derivitive gain numerator
 static int PID_KD_DIV[]    = {3, 1, 3, 0}; // derivitive gain denominator
+#ifdef TESTING_MAX
+static int MIN_EFFORT[]    = {1000, 1, 1000, 0}; // minimum effort given to ensure motor moves
+#else
 static int MIN_EFFORT[]    = {295, 1, 295, 0}; // minimum effort given to ensure motor moves
+#endif
 static int SPEED_AFTER[]   = {3, 3, 3, 0}; // clamp effort if we hit this many correct values in a row
 static int SPEED_CHANGE[]  = {20, 30, 20, 0}; // unclamp if the error is bigger than this
 
@@ -855,8 +860,10 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
     do_event(EVENT_STOP); // started stopping
+#ifndef TESTING_MAX
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(FALSE);
+#endif
 
     return IRQ_HANDLED;
     }
@@ -881,8 +888,10 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
     do_event(EVENT_STOP); // started stopping
+#ifndef TESTING_MAX
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(FALSE);
+#endif
 
     return IRQ_HANDLED;
     }
