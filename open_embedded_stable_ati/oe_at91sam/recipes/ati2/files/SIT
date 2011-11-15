@@ -10,13 +10,13 @@ start () {
    phi=$(has_phi)
    sitb=$(has_sit_battery)
    if [ "$mfs" == "" ] ; then                       
-      mfs=0                                         
+      mfs=1
    fi 
    if [ "$moon" == "" ] ; then                       
-      moon=0                                         
+      moon=1
    fi
    if [ "$phi" == "" ] ; then                       
-      phi=0                                         
+      phi=1
    fi
    if [ "$sitb" == "" ] ; then                       
       sitb=12                                         
