@@ -14,7 +14,9 @@ SRC_URI += "file://ati2-0.9/Makefile"
 SRC_URI += "file://*.fw"
 #SRC_URI += "file://*.tcl"
 SRC_URI += "file://*.bin"
+SRC_URI += "file://fixhost"
 SRC_URI += "file://start_up"
+SRC_URI += "file://avahi-daemon.conf"
 SRC_URI += "file://start"
 SRC_URI += "file://stop"
 SRC_URI += "file://restart"
@@ -47,6 +49,7 @@ FILES_${PN} += "/etc/init.d/*"
 #FILES_${PN} += "/etc/passwd/*"
 FILES_${PN} += "/etc/rcS.d/*"
 FILES_${PN} += "/etc/network/*"
+FILES_${PN} += "/etc/avahi/*"
 FILES_${PN} += "/home/root/*"
 #FILES_${PN} += "/home/root/fasit/*"
 FILES_${PN} += "/home/root/sounds/*"
@@ -61,6 +64,7 @@ do_install () {
 #	 install -m 755 -d ${D}/etc/passwd
     install -m 755 -d ${D}/etc/rcS.d
     install -m 755 -d ${D}/etc/network
+    install -m 755 -d ${D}/etc/avahi
     install -m 755 -d ${D}/home/root/sounds
     install -m 755 -d ${D}/lib/firmware
 #    install -m 755 ${WORKDIR}/*gpio* ${D}/usr/bin
@@ -70,6 +74,8 @@ do_install () {
 	install -m 644 ${WORKDIR}/passwd ${D}/etc
 #    install -m 644 ${WORKDIR}/fasit/*.py ${D}/home/root/fasit
     install -m 644 ${WORKDIR}/fasit/*.mp3 ${D}/home/root/sounds
+    install -m 644 ${WORKDIR}/avahi-daemon.conf ${D}/etc/avahi
+    install -m 755 ${WORKDIR}/fixhost ${D}/etc/init.d
     install -m 755 ${WORKDIR}/start_up ${D}/etc/init.d
     install -m 755 ${WORKDIR}/start ${D}/usr/bin
     install -m 755 ${WORKDIR}/stop ${D}/usr/bin
@@ -94,6 +100,7 @@ do_install () {
     install -m 644 ${WORKDIR}/*.bin ${D}/lib/firmware
     install -m 644 ${WORKDIR}/interfaces ${D}/etc/network
     cd ${D}/etc/rcS.d
+    ln -s ../init.d/fixhost  S36fixhost
     ln -s ../init.d/start_up S98start_up
     date > ${D}/etc/builddate
 }

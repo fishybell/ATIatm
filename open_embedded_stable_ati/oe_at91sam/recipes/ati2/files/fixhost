@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# manage startup of drivers and python code
+
+
+
+
+# create default start routine
+start () {
+    # load board info
+    board=$(/usr/bin/is_board)
+    host=$(/usr/bin/is_mac | cut -d: -f4-6 | grep : | sed -e "s/://g")
+
+    case "$board" in
+        MIT|MAT)
+            # mover's are always radio controlled, and usually with client: be the server
+            echo "server" > /etc/hostname
+            ;;
+        *)
+            # the rest are always either hardwired or the HHC, use the generated hostname
+            echo "sam$host" > /etc/hostname
+            ;;
+    esac
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        ;;
+    force-reload|restart)
+        start
+        ;;
+    *)
+        echo "Usage: /etc/init.d/start_up {start|stop|restart|force-reload}"
+        exit 1
+        ;;
+esac
+
