@@ -11,18 +11,24 @@ if  {$argc == 1} {
     gets stdin num
 }
 
+# increase delays for wireless devices
+set delay 5
+if {[string match -nocase *w* $num]} {
+    set delay 10
+}
+
 system sed -i -e "s/^sam$num.*//" ~/.ssh/known_hosts
 eval spawn scp fasit_conn root@sam$num:/usr/bin
-set timeout 2.5
+set timeout $delay
 while 1 {
     expect {
         -re {.*word:.*} {
-            send "\r"
+            send "shoot\r"
         }
         -re {.*yes/no.*} {
             send "yes\r"
         }
-        default {
+        eof {
             break
         }
     }
