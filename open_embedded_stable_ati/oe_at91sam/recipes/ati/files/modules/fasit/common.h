@@ -7,6 +7,9 @@
 #include "nl_conn.h"
 #include "netlink_user.h"
 
+// version of __FILE__ without full path
+#define __FILEX__ ((strrchr(__FILE__, '/') ? : __FILE__- 1) + 1)
+
 /*
  * min()/max() macros that also do
  * strict type-checking.. See the
@@ -126,14 +129,14 @@ inline int myfprintf(_IO_FILE* file, const char *fmt, ...) {
 }
 
 // for run time tracing of application
-#define FUNCTION_START(arg) { if (C_TRACE) { myfprintf(stdout, "TRACE: Entering " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_END(arg) { if (C_TRACE){ myfprintf(stdout, "TRACE: Leaving " arg  " in %s at line %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define FUNCTION_START(arg) { if (C_TRACE) { myfprintf(stdout, "TRACE: Entering " arg  " in %s at line %i\n", __FILEX__, __LINE__); fflush(stdout);}}
+#define FUNCTION_END(arg) { if (C_TRACE){ myfprintf(stdout, "TRACE: Leaving " arg  " in %s at line %i\n", __FILEX__, __LINE__); fflush(stdout);}}
 
-#define FUNCTION_INT(arg, ret) { if (C_TRACE) { myfprintf(stdout, "TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_HEX(arg, ret) { if (C_TRACE) { myfprintf(stdout, "TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILE__, __LINE__); fflush(stdout);}}
-#define FUNCTION_STR(arg, ret) { if (C_TRACE) { myfprintf(stdout, "TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILE__, __LINE__); fflush(stdout);}}
-#define HERE { if (C_TRACE) { myfprintf(stdout, "TRACE: Here! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
-#define TMSG(...) { if (C_TRACE) { myfprintf(stdout, "TRACE: in %s at line %i:\t", __FILE__, __LINE__); myfprintf(stdout, __VA_ARGS__); fflush(stdout);}}
+#define FUNCTION_INT(arg, ret) { if (C_TRACE) { myfprintf(stdout, "TRACE: Returning %i from " arg  " in %s at line %i\n", ret, __FILEX__, __LINE__); fflush(stdout);}}
+#define FUNCTION_HEX(arg, ret) { if (C_TRACE) { myfprintf(stdout, "TRACE: Returning 0x%08x from " arg  " in %s at line %i\n", (int)ret, __FILEX__, __LINE__); fflush(stdout);}}
+#define FUNCTION_STR(arg, ret) { if (C_TRACE) { myfprintf(stdout, "TRACE: Returning '%s' from " arg  " in %s at line %i\n", ret, __FILEX__, __LINE__); fflush(stdout);}}
+#define HERE { if (C_TRACE) { myfprintf(stdout, "TRACE: Here! %s %i\n", __FILEX__, __LINE__); fflush(stdout);}}
+#define TMSG(...) { if (C_TRACE) { myfprintf(stdout, "TRACE: in %s at line %i:\t", __FILEX__, __LINE__); myfprintf(stdout, __VA_ARGS__); fflush(stdout);}}
 
 #define PRINT_HEXB(data, size) {if (C_TRACE) {{ \
         myfprintf(stdout, "DEBUG: 0x"); \
@@ -141,13 +144,13 @@ inline int myfprintf(_IO_FILE* file, const char *fmt, ...) {
         for (int _i=0; _i<size; _i++) { \
            myfprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
         } \
-        myfprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
+        myfprintf(stdout, " in %s at line %i\n", __FILEX__, __LINE__); \
         }; fflush(stdout);}}
 #define CPRINT_HEXB(SC,data, size)  { if (C_TRACE) {{ \
        myfprintf(stdout, "DEBUG:\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
        char *_data = (char*)data; \
        for (int _i=0; _i<size; _i++) myfprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
-       myfprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
+       myfprintf(stdout, " in %s at line %i\n", __FILEX__, __LINE__); \
 }; fflush(stdout); }}
 #define CJUST_HEXB(SC,data, size)  { if (C_TRACE) {{ \
        myfprintf(stdout, "\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
@@ -159,7 +162,7 @@ inline int myfprintf(_IO_FILE* file, const char *fmt, ...) {
 #define PRINT_HEX(arg) PRINT_HEXB(&arg, sizeof(arg))
 
 // for run time debugging of application
-#define BLIP { if (C_DEBUG ){ myfprintf(stdout, "DEBUG: Blip! %s %i\n", __FILE__, __LINE__); fflush(stdout);}}
+#define BLIP { if (C_DEBUG ){ myfprintf(stdout, "DEBUG: Blip! %s %i\n", __FILEX__, __LINE__); fflush(stdout);}}
 #define DMSG(...) { if (C_DEBUG) { myfprintf(stdout, "DEBUG: " __VA_ARGS__); fflush(stdout);}}
 #define DCMSG(SC, FMT, ...) { if (C_DEBUG) { myfprintf(stdout, "DEBUG: \x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
 #define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ myfprintf(stdout, "DEBUG: \x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
@@ -172,11 +175,11 @@ inline int myfprintf(_IO_FILE* file, const char *fmt, ...) {
 
 
 // for run time information viewing of application
-#define PROG_START { if (C_INFO) { myfprintf(stdout, "INFO: Starting in %s, compiled at %s %s MST\n\n", __FILE__, __DATE__, __TIME__);}}
+#define PROG_START { if (C_INFO) { myfprintf(stdout, "INFO: Starting in %s, compiled at %s %s MST\n\n", __FILEX__, __DATE__, __TIME__);}}
 #define IMSG(...) { if (C_INFO) { myfprintf(stdout, "INFO: " __VA_ARGS__);}}
 
 // for run time viewing of application errors
-#define IERROR(...) { if (C_ERRORS) {myfprintf(stderr, "\x1B[31;1mERROR\x1B[30;0m at %s line %i: \n", __FILE__, __LINE__);} myfprintf(stderr, __VA_ARGS__); fflush(stderr);}
+#define IERROR(...) { if (C_ERRORS) {myfprintf(stderr, "\x1B[31;1mERROR\x1B[30;0m at %s line %i: \n", __FILEX__, __LINE__);} myfprintf(stderr, __VA_ARGS__); fflush(stderr);}
 
 // utility function to get Device ID (mac address)
 __uint64_t getDevID();
