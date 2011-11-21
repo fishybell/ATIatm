@@ -39,7 +39,8 @@ def_progs() {
             ;;
       esac
 
-      ip=`bcast_client`
+      # leave it as auto now that the event_conn and fasit_conn can auto-find on their own
+      # ip=`bcast_client`
 
       # restart event_conn to connect them together
       killall -q -9 event_conn

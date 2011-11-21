@@ -20,6 +20,7 @@ protected :
    int handleWrite(const epoll_event *ev) { return 0; };
    int handleRead(const epoll_event *ev) { return 0; };
    int parseData(int rsize, const char *rbuf) { return 0; };
+   bool auto_ip;
 
 #ifdef EVENT_CONN
    public:

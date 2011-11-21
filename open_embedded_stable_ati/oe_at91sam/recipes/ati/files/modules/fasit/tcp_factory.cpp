@@ -27,7 +27,12 @@ TCP_Factory::TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF) 
 FUNCTION_START("::TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF)")
    memset(&server, 0, sizeof(server));
    server.sin_family = AF_INET;
-   inet_aton(destIP, &server.sin_addr);
+   auto_ip = false;
+   if (!inet_aton(destIP, &server.sin_addr)) {
+      // failed to get IP from given string, automatically find vai multi-cast dns
+      auto_ip = true;
+      inet_aton("0.0.0.0", &server.sin_addr);
+   }
    server.sin_port = htons(port);
 DMSG("Created addr with ip %s, (%08x) port %i\n", inet_ntoa(server.sin_addr), server.sin_addr, port);
 
@@ -65,9 +70,37 @@ FUNCTION_INT("::findNextTnum()", lowTnum)
 // returns a connected and ready socket file descriptor for use in a client
 int TCP_Factory::newClientSock() {
 FUNCTION_START("::newClientSock()")
-   int sock;
+   // find server IP if auto_ip is set
+   if (auto_ip) {
+      // setup a readable command pipe (use multi-cast dns to find "server.local")
+      FILE *pipe = NULL;
+      if ( !(pipe = (FILE*)popen("avahi-resolve-address -n server.local | cut -f2", "r")) ) {
+         IERROR("Problems with creating pipe");
+FUNCTION_INT("::newClientSock()", -1)
+         return -1;
+      }
+
+      // this will block, but we're only using this when we don't have a client, so it's okay
+      char buf[BUF_SIZE+1];
+      int rsize=0;
+      rsize = fread(buf, sizeof(char), BUF_SIZE, pipe);
+
+      // check that we read an IP
+      if (rsize > 0) {
+         if (!inet_aton(buf, &server.sin_addr)) {
+            // didn't read, set back to bad address
+            inet_aton("0.0.0.0", &server.sin_addr);
+         }
+         DCMSG(BLUE, "Auto-IP found address %s\n", inet_ntoa(server.sin_addr));
+      } else {
+         IERROR("Read error: %s\n", strerror(errno))
+FUNCTION_INT("::newClientSock()", -1)
+         return -1;
+      }
+   }
 
    // create the TCP socket
+   int sock;
    if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
 FUNCTION_INT("::newClientSock()", -1)
       return -1;
