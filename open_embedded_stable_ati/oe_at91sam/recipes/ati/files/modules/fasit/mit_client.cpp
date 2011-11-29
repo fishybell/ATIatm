@@ -22,6 +22,9 @@ FUNCTION_START("::MIT_Client(int fd, int tnum) : Connection(fd)")
    att_SIT = new attached_SIT_Client(NULL, 0, -1); // invalid tnum
    server = att_SIT; // for pair()
 
+   // we have not yet connected to SmartRange/TRACR
+   ever_conn = false;
+
    // connect our netlink connection
    nl_conn = NL_Conn::newConn<MIT_Conn>(this);
    if (nl_conn == NULL) {
@@ -215,6 +218,9 @@ FUNCTION_START("::handle_100(int start, int end)")
 
    // do handling of message
    IMSG("Handling 100 in MIT\n");
+
+   // we were connected at some point in time
+   ever_conn = true;
 
    // map header (no body for 100)
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
@@ -538,8 +544,10 @@ bool MIT_Client::reconnect() {
    // first off, handle the real reconnect
    bool retval = TCP_Client::reconnect();
 
-   // second, stop the MIT
-   doMove(0, 0);
+   // second, stop the MIT if we were ever connected
+   if (ever_conn) {
+      doMove(0, 0);
+   }
 
    FUNCTION_INT("::reconnect()", retval);
    return retval;
