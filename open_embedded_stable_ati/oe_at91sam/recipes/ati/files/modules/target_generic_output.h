@@ -105,6 +105,9 @@ typedef enum {
     EVENT_SHUTDOWN,	// shutdown
     EVENT_SLEEP,	// sleep
     EVENT_WAKE,		// wake
+    EVENT_HOME_LIMIT,		// triggered on home limit switch
+    EVENT_END_LIMIT,		// triggered on end limit switch
+    EVENT_TIMED_OUT,		// triggered on end limit switch
     EVENT_ERROR,	// error with one of the above (always causes immediate deactivate)
 } GO_event_t;
 extern void generic_output_event(GO_event_t type); // can be called from interrupt

@@ -31,7 +31,7 @@ static char* MOVER_TYPE[] = {"infantry","armor","infantry","error"};
 static int CONTINUE_ON[] = {2,1,3,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
-static int TIMEOUT_IN_MSECONDS[] = {1500,12000,1500,0};
+static int TIMEOUT_IN_MSECONDS[] = {1000,12000,1000,0};
 static int MOVER_DELAY_MULT[] = {6,2,6,0};
 
 #define MOVER_POSITION_START 		0
@@ -698,6 +698,8 @@ static void timeout_fire(unsigned long data)
 
    delay_printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME[mover_type], __func__);
 
+    do_event(EVENT_TIMED_OUT); // reached timeout
+    
     if (atomic_read(&goal_atomic) == 0) {
        do_event(EVENT_STOPPED); // timeout was part of coasting or stopping
     } else {
@@ -859,6 +861,7 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
+    do_event(EVENT_HOME_LIMIT); // triggered on home limit
     do_event(EVENT_STOP); // started stopping
 #ifndef TESTING_MAX
     atomic_set(&goal_atomic, 0); // reset goal speed
@@ -887,6 +890,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
+    do_event(EVENT_END_LIMIT); // triggered on end limit
     do_event(EVENT_STOP); // started stopping
 #ifndef TESTING_MAX
     atomic_set(&goal_atomic, 0); // reset goal speed
