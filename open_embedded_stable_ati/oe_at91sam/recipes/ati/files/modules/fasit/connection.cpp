@@ -204,9 +204,8 @@ FUNCTION_START("Connection::handleRead(const epoll_event *ev)");
    int rsize=0;
    rsize = read(fd, buf, BUF_SIZE);
 
-DCMSG(GREEN,"fd %i read %i bytes:\n", fd, rsize);
-PRINT_HEXB(buf, rsize);
-
+   DCMSG(BLUE,"fd %i read %i bytes:\n", fd, rsize);
+   CPRINT_HEXB(BLUE,buf, rsize);
    DCOLOR(black) ;
    if (rsize == -1) {
       IERROR("Read error: %s\n", strerror(errno))
@@ -262,6 +261,7 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
 
    DCMSG(BLUE,"fd %i wrote %i bytes with 'write(fd, fwbuf, fwsize)': ", fd, s);
    CPRINT_HEXB(BLUE,fwbuf, s);
+   DCOLOR(black);
 
    // copy what we did write to the "last write buffer"
    if (lwbuf != NULL) { delete [] lwbuf; } // clear out old buffer
