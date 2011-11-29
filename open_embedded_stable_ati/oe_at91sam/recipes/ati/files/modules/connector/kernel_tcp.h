@@ -40,12 +40,12 @@ public :
 
    void outgoingGOEvent(kern_go_event_t *event); // send a generic output event over tcp
    void outgoingCmdEvent(kern_cmd_event_t *event); // send a command event over tcp
+   void sendRole(); // send the role to the opposite tcp connection
 
 protected:
    virtual bool hasPair() { return kern_conn != NULL;};
 
 private:
-   void sendRole(); // send the role to the opposite tcp connection
    int role; // the role this connection handles
    class Kern_Conn *kern_conn;
 };

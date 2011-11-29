@@ -28,7 +28,7 @@ FUNCTION_START("::Kernel_TCP(int fd) : Connection(fd)")
       deleteLater();
    } else {
       // send my role to the other side
-      sendRole();
+      new SRTimer(this, 250); // send the role after 250 milliseconds
    }
 FUNCTION_END("::Kernel_TCP(int fd) : Connection(fd)")
 }
@@ -43,7 +43,7 @@ FUNCTION_START("::Kernel_TCP(int fd, int tnum) : Connection(fd)")
       deleteLater();
    } else {
       // send my role to the other side
-      sendRole();
+      new SRTimer(this, 250); // send the role after 250 milliseconds
    }
 FUNCTION_END("::Kernel_TCP(int fd, int tnum) : Connection(fd)")
 }
@@ -61,6 +61,9 @@ FUNCTION_START("::sendRole()")
    kern_cmd_event_t msg;
    memset(&msg, 0, sizeof(kern_cmd_event_t)); // everything 0...
    msg.event.role = KERN_ROLE;                // ... except role
+   msg.start = CMD_START;                     // ... and start
+   msg.end = CMD_END;                         // ... and end
+   DCMSG(GREEN, "Sending role %i", KERN_ROLE);
 
    // send
    queueMsg(&msg, sizeof(kern_cmd_event_t));
@@ -77,6 +80,7 @@ FUNCTION_START("::parseData(int size, char *buf)")
 FUNCTION_INT("::parseData(int size, char *buf)", 0)
       return 0;
    }
+DCMSG(RED, "Parsing message...(%i, %i, %i)", size, sizeof(kern_go_event_t), sizeof(kern_cmd_event_t));
 
    // check for a valid message
    while (size >= min(sizeof(kern_go_event_t), sizeof(kern_cmd_event_t))) { // msg at least as big as smallest event structure
@@ -94,10 +98,11 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0)
          // move on to next object
          buf += sizeof(kern_go_event_t);
          size -= sizeof(kern_go_event_t);
-      } else if (size >= sizeof(kern_cmd_event_t) && go_trial->start == CMD_START && go_trial->end == CMD_END) { // message a valid cmd event?
+      } else if (size >= sizeof(kern_cmd_event_t) && cmd_trial->start == CMD_START && cmd_trial->end == CMD_END) { // message a valid cmd event?
          // check to see if we're just getting the other side's kernel role
          if (cmd_trial->event.cmd == 0 && cmd_trial->event.payload_size == 0 && cmd_trial->event.attribute == 0) {
             // remember role
+            DCMSG(GREEN, "Received role %i", cmd_trial->event.role);
             role = cmd_trial->event.role;
          } else {
             // send to kernel
@@ -131,6 +136,7 @@ FUNCTION_END("::outgoingGOEvent(kern_go_event_t *event)")
 void Kernel_TCP::outgoingCmdEvent(kern_cmd_event_t *event) {
 FUNCTION_START("::outgoingCmdEvent(kern_cmd_event_t *event)")
 
+DCMSG(GREEN, "My role: %i, want role: %i, see role: %i", KERN_ROLE, event->event.role, role);
    // check to see if we're attached to the correct role
    if (event->event.role == role) {
       // ...we are, queue the message for sending
@@ -231,9 +237,11 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
             }
             // handle with the appropriate role handler
             if (data->role == KERN_ROLE) { // is this kernel the right role?
+               DCMSG(BLUE, "Event for me!");
                incomingCmdEvent(&event);
             } else { // maybe the tcp connection has the right role...
                kern_tcp->outgoingCmdEvent(&event);
+               DCMSG(BLUE, "Event for tcp!");
             }
          }
          break;
