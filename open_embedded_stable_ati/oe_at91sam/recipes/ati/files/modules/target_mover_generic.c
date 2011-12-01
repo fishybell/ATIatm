@@ -17,6 +17,7 @@
 
 //#define TESTING_ON_EVAL
 //#define TESTING_MAX
+#define ACCEL_TEST
 
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
@@ -190,6 +191,7 @@ atomic_t o_count = ATOMIC_INIT(0);
 atomic_t delta_t = ATOMIC_INIT(0);
 atomic_t position = ATOMIC_INIT(0);
 atomic_t position_old = ATOMIC_INIT(0);
+atomic_t velocity_old = ATOMIC_INIT(0);
 atomic_t legs = ATOMIC_INIT(0);
 atomic_t quad_direction = ATOMIC_INIT(0);
 atomic_t doing_pos = ATOMIC_INIT(FALSE);
@@ -755,6 +757,9 @@ irqreturn_t leg_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
 irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
     {
     u32 status, rb, cv, this_t, dn1, dn2;
+#ifdef ACCEL_TEST
+    int pos;
+#endif
     if (!atomic_read(&full_init))
         {
         return IRQ_HANDLED;
@@ -807,6 +812,30 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
             }
         atomic_set(&velocity, dn1 * dn2);
         atomic_set(&last_t, this_t);
+#ifdef ACCEL_TEST
+        // did we reach the target speed?
+        if (current_speed10() == 87) { // 8.69 mph is 14 kph
+            // display current position
+            pos = ((INCHES_PER_TICK[mover_type]*atomic_read(&position))/TICKS_DIV);
+            delay_printk("\
+#************************************#\n\
+# Reached 14kph @ %2i feet, %2i inches #\n\
+#************************************#\n\
+", pos/12, pos%12);
+            // stop mover
+            mover_speed_stop();
+        if (atomic_read(&doing_pos) == FALSE)
+            {
+            atomic_set(&doing_pos, TRUE);
+            mod_timer(&position_timer_list, jiffies+((1*HZ)/1000)); // do as quickly as possible
+            }
+        if (atomic_read(&doing_vel) == FALSE)
+            {
+            atomic_set(&doing_vel, TRUE);
+            mod_timer(&velocity_timer_list, jiffies+((1*HZ)/1000)); // do as quickly as possible
+            }
+        } else {
+#endif
         if (atomic_read(&doing_pos) == FALSE)
             {
             atomic_set(&doing_pos, TRUE);
@@ -817,6 +846,10 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
             atomic_set(&doing_vel, TRUE);
             mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
             }
+#ifdef ACCEL_TEST
+        // we only do updates to position and velocity in the accelleration test when we reach the target speed...this is the end of the else
+        }
+#endif
 // new method
         // call pid_step to change motor at each input of encoder
         pid_step(this_t);
@@ -2153,16 +2186,23 @@ static void do_position(struct work_struct * work)
             }
         }
 
-static void do_velocity(struct work_struct * work)
-        {
+static void do_velocity(struct work_struct * work) {
+    int vel;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
     }
+    // use the calculated speed to see if we've changed a significant digit or not
+    vel = current_speed10();
     
+    // only notify sysfs if we've changed velocity
+    if (abs(atomic_read(&velocity_old) - vel) > 0) {
+        atomic_set(&velocity_old, vel); 
         target_sysfs_notify(&target_device_mover_generic, "velocity");
+        do_event(EVENT_IS_MOVING); // notify mover driver
         target_sysfs_notify(&target_device_mover_generic, "rpm");
-        }
+    }
+}
 
 static void do_delta(struct work_struct * work)
         {
