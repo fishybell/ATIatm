@@ -24,7 +24,7 @@
 //---------------------------------------------------------------------------
 static int mover_type = 1; // 0 = infantry, 1 = armor, 2 = infantry/h-bridge, 3 = error
 module_param(mover_type, int, S_IRUGO);
-static int kp_m = 0, kp_d = 0,  ki_m = 0, ki_d = 0, kd_m = 0, kd_d = 0;
+static int kp_m = -1, kp_d = -1,  ki_m = -1, ki_d = -1, kd_m = -1, kd_d = -1;
 module_param(kp_m, int, S_IRUGO);
 module_param(kp_d, int, S_IRUGO);
 module_param(ki_m, int, S_IRUGO);
@@ -61,10 +61,10 @@ static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0};
 static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0};
 
 // the paremeters of the velocity ramp up
-static int RAMP_UP_TIME_IN_MSECONDS[] = {150,5000,150,0};
-static int RAMP_DOWN_TIME_IN_MSECONDS[] = {100,5000,100,0};
+static int RAMP_UP_TIME_IN_MSECONDS[] = {150,250,150,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {100,100,100,0};
 //static int RAMP_STEPS[] = {25,100,25,0};
-static int RAMP_STEPS[] = {1,100,1,0};
+static int RAMP_STEPS[] = {1,5,1,0};
 
 // the parameters needed for PID speed control
 // old method
@@ -79,23 +79,25 @@ static int PID_TD_MULT[]   = {1,1,2,1}; // time derivitive numerator
 static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
 #endif
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- standard
-// static int PID_KP_MULT[]   = {3, 1, 3, 0}; // proportional gain numerator
-// static int PID_KP_DIV[]    = {5, 1, 5, 0}; // proportional gain denominator
+// new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- standard
+// static int PID_KP_MULT[]   = {3, 2, 3, 0}; // proportional gain numerator
+// static int PID_KP_DIV[]    = {5, 5, 5, 0}; // proportional gain denominator
 // static int PID_KI_MULT[]   = {2, 1, 2, 0}; // integral gain numerator
-// static int PID_KI_DIV[]    = {24575, 1, 24575, 0}; // integral gain denominator
-// static int PID_KD_MULT[]   = {8847, 1, 8847, 0}; // derivitive gain numerator
-// static int PID_KD_DIV[]    = {4, 1, 4, 0}; // derivitive gain denominator
+// static int PID_KI_DIV[]    = {24575, 61440, 24575, 0}; // integral gain denominator
+// static int PID_KD_MULT[]   = {8847, 12288, 8847, 0}; // derivitive gain numerator
+// static int PID_KD_DIV[]    = {4, 5, 4, 0}; // derivitive gain denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot
-static int PID_KP_MULT[]   = {1, 1, 1, 0}; // proportional gain numerator
-static int PID_KP_DIV[]    = {5, 1, 5, 0}; // proportional gain denominator
+// new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot
+static int PID_KP_MULT[]   = {1, 2, 1, 0}; // proportional gain numerator
+static int PID_KP_DIV[]    = {5, 15, 5, 0}; // proportional gain denominator
 static int PID_KI_MULT[]   = {1, 1, 2, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {73725, 1, 73725, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {5898, 1, 5898, 0}; // derivitive gain numerator
-static int PID_KD_DIV[]    = {3, 1, 3, 0}; // derivitive gain denominator
+static int PID_KI_DIV[]    = {73725, 184320, 73725, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {5898, 32768, 5898, 0}; // derivitive gain numerator
+static int PID_KD_DIV[]    = {3, 15, 3, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
-static int MIN_EFFORT[]    = {1000, 1, 1000, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
-static int MIN_EFFORT[]    = {295, 1, 295, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {295, 175, 295, 0}; // minimum effort given to ensure motor moves
 #endif
 static int SPEED_AFTER[]   = {3, 3, 3, 0}; // clamp effort if we hit this many correct values in a row
 static int SPEED_CHANGE[]  = {20, 30, 20, 0}; // unclamp if the error is bigger than this
@@ -622,7 +624,7 @@ static int hardware_speed_set(int new_speed)
         if (atomic_read(&moving_atomic))
             {
             // start the ramp up/down of the mover immediately
-            mod_timer(&ramp_timer_list, jiffies+(((ramp_time*HZ)/1000)/RAMP_STEPS[mover_type]));
+            mod_timer(&ramp_timer_list, jiffies+(((1*HZ)/1000)));
             }
         }
 
@@ -1600,7 +1602,9 @@ static void ramp_fire(unsigned long data) {
 
     // calculate number of steps to take based on the amount of speed change
     speed_steps = (RAMP_STEPS[mover_type] * abs(goal_end - goal_start)) / 2; // 1/2 normal steps * number of speed change
+#ifdef TESTING_MAX
     speed_steps = 1;
+#endif
 
     // find direction
     if (goal_end < goal_start) {
@@ -2252,7 +2256,7 @@ static void pid_step(int delta_t) {
     // read input speed (adjust speed10 value to 1000*percent)
     //input_speed = (523 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type];
     input_speed = (1000 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type]; // absolute velocity, no direction
-    //delay_printk("s:%i; i:%i;", new_speed, input_speed);
+    delay_printk("s:%i; i:%i;", new_speed, input_speed);
 
     // We have just a few microseconds to complete operations, so die if we can't lock
     if (!spin_trylock(&pid_lock)) {
@@ -2368,10 +2372,10 @@ static void pid_step(int delta_t) {
                  PID_GAIN_MULT[mover_type], PID_GAIN_DIV[mover_type], PID_TI_MULT[mover_type], PID_TI_DIV[mover_type], PID_TD_MULT[mover_type], PID_TD_DIV[mover_type]);
 #endif
 // new method
-    //delay_printk(" n:%i; u:%i; e:%i; p:%i:%i/%i; i:%i:%i/%i; d:%i:%i/%i\n", new_speed, pid_effort, pid_error,
-                 //pid_p, kp_m, kp_d,
-                 //pid_i, ki_m, ki_d,
-                 //pid_d, kd_m, kd_d);
+    delay_printk(" n:%i; u:%i; e:%i; p:%i:%i/%i; i:%i:%i/%i; d:%i:%i/%i\n", new_speed, pid_effort, pid_error,
+                 pid_p, kp_m, kp_d,
+                 pid_i, ki_m, ki_d,
+                 pid_d, kd_m, kd_d);
 }
 
 
@@ -2396,12 +2400,12 @@ static int __init target_mover_generic_init(void)
     }
 
     // find actual PID values to use based on given mover type or manually given module parameters
-    if (kp_m == 0) {kp_m = PID_KP_MULT[mover_type];}
-    if (kp_d == 0) {kp_d = PID_KP_DIV[mover_type];}
-    if (ki_m == 0) {ki_m = PID_KI_MULT[mover_type];}
-    if (ki_d == 0) {ki_d = PID_KI_DIV[mover_type];}
-    if (kd_m == 0) {kd_m = PID_KD_MULT[mover_type];}
-    if (kd_d == 0) {kd_d = PID_KD_DIV[mover_type];}
+    if (kp_m < 0) {kp_m = PID_KP_MULT[mover_type];}
+    if (kp_d < 0) {kp_d = PID_KP_DIV[mover_type];}
+    if (ki_m < 0) {ki_m = PID_KI_MULT[mover_type];}
+    if (ki_d < 0) {ki_d = PID_KI_DIV[mover_type];}
+    if (kd_m < 0) {kd_m = PID_KD_MULT[mover_type];}
+    if (kd_d < 0) {kd_d = PID_KD_DIV[mover_type];}
 
     // initialize hardware registers
     hardware_init();
