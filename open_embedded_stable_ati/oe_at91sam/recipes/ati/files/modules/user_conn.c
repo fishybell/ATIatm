@@ -1519,7 +1519,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Toggle target\nFormat: T\n");
                         break;
                     case 'V': case 'v':
-                        snprintf(wbuf, 1024, "Send event to kernel\nFormat: V (0-255)event\nCurrently defined events 0-11:\n0: Start of raise\n1: finished raising\n2: start of lower\n3: finished lowering\n4: start of move\n5: reached target speed\n6: Changed position\n7: started coast\n8: started stopping\n9: finished stopping\n10: hit\n11: kill\n12: Shutdown\n13: Sleep\n:14: Wake\n15: home limit\n16: end limit\n17: timed out\n18: error\n");
+                        snprintf(wbuf, 1024, "Send event to kernel\nFormat: V (0-255)event\nCurrently defined events 0-11:\n0: Start of raise\n1: finished raising\n2: start of lower\n3: finished lowering\n4: start of move\n5: reached target speed\n6: Changed position\n7: started coast\n8: started stopping\n9: finished stopping\n10: hit\n11: kill\n12: Shutdown\n13: Sleep\n:14: Wake\n15: home limit\n16: end limit\n17: timed out\n18: mover changed speed\n19: error\n");
                         break;
                     case 'X': case 'x':
                         snprintf(wbuf, 1024, "Emergency stop\nFormat: X\n");

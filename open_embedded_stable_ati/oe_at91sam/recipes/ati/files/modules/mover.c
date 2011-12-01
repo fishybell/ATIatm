@@ -22,7 +22,7 @@
 // These variables are parameters given when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
 
-#define MOVED_DELAY 750
+#define MOVED_DELAY 250
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are fully initialized
@@ -123,6 +123,7 @@ static void move_event_internal(int etype, bool upload) {
     switch (etype) {
         case EVENT_MOVE:
         case EVENT_MOVING:
+        case EVENT_IS_MOVING:
             mod_timer(&moved_timer, jiffies+(((MOVED_DELAY/2)*HZ)/1000)); // wait for X milliseconds for sensor to settle
             break;
         case EVENT_STOPPED:
@@ -392,6 +393,7 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
 //---------------------------------------------------------------------------
 static void __exit Mover_exit(void) {
     atomic_set(&full_init, FALSE);
+    del_timer(&moved_timer);
     uninstall_nl_driver(atomic_read(&driver_id));
     ati_flush_work(&position_work); // close any open work queue items
 }
