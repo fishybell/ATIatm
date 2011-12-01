@@ -17,13 +17,20 @@
 
 //#define TESTING_ON_EVAL
 //#define TESTING_MAX
-#define ACCEL_TEST
+//#define ACCEL_TEST
 
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
 static int mover_type = 1; // 0 = infantry, 1 = armor, 2 = infantry/h-bridge, 3 = error
 module_param(mover_type, int, S_IRUGO);
+static int kp_m = 0, kp_d = 0,  ki_m = 0, ki_d = 0, kd_m = 0, kd_d = 0;
+module_param(kp_m, int, S_IRUGO);
+module_param(kp_d, int, S_IRUGO);
+module_param(ki_m, int, S_IRUGO);
+module_param(ki_d, int, S_IRUGO);
+module_param(kd_m, int, S_IRUGO);
+module_param(kd_d, int, S_IRUGO);
 
 static char* TARGET_NAME[] = {"old infantry mover","armor mover","infantry mover","error"};
 static char* MOVER_TYPE[] = {"infantry","armor","infantry","error"};
@@ -2309,9 +2316,9 @@ static void pid_step(int delta_t) {
        // do the PID calculations
 
        // individual pid steps to make full equation more clean
-       pid_p = (((1000 * PID_KP_MULT[mover_type] * pid_error) / PID_KP_DIV[mover_type]) / 1000);
-       pid_i = (((1000 * PID_KI_MULT[mover_type] * error_sum) / PID_KI_DIV[mover_type]) / 1000);
-       pid_d = (((1000 * PID_KD_MULT[mover_type] * (pid_error - pid_last_error)) / (PID_KD_DIV[mover_type] * delta_t)) / 1000);
+       pid_p = (((1000 * kp_m * pid_error) / kp_d) / 1000);
+       pid_i = (((1000 * ki_m * error_sum) / ki_d) / 1000);
+       pid_d = (((1000 * kd_m * (pid_error - pid_last_error)) / (kd_d * delta_t)) / 1000);
 
        // descrete PID algorithm gleamed from Scott's brain
        pid_effort = pid_last_effort + pid_p + pid_i + pid_d;
@@ -2362,9 +2369,9 @@ static void pid_step(int delta_t) {
 #endif
 // new method
     //delay_printk(" n:%i; u:%i; e:%i; p:%i:%i/%i; i:%i:%i/%i; d:%i:%i/%i\n", new_speed, pid_effort, pid_error,
-                 //pid_p, PID_KP_MULT[mover_type], PID_KP_DIV[mover_type],
-                 //pid_i, PID_KI_MULT[mover_type], PID_KI_DIV[mover_type],
-                 //pid_d, PID_KD_MULT[mover_type], PID_KD_DIV[mover_type]);
+                 //pid_p, kp_m, kp_d,
+                 //pid_i, ki_m, ki_d,
+                 //pid_d, kd_m, kd_d);
 }
 
 
@@ -2387,6 +2394,14 @@ static int __init target_mover_generic_init(void)
         case 1: atomic_set(&tc_clock, 2); break;
         case 2: atomic_set(&tc_clock, 4); break;
     }
+
+    // find actual PID values to use based on given mover type or manually given module parameters
+    if (kp_m == 0) {kp_m = PID_KP_MULT[mover_type];}
+    if (kp_d == 0) {kp_d = PID_KP_DIV[mover_type];}
+    if (ki_m == 0) {ki_m = PID_KI_MULT[mover_type];}
+    if (ki_d == 0) {ki_d = PID_KI_DIV[mover_type];}
+    if (kd_m == 0) {kd_m = PID_KD_MULT[mover_type];}
+    if (kd_d == 0) {kd_d = PID_KD_DIV[mover_type];}
 
     // initialize hardware registers
     hardware_init();
