@@ -61,6 +61,11 @@ atomic_t operating_atomic = ATOMIC_INIT(FALSE);
 atomic_t full_init = ATOMIC_INIT(FALSE);
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to indicate that we have reverse polarity
+//---------------------------------------------------------------------------
+atomic_t reverse = ATOMIC_INIT(FALSE);
+
+//---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are awake/asleep
 //---------------------------------------------------------------------------
 atomic_t sleep_atomic = ATOMIC_INIT(0); // not sleeping
@@ -114,36 +119,41 @@ static void do_event(int etype) {
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
-static int hardware_motor_on(int direction)
-    {
+static int hardware_motor_on(int direction) {
     unsigned long flags;
 
    delay_printk("%s - %s()\n",TARGET_NAME, __func__);
     spin_lock_irqsave(&motor_lock, flags);
 
-    // These don't get used with the SAT but we set them everytime we get the chance for safety
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
+    // turn everything off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // forward neg off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // reverse neg off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);    // forward pos off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);    // reverse pos off
 
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// forward off
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// reverse off
+    if (direction == LIFTER_POSITION_UP) {
+        delay_printk("%s - %s() - up\n",TARGET_NAME, __func__);
 
-    if (direction == LIFTER_POSITION_UP)
-        {
-   delay_printk("%s - %s() - up\n",TARGET_NAME, __func__);
-
-        at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// forward on
+        if (atomic_read(&reverse) == TRUE) {
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// reverse pos on
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// reverse neg on
+        } else {
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// forward pos on
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// forward neg on
         }
-    else if (direction == LIFTER_POSITION_DOWN)
-        {
-   delay_printk("%s - %s() - down\n",TARGET_NAME, __func__);
+    } else if (direction == LIFTER_POSITION_DOWN) {
+        delay_printk("%s - %s() - down\n",TARGET_NAME, __func__);
 
-        at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// reverse on
+        if (atomic_read(&reverse) == TRUE) {
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// forward pos on
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// forward neg on
+        } else {
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// reverse pos on
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// reverse neg on
         }
-    else
-        {
-	delay_printk("%s - %s() - error\n",TARGET_NAME, __func__);
-        }
+    } else {
+        delay_printk("%s - %s() - error\n",TARGET_NAME, __func__);
+    }
 
     spin_unlock_irqrestore(&motor_lock, flags);
 
@@ -165,12 +175,11 @@ static int hardware_motor_off(void)
    delay_printk("%s - %s()\n",TARGET_NAME, __func__);
     spin_lock_irqsave(&motor_lock, flags);
 
-    // These don't get used with the SAT but we set them everytime we get the chance for safety
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
-
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // forward off
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // reverse off
+    // turn everything off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // forward neg off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // reverse neg off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);    // forward pos off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);    // reverse pos off
 
     spin_unlock_irqrestore(&motor_lock, flags);
     return 0;
@@ -304,13 +313,21 @@ static int hardware_init(void)
     {
     int status = 0;
 
-    // These don't get used with the SAT but we set the initial value for completeness
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
-
     // Configure motor gpio for output and set initial output
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // forward off
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // reverse off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); // forward neg off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); // reverse neg off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // forward pos off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // reverse pos off
+
+    // Configure as reverse polarity or normal polarity
+    at91_set_gpio_input(INPUT_MOVER_TEST_BUTTON_FWD, INPUT_MOVER_TEST_BUTTON_PULLUP_STATE);
+    at91_set_deglitch(INPUT_MOVER_TEST_BUTTON_FWD, INPUT_MOVER_TEST_BUTTON_DEGLITCH_STATE);
+    if (at91_get_gpio_value(INPUT_MOVER_TEST_BUTTON_FWD) == INPUT_MOVER_TEST_BUTTON_ACTIVE_STATE) {
+        atomic_set(&reverse, TRUE); // the +12v line was actually ground, we have reverse polarity
+    }
+
+    // Configure position gpios for input and deglitch for interrupts
+    at91_set_gpio_input(INPUT_LIFTER_POS_DOWN_LIMIT, INPUT_LIFTER_POS_PULLUP_STATE);
 
     // Configure position gpios for input and deglitch for interrupts
     at91_set_gpio_input(INPUT_LIFTER_POS_DOWN_LIMIT, INPUT_LIFTER_POS_PULLUP_STATE);
