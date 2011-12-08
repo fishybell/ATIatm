@@ -1991,6 +1991,14 @@ int main(int argc, char **argv) {
     close(client); // close socket
     free(client_buf); // free buffer
 
+    // stop mover
+    struct nl_msg *msg = nlmsg_alloc();
+    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_MOVE, 1);
+    nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
+    nl_send_auto_complete(g_handle, msg);
+    nlmsg_free(msg);
+    
+
     // destroy netlink handle
     nl_handle_destroy(g_handle);
 
