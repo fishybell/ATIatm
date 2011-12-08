@@ -18,6 +18,8 @@
 //#define TESTING_ON_EVAL
 //#define TESTING_MAX
 //#define ACCEL_TEST
+//#define WOBBLE_DETECT
+//#define DEBUG_PID
 
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
@@ -53,7 +55,7 @@ static int MOVER_DELAY_MULT[] = {6,2,6,0};
 
 // the maximum allowed speed ticks
 //static int NUMBER_OF_SPEEDS[] = {10,20,10,0};
-static int NUMBER_OF_SPEEDS[] = {100,200,100,0};
+static int NUMBER_OF_SPEEDS[] = {200,200,100,0};
 static int MIN_SPEED[] = {15,20,15,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
@@ -86,18 +88,18 @@ static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
 // static int PID_KI_DIV[]    = {24575, 61440, 24575, 0}; // integral gain denominator
 // static int PID_KD_MULT[]   = {8847, 12288, 8847, 0}; // derivitive gain numerator
 // static int PID_KD_DIV[]    = {4, 5, 4, 0}; // derivitive gain denominator
-// new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot
+// new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot
-static int PID_KP_MULT[]   = {1, 2, 1, 0}; // proportional gain numerator
+static int PID_KP_MULT[]   = {2, 2, 1, 0}; // proportional gain numerator
 static int PID_KP_DIV[]    = {5, 15, 5, 0}; // proportional gain denominator
-static int PID_KI_MULT[]   = {1, 1, 2, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {73725, 184320, 73725, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {5898, 32768, 5898, 0}; // derivitive gain numerator
-static int PID_KD_DIV[]    = {3, 15, 3, 0}; // derivitive gain denominator
+static int PID_KI_MULT[]   = {3, 1, 2, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {47515, 184320, 73725, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {19006, 32768, 5898, 0}; // derivitive gain numerator
+static int PID_KD_DIV[]    = {15, 15, 3, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
 static int MIN_EFFORT[]    = {1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
-static int MIN_EFFORT[]    = {295, 175, 295, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {100, 175, 295, 0}; // minimum effort given to ensure motor moves
 #endif
 static int SPEED_AFTER[]   = {3, 3, 3, 0}; // clamp effort if we hit this many correct values in a row
 static int SPEED_CHANGE[]  = {20, 30, 20, 0}; // unclamp if the error is bigger than this
@@ -326,6 +328,11 @@ int pid_last_error = 0;				// prior error
 int pid_error = 0;					// current error
 int pid_correct_count = 0;       // number of correct speeds (used to clamp effort)
 atomic_t pid_set_point = ATOMIC_INIT(0); // set point for speed to maintain
+
+#ifdef WOBBLE_DETECT
+int pid_last_speeds[3];          // prior speeds (for detecting wobble)
+struct timespec pid_last_time;   // prior peak time (for detecting wobble)
+#endif
 
 //---------------------------------------------------------------------------
 // Kernel timer for the delayed update for position and velocity
@@ -653,6 +660,10 @@ static int hardware_movement_stop(int stop_timer)
 // new method
     // reset PID errors and update internal pid variables
     memset(pid_errors, 0, sizeof(int)*MAX_PID_ERRORS);
+#ifdef WOBBLE_DETECT
+    memset(pid_last_speeds, 0, sizeof(int)*3);
+    pid_last_time = current_kernel_time();
+#endif
     pid_step(MAX_TIME); // use maximum delta_t
 
     // turn off the motor
@@ -1655,7 +1666,9 @@ static void ramp_fire(unsigned long data) {
         if (goal_end == 0) {
             do_event(EVENT_STOP); // started stopping (probably finished stopping too, but that's handled elsewhere)
         } else {
+#ifndef WOBBLE_DETECT
             do_event(EVENT_MOVING); // reached moving goal
+#endif
         }
     }
 
@@ -2192,7 +2205,9 @@ static void do_position(struct work_struct * work)
         if (abs(atomic_read(&position_old) - atomic_read(&position)) > (TICKS_PER_LEG[mover_type]/TICKS_DIV/2))
             {
             atomic_set(&position_old, atomic_read(&position)); 
+#ifndef WOBBLE_DETECT
             do_event(EVENT_POSITION); // notify mover driver
+#endif
             target_sysfs_notify(&target_device_mover_generic, "position");
             }
         }
@@ -2210,7 +2225,9 @@ static void do_velocity(struct work_struct * work) {
     if (abs(atomic_read(&velocity_old) - vel) > 0) {
         atomic_set(&velocity_old, vel); 
         target_sysfs_notify(&target_device_mover_generic, "velocity");
+#ifndef WOBBLE_DETECT
         do_event(EVENT_IS_MOVING); // notify mover driver
+#endif
         target_sysfs_notify(&target_device_mover_generic, "rpm");
     }
 }
@@ -2256,12 +2273,30 @@ static void pid_step(int delta_t) {
     // read input speed (adjust speed10 value to 1000*percent)
     //input_speed = (523 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type];
     input_speed = (1000 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type]; // absolute velocity, no direction
+#ifdef DEBUG_PID
     delay_printk("s:%i; i:%i;", new_speed, input_speed);
+#endif
 
     // We have just a few microseconds to complete operations, so die if we can't lock
     if (!spin_trylock(&pid_lock)) {
         return;
     }
+
+#ifdef WOBBLE_DETECT
+    // move last speeds
+    pid_last_speeds[0] = pid_last_speeds[1];
+    pid_last_speeds[1] = pid_last_speeds[2];
+    pid_last_speeds[2] = input_speed;
+
+    // detect wobble peak
+    if (pid_last_speeds[0] < pid_last_speeds[1] &&
+        pid_last_speeds[1] > pid_last_speeds[2]) { // pid_last_speeds[1] is the peak
+        struct timespec time_now = current_kernel_time();
+        struct timespec time_d = timespec_sub(time_now, pid_last_time);
+        pid_last_time = time_now; // remember last time as now
+        delay_printk("Wobble @ %i : %i\n", (time_d.tv_sec * 1000) + (time_d.tv_nsec / 1000000), pid_last_speeds[1] - new_speed); // print wobble time and amount to track if we're wobbling steady
+    }
+#endif
 
 
 // old method
@@ -2372,10 +2407,12 @@ static void pid_step(int delta_t) {
                  PID_GAIN_MULT[mover_type], PID_GAIN_DIV[mover_type], PID_TI_MULT[mover_type], PID_TI_DIV[mover_type], PID_TD_MULT[mover_type], PID_TD_DIV[mover_type]);
 #endif
 // new method
+#ifdef DEBUG_PID
     delay_printk(" n:%i; u:%i; e:%i; p:%i:%i/%i; i:%i:%i/%i; d:%i:%i/%i\n", new_speed, pid_effort, pid_error,
                  pid_p, kp_m, kp_d,
                  pid_i, ki_m, ki_d,
                  pid_d, kd_m, kd_d);
+#endif
 }
 
 
