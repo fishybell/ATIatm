@@ -127,12 +127,12 @@ module_param(shutdown, bool, S_IRUGO);
 static int minvoltval = 12;
 module_param(minvoltval, int, S_IRUGO);
 
-// these lists go 12, 24, 48, error
-const int BATTERY_NORMAL[] = {45, 90, 180, 255};	// at or above this value is considered normal
-const int BATTERY_LOW[] =    {42, 84, 168, 4};		// at or above this value (and below above) is considered low
-const int BATTERY_CRIT[] =   {41, 82, 164, 3};		// at or above this value (and below above) is considered critical
-const int BATTERY_HALT[] =   {40, 80, 160, 2};		// at or below this value (and above below) requires immediate halt of device -- should be around 10v, 20v, 40v
-const int BATTERY_WAIT[] =   {5, 5, 5, 1};			// at or below this value signifies an invalid battery value...ignore
+// these lists go 12, 24, 36, 48, error
+const int BATTERY_NORMAL[] = {45, 90, 135, 180, 255};	// at or above this value is considered normal
+const int BATTERY_LOW[] =    {42, 84, 126, 168, 4};		// at or above this value (and below above) is considered low
+const int BATTERY_CRIT[] =   {41, 82, 123, 164, 3};		// at or above this value (and below above) is considered critical
+const int BATTERY_HALT[] =   {40, 80, 120, 160, 2};		// at or below this value (and above below) requires immediate halt of device -- should be around 10v, 20v, 30v, 40v
+const int BATTERY_WAIT[] =   {5, 5, 5, 5, 1};			// at or below this value signifies an invalid battery value...ignore
 
 //---------------------------------------------------------------------------
 // Declaration of the functions that gets called when the timers fire.
@@ -494,8 +494,9 @@ static int hardware_init(void)
         {
         case 12: minvoltval = 0;  break; /* 12v is first index */
         case 24: minvoltval = 1; break;  /* 24v is second */
-        case 48: minvoltval = 2; break;  /* 48v is third */
-        default: minvoltval = 3; break;  /* error is fourth */
+        case 36: minvoltval = 2; break;  /* 36v is third */
+        case 48: minvoltval = 3; break;  /* 48v is fourth */
+        default: minvoltval = 4; break;  /* error is fifth */
         }
    delay_printk("%s charge: %i, minvoltval: %i\n",__func__,  charge, minvoltval);
 
