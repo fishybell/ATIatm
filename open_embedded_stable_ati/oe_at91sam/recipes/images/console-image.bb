@@ -27,6 +27,7 @@ DEPENDS = "task-base-extended \
 	   tcl \
     madplay \
     osso-esd \
+    ncurses \
            ${@base_contains("MACHINE_FEATURES", "screen", "psplash-zap", "",d)} \
 	   "
 
