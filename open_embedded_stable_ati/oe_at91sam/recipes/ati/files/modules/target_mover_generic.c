@@ -103,6 +103,7 @@ static int MIN_EFFORT[]    = {100, 175, 295, 0}; // minimum effort given to ensu
 #endif
 static int SPEED_AFTER[]   = {3, 3, 3, 0}; // clamp effort if we hit this many correct values in a row
 static int SPEED_CHANGE[]  = {20, 30, 20, 0}; // unclamp if the error is bigger than this
+static int MAX_ACCEL[]     = {500, 500, 500, 0}; // maximum effort change in one step
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -867,7 +868,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
             mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
             }
 #ifdef ACCEL_TEST
-        // we only do updates to position and velocity in the accelleration test when we reach the target speed...this is the end of the else
+        // we only do updates to position and velocity in the acceleration test when we reach the target speed...this is the end of the else
         }
 #endif
 // new method
@@ -2371,6 +2372,12 @@ static void pid_step(int delta_t) {
        pid_effort = max(pid_effort, 0); // minimum when stopping is 0
     } else {
        pid_effort = max(pid_effort, MIN_EFFORT[mover_type]); // minimum when moving
+    }
+
+    // if we're accelerating (not negative acceleration) check maximum acceleration allowed
+    if (pid_effort > pid_last_effort && (pid_effort - pid_last_effort) > MAX_ACCEL[mover_type]) {
+        // clamp at max acceleration...
+        pid_effort = pid_last_effort + MAX_ACCEL[mover_type];
     }
 
 // old method
