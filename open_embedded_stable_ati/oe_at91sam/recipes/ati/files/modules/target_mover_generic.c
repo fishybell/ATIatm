@@ -55,7 +55,7 @@ static int MOVER_DELAY_MULT[] = {6,2,6,0};
 
 // the maximum allowed speed ticks
 //static int NUMBER_OF_SPEEDS[] = {10,20,10,0};
-static int NUMBER_OF_SPEEDS[] = {200,200,100,0};
+static int NUMBER_OF_SPEEDS[] = {100,200,100,0};
 static int MIN_SPEED[] = {15,20,15,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
@@ -63,10 +63,16 @@ static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0};
 static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0};
 
 // the paremeters of the velocity ramp up
-static int RAMP_UP_TIME_IN_MSECONDS[] = {150,250,150,0};
-static int RAMP_DOWN_TIME_IN_MSECONDS[] = {100,100,100,0};
+#ifdef TESTING_MAX
+static int RAMP_UP_TIME_IN_MSECONDS[] = {1,1,1,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {1,1,1,0};
+#else
+static int RAMP_UP_TIME_IN_MSECONDS[] = {5,250,150,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,100,0};
+#endif
 //static int RAMP_STEPS[] = {25,100,25,0};
-static int RAMP_STEPS[] = {1,5,1,0};
+static int RAMP_STEPS[] = {3,5,1,0};
+static int IGNORE_RAMP[] = {0,0,1,0}; // MITs currently completely ignore the ramp function
 
 // the parameters needed for PID speed control
 // old method
@@ -89,20 +95,21 @@ static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
 // static int PID_KD_MULT[]   = {8847, 12288, 8847, 0}; // derivitive gain numerator
 // static int PID_KD_DIV[]    = {4, 5, 4, 0}; // derivitive gain denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
-// new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot
-static int PID_KP_MULT[]   = {2, 2, 1, 0}; // proportional gain numerator
-static int PID_KP_DIV[]    = {5, 15, 5, 0}; // proportional gain denominator
-static int PID_KI_MULT[]   = {3, 1, 2, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {47515, 184320, 73725, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {19006, 32768, 5898, 0}; // derivitive gain numerator
+// new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot -- due to throttle cut-off from motor controller, had to adjust by hand afterwards
+static int PID_KP_MULT[]   = {1, 2, 1, 0}; // proportional gain numerator
+static int PID_KP_DIV[]    = {4, 15, 5, 0}; // proportional gain denominator
+static int PID_KI_MULT[]   = {15, 1, 2, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {475150, 184320, 73725, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {190060, 32768, 5898, 0}; // derivitive gain numerator
 static int PID_KD_DIV[]    = {15, 15, 3, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
 static int MIN_EFFORT[]    = {1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
-static int MIN_EFFORT[]    = {100, 175, 295, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {115, 175, 295, 0}; // minimum effort given to ensure motor moves
 #endif
-static int SPEED_AFTER[]   = {3, 3, 3, 0}; // clamp effort if we hit this many correct values in a row
-static int SPEED_CHANGE[]  = {20, 30, 20, 0}; // unclamp if the error is bigger than this
+static int SPEED_AFTER[]   = {1, 3, 3, 0}; // clamp effort if we hit this many correct values in a row
+static int SPEED_CHANGE[]  = {40, 30, 20, 0}; // unclamp if the error is bigger than this
+static int ADJUST_PID_P[]  = {0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
 static int MAX_ACCEL[]     = {500, 500, 500, 0}; // maximum effort change in one step
 
 // These map directly to the FASIT faults for movers
@@ -835,7 +842,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         atomic_set(&last_t, this_t);
 #ifdef ACCEL_TEST
         // did we reach the target speed?
-        if (current_speed10() == 87) { // 8.69 mph is 14 kph
+        if (abs(current_speed10()) == 75) { // 7.45 mph is 12 kph
             // display current position
             pos = ((INCHES_PER_TICK[mover_type]*atomic_read(&position))/TICKS_DIV);
             delay_printk("\
@@ -848,11 +855,13 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         if (atomic_read(&doing_pos) == FALSE)
             {
             atomic_set(&doing_pos, TRUE);
+            do_event(EVENT_POSITION); // notify mover driver
             mod_timer(&position_timer_list, jiffies+((1*HZ)/1000)); // do as quickly as possible
             }
         if (atomic_read(&doing_vel) == FALSE)
             {
             atomic_set(&doing_vel, TRUE);
+            do_event(EVENT_MOVING); // notify mover driver
             mod_timer(&velocity_timer_list, jiffies+((1*HZ)/1000)); // do as quickly as possible
             }
         } else {
@@ -1613,10 +1622,16 @@ static void ramp_fire(unsigned long data) {
     start_speed = percent_from_speed(goal_start);
 
     // calculate number of steps to take based on the amount of speed change
-    speed_steps = (RAMP_STEPS[mover_type] * abs(goal_end - goal_start)) / 2; // 1/2 normal steps * number of speed change
+    if (IGNORE_RAMP[mover_type]) {
+        // don't ramp MITs
+        speed_steps = 1;
+    } else {
+        // ramp MATs
+        speed_steps = (RAMP_STEPS[mover_type] * abs(goal_end - goal_start)) / 2; // 1/2 normal steps * number of speed change
 #ifdef TESTING_MAX
-    speed_steps = 1;
+        speed_steps = 1;
 #endif
+    }
 
     // find direction
     if (goal_end < goal_start) {
@@ -1658,7 +1673,15 @@ static void ramp_fire(unsigned long data) {
 
     // take another step?
     if (abs(goal_step) < speed_steps) {
-        mod_timer(&ramp_timer_list, jiffies+(((ramp_time*HZ)/1000)/RAMP_STEPS[mover_type])); // use original number of steps here to allow speed_steps to stretch the time
+        if (IGNORE_RAMP[mover_type]) {
+            mod_timer(&ramp_timer_list, jiffies+(1*HZ)/1000); // move immediately if we're ignoring the ramp
+        } else {
+#ifdef TESTING_MAX
+            mod_timer(&ramp_timer_list, jiffies+(1*HZ)/1000); // move immediately if we're ignoring the ramp
+#else
+            mod_timer(&ramp_timer_list, jiffies+(((ramp_time*HZ)/1000)/RAMP_STEPS[mover_type])); // use original number of steps here to allow speed_steps to stretch the time
+#endif
+        }
     } else {
         // done moving
         atomic_set(&speed_atomic, goal_end); // reached new speed value
@@ -1668,7 +1691,9 @@ static void ramp_fire(unsigned long data) {
             do_event(EVENT_STOP); // started stopping (probably finished stopping too, but that's handled elsewhere)
         } else {
 #ifndef WOBBLE_DETECT
+#ifndef ACCEL_TEST
             do_event(EVENT_MOVING); // reached moving goal
+#endif
 #endif
         }
     }
@@ -2207,7 +2232,9 @@ static void do_position(struct work_struct * work)
             {
             atomic_set(&position_old, atomic_read(&position)); 
 #ifndef WOBBLE_DETECT
+#ifndef ACCEL_TEST
             do_event(EVENT_POSITION); // notify mover driver
+#endif
 #endif
             target_sysfs_notify(&target_device_mover_generic, "position");
             }
@@ -2227,7 +2254,9 @@ static void do_velocity(struct work_struct * work) {
         atomic_set(&velocity_old, vel); 
         target_sysfs_notify(&target_device_mover_generic, "velocity");
 #ifndef WOBBLE_DETECT
+#ifndef ACCEL_TEST
         do_event(EVENT_IS_MOVING); // notify mover driver
+#endif
 #endif
         target_sysfs_notify(&target_device_mover_generic, "rpm");
     }
@@ -2357,6 +2386,11 @@ static void pid_step(int delta_t) {
 
        // individual pid steps to make full equation more clean
        pid_p = (((1000 * kp_m * pid_error) / kp_d) / 1000);
+       if (ADJUST_PID_P[mover_type]) {
+          // adjust PID proportional gain as percentage (top speed = 100%)
+          pid_p *= new_speed;
+          pid_p /= 1000;
+       }
        pid_i = (((1000 * ki_m * error_sum) / ki_d) / 1000);
        pid_d = (((1000 * kd_m * (pid_error - pid_last_error)) / (kd_d * delta_t)) / 1000);
 
