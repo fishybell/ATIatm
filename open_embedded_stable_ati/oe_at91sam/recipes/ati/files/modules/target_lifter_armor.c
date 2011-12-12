@@ -465,6 +465,14 @@ static ssize_t position_show(struct device *dev, struct device_attribute *attr, 
     }
 
 //---------------------------------------------------------------------------
+// Handles reads to the reverse attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t reverse_show(struct device *dev, struct device_attribute *attr, char *buf)
+    {
+    return sprintf(buf, "%i\n", atomic_read(&reverse));
+    }
+
+//---------------------------------------------------------------------------
 // Handles writes to the position attribute through sysfs
 //---------------------------------------------------------------------------
 static ssize_t position_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
@@ -505,10 +513,32 @@ static ssize_t position_store(struct device *dev, struct device_attribute *attr,
     }
 
 //---------------------------------------------------------------------------
+// Handles writes to the reverse attribute through sysfs
+//---------------------------------------------------------------------------
+static ssize_t reverse_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size) {
+   ssize_t status;
+   status = size;
+
+   // check if an operation is in progress, if so ignore any command
+   if (atomic_read(&operating_atomic)) {
+      // nothing
+   } else if (sysfs_streq(buf, "1")) {
+      atomic_set(&reverse, 1);
+   } else if (sysfs_streq(buf, "0")) {
+      atomic_set(&reverse, 0);
+   } else {
+      // nothing
+   }
+
+   return status;
+}
+
+//---------------------------------------------------------------------------
 // maps attributes, r/w permissions, and handler functions
 //---------------------------------------------------------------------------
 static DEVICE_ATTR(type, 0444, type_show, NULL);
 static DEVICE_ATTR(position, 0644, position_show, position_store);
+static DEVICE_ATTR(reverse, 0644, reverse_show, reverse_store);
 
 //---------------------------------------------------------------------------
 // Defines the attributes of the armor target lifter for sysfs
@@ -517,6 +547,7 @@ static const struct attribute * armor_lifter_attrs[] =
     {
     &dev_attr_type.attr,
     &dev_attr_position.attr,
+    &dev_attr_reverse.attr,
     NULL,
     };
 
