@@ -848,7 +848,6 @@ int SIT_Client::handle_14401(int start, int end) {
     return 0;
 }
 
-
 /***********************************************************
  *                    Basic SIT Commands                    *
  ***********************************************************/
@@ -993,6 +992,15 @@ void SIT_Client::didBattery(int val) {
     lastBatteryVal = val;
 
     FUNCTION_END("::didBattery(int val)");
+}
+
+// current fault value
+void SIT_Client::didFault(int val) {
+    FUNCTION_START("::didFault(int val)");
+
+    didFailure(val);
+
+    FUNCTION_END("::didFault(int val)");
 }
 
 // immediate stop (stops accessories as well)
@@ -1289,6 +1297,17 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
                 // received change in battery value
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
                 sit_client->didBattery(value); // tell client
+            }
+            break;
+        case NL_C_FAULT:
+            genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+            data=(int *)nla_data(attrs[GEN_INT8_A_MSG]);
+            DCMSG(BLUE,"parseData case NL_C_FAULT: attrs = 0x%x, nla_data (0x%x)  =%d ",attrs[GEN_INT8_A_MSG],data,*data);
+
+            if (attrs[GEN_INT8_A_MSG]) {
+                // received change in battery value
+                int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+                sit_client->didFault(value); // tell client
             }
             break;
         case NL_C_STOP:

@@ -109,6 +109,7 @@ static string_match_t string_table[] = {
    {"NL_C_DMSG", NL_C_DMSG},       /* debug message (reply) (generic string) */
    {"NL_C_SCENARIO", NL_C_SCENARIO},   /* run scenario message (reply) (generic string) */
    {"NL_C_EVENT_REF", NL_C_EVENT_REF},      /* reflected event (command) (generic 8-bit int) */
+   {"NL_C_FAULT", NL_C_FAULT},      /* fault event (reply) (generic 8-bit int) */
    {"R_UNSPECIFIED", R_UNSPECIFIED}, // no role specified
    {"R_LIFTER", R_LIFTER},      // lifting device
    {"R_MOVER", R_MOVER},       // moving device
@@ -161,6 +162,7 @@ static wait_watcher_t wait_watchers[] = {
    {"NL_C_SLEEP",    NL_C_SLEEP,    -1, 0, WATCHER_NONE, 0},
    {"NL_C_DMSG",     NL_C_DMSG,     -1, 0, WATCHER_NONE, 0},
    {"NL_C_EVENT_REF",NL_C_EVENT_REF,-1, 0, WATCHER_NONE, 0},
+   {"NL_C_FAULT",    NL_C_FAULT,    -1, 0, WATCHER_NONE, 0},
    {"EVENT_RAISE",   -1, EVENT_RAISE,   0, WATCHER_NONE, 0},
    {"EVENT_UP",      -1, EVENT_UP,      0, WATCHER_NONE, 0},
    {"EVENT_LOWER",   -1, EVENT_LOWER,   0, WATCHER_NONE, 0},
@@ -1783,6 +1785,7 @@ static int __init Scenario_init(void) {
         {NL_C_SLEEP,         nl_default_handler},
         {NL_C_CMD_EVENT,     nl_cmd_event_handler},
         {NL_C_EVENT_REF,     nl_default_handler},
+        {NL_C_FAULT,         nl_default_handler},
    };
    struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 

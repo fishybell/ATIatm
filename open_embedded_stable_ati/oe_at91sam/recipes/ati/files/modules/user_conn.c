@@ -280,6 +280,24 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
             }
             break;
 
+        case NL_C_FAULT:
+            genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+
+            if (attrs[GEN_INT8_A_MSG]) {
+                // battery value percentage
+                int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+                if (value != 0) {
+                     if (value == 26) {
+                        snprintf(wbuf, 1024, "U Disconnected Hit Sensor\n");
+                     } else {
+                        snprintf(wbuf, 1024, "U Unknown\n");
+                     }
+                } else {
+                    snprintf(wbuf, 1024, "U Normal\n");
+                }
+            }
+
+            break;
         case NL_C_FAILURE:
             genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_string_policy);
 
@@ -1531,7 +1549,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Request knob value\nFormat: Z\n");
                         break;
                     default: // print default help
-                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nI: Eeprom\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob\n");
+                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nI: Eeprom\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nU: Faults\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob\n");
                         break;
                 }
                 write(client, wbuf, strnlen(wbuf,1024));

@@ -967,6 +967,20 @@ void hit_event_internal(int line, bool upload) {
 
 }
 
+void disconnected_hit_sensor_event(int disconnected) {
+	struct hit_item *new_hit;
+	int stay_up = 1;
+	u8 fault = 0, kdata;
+
+   if (disconnected) {
+      fault = 26; 
+	   // send fault upstream always
+	   // Only send disconnects
+	   queue_nl_multi(NL_C_FAULT, &fault, sizeof(fault));
+   }
+
+}
+
 //---------------------------------------------------------------------------
 // netlink command handler for event commands
 //---------------------------------------------------------------------------
@@ -1086,7 +1100,7 @@ static int __init Lifter_init(void) {
     hit_start = current_kernel_time();
 
     // set callback handlers
-    set_hit_callback(hit_event);
+    set_hit_callback(hit_event, disconnected_hit_sensor_event);
     set_lift_callback(lift_event);
 
     INIT_WORK(&position_work, position_change);

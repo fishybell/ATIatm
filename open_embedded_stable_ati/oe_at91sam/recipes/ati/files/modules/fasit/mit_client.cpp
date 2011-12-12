@@ -391,6 +391,15 @@ FUNCTION_START("::didBattery(int val)")
 FUNCTION_END("::didBattery(int val)")
 }
 
+// current fault value
+void MIT_Client::didFault(int val) {
+    FUNCTION_START("::didFault(int val)");
+
+    didFailure(val);
+
+    FUNCTION_END("::didFault(int val)");
+}
+
 // retrieve position value
 void MIT_Client::doPosition() {
 FUNCTION_START("::doPosition()")
@@ -630,6 +639,16 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
             mit_client->didBattery(value); // tell client
          }
          break;
+
+        case NL_C_FAULT:
+            genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+
+            if (attrs[GEN_INT8_A_MSG]) {
+                // received fault value
+                int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+                mit_client->didFault(value); // tell client
+            }
+            break;
 
       case NL_C_STOP:
          // received emergency stop response

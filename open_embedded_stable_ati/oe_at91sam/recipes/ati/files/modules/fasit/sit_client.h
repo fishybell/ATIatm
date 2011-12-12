@@ -32,6 +32,7 @@ public :
    void doWake(); // wake target
    void doBattery(); // retrieve battery value
    void didBattery(int val); // current battery value
+   void didFault(int val); // current fault value
    void doStop(); // emergency stop (stops accessories as well)
    void didStop(); // received immediate stop response
    void doHitCal(struct hit_calibration hit_c); // change hit calibration data

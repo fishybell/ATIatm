@@ -56,6 +56,8 @@ typedef struct hit_sensor {
     int sens_cal;
     int l_count;
     int blanking;
+    int d_count;
+    int disconnected;
     int invert;
     spinlock_t lock;
     int gpio;
@@ -70,6 +72,8 @@ static hit_sensor_t sensors[] = {{
     15, // default sensitivity calibration setting
     -1, // invalid counting value
     0, // start not blanking
+    0, // start connected 
+    0, // start connected 
     0, // no inverting
     SPIN_LOCK_UNLOCKED,
     INPUT_HIT_SENSOR,
@@ -82,6 +86,8 @@ static hit_sensor_t sensors[] = {{
     15, // default sensitivity calibration setting
     -1, // invalid counting value
     0, // start not blanking
+    0, // start connected 
+    0, // start connected 
     0, // no inverting
     SPIN_LOCK_UNLOCKED,
     INPUT_MILES_HIT,
@@ -109,11 +115,16 @@ static struct timer_list fake_timer = TIMER_INITIALIZER(fake_run, 0, 0);
 // Callback for hit events
 //---------------------------------------------------------------------------
 static hit_event_callback hit_callback = NULL;
-void set_hit_callback(hit_event_callback handler) {
+static hit_event_callback disconnected_hit_sensor_callback = NULL;
+void set_hit_callback(hit_event_callback handler, hit_event_callback discon) {
     spin_lock(&sensors[line].lock);
     // only allow setting the callback once
     if (handler != NULL && hit_callback == NULL) {
         hit_callback = handler;
+        delay_printk("HIT SENSOR: Registered callback function for hit events\n");
+    }
+    if (discon != NULL && disconnected_hit_sensor_callback == NULL) {
+        disconnected_hit_sensor_callback = discon;
         delay_printk("HIT SENSOR: Registered callback function for hit events\n");
     }
     spin_unlock(&sensors[line].lock);
@@ -159,7 +170,7 @@ mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return l
 // Poll driven data-read (kyle method)
 //---------------------------------------------------------------------------
 static void hit_kyle(void) {
-    int in_val;
+    int in_val, tmp_val;
 
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
@@ -171,8 +182,34 @@ static void hit_kyle(void) {
         return;
     }
 
-    // if we're blanking the input, ignore everything
-    if (sensors[line].blanking) {
+    tmp_val = at91_get_gpio_value(sensors[line].gpio);
+   // Line is high see look for disconnected hit sensor
+   if (tmp_val) {
+      sensors[line].d_count ++;
+      if ( sensors[line].d_count > 10000) {
+         sensors[line].d_count = 10000;
+         if (!sensors[line].disconnected) {
+            sensors[line].disconnected = 1;
+            if (disconnected_hit_sensor_callback != NULL) {
+               disconnected_hit_sensor_callback(sensors[line].disconnected);
+            }
+         }
+      }
+   } else {
+      sensors[line].d_count --;
+      if ( sensors[line].d_count < 0) {
+         sensors[line].d_count = 0;
+         if (sensors[line].disconnected) {
+            sensors[line].disconnected = 0;
+            if (disconnected_hit_sensor_callback != NULL) {
+               disconnected_hit_sensor_callback(sensors[line].disconnected);
+            }
+         }
+      }
+   }
+
+    // if we're blanking the input or disconnected, ignore everything
+    if (sensors[line].blanking || sensors[line].disconnected) {
         spin_unlock(&sensors[line].lock);
         return;
     }
@@ -251,7 +288,7 @@ EXPORT_SYMBOL(get_hit_calibration);
 
 //---------------------------------------------------------------------------
 // Hit sensor blanking methods (turns sensor on or off)
-//---------------------------------------------------------------------------
+//--------------------------------------------------------------------------
 void hit_blanking_on(void) {
     spin_lock(&sensors[line].lock);
     sensors[line].blanking = 1; // turn sensor off (blanking on)

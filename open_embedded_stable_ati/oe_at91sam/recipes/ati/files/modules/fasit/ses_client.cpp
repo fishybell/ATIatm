@@ -689,6 +689,15 @@ FUNCTION_START("::didBattery(int val)");
 FUNCTION_END("::didBattery(int val)");
 }
 
+// current fault value
+void SES_Client::didFault(int val) {
+    FUNCTION_START("::didFault(int val)");
+
+    didFailure(val);
+
+    FUNCTION_END("::didFault(int val)");
+}
+
 // immediate stop (stops accessories as well)
 void SES_Client::doStop() {
 FUNCTION_START("::doStop()");
@@ -1135,6 +1144,16 @@ FUNCTION_START("SES_Conn::parseData(struct nl_msg *msg)")
             // received change in battery value
             int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
             ses_client->didBattery(value); // tell client
+         }
+         break;
+      case NL_C_FAULT:
+         genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+	 DCMSG(BLUE,"parseData case NL_C_FAULT: attrs = 0x%x",attrs[GEN_INT8_A_MSG]) ;
+
+         if (attrs[GEN_INT8_A_MSG]) {
+            // received change in battery value
+            int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+            ses_client->didFault(value); // tell client
          }
          break;
       case NL_C_STOP:
