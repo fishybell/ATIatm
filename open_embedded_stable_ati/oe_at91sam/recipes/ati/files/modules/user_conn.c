@@ -276,7 +276,23 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
             if (attrs[GEN_INT8_A_MSG]) {
                 // a mover/lifter event happened
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-                snprintf(wbuf, 1024, "V %i\n", value);
+                switch (value) {
+                  case 0: // Start raise
+                     snprintf(wbuf, 1024, "V Start Raise\n");
+                     break;
+                  case 1: // Arrived at up switch
+                     snprintf(wbuf, 1024, "V Raised\n");
+                     break;
+                  case 2: // Start lower
+                     snprintf(wbuf, 1024, "V Start Lower\n");
+                     break;
+                  case 3: // Arrived at down switch
+                     snprintf(wbuf, 1024, "V Lowered\n");
+                     break;
+                  default: // Other event
+                     snprintf(wbuf, 1024, "V Lowered\n");
+                     break;
+                }
             }
             break;
 

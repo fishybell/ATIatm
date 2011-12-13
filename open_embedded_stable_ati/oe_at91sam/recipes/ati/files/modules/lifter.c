@@ -762,10 +762,22 @@ static void hit_enable_change(struct work_struct * work) {
 // Work item to notify the user-space about a position change or error
 //---------------------------------------------------------------------------
 static void position_change(struct work_struct * work) {
+    int lifterPosition = LIFTER_POSITION_ERROR_NEITHER;
     u8 pos_data;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
+    }
+    lifterPosition = lifter_position_get();
+    if (lifterPosition >= LIFTER_POSITION_ERROR_NEITHER){
+      if (lifterPosition == LIFTER_POSITION_ERROR_BOTH)
+         pos_data = 14; 
+      else
+         pos_data = 14; 
+      
+	      // send fault upstream always
+	      queue_nl_multi(NL_C_FAULT, &pos_data, sizeof(pos_data));
+      return;
     }
 
     // notify netlink userspace
@@ -776,6 +788,17 @@ static void position_change(struct work_struct * work) {
         default: pos_data = EXPOSURE_REQ; break; //error
     }
     send_nl_message_multi(&pos_data, pos_mfh, NL_C_EXPOSE);
+}
+
+void lift_faults(int liftfault) {
+	u8 fault = 0;
+
+   if (liftfault) {
+      fault = liftfault; 
+	   // send fault upstream always
+	   queue_nl_multi(NL_C_FAULT, &fault, sizeof(fault));
+   }
+
 }
 
 //---------------------------------------------------------------------------
@@ -968,9 +991,7 @@ void hit_event_internal(int line, bool upload) {
 }
 
 void disconnected_hit_sensor_event(int disconnected) {
-	struct hit_item *new_hit;
-	int stay_up = 1;
-	u8 fault = 0, kdata;
+	u8 fault = 0;
 
    if (disconnected) {
       fault = 26; 
@@ -1101,7 +1122,7 @@ static int __init Lifter_init(void) {
 
     // set callback handlers
     set_hit_callback(hit_event, disconnected_hit_sensor_event);
-    set_lift_callback(lift_event);
+    set_lift_callback(lift_event, lift_faults);
 
     INIT_WORK(&position_work, position_change);
     INIT_WORK(&hit_enable_work, hit_enable_change);

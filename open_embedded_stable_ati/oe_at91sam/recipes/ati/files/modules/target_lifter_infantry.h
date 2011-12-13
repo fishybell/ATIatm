@@ -7,6 +7,7 @@
 #define LIFTER_POSITION_UP    			1
 #define LIFTER_POSITION_MOVING  		2
 #define LIFTER_POSITION_ERROR_NEITHER	3	// Neither limit switch is active, but the lifter is not moving
+#define LIFTER_POSITION_ERROR_BOTH	4	// Both limit switch is active, means neither motor sensor connected
 
 // get current position
 extern int lifter_position_get(void);
@@ -22,6 +23,6 @@ extern int lifter_sleep_set(int);
 
 // register a callback for the lift event
 typedef void (*lift_event_callback)(int); // called on finished, starting, and error (passing an EVENT_### value)
-extern void set_lift_callback(lift_event_callback handler);
+extern void set_lift_callback(lift_event_callback handler, lift_event_callback faultHandler);
 
 #endif // __TARGET_LIFTER_INFANTRY_H__

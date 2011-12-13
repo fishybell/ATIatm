@@ -16,6 +16,7 @@
 #define LIFTER_TYPE  	"infantry"
 
 #define TIMEOUT_IN_SECONDS		3
+#define SENSOR_TIMEOUT_IN_MILLISECONDS		100
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -97,6 +98,12 @@ static void timeout_fire(unsigned long data);
 static struct timer_list timeout_timer_list = TIMER_INITIALIZER(timeout_fire, 0, 0);
 
 //---------------------------------------------------------------------------
+// Declaration of the function that gets called when the sensor timeout fires.
+//---------------------------------------------------------------------------
+static void sensor_timeout_fire(unsigned long data);
+static struct timer_list sensor_timeout_list = TIMER_INITIALIZER(sensor_timeout_fire, 0, 0);
+
+//---------------------------------------------------------------------------
 // Maps the position to position name.
 //---------------------------------------------------------------------------
 static const char * lifter_position[] =
@@ -111,11 +118,16 @@ static const char * lifter_position[] =
 // Callback for lift events
 //---------------------------------------------------------------------------
 static lift_event_callback lift_callback = NULL;
-void set_lift_callback(lift_event_callback handler) {
+static lift_event_callback lift_fault_callback = NULL;
+void set_lift_callback(lift_event_callback handler, lift_event_callback faultHandler) {
     // only allow setting the callback once
     if (handler != NULL && lift_callback == NULL) {
         lift_callback = handler;
         delay_printk("INFANTRY LIFTER: Registered callback function for lift events\n");
+    }
+    if (faultHandler != NULL && lift_fault_callback == NULL) {
+        lift_fault_callback = faultHandler;
+        delay_printk("INFANTRY LIFTER: Registered fault callback function for lift events\n");
     }
 }
 EXPORT_SYMBOL(set_lift_callback);
@@ -125,6 +137,58 @@ static void do_event(int etype) {
         lift_callback(etype);
     }
 }
+
+static void do_fault(int etype) {
+    if (lift_fault_callback != NULL) {
+        lift_fault_callback(etype);
+    }
+}
+
+//---------------------------------------------------------------------------
+// Starts the timeout timer.
+//---------------------------------------------------------------------------
+static int sensorTimerDirection;
+static void sensor_timeout_start(int direction)
+	{
+   sensorTimerDirection = direction;
+	mod_timer(&sensor_timeout_list, jiffies+(SENSOR_TIMEOUT_IN_MILLISECONDS*HZ/1000));
+	}
+
+//---------------------------------------------------------------------------
+// Stops the timeout timer.
+//---------------------------------------------------------------------------
+static void sensor_timeout_stop(void)
+	{
+	del_timer(&sensor_timeout_list);
+	}
+
+//---------------------------------------------------------------------------
+// The function that gets called when the timeout fires.
+//---------------------------------------------------------------------------
+static void sensor_timeout_fire(unsigned long data)
+    {
+    int readLimit;
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+
+	if (sensorTimerDirection == LIFTER_POSITION_DOWN)
+		{
+         readLimit = at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT);
+         if (readLimit == INPUT_LIFTER_POS_ACTIVE_STATE) {
+            do_fault(17); // Did not leave conceal switch
+         }
+		}
+	else if (sensorTimerDirection == LIFTER_POSITION_UP)
+		{
+         readLimit = at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT);
+         if (readLimit == INPUT_LIFTER_POS_ACTIVE_STATE) {
+            do_fault(16); // Did not leave expose switch
+         }
+		}
+      sensor_timeout_stop();
+    }
 
 //---------------------------------------------------------------------------
 //
@@ -172,6 +236,7 @@ delay_printk("%s - %s()\n",TARGET_NAME, __func__);
         at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake off
     	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor on
     	spin_unlock_irqrestore(&motor_lock, flags);
+      sensor_timeout_start(direction);
     }
 
     // when not locking, signal an event
@@ -387,10 +452,16 @@ static int hardware_exit(void)
 //
 //---------------------------------------------------------------------------
 int lifter_position_set(int position) {
+    int liftPosition = LIFTER_POSITION_ERROR_NEITHER;
     // check to see if we're sleeping or not
     if (atomic_read(&sleep_atomic) == 1) { return 0; }
 
-    if (lifter_position_get() != position) {
+    liftPosition = lifter_position_get();
+    if (liftPosition == LIFTER_POSITION_ERROR_BOTH) {
+      do_fault(14);
+      return 0;
+    }
+    if (liftPosition != position) {
         // signal that an operation is in progress
         atomic_set(&operating_atomic, TRUE);
 
@@ -410,18 +481,27 @@ EXPORT_SYMBOL(lifter_position_set);
 //---------------------------------------------------------------------------
 int lifter_position_get(void)
     {
+    int downLimit = 0;
+    int upLimit = 0;
     // check if an operation is in progress...
     if (atomic_read(&operating_atomic))
 		{
 		return LIFTER_POSITION_MOVING;
 		}
 
-    if (at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
+    downLimit = at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT);
+    upLimit = at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT);
+    if (downLimit == INPUT_LIFTER_POS_ACTIVE_STATE && upLimit == INPUT_LIFTER_POS_ACTIVE_STATE) {
+      // Indicates disconnected sensors
+      return LIFTER_POSITION_ERROR_BOTH;
+    }
+
+    if (downLimit == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
         return LIFTER_POSITION_DOWN;
         }
 
-    if (at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
+    if (upLimit == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
         return LIFTER_POSITION_UP;
         }
