@@ -12,6 +12,7 @@
 #include "target_generic_output.h" /* for EVENT_### definitions */
 
 #include "netlink_kernel.h"
+#include "fasit/faults.h"
 //---------------------------------------------------------------------------
 // #define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -167,14 +168,14 @@ static void sensor_timeout_fire(unsigned long data)
 		{
          readLimit = at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT);
          if (readLimit == INPUT_LIFTER_POS_ACTIVE_STATE) {
-            do_fault(17); // Did not leave conceal switch
+            do_fault(ERR_not_leave_expose); // Did not leave expose switch
          }
 		}
 	else if (sensorTimerDirection == LIFTER_POSITION_UP)
 		{
          readLimit = at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT);
          if (readLimit == INPUT_LIFTER_POS_ACTIVE_STATE) {
-            do_fault(16); // Did not leave expose switch
+            do_fault(ERR_not_leave_conceal); // Did not leave conceal switch
          }
 		}
       sensor_timeout_stop();
@@ -460,7 +461,7 @@ int lifter_position_set(int position) {
 
     liftPosition = lifter_position_get();
     if (liftPosition == LIFTER_POSITION_ERROR_BOTH) {
-      do_fault(14);
+      do_fault(ERR_lifter_stuck_at_limit);
       return 0;
     }
     if (liftPosition != position) {

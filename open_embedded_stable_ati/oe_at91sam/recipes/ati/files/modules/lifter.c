@@ -18,6 +18,7 @@
 #include "target_generic_output.h"
 #include "target_hit_poll.h"
 #include "target_battery.h"
+#include "fasit/faults.h"
 
 //---------------------------------------------------------------------------
 #define TARGET_NAME     "lifter"
@@ -771,9 +772,9 @@ static void position_change(struct work_struct * work) {
     lifterPosition = lifter_position_get();
     if (lifterPosition >= LIFTER_POSITION_ERROR_NEITHER){
       if (lifterPosition == LIFTER_POSITION_ERROR_BOTH)
-         pos_data = 14; 
+         pos_data = ERR_lifter_stuck_at_limit; 
       else
-         pos_data = 14; 
+         pos_data = ERR_lifter_stuck_at_limit; 
       
 	      // send fault upstream always
 	      queue_nl_multi(NL_C_FAULT, &pos_data, sizeof(pos_data));
@@ -994,12 +995,11 @@ void disconnected_hit_sensor_event(int disconnected) {
 	u8 fault = 0;
 
    if (disconnected) {
-      fault = 26; 
+      fault = ERR_hit_sensor_failure; 
 	   // send fault upstream always
 	   // Only send disconnects
 	   queue_nl_multi(NL_C_FAULT, &fault, sizeof(fault));
    }
-
 }
 
 //---------------------------------------------------------------------------
