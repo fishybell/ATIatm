@@ -88,6 +88,7 @@ private:
 
    // re-initialize to default settings
    void reInit();
+   void Reset();
 
    // helper functions for filling out a 2102 status message
    void fillStatus2102(FASIT_2102 *msg);

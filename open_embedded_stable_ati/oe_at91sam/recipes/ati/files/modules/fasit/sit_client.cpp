@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <signal.h>
 
 using namespace std;
 
@@ -38,6 +39,17 @@ SIT_Client::~SIT_Client() {
     FUNCTION_END("::~SIT_Client()");
 }
 
+void SIT_Client::Reset() {
+   const char *args[]={"1", (char *)0};
+FUNCTION_START("::Reset()");
+      signal(SIGCHLD, SIG_IGN);
+      if (!fork()) {
+        DCMSG(BLUE,"Preparing to REBOOT");
+         execl("/sbin/reboot", "reboot", "-f", (char *)0 );
+      }
+      exit(0);
+}
+
 void SIT_Client::reInit() {
 FUNCTION_START("::reInit()");
      // initialize default settings
@@ -57,6 +69,7 @@ FUNCTION_START("::reInit()");
       * to your SIT script. You may want to look at target_generic_output.c and
       * define TESTING_ON_EVAL to enable the muzzle flash to use one of the LEDs on the dev board.
       */
+
 
      if (start_config&PD_NES){
          doMFS(Eeprom::ReadEeprom(MFS_ACTIVATE_EXPOSE_LOC, MFS_ACTIVATE_EXPOSE_SIZE, MFS_ACTIVATE_EXPOSE),Eeprom::ReadEeprom(MFS_MODE_LOC, MFS_MODE_SIZE, MFS_MODE),Eeprom::ReadEeprom(MFS_START_DELAY_LOC, MFS_START_DELAY_SIZE, MFS_START_DELAY),Eeprom::ReadEeprom(MFS_REPEAT_DELAY_LOC, MFS_REPEAT_DELAY_SIZE, MFS_REPEAT_DELAY)); // on when fully exposed, burst, no delay, 2 seconds between bursts
@@ -513,7 +526,7 @@ int SIT_Client::handle_2100(int start, int end) {
             send_2101_ACK(hdr,'S');
             // also supposed to reset all values to the 'initial exercise step value'
             //  which I am not sure if it is different than ordinary inital values 
-            reInit();
+            Reset();
             break;
 
         case CID_Move_Request:
