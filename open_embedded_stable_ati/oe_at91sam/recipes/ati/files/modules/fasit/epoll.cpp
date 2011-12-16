@@ -163,6 +163,15 @@ FUNCTION_START("setnonblocking(int sock, bool socket)")
 FUNCTION_END("setnonblocking(int sock, bool socket)")
 }
 
+static int listener = -1; // File descriptor for listener
+
+void closeListener(){
+FUNCTION_START("closeListener")
+   if (listener >= 0){
+      close(listener);
+   }
+FUNCTION_END("closeListener")
+}
 /**********************************
 *          Main Function          *
 **********************************/
@@ -171,7 +180,7 @@ int main(int argc, char *argv[]) {
 PROG_START
 
    struct epoll_event ev, events[MAX_EVENTS];
-   int client, listener, kdpfd; // file descriptors
+   int client, kdpfd; // file descriptors
    int n, nfds, yes=1;
    socklen_t addrlen;
    struct sockaddr_in serveraddr, local;

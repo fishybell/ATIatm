@@ -234,5 +234,7 @@ inline int metersToFeet(const int &meters) {
    return feet;
 }
 
+void closeListener();
+
 #endif
 

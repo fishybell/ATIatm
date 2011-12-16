@@ -9,6 +9,7 @@ using namespace std;
 
 #include "sit_client.h"
 #include "common.h"
+#include "process.h"
 #include "timers.h"
 #include "eeprom.h"
 #include "defaults.h"
@@ -40,14 +41,20 @@ SIT_Client::~SIT_Client() {
 }
 
 void SIT_Client::Reset() {
-   const char *args[]={"1", (char *)0};
 FUNCTION_START("::Reset()");
+      int pid;
       signal(SIGCHLD, SIG_IGN);
       if (!fork()) {
         DCMSG(BLUE,"Preparing to REBOOT");
-         execl("/sbin/reboot", "reboot", "-f", (char *)0 );
+         nl_conn->~NL_Conn();
+         if (fd >= 0) close(fd);
+         closeListener();
+         execl("/usr/bin/restart", "restart", (char *)0 );
+         exit(0);
       }
-      exit(0);
+      pid = getpid();
+      kill(pid, SIGQUIT);
+FUNCTION_END("::Reset()");
 }
 
 void SIT_Client::reInit() {
