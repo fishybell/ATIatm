@@ -187,7 +187,8 @@ atomic_t check_atomic = ATOMIC_INIT(1); // enabled
 //---------------------------------------------------------------------------
 // This atomic variable used for storing the last adc value read
 //---------------------------------------------------------------------------
-atomic_t adc_atomic = ATOMIC_INIT(0);
+atomic_t adc_atomic = ATOMIC_INIT(255); // max value on startup
+atomic_t adc_startup = ATOMIC_INIT(1);  // we're still starting up
 
 //---------------------------------------------------------------------------
 // This atomic variable used for storing the amount of times we've blinked
@@ -281,6 +282,9 @@ static void adc_read_fire(unsigned long data)
     if (!atomic_read(&check_atomic)) {
         return;
     }
+
+   // we're not starting up anymore
+   atomic_set(&adc_startup, 0);
 
 	// check if the register adc register is ready
 	if(!(__raw_readl(adc_base + ADC_SR) & CH_EN))
@@ -415,7 +419,7 @@ static void led_blink_fire(unsigned long data)
 
     // are we still low?
     value = atomic_read(&adc_atomic);
-    if (value >= BATTERY_NORMAL[minvoltval])
+    if (atomic_read(&adc_startup) == 0 && value >= BATTERY_NORMAL[minvoltval])
         {
         // we're high, turn led on and return
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
