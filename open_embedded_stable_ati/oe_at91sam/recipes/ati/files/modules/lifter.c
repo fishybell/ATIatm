@@ -176,6 +176,7 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
                 break;
         }
 
+
         // are we creating a response?
         if (rc != -1) {
             rc = nla_put_u8(skb, GEN_INT8_A_MSG, rc); // rc depends on above
@@ -891,7 +892,7 @@ void lift_event_internal(int etype, bool upload) {
 			case EVENT_DOWN:
 				// bob after we went down
 				atomic_set(&at_conceal, 0); // reset to do nothing
-                enable_battery_check(0); // disable battery checking while motor is on
+            enable_battery_check(0); // disable battery checking while motor is on
 				lifter_position_set(LIFTER_POSITION_UP); // expose now
 				break;
 			default:
@@ -917,7 +918,7 @@ void hit_event_internal(int line, bool upload) {
 	delay_printk("hit_event_internal(line=%i, upload=%d)\n", line,upload);
 
 	// create event
-	lift_event_internal(EVENT_HIT, upload);
+//	lift_event_internal(EVENT_HIT, upload);
 
 	// log event
 	new_hit = kmalloc(sizeof(struct hit_item), GFP_KERNEL);
@@ -984,7 +985,8 @@ void hit_event_internal(int line, bool upload) {
 				// put down
                 enable_battery_check(0); // disable battery checking while motor is on
 				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-				atomic_set(&at_conceal, 1); // when we get a CONCEAL event, go back up
+				lifter_position_set(LIFTER_POSITION_UP); // conceal now
+//				atomic_set(&at_conceal, 1); // when we get a CONCEAL event, go back up
 				break;
 		}
 	}
