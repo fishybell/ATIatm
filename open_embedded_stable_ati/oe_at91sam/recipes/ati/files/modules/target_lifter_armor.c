@@ -56,6 +56,7 @@ static DEFINE_SPINLOCK(motor_lock);
 // user-space commands with the actual hardware.
 //---------------------------------------------------------------------------
 atomic_t operating_atomic = ATOMIC_INIT(FALSE);
+atomic_t at_conceal = ATOMIC_INIT(0);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are fully initialized
@@ -293,6 +294,11 @@ static void timeout_fire(unsigned long data)
     schedule_work(&position_work);
     }
 
+void set_target_conceal(void)
+{
+     atomic_set(&at_conceal, 1);
+}
+EXPORT_SYMBOL(set_target_conceal);
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
@@ -324,6 +330,12 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
         // notify user-space
         schedule_work(&position_work);
+
+	      if (atomic_read(&at_conceal) ==  1) {
+            atomic_set(&at_conceal, 0);
+            lifter_position_set(LIFTER_POSITION_UP);
+         }
+
         }
     else
     	{

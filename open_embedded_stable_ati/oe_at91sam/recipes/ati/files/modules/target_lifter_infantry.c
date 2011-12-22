@@ -75,6 +75,7 @@ atomic_t sleep_atomic = ATOMIC_INIT(0); // not sleeping
 #define LIFTER_MOVEMENT_UP				1
 #define LIFTER_MOVEMENT_DOWN			2
 atomic_t movement_atomic = ATOMIC_INIT(LIFTER_MOVEMENT_NONE);
+atomic_t at_conceal = ATOMIC_INIT(0);
 
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space of a position
@@ -290,6 +291,11 @@ delay_printk(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME, 
     schedule_work(&position_work);
     }
 
+void set_target_conceal(void)
+{
+     atomic_set(&at_conceal, 1);
+}
+EXPORT_SYMBOL(set_target_conceal);
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
@@ -326,6 +332,13 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
         // notify user-space
         schedule_work(&position_work);
+
+
+	      if (atomic_read(&at_conceal) ==  1) {
+            atomic_set(&at_conceal, 0);
+            lifter_position_set(LIFTER_POSITION_UP);
+         }
+
         }
     else
     {

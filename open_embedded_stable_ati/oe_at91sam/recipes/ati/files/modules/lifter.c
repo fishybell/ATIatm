@@ -882,6 +882,7 @@ void lift_event_internal(int etype, bool upload) {
 	}
 
 	// do bob?
+#if 0
 	if (atomic_read(&at_conceal) == 1) {
 		switch (etype) {
 			case EVENT_HIT:
@@ -901,6 +902,7 @@ void lift_event_internal(int etype, bool upload) {
 				break;
 		}
 	}
+#endif
 
 }
 
@@ -915,9 +917,14 @@ void hit_event_internal(int line, bool upload) {
 	struct hit_item *new_hit;
 	int stay_up = 1;
 	u8 hits = 0, kdata;
+	u8 data = EVENT_HIT; // cast to 8-bits
 	delay_printk("hit_event_internal(line=%i, upload=%d)\n", line,upload);
 
 	// create event
+   if (upload){
+	   queue_nl_multi(NL_C_EVENT, &data, sizeof(data));
+   }
+	generic_output_event(EVENT_HIT);
 //	lift_event_internal(EVENT_HIT, upload);
 
 	// log event
@@ -984,9 +991,10 @@ void hit_event_internal(int line, bool upload) {
 			case 4: /* bob */
 				// put down
                 enable_battery_check(0); // disable battery checking while motor is on
-				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-				lifter_position_set(LIFTER_POSITION_UP); // conceal now
 //				atomic_set(&at_conceal, 1); // when we get a CONCEAL event, go back up
+            set_target_conceal();
+				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+//				lifter_position_set(LIFTER_POSITION_UP); // conceal now
 				break;
 		}
 	}

@@ -14,6 +14,7 @@ extern int lifter_position_get(void);
 
 // set current position
 extern int lifter_position_set(int position);
+extern void set_target_conceal(void);
 
 // get the device sleep state
 extern int lifter_sleep_get(void);
