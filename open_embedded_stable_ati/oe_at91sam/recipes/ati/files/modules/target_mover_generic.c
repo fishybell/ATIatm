@@ -24,7 +24,7 @@
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
-static int mover_type = 1; // 0 = infantry, 1 = armor, 2 = infantry/h-bridge, 3 = error
+static int mover_type = 1; // 0 = infantry/36v KBB controller, 1 = armor, 2 = infantry/36v KDZ controller, 3 = error
 module_param(mover_type, int, S_IRUGO);
 static int kp_m = -1, kp_d = -1,  ki_m = -1, ki_d = -1, kd_m = -1, kd_d = -1;
 module_param(kp_m, int, S_IRUGO);
@@ -38,7 +38,7 @@ static char* TARGET_NAME[] = {"old infantry mover","armor mover","infantry mover
 static char* MOVER_TYPE[] = {"infantry","armor","infantry","error"};
 
 // continue moving on leg or quad interrupt or neither
-static int CONTINUE_ON[] = {2,1,3,0}; // leg = 1, quad = 2, both = 3, neither = 0
+static int CONTINUE_ON[] = {2,1,2,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
 static int TIMEOUT_IN_MSECONDS[] = {1000,12000,1000,0};
@@ -67,12 +67,12 @@ static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0};
 static int RAMP_UP_TIME_IN_MSECONDS[] = {1,1,1,0};
 static int RAMP_DOWN_TIME_IN_MSECONDS[] = {1,1,1,0};
 #else
-static int RAMP_UP_TIME_IN_MSECONDS[] = {5,250,150,0};
-static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,100,0};
+static int RAMP_UP_TIME_IN_MSECONDS[] = {5,250,5,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,5,0};
 #endif
 //static int RAMP_STEPS[] = {25,100,25,0};
-static int RAMP_STEPS[] = {3,5,1,0};
-static int IGNORE_RAMP[] = {0,0,1,0}; // MITs currently completely ignore the ramp function
+static int RAMP_STEPS[] = {3,5,3,0};
+static int IGNORE_RAMP[] = {0,0,0,0}; // MITs currently completely ignore the ramp function
 
 // the parameters needed for PID speed control
 // old method
@@ -97,18 +97,18 @@ static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot -- due to throttle cut-off from motor controller, had to adjust by hand afterwards
 static int PID_KP_MULT[]   = {1, 2, 1, 0}; // proportional gain numerator
-static int PID_KP_DIV[]    = {4, 15, 5, 0}; // proportional gain denominator
-static int PID_KI_MULT[]   = {15, 1, 2, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {475150, 184320, 73725, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {190060, 32768, 5898, 0}; // derivitive gain numerator
-static int PID_KD_DIV[]    = {15, 15, 3, 0}; // derivitive gain denominator
+static int PID_KP_DIV[]    = {4, 15, 4, 0}; // proportional gain denominator
+static int PID_KI_MULT[]   = {15, 1, 15, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {475150, 184320, 475150, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {190060, 32768, 190060, 0}; // derivitive gain numerator
+static int PID_KD_DIV[]    = {15, 15, 15, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
 static int MIN_EFFORT[]    = {1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
-static int MIN_EFFORT[]    = {115, 175, 295, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {115, 175, 115, 0}; // minimum effort given to ensure motor moves
 #endif
-static int SPEED_AFTER[]   = {1, 3, 3, 0}; // clamp effort if we hit this many correct values in a row
-static int SPEED_CHANGE[]  = {40, 30, 20, 0}; // unclamp if the error is bigger than this
+static int SPEED_AFTER[]   = {1, 3, 1, 0}; // clamp effort if we hit this many correct values in a row
+static int SPEED_CHANGE[]  = {40, 30, 40, 0}; // unclamp if the error is bigger than this
 static int ADJUST_PID_P[]  = {0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
 static int MAX_ACCEL[]     = {500, 500, 500, 0}; // maximum effort change in one step
 
@@ -128,8 +128,8 @@ static int MAX_ACCEL[]     = {500, 500, 500, 0}; // maximum effort change in one
 #define FAULT_WRONG_DIRECTION_DETECTED                     12
 #define FAULT_STOPPED_DUE_TO_STOP_COMMAND                  13
 
-static int MOTOR_PWM_FWD[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_MOTOR_FWD_POS,0};
-static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_MOTOR_REV_POS,0};
+static int MOTOR_PWM_FWD[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_FWD_POS if PWM on H-bridge
+static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_REV_POS if PWM on H-bridge
 #define MOTOR_PWM_F (reverse ? MOTOR_PWM_REV[mover_type] : MOTOR_PWM_FWD[mover_type])
 #define MOTOR_PWM_R (reverse ? MOTOR_PWM_FWD[mover_type] : MOTOR_PWM_REV[mover_type])
 
@@ -137,8 +137,8 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
 // RA - low time setting - cannot exceed RC
 // RB - low time setting - cannot exceed RC
-static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x4000,0};
-static int MOTOR_PWM_END[] = {0x1180,0x3074,0x4000,0};
+static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0};
+static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
 static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x0320,0};
@@ -146,7 +146,7 @@ static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x0320,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
-static int MOTOR_PWM_CHANNEL[] = {1,1,2,0};		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+static int MOTOR_PWM_CHANNEL[] = {1,1,1,0};		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 #define ENCODER_PWM_CHANNEL		0				// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 
 #define MAX_TIME	0x10000
@@ -186,7 +186,7 @@ module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only 
 #define INPUT_MOVER_TRACK_HOME	(reverse ? INPUT_MOVER_END_OF_TRACK_1 : INPUT_MOVER_END_OF_TRACK_2)
 #define INPUT_MOVER_TRACK_END	(reverse ? INPUT_MOVER_END_OF_TRACK_2 : INPUT_MOVER_END_OF_TRACK_1)
 
-static bool PWM_H_BRIDGE[] = {false,false,true,false};
+static bool PWM_H_BRIDGE[] = {false,false,false,false};
 static bool OUTPUT_H_BRIDGE[] = {false,true,true,false};
 static bool USE_BRAKE[] = {true,false,false,false};
 static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false};
