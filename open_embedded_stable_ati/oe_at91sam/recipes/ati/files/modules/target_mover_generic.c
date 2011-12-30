@@ -18,7 +18,7 @@
 //#define TESTING_ON_EVAL
 //#define TESTING_MAX
 //#define ACCEL_TEST
-#define WOBBLE_DETECT
+//#define WOBBLE_DETECT
 //#define DEBUG_PID
 
 //---------------------------------------------------------------------------
