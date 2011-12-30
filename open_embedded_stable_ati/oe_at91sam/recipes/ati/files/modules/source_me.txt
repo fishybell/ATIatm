@@ -1,3 +1,3 @@
-export KDIR=/home/nathanb/devel/oe/tmp/work/at91sam9g20ek_2mmc-angstrom-linux-gnueabi/linux-2.6.30-r1/linux-2.6.30/
-export PATH=/home/nathanb/devel/oe/tmp/cross/armv5te/bin:$PATH  
+export KDIR=/usr/local/var/oe/tmp/work/at91sam9g20ek_2mmc-angstrom-linux-gnueabi/linux-2.6.30-r1/linux-2.6.30/
+export PATH=/usr/local/var/oe/tmp/cross/armv5te/bin:$PATH  
 
