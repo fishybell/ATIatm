@@ -18,7 +18,7 @@
 //#define TESTING_ON_EVAL
 //#define TESTING_MAX
 //#define ACCEL_TEST
-//#define WOBBLE_DETECT
+#define WOBBLE_DETECT
 //#define DEBUG_PID
 
 //---------------------------------------------------------------------------
@@ -55,8 +55,8 @@ static int MOVER_DELAY_MULT[] = {6,2,6,0};
 
 // the maximum allowed speed ticks
 //static int NUMBER_OF_SPEEDS[] = {10,20,10,0};
-static int NUMBER_OF_SPEEDS[] = {100,200,100,0};
-static int MIN_SPEED[] = {15,20,15,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
+static int NUMBER_OF_SPEEDS[] = {100,200,200,0};
+static int MIN_SPEED[] = {15,20,10,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
 static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0};
@@ -97,20 +97,20 @@ static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot -- due to throttle cut-off from motor controller, had to adjust by hand afterwards
 static int PID_KP_MULT[]   = {1, 2, 1, 0}; // proportional gain numerator
-static int PID_KP_DIV[]    = {4, 15, 4, 0}; // proportional gain denominator
+static int PID_KP_DIV[]    = {4, 15, 3, 0}; // proportional gain denominator
 static int PID_KI_MULT[]   = {15, 1, 15, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {475150, 184320, 475150, 0}; // integral gain denominator
+static int PID_KI_DIV[]    = {475150, 184320, 47515, 0}; // integral gain denominator
 static int PID_KD_MULT[]   = {190060, 32768, 190060, 0}; // derivitive gain numerator
 static int PID_KD_DIV[]    = {15, 15, 15, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
 static int MIN_EFFORT[]    = {1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
-static int MIN_EFFORT[]    = {115, 175, 115, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {115, 175, 1, 0}; // minimum effort given to ensure motor moves
 #endif
 static int SPEED_AFTER[]   = {1, 3, 1, 0}; // clamp effort if we hit this many correct values in a row
 static int SPEED_CHANGE[]  = {40, 30, 40, 0}; // unclamp if the error is bigger than this
 static int ADJUST_PID_P[]  = {0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
-static int MAX_ACCEL[]     = {500, 500, 500, 0}; // maximum effort change in one step
+static int MAX_ACCEL[]     = {500, 500, 1000, 0}; // maximum effort change in one step
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -141,8 +141,8 @@ static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0};
 static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x0320,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x0320,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x01F0,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x01F0,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -842,7 +842,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         atomic_set(&last_t, this_t);
 #ifdef ACCEL_TEST
         // did we reach the target speed?
-        if (abs(current_speed10()) == 75) { // 7.45 mph is 12 kph
+        if (abs(current_speed10()) >= 75) { // 7.45 mph is 12 kph
             // display current position
             pos = ((INCHES_PER_TICK[mover_type]*atomic_read(&position))/TICKS_DIV);
             delay_printk("\
@@ -2283,6 +2283,14 @@ static void movement_change(struct work_struct * work)
     }
 
 //---------------------------------------------------------------------------
+// Message filler handler for failure messages
+//---------------------------------------------------------------------------
+int error_mfh(struct sk_buff *skb, void *msg) {
+    // the msg argument is a null-terminated string
+    nla_put_string(skb, GEN_STRING_A_MSG, msg);
+}
+
+//---------------------------------------------------------------------------
 // PID loop step
 //---------------------------------------------------------------------------
 // old method
@@ -2323,8 +2331,13 @@ static void pid_step(int delta_t) {
         pid_last_speeds[1] > pid_last_speeds[2]) { // pid_last_speeds[1] is the peak
         struct timespec time_now = current_kernel_time();
         struct timespec time_d = timespec_sub(time_now, pid_last_time);
+        char *msg = kmalloc(128, GFP_KERNEL);
         pid_last_time = time_now; // remember last time as now
-        delay_printk("Wobble @ %i : %i\n", (time_d.tv_sec * 1000) + (time_d.tv_nsec / 1000000), pid_last_speeds[1] - new_speed); // print wobble time and amount to track if we're wobbling steady
+        snprintf(msg, 128, "Wobble @ %i : %i\n", (time_d.tv_sec * 1000) + (time_d.tv_nsec / 1000000), pid_last_speeds[1] - new_speed); // print wobble time and amount to track if we're wobbling steady
+        delay_printk(msg);
+        // send to userspace as a "failure" message
+        send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+        kfree(msg);
     }
 #endif
 
@@ -2380,6 +2393,7 @@ static void pid_step(int delta_t) {
     if (pid_correct_count >= SPEED_AFTER[mover_type] && abs(pid_error) < SPEED_CHANGE[mover_type]) {
        // clamp effort to same as last time
        pid_effort = pid_last_effort;
+//send_nl_message_multi("Clamped at correct speed", error_mfh, NL_C_FAILURE);
 //delay_printk("CLAMPED!");
     } else {
        // do the PID calculations
@@ -2406,10 +2420,20 @@ static void pid_step(int delta_t) {
        pid_effort = max(pid_effort, 0); // minimum when stopping is 0
     } else {
        pid_effort = max(pid_effort, MIN_EFFORT[mover_type]); // minimum when moving
+       if (pid_effort == MIN_EFFORT[mover_type]) {
+          char *msg = kmalloc(128, GFP_KERNEL);
+          snprintf(msg, 128, "Used minimum effort: %i\n", pid_last_effort);
+          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+          kfree(msg);
+       }
     }
 
     // if we're accelerating (not negative acceleration) check maximum acceleration allowed
     if (pid_effort > pid_last_effort && (pid_effort - pid_last_effort) > MAX_ACCEL[mover_type]) {
+        char *msg = kmalloc(128, GFP_KERNEL);
+        snprintf(msg, 128, "Clamped at max accel: %i+%i\n", pid_last_effort, pid_effort - pid_last_effort);
+        send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+        kfree(msg);
         // clamp at max acceleration...
         pid_effort = pid_last_effort + MAX_ACCEL[mover_type];
     }

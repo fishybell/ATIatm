@@ -277,20 +277,68 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                 // a mover/lifter event happened
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
                 switch (value) {
-                  case 0: // Start raise
-                     snprintf(wbuf, 1024, "V Start Raise\n");
+                  case 0: // start of raise
+                     snprintf(wbuf, 1024, "V %i start of raise\n", value);
                      break;
-                  case 1: // Arrived at up switch
-                     snprintf(wbuf, 1024, "V Raised\n");
+                  case 1: // finished raising
+                     snprintf(wbuf, 1024, "V %i finished raising\n", value);
                      break;
-                  case 2: // Start lower
-                     snprintf(wbuf, 1024, "V Start Lower\n");
+                  case 2: // start of lower
+                     snprintf(wbuf, 1024, "V %i start of lower\n", value);
                      break;
-                  case 3: // Arrived at down switch
-                     snprintf(wbuf, 1024, "V Lowered\n");
+                  case 3: // finished lowering
+                     snprintf(wbuf, 1024, "V %i finished lowering\n", value);
+                     break;
+                  case 4: // start of move
+                     snprintf(wbuf, 1024, "V %i start of move\n", value);
+                     break;
+                  case 5: // reached target speed
+                     snprintf(wbuf, 1024, "V %i reached target speed\n", value);
+                     break;
+                  case 6: // changed position
+                     snprintf(wbuf, 1024, "V %i changed position\n", value);
+                     break;
+                  case 7: // started coast
+                     snprintf(wbuf, 1024, "V %i started coast\n", value);
+                     break;
+                  case 8: // started stopping
+                     snprintf(wbuf, 1024, "V %i started stopping\n", value);
+                     break;
+                  case 9: // finished stopping
+                     snprintf(wbuf, 1024, "V %i finished stopping\n", value);
+                     break;
+                  case 10: // hit
+                     snprintf(wbuf, 1024, "V %i hit\n", value);
+                     break;
+                  case 11: // kill
+                     snprintf(wbuf, 1024, "V %i kill\n", value);
+                     break;
+                  case 12: // shutdown
+                     snprintf(wbuf, 1024, "V %i shutdown\n", value);
+                     break;
+                  case 13: // sleep
+                     snprintf(wbuf, 1024, "V %i sleep\n", value);
+                     break;
+                  case 14: // wake
+                     snprintf(wbuf, 1024, "V %i wake\n", value);
+                     break;
+                  case 15: // home limit
+                     snprintf(wbuf, 1024, "V %i home limit\n", value);
+                     break;
+                  case 16: // end limit
+                     snprintf(wbuf, 1024, "V %i end limit\n", value);
+                     break;
+                  case 17: // timeout
+                     snprintf(wbuf, 1024, "V %i timeout\n", value);
+                     break;
+                  case 18: // speed change
+                     snprintf(wbuf, 1024, "V %i speed change\n", value);
+                     break;
+                  case 19: // error
+                     snprintf(wbuf, 1024, "V %i error\n", value);
                      break;
                   default: // Other event
-                     snprintf(wbuf, 1024, "V Lowered\n");
+                     snprintf(wbuf, 1024, "V %i unknown\n", value);
                      break;
                 }
             }
@@ -320,6 +368,8 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
             if (attrs[GEN_STRING_A_MSG]) {
                 char *data = nla_get_string(attrs[GEN_STRING_A_MSG]);
                 snprintf(wbuf, 1024, "failure attribute: %s\n", data);
+            } else {
+                snprintf(wbuf, 1024, "failed to get attribute\n");
             }
 
             break;
