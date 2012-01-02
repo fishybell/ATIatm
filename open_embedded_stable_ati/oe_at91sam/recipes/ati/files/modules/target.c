@@ -173,6 +173,28 @@ void target_sysfs_notify(struct target_device * target_device, char * attribute_
     }
 EXPORT_SYMBOL(target_sysfs_notify);
 
+
+//---------------------------------------------------------------------------
+// Scenario running on the kernel
+//---------------------------------------------------------------------------
+static scenario_run_callback scenario_callback = NULL;
+void set_scenario_callback(scenario_run_callback handler) {
+   // only allow setting the callback once
+   if (handler != NULL && scenario_callback == NULL) {
+      scenario_callback = handler;
+   }
+}
+EXPORT_SYMBOL(set_scenario_callback);
+
+int target_scenario(char *scen) {
+   if (scenario_callback != NULL) {
+      return scenario_callback(scen);
+   } else {
+      return -1;
+   }
+}
+EXPORT_SYMBOL(target_scenario);
+
 //---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------

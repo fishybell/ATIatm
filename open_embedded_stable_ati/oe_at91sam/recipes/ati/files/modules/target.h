@@ -44,4 +44,11 @@ extern int 					target_hrtimer_start		(struct hrtimer *timer, ktime_t tim, const
 extern int 					target_hrtimer_cancel		(struct hrtimer *timer);
 extern u64					target_hrtimer_forward_now	(struct hrtimer *timer, ktime_t interval);
 
+extern int target_scenario(char *scen); // null-terminated scenario
+                                        // returns 1 if started running scenario
+                                        // returns 0 if running another scenario already
+                                        // returns -1 if no callback is defined
+typedef int (*scenario_run_callback)(char*); // callback for actual scenario running
+extern void set_scenario_callback(scenario_run_callback handler);
+
 #endif // __TARGET_H__
