@@ -216,9 +216,6 @@ void handle_bit_test_long(struct nl_handle *handle, int is_on) {
 
 // bit button might have been pressed, move the lifter up or down
 void handle_bit_test(struct nl_handle *handle, int is_on) {
-    // ignore button not pressed events
-    if (is_on != 1) { return; }
-
     // toggle lifter position
     struct nl_msg *msg;
     msg = nlmsg_alloc();
