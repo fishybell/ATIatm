@@ -12,7 +12,7 @@ start () {
 
    # load modules
    load_modules "target_user_interface.ko mover=0" \
-                "target_battery.ko minvoltval=$satb" \
+                "target_battery.ko minvoltval=$satb shutdown_wait=10" \
                 "target_hit_poll.ko line=0" \
                 "target_generic_output.ko" \
                 "target_lifter_armor.ko" \
