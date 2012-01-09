@@ -20,7 +20,7 @@ start () {
 
    # load modules
    load_modules "target_user_interface.ko mover=1" \
-                "target_battery.ko minvoltval=$matb" \
+                "target_battery.ko minvoltval=$matb shutdown_wait=5" \
                 "target_mover_generic.ko mover_type=$matm reverse=$matr" \
                 "target_generic_output.ko" \
                 "mover.ko"
