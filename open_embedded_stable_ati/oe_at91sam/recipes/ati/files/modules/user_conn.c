@@ -8,9 +8,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <netinet/in.h>
-#include "defaults.h"
 
+#include "defaults.h"
 #include "netlink_user.h"
+#include "fasit/faults.h"
 
 // tcp port we'll listen to for new connections
 #define PORT 4422
@@ -350,14 +351,109 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
             if (attrs[GEN_INT8_A_MSG]) {
                 // battery value percentage
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
-                if (value != 0) {
-                     if (value == 26) {
-                        snprintf(wbuf, 1024, "U Disconnected Hit Sensor\n");
-                     } else {
-                        snprintf(wbuf, 1024, "U Unknown\n");
-                     }
-                } else {
-                    snprintf(wbuf, 1024, "U Normal\n");
+                switch (value) {
+                   case ERR_normal:
+                      snprintf(wbuf, 1024, "U normal\n");
+                      break;
+                   case ERR_both_limits_active:
+                      snprintf(wbuf, 1024, "U both limits active\n");
+                      break;
+                   case ERR_invalid_direction_req:
+                      snprintf(wbuf, 1024, "U invalid direction req\n");
+                      break;
+                   case ERR_invalid_speed_req:
+                      snprintf(wbuf, 1024, "U invalid speed req\n");
+                      break;
+                   case ERR_speed_zero_req:
+                      snprintf(wbuf, 1024, "U speed zero req\n");
+                      break;
+                   case ERR_stop_right_limit:
+                      snprintf(wbuf, 1024, "U stop right limit\n");
+                      break;
+                   case ERR_stop_left_limit:
+                      snprintf(wbuf, 1024, "U stop left limit\n");
+                      break;
+                   case ERR_stop_by_distance:
+                      snprintf(wbuf, 1024, "U stop by distance\n");
+                      break;
+                   case ERR_emergency_stop:
+                      snprintf(wbuf, 1024, "U emergency stop\n");
+                      break;
+                   case ERR_no_movement:
+                      snprintf(wbuf, 1024, "U no movement\n");
+                      break;
+                   case ERR_over_speed:
+                      snprintf(wbuf, 1024, "U over speed\n");
+                      break;
+                   case ERR_unassigned:
+                      snprintf(wbuf, 1024, "U unassigned\n");
+                      break;
+                   case ERR_wrong_direction:
+                      snprintf(wbuf, 1024, "U wrong direction\n");
+                      break;
+                   case ERR_stop:
+                      snprintf(wbuf, 1024, "U stop\n");
+                      break;
+                   case ERR_lifter_stuck_at_limit:
+                      snprintf(wbuf, 1024, "U lifter stuck at limit\n");
+                      break;
+                   case ERR_actuation_not_complete:
+                      snprintf(wbuf, 1024, "U actuation not complete\n");
+                      break;
+                   case ERR_not_leave_conceal:
+                      snprintf(wbuf, 1024, "U not leave conceal\n");
+                      break;
+                   case ERR_not_leave_expose:
+                      snprintf(wbuf, 1024, "U not leave expose\n");
+                      break;
+                   case ERR_not_reach_expose:
+                      snprintf(wbuf, 1024, "U not reach expose\n");
+                      break;
+                   case ERR_not_reach_conceal:
+                      snprintf(wbuf, 1024, "U not reach conceal\n");
+                      break;
+                   case ERR_low_battery:
+                      snprintf(wbuf, 1024, "U low battery\n");
+                      break;
+                   case ERR_engine_stop:
+                      snprintf(wbuf, 1024, "U engine stop\n");
+                      break;
+                   case ERR_IR_failure:
+                      snprintf(wbuf, 1024, "U IR failure\n");
+                      break;
+                   case ERR_audio_failure:
+                      snprintf(wbuf, 1024, "U audio failure\n");
+                      break;
+                   case ERR_miles_failure:
+                      snprintf(wbuf, 1024, "U miles failure\n");
+                      break;
+                   case ERR_thermal_failure:
+                      snprintf(wbuf, 1024, "U thermal failure\n");
+                      break;
+                   case ERR_hit_sensor_failure:
+                      snprintf(wbuf, 1024, "U hit sensor failure\n");
+                      break;
+                   case ERR_invalid_target_type:
+                      snprintf(wbuf, 1024, "U invalid target type\n");
+                      break;
+                   case ERR_bad_RF_packet:
+                      snprintf(wbuf, 1024, "U bad RF packet\n");
+                      break;
+                   case ERR_bad_checksum:
+                      snprintf(wbuf, 1024, "U bad checksum\n");
+                      break;
+                   case ERR_unsupported_command:
+                      snprintf(wbuf, 1024, "U unsupported command\n");
+                      break;
+                   case ERR_invalid_exception:
+                      snprintf(wbuf, 1024, "U invalid exception\n");
+                      break;
+                   case ERR_critical_battery:
+                      snprintf(wbuf, 1024, "U critical battery\n");
+                      break;
+                   default:
+                      snprintf(wbuf, 1024, "U Unknown: %i\n", value);
+                      break;
                 }
             }
 
