@@ -124,6 +124,8 @@ static int charge = FALSE;
 module_param(charge, bool, S_IRUGO);
 static int shutdown = TRUE;
 module_param(shutdown, bool, S_IRUGO);
+static int shutdown_wait = 1;
+module_param(shutdown_wait, int, S_IRUGO);
 static int minvoltval = 12;
 module_param(minvoltval, int, S_IRUGO);
 
@@ -225,12 +227,25 @@ static void shutdown_soon(bool lowbat) {
     // tell the debug port we're shutting down
     delay_printk("Shutting down due to %s.\n", lowbat ? "low battery" : "user command");
 
-    // let attached devices know that we're shutting down
-    queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
-
     if (atomic_inc_return(&shutdown_msg) < 3) {
-        // shutdown in a short period of time
-        mod_timer(&shutdown_timer_list, jiffies+((SHUTDOWN_IN_MSECONDS*HZ)/1000));
+        // let attached devices know that we're shutting down
+        queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
+
+        // on command (and when we're programmed to wait) shutdown after a long delay 
+        if (!lowbat || shutdown_wait <= 0) {
+            // build shutdown scenario
+            char *scen = "\
+               {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
+               {Send;R_MOVER;NL_C_MOVE;1;0080} -- Send Stop to mover";
+            target_kill_scenario(); // abort running scenarios
+            target_scenario(scen); // send shutdown scenario
+
+            // shutdown in a long period of time
+            mod_timer(&shutdown_timer_list, jiffies+(shutdown_wait*HZ));
+        } else {
+            // shutdown in a short period of time
+            mod_timer(&shutdown_timer_list, jiffies+((SHUTDOWN_IN_MSECONDS*HZ)/1000));
+        }
     }
 }
 
@@ -697,7 +712,7 @@ int nl_battery_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
 //delay_printk("received value: %i\n", value);
         switch (value) {
             case BATTERY_SHUTDOWN:
-               // shutdown requested, do it now
+               // shutdown requested, do it soon
                shutdown_soon(false);
                break;
             case BATTERY_REQUEST:
