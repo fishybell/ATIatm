@@ -42,6 +42,12 @@ public :
    void outgoingCmdEvent(kern_cmd_event_t *event); // send a command event over tcp
    void sendRole(); // send the role to the opposite tcp connection
 
+   // cause a reconnect attempt in 10 seconds
+   virtual bool reconnect();
+
+   // delayed reconnect handler
+   void handleReconnect();
+
 protected:
    virtual bool hasPair() { return kern_conn != NULL;};
 

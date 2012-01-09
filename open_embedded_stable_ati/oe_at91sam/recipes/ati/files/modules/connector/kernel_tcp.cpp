@@ -5,6 +5,7 @@
 
 using namespace std;
 
+#include "tcp_factory.h"
 #include "kernel_tcp.h"
 #include "common.h"
 #include "timers.h"
@@ -54,7 +55,64 @@ FUNCTION_START("::~Kernel_TCP()")
 FUNCTION_END("::~Kernel_TCP()")
 }
 
-void Kernel_TCP::sendRole() {
+bool Kernel_TCP::reconnect() {
+FUNCTION_START("::reconnect()")
+
+   // were we really in need of deletion?
+   if (needDelete) {
+FUNCTION_INT("::reconnect()", false)
+      return false; // don't reconnect
+   }
+
+   // remove dead socket from of epoll
+   epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
+   close(fd);
+
+   // clear buffers
+   list<char*>::iterator it; // iterator for write buffer
+   for (it = wbuf.begin(); it != wbuf.end(); it++) {
+      delete [] *it; // clear write buffer item
+   }
+   wbuf.clear(); // clear write buffer
+   wsize.clear();
+   if (lwbuf) {			// clear last write buffer
+      delete [] lwbuf;
+      lwbuf = NULL;
+   }
+   lwsize=0;
+
+   // queue the reconnect for 10 seconds from now
+   new ReconTimer(this, RECONNECTION);
+
+FUNCTION_INT("::reconnect()", true)
+   return true;
+}
+
+void Kernel_TCP::handleReconnect() {
+FUNCTION_START("::handleReconnect()")
+
+   // attempt reconnection now
+   int sock = factory->newClientSock();
+   if (sock <= 0) {
+      // queue another reconnect for 10 seconds from now
+      reconnect();
+      return; // we'll be back
+   }
+
+   // set fd to new socket
+   fd = sock;
+
+   // add back in to epoll
+   if (!addToEPoll(sock, this)) {
+      // queue another reconnect for 10 seconds from now
+      reconnect();
+   }
+
+   // send my role to the other side
+   new SRTimer(this, 500); // send the role after 500 milliseconds
+
+FUNCTION_END("::handleReconnect()")
+}void Kernel_TCP::sendRole() {
 FUNCTION_START("::sendRole()")
 
    // create "I am this role" message
@@ -150,11 +208,11 @@ FUNCTION_END("::outgoingCmdEvent(kern_cmd_event_t *event)")
 *                     Kern_Conn Class                      *
 ***********************************************************/
 Kern_Conn::Kern_Conn(struct nl_handle *handle, Kernel_TCP *client, int family) : NL_Conn(handle, client, family) {
-FUNCTION_START("::Kern_Conn(struct nl_handle *handle, TCP_Client *client, int family) : NL_Conn(handle, client, family)")
+FUNCTION_START("::Kern_Conn(struct nl_handle *handle, Kernel_TCP *client, int family) : NL_Conn(handle, client, family)")
 
    kern_tcp = client;
 
-FUNCTION_END("::Kern_Conn(struct nl_handle *handle, TCP_Client *client, int family) : NL_Conn(handle, client, family)")
+FUNCTION_END("::Kern_Conn(struct nl_handle *handle, Kernel_TCP *client, int family) : NL_Conn(handle, client, family)")
 }
 
 Kern_Conn::~Kern_Conn() {

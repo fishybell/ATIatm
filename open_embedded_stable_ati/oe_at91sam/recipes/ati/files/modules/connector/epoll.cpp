@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <linux/if.h>
+#include <netinet/tcp.h>
 
 using namespace std;
 
@@ -58,7 +59,21 @@ static void quitproc(int sig) {
 // utility function to properly configure a client TCP connection
 void setnonblocking(int sock, bool socket) {
 FUNCTION_START("setnonblocking(int sock, bool socket)")
-   int opts;
+   int opts, yes=1;
+
+   // socket specific setup
+   if (socket) {
+      // disable Nagle's algorithm so we send messages as discrete packets
+      if (setsockopt(sock, SOL_SOCKET, TCP_NODELAY, &yes, sizeof(int)) == -1) {
+         IERROR("Could not disable Nagle's algorithm\n");
+         perror("setsockopt(TCP_NODELAY)");
+      }
+
+      if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)) < 0) { // set keepalive so we disconnect on link failure or timeout
+         perror("setsockopt(SO_KEEPALIVE)");
+         exit(EXIT_FAILURE);
+      }
+   }
 
    opts = fcntl(sock, F_GETFL);
    if (opts < 0) {
@@ -314,7 +329,10 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
             Connection *conn = (Connection*)events[n].data.ptr;
             int ret = conn->handleReady(&events[n]);
             if (ret == -1) {
-               delete conn;
+               // attempt reconnection
+               if (!conn->reconnect()) {
+                  delete conn;
+               }
             }
          }
       }
