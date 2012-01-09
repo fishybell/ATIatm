@@ -196,6 +196,25 @@ int target_scenario(char *scen) {
 EXPORT_SYMBOL(target_scenario);
 
 //---------------------------------------------------------------------------
+// Scenario stopping on the kernel
+//---------------------------------------------------------------------------
+static scenario_kill_callback scenario_k_callback = NULL;
+void set_kill_scenario_callback(scenario_kill_callback handler) {
+   // only allow setting the callback once
+   if (handler != NULL && scenario_k_callback == NULL) {
+      scenario_k_callback = handler;
+   }
+}
+EXPORT_SYMBOL(set_kill_scenario_callback);
+
+void target_kill_scenario() {
+   if (scenario_k_callback != NULL) {
+      scenario_k_callback();
+   }
+}
+EXPORT_SYMBOL(target_kill_scenario);
+
+//---------------------------------------------------------------------------
 // init handler for the module
 //---------------------------------------------------------------------------
 static int __init target_init(void)

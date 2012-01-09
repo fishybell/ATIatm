@@ -1789,8 +1789,9 @@ static int __init Scenario_init(void) {
    };
    struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 
-   // install scenario callback function
+   // install scenario callback functions
    set_scenario_callback(scenario_run);
+   set_kill_scenario_callback(scenario_kill);
 
    // install driver w/ netlink provider
    d_id = install_nl_driver(&driver);

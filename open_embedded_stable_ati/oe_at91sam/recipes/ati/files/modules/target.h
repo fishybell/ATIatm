@@ -48,7 +48,10 @@ extern int target_scenario(char *scen); // null-terminated scenario
                                         // returns 1 if started running scenario
                                         // returns 0 if running another scenario already
                                         // returns -1 if no callback is defined
+extern void target_kill_scenario(void); // stop scenario (if running)
 typedef int (*scenario_run_callback)(char*); // callback for actual scenario running
+typedef void (*scenario_kill_callback)(void); // callback for actual scenario killing
 extern void set_scenario_callback(scenario_run_callback handler);
+extern void set_kill_scenario_callback(scenario_kill_callback handler);
 
 #endif // __TARGET_H__
