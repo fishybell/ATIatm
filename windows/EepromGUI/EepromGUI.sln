@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EepromGUI", "EepromGUI\EepromGUI.csproj", "{883CAE57-E538-4D36-B740-FAA3D51672B9}"
 EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "PAD", "PAD\PAD.vdproj", "{97CCD794-CAF7-43DC-B03B-D092DA1F3BE0}"
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "PMA", "PMA\PMA.vdproj", "{98F4665D-1950-434C-A8AD-378CAC01CA47}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,8 +15,8 @@ Global
 		{883CAE57-E538-4D36-B740-FAA3D51672B9}.Debug|x86.Build.0 = Debug|x86
 		{883CAE57-E538-4D36-B740-FAA3D51672B9}.Release|x86.ActiveCfg = Release|x86
 		{883CAE57-E538-4D36-B740-FAA3D51672B9}.Release|x86.Build.0 = Release|x86
-		{97CCD794-CAF7-43DC-B03B-D092DA1F3BE0}.Debug|x86.ActiveCfg = Debug
-		{97CCD794-CAF7-43DC-B03B-D092DA1F3BE0}.Release|x86.ActiveCfg = Release
+		{98F4665D-1950-434C-A8AD-378CAC01CA47}.Debug|x86.ActiveCfg = Debug
+		{98F4665D-1950-434C-A8AD-378CAC01CA47}.Release|x86.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

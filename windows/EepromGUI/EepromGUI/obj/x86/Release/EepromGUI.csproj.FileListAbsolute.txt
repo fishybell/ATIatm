@@ -7,3 +7,12 @@ C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI
 C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\GenerateResource.write.1.tlog
 C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.exe
 C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.pdb
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.exe
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.pdb
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\bin\Release\EepromGUI.exe
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\bin\Release\EepromGUI.pdb
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\ResolveAssemblyReference.cache
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.Form1.resources
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.Properties.Resources.resources
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\GenerateResource.read.1.tlog
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\GenerateResource.write.1.tlog

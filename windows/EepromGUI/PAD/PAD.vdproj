@@ -33,7 +33,7 @@
         "DisplayName" = "8:Debug"
         "IsDebugOnly" = "11:TRUE"
         "IsReleaseOnly" = "11:FALSE"
-        "OutputFilename" = "8:Debug\\PAD.msi"
+        "OutputFilename" = "8:Debug\\PMA.msi"
         "PackageFilesAs" = "3:2"
         "PackageFileSize" = "3:-2147483648"
         "CabType" = "3:1"
@@ -43,6 +43,27 @@
         "PrivateKeyFile" = "8:"
         "TimeStampServer" = "8:"
         "InstallerBootstrapper" = "3:2"
+            "BootstrapperCfg:{63ACBE69-63AA-4F98-B2B6-99F9E24495F2}"
+            {
+            "Enabled" = "11:TRUE"
+            "PromptEnabled" = "11:TRUE"
+            "PrerequisitesLocation" = "2:1"
+            "Url" = "8:"
+            "ComponentsUrl" = "8:"
+                "Items"
+                {
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:.NETFramework,Version=v4.0,Profile=Client"
+                    {
+                    "Name" = "8:Microsoft .NET Framework 4 Client Profile (x86 and x64)"
+                    "ProductCode" = "8:.NETFramework,Version=v4.0,Profile=Client"
+                    }
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:Microsoft.Windows.Installer.3.1"
+                    {
+                    "Name" = "8:Windows Installer 3.1"
+                    "ProductCode" = "8:Microsoft.Windows.Installer.3.1"
+                    }
+                }
+            }
         }
         "Release"
         {
@@ -59,6 +80,14 @@
         "PrivateKeyFile" = "8:"
         "TimeStampServer" = "8:"
         "InstallerBootstrapper" = "3:2"
+            "BootstrapperCfg:{63ACBE69-63AA-4F98-B2B6-99F9E24495F2}"
+            {
+            "Enabled" = "11:TRUE"
+            "PromptEnabled" = "11:TRUE"
+            "PrerequisitesLocation" = "2:1"
+            "Url" = "8:"
+            "ComponentsUrl" = "8:"
+            }
         }
     }
     "Deployable"
@@ -201,7 +230,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:PAD"
         "ProductCode" = "8:{B4650C40-D060-4B31-8409-8BC6C4B532BB}"
-        "PackageCode" = "8:{377E1BBD-DB96-497E-82D9-0701BA47A4B5}"
+        "PackageCode" = "8:{BDF5041A-0B35-4DE1-B5AF-2F0C3D056D01}"
         "UpgradeCode" = "8:{A39DE48D-E085-42F3-BFDC-8378C660F4DB}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
@@ -722,7 +751,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_9099232DE917432F8113E9808B3538C2"
             {
-            "SourcePath" = "8:..\\EepromGUI\\obj\\x86\\Debug\\EepromGUI.exe"
+            "SourcePath" = "8:\\\\tao\\shellyb\\Shelly's VS Projects\\EepromGUI\\EepromGUI\\obj\\x86\\Debug\\EepromGUI.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_3E03F7EB9CE8408DBB7222C792B16AEC"
