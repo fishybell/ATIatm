@@ -26,13 +26,13 @@ namespace WindowsFormsApplication1
         private void button1_Click(object sender, EventArgs e)
         {
             string sPath, sFile;
-            string sText, sLineText, sTemp, sTable, sTask, sTime, sRound, sRange;
-            int iPos, iPos2, iLen, iElement;
+            string sText, sLineText, sTemp;
+            int iPos, iLen, iElement;
             int iStartPos;
-            string sDate = "", sIDCode, sLane, exp, sName, sSelected;
+            string sIDCode, exp;
             bool bOut;
-            //string[] sIDCodes;
-
+            List<string> logLines = new List<string>();
+            List<string> shooterGroups = new List<string>();
             //textBox1.Text = "c:\\dummy.txt";
             sPath = tbLogFilePath.Text;
 
@@ -40,10 +40,9 @@ namespace WindowsFormsApplication1
             sText = streamReader.ReadToEnd();
             streamReader.Close();
 
-            textBox2.Text = sText;
-
             //string[] sIDCodes = new string[];
-            string[] sIDCodes = new string[21];
+            //string[] sIDCodes = new string[];
+            List<string> sIDCodes = new List<string>();
             iElement = -1;  //used for the array
 
             DataSet1 ds = new DataSet1();
@@ -57,28 +56,34 @@ namespace WindowsFormsApplication1
             DataTable dt8 = ds.SCENARIOSTART;
             DataTable dt9 = ds.TARGETEXPOSED;
             DataTable dt10 = ds.TARGETCONCEALED;
+            DataTable dt11 = ds.GROUP;
+            //DataTable dt12 = ds.TABLE;
+            //DataTable dt13 = ds.TASK;
 
-            DataRow r;
-            DataRow r2;
-            DataRow r3;
-            DataRow r4;
-            DataRow r5;
-            DataRow r6;
-            DataRow r7;
-            DataRow r8;
-            DataRow r9;
-            DataRow r10;
+            DataRow shooter_row;
+            DataRow hit_row;
+            DataRow task_start_row;
+            DataRow task_end_row;
+            DataRow target_row;
+            DataRow spotter_row;
+            DataRow malfunction_row;
+            DataRow scenario_start_row;
+            DataRow target_exposed_row;
+            DataRow target_concealed_row;
+            DataRow group_row;
+            //DataRow table_row;
+            //DataRow task_row;
 
             DataRow[] foundRows;
 
-            
+            // Initialize new rows
             bOut = false;
             while (bOut == false)    //bOut is set to true when the log file parse is complete
             {
                 iStartPos = sText.Length;
 
                 // Find the next line header
-                
+
                 iStartPos = GetStartPos(sText, "SCENARIOSTART:", iStartPos);
 
                 iStartPos = GetStartPos(sText, "SHOOTER:", iStartPos);
@@ -102,6 +107,10 @@ namespace WindowsFormsApplication1
                 iStartPos = GetStartPos(sText, "SCENARIOEND:", iStartPos);
 
                 iStartPos = GetStartPos(sText, "MALFUNCTION:", iStartPos);
+
+                iStartPos = GetStartPos(sText, "TABLE:", iStartPos);
+
+                iStartPos = GetStartPos(sText, "TASK:", iStartPos);
 
                 // Take off all characters before the header
                 iLen = sText.Length - iStartPos;
@@ -135,505 +144,581 @@ namespace WindowsFormsApplication1
                 {
                     sTemp = sLineText.Substring(0, iPos);
                     sTemp = sTemp.ToUpper();
+                    logLines.Add(sLineText);
                 }
-                switch (sTemp)
-                {
-                    case "SCENARIOSTART":
-
-                        r8 = dt8.NewRow();
-
-                        iPos = sLineText.IndexOf("TIMESTAMP(", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sDate = sLineText.Substring(iPos, iLen);
-                        r8["TIMESTAMP"] = sDate;
-
-                        iPos = sLineText.IndexOf("NAME(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r8["NAME"] = sName;
-
-                        dt8.Rows.Add(r8);
-                        break;
-                    case "SHOOTER":
-
-
-                        r = dt1.NewRow();
-
-                        iPos = sLineText.IndexOf("IDCODE(", 0);
-                        iPos += 7;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sIDCode = sLineText.Substring(iPos, iLen);
-                        r["IDCode"] = sIDCode;
-                        iElement++;
-                        sIDCodes[iElement] = sIDCode;   // store this for opening multiple reports
-
-                        iPos = sLineText.IndexOf("UNIT(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sLane = sLineText.Substring(iPos, iLen);
-                        r["UNIT"] = sLane;
-
-                        iPos = sLineText.IndexOf("GROUP(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sLane = sLineText.Substring(iPos, iLen);
-                        r["GROUP"] = sLane;
-
-                        iPos = sLineText.IndexOf("LASTNAME(", 0);
-                        iPos += 9;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r["LASTNAME"] = sName;
-
-                        iPos = sLineText.IndexOf("FIRSTNAME(", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r["FIRSTNAME"] = sName;
-
-                        iPos = sLineText.IndexOf("MIDDLE(", 0);
-                        iPos += 7;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r["MIDDLE"] = sName;
-
-                        iPos = sLineText.IndexOf("RANK(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sLane = sLineText.Substring(iPos, iLen);
-                        r["RANK"] = sLane;
-
-                        r["DATE"] = sDate;
-
-                        dt1.Rows.Add(r);
-                        break;
-
-                    case "SPOTTER":
-
-                        r6 = dt6.NewRow();
-
-                        iPos = sLineText.IndexOf("LASTNAME(", 0);
-                        iPos += 9;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r6["LASTNAME"] = sName;
-
-                        iPos = sLineText.IndexOf("FIRSTNAME(", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r6["FIRSTNAME"] = sName;
-
-                        iPos = sLineText.IndexOf("GROUP(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sLane = sLineText.Substring(iPos, iLen);
-                        r6["GROUP"] = sLane;
-
-                        dt6.Rows.Add(r6);
-
-                        break;
-
-
-                    case "TASKSTART":  //TARGET(TABLE 2 TASK 2 QUALIFY), NAME(abc2), TIMESTAMP(2011/04/21 12:04:20);
-                        r3 = dt3.NewRow();
-
-                        iPos = sLineText.IndexOf("TABLE(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sTable = sLineText.Substring(iPos, iLen);
-                        r3["TABLE"] = sTable;
-
-                        iPos = sLineText.IndexOf("TASK(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sTask = sLineText.Substring(iPos, iLen);
-                        r3["TASK"] = sTask;
-
-                        iPos = sLineText.IndexOf("RANGE(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sRange = sLineText.Substring(iPos, iLen);
-                        r3["RANGE"] = sRange;
-
-                        iPos = sLineText.IndexOf("ROUND(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sRound = sLineText.Substring(iPos, iLen);
-                        r3["ROUND"] = sRound;
-
-                        iPos = sLineText.IndexOf("TIMESTAMP", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sTime = sLineText.Substring(iPos, iLen);
-                        r3["TIMESTAMP"] = sTime;
-
-                        //Make sure that there are no duplicate rows already in the datatable
-                        //  If there are, then they must be deleted from the table.
-                        exp = "TABLE = '" + sTable + "' AND TASK = '" + sTask + "' AND RANGE = '" + sRange + "' AND ROUND = '" + sRound + "'";
-                        foundRows = dt3.Select(exp);
-                        //int i = foundRows[0].ToString;
-                        if (foundRows.Length > 0)
-                            foundRows[0].Delete();
-
-                        dt3.Rows.Add(r3);
-                        break;
-
-                    case "HIT":   // HIT: NAME(abc4), TIMESTAMP(2011/04/21 12:10:12);
-                        r2 = dt2.NewRow();
-
-                        iPos = sLineText.IndexOf("NAME(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r2["NAME"] = sName;
-
-                        iPos = sLineText.IndexOf("TIMESTAMP(", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sTime = sLineText.Substring(iPos, iLen);
-                        r2["TIMESTAMP"] = sTime;
-
-
-                        dt2.Rows.Add(r2);
-
-                        break;
-
-                    case "TASKEND":    
-                        r4 = dt4.NewRow();
-
-                        iPos = sLineText.IndexOf("TABLE(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sTable = sLineText.Substring(iPos, iLen);
-                        r4["TABLE"] = sTable;
-
-                        iPos = sLineText.IndexOf("TASK(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sTask = sLineText.Substring(iPos, iLen);
-                        r4["TASK"] = sTask;
-
-                        iPos = sLineText.IndexOf("RANGE(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sRange = sLineText.Substring(iPos, iLen);
-                        r4["RANGE"] = sRange;
-
-                        iPos = sLineText.IndexOf("ROUND(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sRound = sLineText.Substring(iPos, iLen);
-                        r4["ROUND"] = sRound;
-
-                        iPos = sLineText.IndexOf("TIMESTAMP", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sTime = sLineText.Substring(iPos, iLen);
-                        r4["TIMESTAMP"] = sTime;
-
-                        //Make sure that there are no duplicate rows already in the datatable
-                        //  If there are, then they must be deleted from the table.
-                        exp = "TABLE = '" + sTable + "' AND TASK = '" + sTask + "' AND RANGE = '" + sRange + "' AND ROUND = '" + sRound + "'";
-                        foundRows = dt4.Select(exp);
-                        //int i = foundRows[0].ToString;
-                        if (foundRows.Length > 0)
-                            foundRows[0].Delete();
-
-                        dt4.Rows.Add(r4);
-                        break;
-
-
-                    case "TARGET":
-                        r5 = dt5.NewRow();
-
-                        iPos = sLineText.IndexOf("RANGE(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sRange = sLineText.Substring(iPos, iLen);
-                        r5["RANGE"] = sRange;
-
-                        iPos = sLineText.IndexOf("NAME(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r5["NAME"] = sName;
-
-                        iPos = sLineText.IndexOf("GROUP(", 0);
-                        iPos += 6;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sLane = sLineText.Substring(iPos, iLen);
-                        r5["GROUP"] = sLane;
-
-
-                        dt5.Rows.Add(r5);
-                        break;
-
-
-                    case "TARGETEXPOSED":
-                        r9 = dt9.NewRow();
-
-                        iPos = sLineText.IndexOf("NAME(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r9["NAME"] = sName;
-
-                        iPos = sLineText.IndexOf("TIMESTAMP(", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sTime = sLineText.Substring(iPos, iLen);
-                        r9["TIMESTAMP"] = sTime;
-
-                        iPos = sLineText.IndexOf("ATTRITION(", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sLane = sLineText.Substring(iPos, iLen);
-                        r9["ATTRITION"] = sLane;
-
-
-                        dt9.Rows.Add(r9);
-                        break;
-
-                    case "TARGETCONCEALED":
-                        r10 = dt10.NewRow();
-
-                        iPos = sLineText.IndexOf("NAME(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r10["NAME"] = sName;
-
-                        iPos = sLineText.IndexOf("TIMESTAMP(", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sTime = sLineText.Substring(iPos, iLen);
-                        r10["TIMESTAMP"] = sTime;
-
-                        iPos = sLineText.IndexOf("KILL(", 0);
-                        iPos += 5;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sLane = sLineText.Substring(iPos, iLen);
-                        r10["KILL"] = sLane;
-
-
-                        dt10.Rows.Add(r10);
-                        break;
-
-                    case "MALFUNCTION":
-
-                        r7 = dt7.NewRow();
-
-                        iPos = sLineText.IndexOf("ADDRESS(", 0);
-                        iPos += 8;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r7["ADDRESS"] = sName;
-
-                        iPos = sLineText.IndexOf("TIMESTAMP(", 0);
-                        iPos += 10;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sName = sLineText.Substring(iPos, iLen);
-                        r7["TIMESTAMP"] = sName;
-
-                        iPos = sLineText.IndexOf("DEFINITION(", 0);
-                        iPos += 11;
-                        iPos2 = sLineText.IndexOf(")", iPos);
-                        iLen = iPos2 - iPos;
-                        sLane = sLineText.Substring(iPos, iLen);
-                        r7["DEFINITION"] = sLane;
-
-                        dt7.Rows.Add(r7);
-
-                        break;
-
-                    case "SCENARIOEND":
-                        break;
-
-
-
-                }
-
-
-
-
             }
 
+            //Pull out relevant lines of the log file to add to the database
+
+            // Add SCENARIOSTART
+            foreach (var line in logLines)
+            {
+                if (line.Contains("SCENARIOSTART:"))
+                {
+                    scenario_start_row = dt8.NewRow();
+
+                    String[] scenStartSplit = splitLine(line);
+                    foreach (var item in scenStartSplit)
+                    {
+                        if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            scenario_start_row["TIMESTAMP"] = addTag(item);
+                        }
+                        else if (item.IndexOf("NAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            scenario_start_row["NAME"] = addTag(item);
+                        }
+                    }
+                    dt8.Rows.Add(scenario_start_row);
+                }
+            }
+
+            // Add SHOOTER
+            foreach (var line in logLines)
+            {
+                if (line.Contains("SHOOTER:"))
+                {
+                    shooter_row = dt1.NewRow();
+                    spotter_row = dt6.NewRow();
+
+                    String[] shooterSplit = splitLine(line);
+                    String shooterType = "";
+                    //If the shooterType is shooter add additional shooter attributes
+                    if (line.IndexOf("TYPE(Shooter)", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        shooterType = "shooter";
+                    }
+                    else if ((line.IndexOf("TYPE(Spotter)", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        shooterType = "spotter";
+                    }
+                    foreach (var item in shooterSplit)
+                    {
+                        if (shooterType == "shooter" || shooterType == "")
+                        {
+                            // Look for indexes while ignoring case and add them to the data tables
+                            if (item.IndexOf("FIRSTNAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["FIRSTNAME"] = addTag(item);
+                            }
+                            else if (item.IndexOf("LASTNAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["LASTNAME"] = addTag(item);
+                            }
+                            else if (item.IndexOf("GROUP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooterGroups.Add(addTag(item));
+                                shooter_row["GROUP"] = addTag(item);
+                            }
+                            else if (item.IndexOf("UNIT(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["UNIT"] = addTag(item);
+                            }
+                            else if (item.IndexOf("GROUP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["GROUP"] = addTag(item);
+                            }
+                            else if (item.IndexOf("IDCODE(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["IDCode"] = addTag(item);
+                                sIDCodes.Add(addTag(item)); // store this for opening multiple reports
+                            }
+                            else if (item.IndexOf("MIDDLE(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["MIDDLE"] = addTag(item);
+                            }
+                            else if (item.IndexOf("RANK(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["RANK"] = addTag(item);
+                            }
+                            else if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["DATE"] = addTag(item);
+                            }
+                            else if (item.IndexOf("SSN(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["SSN"] = addTag(item);
+                            }
+                            else if (item.IndexOf("ORDER(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["ORDER"] = addTag(item);
+                            }
+                            else if (item.IndexOf("LANE(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["LANE"] = addTag(item);
+                            }
+                        }
+                        else if (shooterType == "spotter")
+                        {
+                            // Look for indexes while ignoring case and add them to the data tables
+                            if (item.IndexOf("FIRSTNAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                spotter_row["FIRSTNAME"] = addTag(item);
+                            }
+                            else if (item.IndexOf("LASTNAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                spotter_row["LASTNAME"] = addTag(item);
+                            }
+                            else if (item.IndexOf("GROUP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                spotter_row["GROUP"] = addTag(item);
+                            }
+                        }
+                    }
+                    // Add to the appropriate table if 
+                    if (shooterType == "spotter")
+                    {
+                        dt6.Rows.Add(spotter_row);
+                    }
+                    else if (shooterType == "shooter" || shooterType == "")
+                    {
+                        dt1.Rows.Add(shooter_row);
+                    }
+                }
+            }
+
+            // Add TARGET
+            foreach (var line in logLines)
+            {
+                if (line.Contains("TARGET:"))
+                {
+                    target_row = dt5.NewRow();
+
+                    String[] targetSplit = splitLine(line);
+                    String thisTargetName = "";
+                    String[] groups = { "", "" };
+                    String sGroup = "";
+                    foreach (var item in targetSplit)
+                    {
+                        if (item.IndexOf("RANGE(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            target_row["RANGE"] = addTag(item);
+                        }
+                        else if (item.IndexOf("NAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            thisTargetName = addTag(item);
+                            target_row["NAME"] = thisTargetName;
+                        }
+                        else if (item.IndexOf("GROUP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            groups = addTag(item).Split(' ');
+                            foreach (var piece in groups)
+                            {
+                                if (shooterGroups.Contains(piece))
+                                {
+                                    sGroup = piece;
+                                }
+                            }
+                        }
+                    }
+                    // Only add a new row if this target hasn't been added yet
+                    if (!dt5.Rows.Contains(thisTargetName))
+                    {
+                        dt5.Rows.Add(target_row);
+                    }
+                    // add multiple groups
+                    for (int i = 0; i < groups.Length; i++)
+                    {
+                        if (sGroup != groups[i])
+                        {
+                            group_row = dt11.NewRow();
+                            group_row["TARGET_NAME"] = thisTargetName;
+                            group_row["SHOOTER_GROUP"] = sGroup;
+                            group_row["OTHER_GROUP"] = groups[i];
+
+                            dt11.Rows.Add(group_row);
+                        }
+                    }
+                }
+            }
+
+            // Add TargetConcealed
+            foreach (var line in logLines)
+            {
+                if (line.Contains("TARGETCONCEALED:"))
+                {
+                    target_concealed_row = dt10.NewRow();
+
+                    String[] tarConSplit = splitLine(line);
+                    foreach (var item in tarConSplit)
+                    {
+                        if (item.IndexOf("NAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            target_concealed_row["NAME"] = addTag(item);
+                        }
+                        if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            target_concealed_row["TIMESTAMP"] = addTag(item);
+                        }
+                        if (item.IndexOf("KILL(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            target_concealed_row["KILL"] = addTag(item);
+                        }
+                    }
+                    dt10.Rows.Add(target_concealed_row);
+                }
+            }
+
+            // Add TASKSTART
+             for (int i = 0; i < logLines.Count; i++)
+            {
+                String hitLine = "";
+                if (logLines.ElementAt(i).Contains("TASKSTART:"))
+                {
+                    task_start_row = dt3.NewRow();
+                    //table_row = dt12.NewRow();
+                    //task_row = dt13.NewRow();
+                    
+
+                    String[] taskStartSplit = splitLine(logLines.ElementAt(i));
+                    String sTable = "";
+                    String sRow = "";
+                    String sRound = "";
+                    String sTask = "";
+                    foreach (var item in taskStartSplit)
+                    {
+                        if (item.IndexOf("TABLE(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            sTable = addTag(item);
+                            //table_row["TABLE_ID"] = sTable;
+                            task_start_row["TABLE"] = sTable;
+                            //task_row["TABLE_ID"] = sTable;
+                        }
+                        if (item.IndexOf("TASK(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            sTask = addTag(item);
+                            task_start_row["TASK"] = sTask;
+                            //task_row["TASK_ID"] = sTask;
+                        }
+                        if (item.IndexOf("ROW(", StringComparison.OrdinalIgnoreCase) >= 0)  // Range needs to be changed to Row
+                        {
+                            sRow = addTag(item);
+                            task_start_row["ROW"] = sRow;
+                            //task_row["ROW"] = sRow;
+                        }
+                        if (item.IndexOf("ROUND(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            sRound = addTag(item);
+                            task_start_row["ROUND"] = sRound;
+                            //task_row["ROUND"] = sRound;
+                        }
+                        if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            task_start_row["TIMESTAMP"] = addTag(item);
+                            //task_row["TIMESTAMP"] = addTag(item);
+                        }
+                    }
+                    //Make sure that there are no duplicate rows already in the datatable
+                    //  If there are, then they must be deleted from the table.
+                    exp = "TABLE = '" + sTable + "' AND TASK = '" + sTask + "' AND ROW = '" + sRow + "' AND ROUND = '" + sRound + "'";
+                    foundRows = dt3.Select(exp);
+                    //int i = foundRows[0].ToString;
+                    if (foundRows.Length > 0)
+                        foundRows[0].Delete();
+
+                    dt3.Rows.Add(task_start_row);
+                    //dt13.Rows.Add(task_row);
+
+                    /*int j = 0;
+                    while (!logLines.ElementAt(i + j).Contains("TASKEND:"))
+                    {
+                        if (logLines.ElementAt(i + j).Contains("HIT:"))
+                        {
+                            hit_row = dt2.NewRow();
+                            hitLine = logLines.ElementAt(i + j);
+                            // add hit count here
+                            String[] hitTaskSplit = splitLine(hitLine);
+                            foreach (var item in hitTaskSplit)
+                            {
+                                if (item.IndexOf("NAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    hit_row["NAME"] = addTag(item);
+                                }
+                                else if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    hit_row["TIMESTAMP"] = addTag(item);
+                                }
+                                // Increase hit count of this table/task
+
+                            }
+                            hit_row["TASK_ID"] = sTask;
+                            hit_row["TABLE_ID"] = sTable;
+                            hit_row["ROW"] = sRow;
+                            // Increase hit counter of this table/task/row
+                            string expression = "TASK_ID = " + sTable + " and TABLE_ID = " + sTask;
+                            DataRow[] selectedRows = dt13.Select(expression);
+                            if (selectedRows.Count() > 0)
+                            {
+                                int counter = (int)selectedRows[0]["HIT_COUNT"];
+                                counter++;
+                                selectedRows[0]["HIT_COUNT"] = counter;
+                            }
+                            dt2.Rows.Add(hit_row);
+                        }
+                        j++;
+                    }*/
+                }
+            }
+
+            // Add TargetExposed
+            foreach (var line in logLines)
+            {
+                if (line.Contains("TARGETEXPOSED:"))
+                {
+                    target_exposed_row = dt9.NewRow();
+
+                    String[] tarExpSplit = splitLine(line);
+                    foreach (var item in tarExpSplit)
+                    {
+                        if (item.IndexOf("NAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            target_exposed_row["NAME"] = addTag(item);
+                        }
+                        if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            target_exposed_row["TIMESTAMP"] = addTag(item);
+                        }
+                        if (item.IndexOf("ATTRITION(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            target_exposed_row["ATTRITION"] = addTag(item);
+                        }
+                    }
+                    dt9.Rows.Add(target_exposed_row);
+                }
+            }
+
+
+            // Add TASKEND
+            /*for (int i = 0; i < logLines.Count; i++)
+            {
+                String hitLine = "";
+                if (logLines.ElementAt(i).Contains("TASKEND:"))
+                {
+                    task_end_row = dt4.NewRow();
+                    int j = 0;
+                    while (!logLines.ElementAt(i - j).Contains("TASKSTART:"))
+                    {
+                        if (logLines.ElementAt(i - j).Contains("HIT:"))
+                        {
+                            hitLine = logLines.ElementAt(i - j);
+                            // add hit count here
+                            String[] hitTaskSplit = splitLine(hitLine);
+                            foreach (var item in hitTaskSplit)
+                            {
+                                if (item.IndexOf("NAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                                {
+                                    task_end_row["HIT_NAME"] = addTag(item);
+                                }
+                            }
+                        }
+                        j++;
+                    }
+                    String[] taskEndSplit = splitLine(logLines.ElementAt(i));
+                    String tTable = "";
+                    String tRange = "";
+                    String tRound = "";
+                    String tTask = "";
+                    foreach (var item in taskEndSplit)
+                    {
+                        if (item.IndexOf("TABLE(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            tTable = addTag(item);
+                            task_end_row["TABLE"] = tTable;
+                        }
+                        if (item.IndexOf("TASK(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            tTask = addTag(item);
+                            task_end_row["TASK"] = tTask;
+                        }
+                        if (item.IndexOf("ROW(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            tRange = addTag(item);
+                            task_end_row["ROW"] = tRange;
+                        }
+                        if (item.IndexOf("ROUND(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            tRound = addTag(item);
+                            task_end_row["ROUND"] = tRound;
+                        }
+                        if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            task_end_row["TIMESTAMP"] = addTag(item);
+                        }
+                    }
+
+                    //Make sure that there are no duplicate rows already in the datatable
+                    //  If there are, then they must be deleted from the table.
+                    exp = "TABLE = '" + tTable + "' AND TASK = '" + tTask + "' AND ROW = '" + tRange + "' AND ROUND = '" + tRound + "'";
+                    foundRows = dt4.Select(exp);
+                    //int i = foundRows[0].ToString;
+                    if (foundRows.Length > 0)
+                        foundRows[0].Delete();
+
+                    dt4.Rows.Add(task_end_row);
+                }
+                
+            }*/
+
+            foreach (var line in logLines)
+            {
+                if (line.Contains("TASKEND:"))
+                {
+                    task_end_row = dt4.NewRow();
+
+                    String[] taskEndSplit = splitLine(line);
+                    String tTable = "";
+                    String tRange = "";
+                    String tRound = "";
+                    String tTask = "";
+                    foreach (var item in taskEndSplit)
+                    {
+                        if (item.IndexOf("TABLE(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            tTable = addTag(item);
+                            task_end_row["TABLE"] = tTable;
+                        }
+                        if (item.IndexOf("TASK(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            tTask = addTag(item);
+                            task_end_row["TASK"] = tTask;
+                        }
+                        if (item.IndexOf("ROW(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            tRange = addTag(item);
+                            task_end_row["ROW"] = tRange;
+                        }
+                        if (item.IndexOf("ROUND(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            tRound = addTag(item);
+                            task_end_row["ROUND"] = tRound;
+                        }
+                        if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            task_end_row["TIMESTAMP"] = addTag(item);
+                        }
+                    }
+
+                    //Make sure that there are no duplicate rows already in the datatable
+                    //  If there are, then they must be deleted from the table.
+                    exp = "TABLE = '" + tTable + "' AND TASK = '" + tTask + "' AND ROW = '" + tRange + "' AND ROUND = '" + tRound + "'";
+                    foundRows = dt4.Select(exp);
+                    //int i = foundRows[0].ToString;
+                    if (foundRows.Length > 0)
+                        foundRows[0].Delete();
+
+                    dt4.Rows.Add(task_end_row);
+                }
+            }
+
+            // Add HIT
+            foreach (var line in logLines)
+            {
+                if (line.Contains("HIT:"))
+                {
+                    hit_row = dt2.NewRow();
+
+                    String[] hitSplit = splitLine(line);
+                    foreach (var item in hitSplit)
+                    {
+                        if (item.IndexOf("NAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            hit_row["NAME"] = addTag(item);
+                        }
+                        if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            // Find table and task according to the timestamp.
+                            DateTime hitTime = ConvertDateTime(addTag(item));
+                            //string expression = "1=1";
+                            //DataRow[] selectedRows = dt3.Select(expression);  //dt3 - taskstart, dt4 - taskend
+                            foreach (var row in dt3.Rows)
+                            {
+                                DateTime taskStartTime = ConvertDateTime(((WindowsFormsApplication1.DataSet1.TASKSTARTRow)(row)).TIMESTAMP);
+                                String taskStartTable = ((WindowsFormsApplication1.DataSet1.TASKSTARTRow)(row)).TABLE;
+                                String taskStartTask = ((WindowsFormsApplication1.DataSet1.TASKSTARTRow)(row)).TASK;
+                                String taskExpression = "TABLE = '" + taskStartTable + "' AND TASK = '" + taskStartTask + "'";
+                                DataRow[] taskEndRows = dt4.Select(taskExpression);
+                                DateTime taskEndTime = ConvertDateTime(((WindowsFormsApplication1.DataSet1.TASKENDRow)(taskEndRows[0])).TIMESTAMP);
+                                // Find the taskstart and taskend objects that the hit timestamp falls between
+                                if (hitTime > taskStartTime && hitTime < taskEndTime)
+                                {
+                                    hit_row["TABLE_ID"] = taskStartTable;
+                                    hit_row["TASK_ID"] = taskStartTask;
+                                }
+                            }
+                            hit_row["TIMESTAMP"] = hitTime;
+                        }
+                        /*if (item.IndexOf("TABLE(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            hit_row["TABLE_ID"] = addTag(item);
+                        }
+                        if (item.IndexOf("TASK(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            hit_row["TASK_ID"] = addTag(item);
+                        }*/
+                    }
+                    dt2.Rows.Add(hit_row);
+                }
+            }
+
+            // Add MALFUNCTION
+            foreach (var line in logLines)
+            {
+                if (line.Contains("MALFUNCTION:"))
+                {
+                    malfunction_row = dt7.NewRow();
+
+                    String[] malSplit = splitLine(line);
+                    foreach (var item in malSplit)
+                    {
+                        if (item.IndexOf("ADDRESS(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            malfunction_row["ADDRESS"] = addTag(item);
+                        }
+                        if (item.IndexOf("TIMESTAMP(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            malfunction_row["TIMESTAMP"] = addTag(item);
+                        }
+                        if (item.IndexOf("DEFINITION(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            malfunction_row["DEFINITION"] = addTag(item);
+                        }
+                    }
+                    dt7.Rows.Add(malfunction_row);
+                }
+            }
+
+            //Test data
+            /*for (int i = 1; i < 6; i++)
+            {
+                table_row = dt12.NewRow();
+                table_row["TABLE"] = 1;
+                table_row["TASK"] = i.ToString();
+                table_row["ROW"] = "Row" + i;
+                if (i % 2 == 0)
+                {
+                    table_row["HITS"] = "X";
+                }
+                table_row["ROUND"] = "None";
+                dt12.Rows.Add(table_row);
+            }
+
+            for (int i = 1; i < 6; i++)
+            {
+                table_row = dt12.NewRow();
+                table_row["TABLE"] = 2;
+                table_row["TASK"] = i.ToString();
+                table_row["ROW"] = "Row" + i;
+                if (i % 3 == 0)
+                {
+                    table_row["HITS"] = "X";
+                }
+                table_row["ROUND"] = "None";
+                dt12.Rows.Add(table_row);
+            }*/
             
-            //for (i = 0; i <= iElement; i++)
-            //{
-            //CrystalReport3 cryRpt = new CrystalReport3();
-            //Report_DA_Form_3595R cryRpt0 = new Report_DA_Form_3595R();
-            //Report_DA_Form_3601R cryRpt1 = new Report_DA_Form_3601R();
-            //Report_DA_Form_5241R cryRpt2 = new Report_DA_Form_5241R();
-            //Report_DA_Form_7643R cryRpt3 = new Report_DA_Form_7643R();
-            //Report_DA_Form_7644R cryRpt4 = new Report_DA_Form_7644R();
-            //Report_DA_Form_7645R cryRpt5 = new Report_DA_Form_7645R();
-            //Report_DA_Form_7646R cryRpt6 = new Report_DA_Form_7646R();
-            //Report_DA_Form_7448R cryRpt7 = new Report_DA_Form_7448R();
-            //Report_DA_Form_7449R cryRpt8 = new Report_DA_Form_7449R();
-            //Report_DA_Form_7537R cryRpt9 = new Report_DA_Form_7537R();
-            //Report_DA_Form_7521R cryRpt10 = new Report_DA_Form_7521R();
-            //Report_DA_Form_7520R cryRpt11 = new Report_DA_Form_7520R();
-            //Report_DA_Form_7519R cryRpt12 = new Report_DA_Form_7519R();
-            //Report_DA_Form_7518R cryRpt13 = new Report_DA_Form_7518R();
-            //Report_DA_Form_7450R cryRpt14 = new Report_DA_Form_7450R();
-            //Report_DA_Form_7451R cryRpt15 = new Report_DA_Form_7451R();
-            //Report_DA_Form_88R cryRpt16 = new Report_DA_Form_88R();
-            //Report_DA_Form_85R cryRpt17 = new Report_DA_Form_85R();
-            //Report_DA_Form_7304R cryRpt18 = new Report_DA_Form_7304R();
-            //Report_MALFUNCTION cryRpt19 = new Report_MALFUNCTION();
-            //Report_Firing_Order_Summary cryRpt20 = new Report_Firing_Order_Summary();
-
-            //sSelected = cbReportList.SelectedItem.ToString();
-            //switch (sSelected)
-            //{
-            //    case "DA Form 3595R":
-            //        cryRpt0.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt0;
-            //        break;
-
-            //    case "DA Form 3601R":
-            //        cryRpt1.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt1;
-            //        break;
-
-            //    case "DA Form 5241R":
-            //        cryRpt2.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt2;
-            //        break;
-
-            //    case "DA Form 7643R":
-            //        cryRpt3.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt3;
-            //        break;
-
-            //    case "DA Form 7644R":
-            //        cryRpt4.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt4;
-            //        break;
-
-            //    case "DA Form 7645R":
-            //        cryRpt5.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt5;
-            //        break;
-
-            //    case "DA Form 7646R":
-            //        cryRpt6.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt6;
-            //        break;
-
-            //    case "DA Form 7518R":
-            //        cryRpt7.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt7;
-            //        break;
-
-            //    case "DA Form 7519R":
-            //        cryRpt8.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt8;
-            //        break;
-
-            //    case "DA Form 7520R":
-            //        cryRpt9.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt9;
-            //        break;
-
-            //    case "DA Form 7521R":
-            //        cryRpt10.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt10;
-            //        break;
-
-            //    case "DA Form 7537R":
-            //        cryRpt11.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt11;
-            //        break;
-
-            //    case "DA Form 7448R":
-            //        cryRpt12.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt12;
-            //        break;
-
-            //    case "DA Form 7449R":
-            //        cryRpt13.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt13;
-            //        break;
-
-            //    case "DA Form 7450R":
-            //        cryRpt14.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt14;
-            //        break;
-
-            //    case "DA Form 7451R":
-            //        cryRpt15.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt15;
-            //        break;
-
-            //    case "DA Form 85R":
-            //        cryRpt16.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt16;
-            //        break;
-
-            //    case "DA Form 88R":
-            //        cryRpt17.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt17;
-            //        break;
-
-            //    case "DA Form 7304R":
-            //        cryRpt18.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt18;
-            //        break;
-
-            //    case "Malfunction":
-            //        cryRpt19.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt19;
-            //        break;
-
-            //    case "Firing Order Summary":
-            //        cryRpt20.SetDataSource(ds);
-            //        crystalReportViewer1.ReportSource = cryRpt20;
-            //        break;
-
-            //}
 
             ReportDocument cryRpt = new ReportDocument();
-            
+
             sFile = tbFileName.Text;
             Console.WriteLine("sFile loaded here " + sFile);
             cryRpt.Load(sFile);
@@ -641,23 +726,26 @@ namespace WindowsFormsApplication1
 
             cryRpt.SetDataSource(ds);
 
-            ParameterFields paramFields = new ParameterFields();
+            /*ParameterFields paramFields = new ParameterFields();
             ParameterField paramField = new ParameterField();
             ParameterDiscreteValue discreteVal = new ParameterDiscreteValue();
 
-
             paramField.ParameterFieldName = "IDCode_param";
 
+            // Run multiple reports
+            for (int i = 0; i < sIDCodes.Count; i++)
+            {
+                sIDCode = sIDCodes.ElementAt(i);
+                //sIDCode = sIDCodes[i];
+                discreteVal.Value = sIDCode;
+                paramField.CurrentValues.Add(discreteVal);
 
-            sIDCode = sIDCodes[0];
-            discreteVal.Value = sIDCode;
-            paramField.CurrentValues.Add(discreteVal);
+                crystalReportViewer1.ParameterFieldInfo.Clear();
+                crystalReportViewer1.ParameterFieldInfo.Add(paramField);
 
-            crystalReportViewer1.ParameterFieldInfo.Clear();
-            crystalReportViewer1.ParameterFieldInfo.Add(paramField);
-
-            paramField.HasCurrentValue = true;
-            crystalReportViewer1.Refresh();
+                paramField.HasCurrentValue = true;*/
+                crystalReportViewer1.Refresh();
+            //}
 
             //cryRpt.PrintToPrinter(1, false, 0, 0);
             //MessageBox.Show("Pause", "Go");
@@ -667,12 +755,26 @@ namespace WindowsFormsApplication1
 
         }
 
+        // Converts the log timestamp to a datetime data type
+        private DateTime ConvertDateTime(string dateTime)
+        {
+            int year = Convert.ToInt32(dateTime.Substring(0, 4));
+            int month = Convert.ToInt32(dateTime.Substring(5, 2));
+            int day = Convert.ToInt32(dateTime.Substring(8, 2));
+            int hour = Convert.ToInt32(dateTime.Substring(11, 2));
+            int minute = Convert.ToInt32(dateTime.Substring(14, 2));
+            int second = Convert.ToInt32(dateTime.Substring(17, 2));
+            DateTime newtime = new DateTime(year, month, day, hour, minute, second);
+            return newtime;
+        }
+
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            //tbLogFilePath.Text = "c:\\logfile_85.txt";
-            tbLogFilePath.Text = "C:\\Documents and Settings\\ATI\\Desktop\\Reports\\Test Logs\\20111004 Oct 04 2011 Scenario 11-01-37.txt";
-            tbFileName.Text = "C:\\Documents and Settings\\ATI\\My Documents\\Visual Studio 2010\\Projects\\SmartRangeReports\\SmartRangeReports\\Report_DA_Form_85R.rpt";
+            tbLogFilePath.Text = "C:\\Users\\Public\\Documents\\Log Files\\Reports Info\\Scenarios\\85-1.txt";
+            //tbLogFilePath.Text = "\\\\tao\\shellyb\\Shelly's VS Projects\\Reports Info\\Scenarios\\88-12.txt";
+            //tbLogFilePath.Text = "C:\\Users\\Chris\\Desktop\\Log Files\\TargetLogFiles\\85-1.txt";
+            tbFileName.Text = "C:\\Users\\ATI\\Documents\\Visual Studio 2010\\Projects\\SmartRangeReports\\85_Table.rpt";
 
         }
 
@@ -710,10 +812,6 @@ namespace WindowsFormsApplication1
             return iStartPos;
         }
 
-        private void cbReportList_SelectedIndexChanged(object sender, EventArgs e)
-        {
-        }
-
         private void button2_Click(object sender, EventArgs e)
         {
             string sFile = "";
@@ -742,6 +840,44 @@ namespace WindowsFormsApplication1
             tbLogFilePath.Text = sFile;
         }
 
+        /***************************************************
+         * Gets the string piece from between the parenthesis
+         * *************************************************/
+        private String addTag(String splitString)
+        {
+            int index1 = splitString.IndexOf('(');
+            int index2 = splitString.LastIndexOf(')');
+            String piece = splitString.Substring(index1 + 1, (index2 - index1) - 1);
+            return piece;
+        }
 
+        /***************************************************
+         * Splits the string to parse into nice components
+         * that contain the tag name and parenthesis.
+         * *************************************************/
+        private String[] splitLine(String inputLine)
+        {
+            String[] inputSplit = inputLine.Split(' ');
+            for (int i = 0; i < inputSplit.Length; i++)
+            {
+                int count = 1;
+                if (inputSplit[i] != "" && !inputSplit[i].EndsWith("),") && !inputSplit[i].EndsWith(")") && !inputSplit[i].EndsWith(":"))
+                {
+                    while (!inputSplit[i].Contains(")"))
+                    {
+                        inputSplit[i] = inputSplit[i] + " " + inputSplit[i + count];
+                        inputSplit[i + count] = "";
+                        count++;
+                    }
+                    i = i + count-1;
+                }
+            }
+            return inputSplit;
+        }
+
+        private void testButton_Click(object sender, EventArgs e)
+        {
+            Console.WriteLine("Page number: " + crystalReportViewer1.GetCurrentPageNumber());
+        }
     }
 }
