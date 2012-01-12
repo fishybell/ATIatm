@@ -11,11 +11,14 @@ namespace EepromGUI
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
+
         static void Main()
         {
+            MyTcpListener listener = new MyTcpListener();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new Form1());
         }
     }
 }
+

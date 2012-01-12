@@ -16,14 +16,20 @@ namespace EepromGUI
         NetworkStream stream;
         String ip = "";
         int port = 4422;
+        //int port = 4227;
+
         //instance of our delegate
         private static ProcessStatus _status;
+
         //our thread object
         private static Thread _thread;
+
         //our ISynchronizeInvoke object
         private static ISynchronizeInvoke _synch;
+
         //our delegate, which will be used to marshal our call to the UI thread for updating the UI
         public delegate void ProcessStatus(string Message, int status);
+
 
         /***********************************************
          * Constructor that helps set up interthread communication
@@ -38,11 +44,13 @@ namespace EepromGUI
         /***********************
          * Empty Constructor
          * ********************/
+
         public Eeprom()
         {
             _synch = null;
             _status = null;
         }
+
 
         /***************************************
          * Start a separate thread to listen for
@@ -58,7 +66,6 @@ namespace EepromGUI
             _thread.Start();
         }
 
-
         /*****************************************
          * Start the TCP/IP connection to the given machine
          * ***************************************/
@@ -68,7 +75,7 @@ namespace EepromGUI
             //Server server = new Server();
             IPHostEntry entry = Dns.GetHostEntry(machine);
             this.ip = entry.AddressList[0].ToString();
-            
+
             //Connect to a tcp socket
             try
             {
@@ -89,13 +96,13 @@ namespace EepromGUI
             }
         }
 
+
         /********************************
          * This creates a listener on a seperate 
          * thread to log incoming respones
          * ******************************/
         public void ListenForUpdates()
         {
-
             try
             {
                 // Create a TcpClient.
@@ -109,7 +116,6 @@ namespace EepromGUI
                 {
                     // Buffer to store the response bytes.
                     Byte[] data = new Byte[4096];
-
                     // String to store the response ASCII representation.
                     String responseData = String.Empty;
 
@@ -126,19 +132,18 @@ namespace EepromGUI
                             numberOfBytesRead = stream.Read(myReadBuffer, 0, myReadBuffer.Length);
 
                             myCompleteMessage.AppendFormat("{0}", Encoding.ASCII.GetString(myReadBuffer, 0, numberOfBytesRead));
-
                         }
                         while (stream.DataAvailable);
 
                         // Print out the received message to the console.
                         Console.WriteLine("Received: " + myCompleteMessage);
                         UpdateStatus(myCompleteMessage.ToString(), 0);
-
                     }
                     else
                     {
                         Console.WriteLine("Sorry.  You cannot read from this NetworkStream.");
                     }
+
                     // sleep 5 seconds
                     Thread.Sleep(5000);
                 }
@@ -158,6 +163,73 @@ namespace EepromGUI
             }
         }
 
+        /********************************
+         * This creates a listener on a seperate 
+         * thread to log incoming respones
+         * ******************************/
+        /*public void ListenForBroadcast()
+        {
+            try
+            {
+                // Create a TcpClient.
+                TcpListener listener = new TcpListener(4227);
+                //threadClient = new TcpClient(ip, port);
+
+                //threadStream = threadClient.GetStream();
+                //otherStream.ReadTimeout = 1500;
+
+                // Loop forever
+                while (true)
+                {
+                    // Buffer to store the response bytes.
+                    Byte[] data = new Byte[4096];
+                    // String to store the response ASCII representation.
+                    String responseData = String.Empty;
+
+                    // Check to see if this NetworkStream is readable.
+                    if (stream.CanRead)
+                    {
+                        byte[] myReadBuffer = new byte[1024];
+                        StringBuilder myCompleteMessage = new StringBuilder();
+                        int numberOfBytesRead = 0;
+
+                        // Incoming message may be larger than the buffer size.
+                        do
+                        {
+                            numberOfBytesRead = stream.Read(myReadBuffer, 0, myReadBuffer.Length);
+
+                            myCompleteMessage.AppendFormat("{0}", Encoding.ASCII.GetString(myReadBuffer, 0, numberOfBytesRead));
+                        }
+                        while (stream.DataAvailable);
+
+                        // Print out the received message to the console.
+                        Console.WriteLine("Received: " + myCompleteMessage);
+                        UpdateStatus(myCompleteMessage.ToString(), 0);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Sorry.  You cannot read from this NetworkStream.");
+                    }
+
+                    // sleep 5 seconds
+                    Thread.Sleep(5000);
+                }
+
+            }
+            catch (ArgumentNullException e)
+            {
+                Console.WriteLine("ArgumentNullException: {0}", e);
+            }
+            catch (SocketException e)
+            {
+                Console.WriteLine("SocketException: {0}", e);
+            }
+            catch (IOException e)
+            {
+                Console.WriteLine("IOException: {0}", e);
+            }
+        }*/
+
         /******************************************************
          * Update the GUI
          * ***************************************************/
@@ -168,6 +240,7 @@ namespace EepromGUI
             //populate our array with the parameters passed to our method
             items[0] = msg;
             items[1] = status;
+
             //call the delegate
             _synch.Invoke(_status, items);
         }
@@ -196,7 +269,6 @@ namespace EepromGUI
                 }
 
                 Console.WriteLine("Sent: {0}", message);
-
             }
             catch (ArgumentNullException e)
             {
@@ -229,7 +301,6 @@ namespace EepromGUI
                 _thread.Abort();
             }
         }
-
     }
-
 }
+
