@@ -16,13 +16,14 @@ namespace EepromGUI
         NetworkStream stream;
         String ip = "";
         int port = 4422;
-        //int port = 4227;
+        //int port = 4227; // broadcast port
 
         //instance of our delegate
         private static ProcessStatus _status;
 
         //our thread object
         private static Thread _thread;
+        private static Thread broadcast_thread;
 
         //our ISynchronizeInvoke object
         private static ISynchronizeInvoke _synch;
@@ -64,6 +65,13 @@ namespace EepromGUI
             _thread.IsBackground = true;
             _thread.Name = "Listen to TCP thread";
             _thread.Start();
+
+            //Start thread for listening for machines coming up
+            broadcast_thread = new System.Threading.Thread(ListenForBroadcast);
+            broadcast_thread.IsBackground = true;
+            broadcast_thread.Name = "Listen for Machines";
+            broadcast_thread.Start();
+
         }
 
         /*****************************************
@@ -165,70 +173,23 @@ namespace EepromGUI
 
         /********************************
          * This creates a listener on a seperate 
-         * thread to log incoming respones
+         * thread to log incoming broadcast machines
          * ******************************/
-        /*public void ListenForBroadcast()
+        public void ListenForBroadcast()
         {
-            try
+            IPEndPoint recvEp = new IPEndPoint(IPAddress.Any, 4227);
+            UdpClient udpResponse = new UdpClient(4227);
+            while (true)
             {
-                // Create a TcpClient.
-                TcpListener listener = new TcpListener(4227);
-                //threadClient = new TcpClient(ip, port);
+                Byte[] recvBytes = udpResponse.Receive(ref recvEp);
+                Console.WriteLine("Received: " + recvEp.Address);
+                UpdateStatus(recvEp.Address.ToString(), 0);
 
-                //threadStream = threadClient.GetStream();
-                //otherStream.ReadTimeout = 1500;
-
-                // Loop forever
-                while (true)
-                {
-                    // Buffer to store the response bytes.
-                    Byte[] data = new Byte[4096];
-                    // String to store the response ASCII representation.
-                    String responseData = String.Empty;
-
-                    // Check to see if this NetworkStream is readable.
-                    if (stream.CanRead)
-                    {
-                        byte[] myReadBuffer = new byte[1024];
-                        StringBuilder myCompleteMessage = new StringBuilder();
-                        int numberOfBytesRead = 0;
-
-                        // Incoming message may be larger than the buffer size.
-                        do
-                        {
-                            numberOfBytesRead = stream.Read(myReadBuffer, 0, myReadBuffer.Length);
-
-                            myCompleteMessage.AppendFormat("{0}", Encoding.ASCII.GetString(myReadBuffer, 0, numberOfBytesRead));
-                        }
-                        while (stream.DataAvailable);
-
-                        // Print out the received message to the console.
-                        Console.WriteLine("Received: " + myCompleteMessage);
-                        UpdateStatus(myCompleteMessage.ToString(), 0);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Sorry.  You cannot read from this NetworkStream.");
-                    }
-
-                    // sleep 5 seconds
-                    Thread.Sleep(5000);
-                }
-
+                // sleep 5 seconds
+                Thread.Sleep(5000);
             }
-            catch (ArgumentNullException e)
-            {
-                Console.WriteLine("ArgumentNullException: {0}", e);
-            }
-            catch (SocketException e)
-            {
-                Console.WriteLine("SocketException: {0}", e);
-            }
-            catch (IOException e)
-            {
-                Console.WriteLine("IOException: {0}", e);
-            }
-        }*/
+
+        }
 
         /******************************************************
          * Update the GUI
@@ -299,6 +260,10 @@ namespace EepromGUI
             if (_thread.IsAlive)
             {
                 _thread.Abort();
+            }
+            if (broadcast_thread.IsAlive)
+            {
+                broadcast_thread.Abort();
             }
         }
     }

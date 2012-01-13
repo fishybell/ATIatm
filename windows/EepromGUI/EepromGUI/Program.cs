@@ -14,7 +14,7 @@ namespace EepromGUI
 
         static void Main()
         {
-            MyTcpListener listener = new MyTcpListener();
+            //MyTcpListener listener = new MyTcpListener();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new Form1());
