@@ -223,6 +223,40 @@ FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", 0);
    return 0;
 }
 
+// sends all pending messages now (don't use normally)
+void Connection::forceQueueDump() {
+FUNCTION_START("::forceQueueDump()");
+    // send all items in queue
+    int times = 0, opts;
+    // generic file descriptor setup
+    opts = fcntl(fd, F_GETFL); // grab existing flags
+    if (opts < 0) {
+        IERROR("Could not get socket flags\n");
+        perror("fcntl(F_GETFL)");
+        exit(EXIT_FAILURE);
+    }
+    opts = (opts ^ O_NONBLOCK); // remove nonblock from existing flags
+    if (fcntl(fd, F_SETFL, opts) < 0) {
+        IERROR("Could not set socket to non-blocking\n");
+        perror("fcntl(F_SETFL)");
+        exit(EXIT_FAILURE);
+    }
+
+    while (!wbuf.empty()) {
+        DCMSG(MAGENTA, "Calling handleWrite...%i", times++);
+        handleWrite(NULL); // don't use an epoll_event
+        fsync(fd); // force flush, but don't read again
+    }
+    opts = (opts | O_NONBLOCK); // add in nonblock to existing flags
+    if (fcntl(fd, F_SETFL, opts) < 0) {
+        IERROR("Could not set socket to non-blocking\n");
+        perror("fcntl(F_SETFL)");
+        exit(EXIT_FAILURE);
+    }
+
+FUNCTION_END("::forceQueueDump()");
+}
+
 // the file descriptor is ready to receive the data, send it on through
 int Connection::handleWrite(const epoll_event *ev) {
 FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");

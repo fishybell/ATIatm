@@ -24,6 +24,7 @@ public:
    virtual void queueMsg(const char *msg, int size);
    void queueMsg(const void *msg, int size) {queueMsg((const char*)msg, size);} // auto-cast for various data pointers
    void finishMsg() {newMsg = true;}; // make the currently queued message a singular message (good for packet sending)
+   void forceQueueDump(); // sends all pending messages now (don't use normally)
    __uint64_t getUUID() {return uuid;};
    __uint32_t getRnum() {return rnum;};
    __uint16_t getTnum() {return tnum;};
