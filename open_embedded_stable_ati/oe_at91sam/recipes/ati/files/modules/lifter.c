@@ -953,9 +953,9 @@ void hit_event_internal(int line, bool upload) {
 	spin_unlock(hit_lock);
 
 	// send hits upstream
-	//    if (upload) {
-	queue_nl_multi(NL_C_HITS, &hits, sizeof(hits));
-	//    }
+   if (upload) {
+      queue_nl_multi(NL_C_HITS, &hits, sizeof(hits));
+   }
 
 	// go down if we need to go down
 	if (atomic_read(&hits_to_kill) > 0) {
