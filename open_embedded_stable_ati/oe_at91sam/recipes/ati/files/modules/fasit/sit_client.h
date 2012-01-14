@@ -93,7 +93,8 @@ private:
    // helper functions for filling out a 2102 status message
    void fillStatus2102(FASIT_2102 *msg);
    void sendStatus2102(int force);
-   void sendStatus2112(int on, int mode, int idelay, int rdelay) ;
+   void setStatus2112(int on, int mode, int idelay, int rdelay);
+   void sendStatus2112();
    void sendStatus13112(int on);
    void sendStatus14112(int on);
 
@@ -113,6 +114,8 @@ private:
 
    // place to save a copy of the last status message, so we can check for a change
    struct FASIT_2102b lastMsgBody;
+   struct FASIT_2112b lastMFSBody;
+   int sendMFSStatus;
    
    // hit calibration table (ours to theirs and back)
    static const u32 cal_table[16];

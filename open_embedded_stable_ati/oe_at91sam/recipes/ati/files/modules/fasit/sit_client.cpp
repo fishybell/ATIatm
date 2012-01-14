@@ -78,6 +78,7 @@ FUNCTION_START("::reInit()");
       */
 
 
+     sendMFSStatus = 0;
      if (start_config&PD_NES){
          doMFS(Eeprom::ReadEeprom(MFS_ACTIVATE_EXPOSE_LOC, MFS_ACTIVATE_EXPOSE_SIZE, MFS_ACTIVATE_EXPOSE),Eeprom::ReadEeprom(MFS_MODE_LOC, MFS_MODE_SIZE, MFS_MODE),Eeprom::ReadEeprom(MFS_START_DELAY_LOC, MFS_START_DELAY_SIZE, MFS_START_DELAY),Eeprom::ReadEeprom(MFS_REPEAT_DELAY_LOC, MFS_REPEAT_DELAY_SIZE, MFS_REPEAT_DELAY)); // on when fully exposed, burst, no delay, 2 seconds between bursts
      } else {
@@ -136,7 +137,7 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
     msg->body.type = 1; // SIT. TODO -- SIT vs. SAT vs. HSAT
 
     //   DCMSG(YELLOW,"before  doHits(-1)   hits = %d",hits) ;    
-    doHits(-1);  // request the hit count
+    //doHits(-1);  // request the hit count ... or not, it isn't needed or wanted
     //   DCMSG(YELLOW,"retrieved hits with doHits(-1) and setting to %d",hits) ; 
 
     // hit record
@@ -205,8 +206,26 @@ void SIT_Client::sendStatus2102(int force) {
     FUNCTION_END("::sendStatus2102()");
 }
 
-// create and send a status messsage to the FASIT server
-void SIT_Client::sendStatus2112(int on, int mode, int idelay, int rdelay) {
+// create and store a MFS status messsage to the FASIT server
+void SIT_Client::setStatus2112(int on, int mode, int idelay, int rdelay) {
+    FUNCTION_START("::setStatus2112()");
+
+    // overwrite existing values
+    lastMFSBody.on = on;
+    lastMFSBody.mode = mode ;
+    lastMFSBody.idelay = idelay;
+    lastMFSBody.rdelay = rdelay;
+
+    // force to send?
+    if (sendMFSStatus != 0) {
+       sendStatus2112();
+    }
+
+    FUNCTION_END("::setStatus2112()");
+}
+
+// send stored MFS status messsage to the FASIT server
+void SIT_Client::sendStatus2112() {
     FUNCTION_START("::sendStatus2112()");
 
     FASIT_header hdr;
@@ -220,11 +239,8 @@ void SIT_Client::sendStatus2112(int on, int mode, int idelay, int rdelay) {
     msg.response.rseq = resp_seq;
     resp_num = resp_seq = 0; // the next one will be unsolicited
 
-    msg.body.on = on;
-    msg.body.mode = mode ;
-    msg.body.idelay = idelay;
-    msg.body.rdelay = rdelay;
-    //      didMFS(&rmsg.body.on,&rmsg.body.mode,&rmsg.body.idelay,&rmsg.body.rdelay);
+    // use stored values
+    msg.body = lastMFSBody;
 
     DCMSG(BLUE,"Prepared to send 2112 status packet:");
     DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htonl(hdr.seq),htonl(hdr.rsrvd),htons(hdr.length));
@@ -239,6 +255,8 @@ void SIT_Client::sendStatus2112(int on, int mode, int idelay, int rdelay) {
     queueMsg(&msg, sizeof(FASIT_2112));
     finishMsg();
 
+    // don't send again until requested
+    sendMFSStatus = 0;
 
     FUNCTION_END("::sendStatus2112()");
 }
@@ -354,7 +372,11 @@ int SIT_Client::handle_100(int start, int end) {
     //retrieve the PD_NES flag from the kernel like Nate described -
     //now that I used a kludge to get those options into the device when
     //the sit_client was constructed during startup
-    msg.body.flags = 0;//PD_NES; // TODO -- find actual capabilities from command line
+    if (start_config&PD_NES){
+        msg.body.flags = PD_NES; // TODO -- find actual capabilities from command line
+    } else {
+        msg.body.flags = 0;
+    }
     //BDR   fasit_conn  has the command line option -S  that instaniates a
     //SIT handler.   It probably has to handle a bunch of possibilitys and
     //this part of code has to do the right thing
@@ -428,6 +450,8 @@ int SIT_Client::handle_2006(int start, int end) {
 int SIT_Client::handle_2100(int start, int end) {
     FUNCTION_START("::handle_2100(int start, int end)");
 
+    int r_num, r_seq;
+
     // map header and body for both message and response
     FASIT_header *hdr = (FASIT_header*)(rbuf + start);
     FASIT_2100 *msg = (FASIT_2100*)(rbuf + start + sizeof(FASIT_header));
@@ -483,7 +507,6 @@ int SIT_Client::handle_2100(int start, int end) {
           msg->cid,msg->exp,msg->asp,msg->dir,msg->move,msg->speed,msg->on,htons(msg->hit),msg->react,htons(msg->tokill),htons(msg->sens),msg->mode,htons(msg->burst));
 
     // do the event that was requested
-
     switch (msg->cid) {
         case CID_No_Event:
             DCMSG(RED,"CID_No_Event  send 'S'uccess ack") ; 
@@ -499,15 +522,22 @@ int SIT_Client::handle_2100(int start, int end) {
             break;
 
         case CID_Status_Request:
+            // remember and send back with all status messages
+            r_num = resp_num;
+            r_seq = resp_seq;
             // send 2102 status
             DCMSG(RED,"CID_Status_Request   send 2102 status") ; 
             sendStatus2102(1); // forces sending of a 2102
-            // AND/OR? send 2115 MILES shootback status if supported
-            if (acc_conf.acc_type == ACC_NES_MFS){
-                DCMSG(RED,"we also seem to have a MFS Muzzle Flash Simulator - TODO send 2112 status eventually") ; 
+            // send 2112 Muzzle Flash status if supported   
+            if (start_config&PD_NES){
+                resp_num = r_num;
+                resp_seq = r_seq;
+                DCMSG(RED,"we also seem to have a MFS Muzzle Flash Simulator - send 2112 status") ; 
+                sendStatus2112(); // forces sending of a 2112
             }
-            // AND/OR? send 2112 Muzzle Flash status if supported   
 
+            // force sending of all messages now (will block until they are sent)
+//            forceQueueDump();
             break;
 
         case CID_Expose_Request:
@@ -578,6 +608,7 @@ int SIT_Client::handle_2100(int start, int end) {
             // send 2102 status or change the hit count (which will send the 2102 later)
             if (hits == htons(msg->hit)) {
                 sendStatus2102(1);  // sends a 2102 as we won't if we didn't change the the hit count
+                //sendStatus2102(0);  // sends a 2102 only if we changed the the hit calibration
                 DCMSG(RED,"We will send 2102 status in response to the config hit sensor command"); 
             } else {
                 doHits(htons(msg->hit));    // set hit count to something other than zero
@@ -648,6 +679,10 @@ int SIT_Client::handle_2110(int start, int end) {
     FASIT_header *hdr = (FASIT_header*)(rbuf + start);
     FASIT_2110 *msg = (FASIT_2110*)(rbuf + start + sizeof(FASIT_header));
 
+    // save response numbers
+    resp_num = hdr->num; //  pulls the message number from the header  (htons was wrong here)
+    resp_seq = hdr->seq;
+
     DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
     DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nOn/Off | Mode | I-Delay | R-Delay\n%7d  %5d  %8d  %8d",
           msg->on,msg->mode,msg->idelay,msg->rdelay);
@@ -657,9 +692,8 @@ int SIT_Client::handle_2110(int start, int end) {
 
         doMFS(msg->on,msg->mode,msg->idelay,msg->rdelay);
 
-        // when the didMFS happens it will force a 2112 message to be sent
-
-
+        // when the didMFS happens fill in the 2112, force a 2112 message to be sent
+        sendMFSStatus = 1; // force
     } else {
         send_2101_ACK(hdr,'F');   // no muzzle flash capability, so send a negative ack
     }
@@ -1158,7 +1192,7 @@ void SIT_Client::didMFS(int exists,int on, int mode, int idelay, int rdelay) {
     // send status message to FASIT server
     DCOLOR(RED) ; // change color
     if (exists) {
-        sendStatus2112(on, mode, idelay, rdelay);
+        setStatus2112(on, mode, idelay, rdelay);
     } else {
 //        send_2101_ACK(hdr,'F'); // probably not really right
     }
