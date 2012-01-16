@@ -1,8 +1,6 @@
 # Makefile for the RF system
 
 
-
-
 default: mcp
 
 mcp : mcp.c minion.c mcp.h
@@ -10,3 +8,4 @@ mcp : mcp.c minion.c mcp.h
 
 clean:
 	$(RM) mcp *.o 
+

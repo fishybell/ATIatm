@@ -57,18 +57,19 @@ typedef struct minion_state {
     state_u16_item_t		dir;
     state_u8_item_t		move;
     state_float_item_t		speed;
+    //					hit configuration (aka sensor)
     state_u8_item_t		on;
-    state_u16_item_t	hit;
+    state_u16_item_t		hit;
     state_u8_item_t		react;
-    state_u16_item_t	tokill;
-    state_u16_item_t	sens;
+    state_u16_item_t		tokill;
+    state_u16_item_t		sens;
     state_u8_item_t		mode;
-    state_u16_item_t	burst;
+    state_u16_item_t		burst;
 // MISC
     state_u8_item_t		pos;
     state_u8_item_t		type;
     state_u8_item_t		hit_config;
-    state_u16_item_t	blanking;
+    state_u16_item_t		blanking;
 // MILES
     state_u8_item_t		miles_code;
     state_u8_item_t		miles_ammo;
@@ -77,8 +78,8 @@ typedef struct minion_state {
 // MFS
     state_u8_item_t		mfs_on;
     state_u8_item_t		mfs_mode;
-    state_u16_item_t	mfs_idelay;
-    state_u16_item_t	mfs_rdelay;
+    state_u16_item_t		mfs_idelay;
+    state_u16_item_t		mfs_rdelay;
 // MGS
     state_u8_item_t		mgs_on;
 // PHI
@@ -124,12 +125,9 @@ typedef struct minion {
 	FILE	pipe;
 } minion_t;
 
-
 void *minion_thread(thread_data_t * );
 
 #define MAX_NUM_Minions 100
-
-
 
 //  colors for the DCMSG  
 #define black	0
@@ -164,6 +162,15 @@ void *minion_thread(thread_data_t * );
 
 #define CPRINT_HEXB(SC,data, size)  { if (C_DEBUG) {{ \
 					fprintf(stdout, "DEBUG:\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
+					char *_data = (char*)data; \
+					for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
+					fprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
+				    }; fflush(stdout); }}
+
+
+
+#define DCMSG_HEXB(SC,hbuf,data, size)  { if (C_DEBUG) {{ \
+					fprintf(stdout, "%s:\x1B[3%d;%dm 0x",hbuf,(SC)&7,((SC)>>3)&1); \
 					char *_data = (char*)data; \
 					for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
 					fprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \

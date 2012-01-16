@@ -36,20 +36,22 @@ uint64 htonll( uint64 id){
 }
 
 int main(int argc, char **argv) {
-    int i, rc, mID,child,result,msglen,highest_minion,minnum;
+    int i, rc, mID,child,result,msglen,highest_minion,minnum,error;
     char buf[1024];
     char cbuf[1024];
     fd_set minion_fds;
     int minions_ready;
     struct timeval timeout;
 
+    // MAX_NUM_Minions must be greater than minnum
     minnum = 1;
-    
+
+    DCMSG(RED,"MCP will start  %d minions",minnum);
+
     // loop until somebody wants to exit, or something
     while(1) {
 
 	// determine what slaves are out there
-
 	// lets only make minnum minions, so they don't take over the system like magic brooms are likely to do
 	for (mID=0; mID<minnum; mID++) {
 	    // if we have a new slave, make a minion for it
@@ -70,16 +72,19 @@ int main(int argc, char **argv) {
 	    if ((child = fork()) == -1) perror("fork");
 	    else if (child) {
 		/* This is the parent. */
+		DCMSG(RED,"MCP forked minion %d", mID);
 		close(minions[mID].mcp_sock);
 		
 		msglen=read(minions[mID].minion, buf, 1023);
+		error=errno;
 		if (msglen > 0) {
 		    buf[msglen]=0;
 		    DCMSG(RED,"MCP received %d chars from minion %d -->%s<--",msglen, mID, buf);
 		} else if (!msglen) {
-		    DCMSG(RED,"MCP minion %d socket closed, minion has been DE-REZZED !", mID);
+		    DCMSG(RED,"MCP minion %d socket closed, minion has been DE-REZZED !  errno=%d", mID,error);
 		    close(minions[mID].minion);
-		    minions[mID].status=S_closed;		    
+		    minions[mID].status=S_closed;
+		    break;
 		} else {
 		    perror("reading stream message");
 		}
@@ -103,7 +108,7 @@ int main(int argc, char **argv) {
 	    }
 	}
 
-#if 0	
+#if 1
 	//  at this point we have a bunch of minions with open connections that
 	//  we should be able to exploit.
 	for (mID=0; mID<minnum; mID++){

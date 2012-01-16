@@ -2,7 +2,7 @@ In fasit.h there are the structures:
 
 //  from ICD.FASIT.SYS 2.1
 /* 100 - Device Definition Request          */
-  FASIT_100
+  FASIT_100		SENT BY SR
 FC 
   a PD    responds with 2111 
   a PYRO  will respond with 2005 (not done)
