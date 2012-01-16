@@ -1,0 +1,97 @@
+#!/usr/bin/tclsh
+package require Expect
+package require Tclx
+fconfigure stdin -blocking 1            ;#expect bug?
+
+set targets {}
+if  {$argc != 0} {
+    # passed in list of targets, use it verbatim
+    set targets $argv
+} else {
+    # ask for first and last then generate list of targets
+    puts -nonewline "first one (samXXX)? "
+    flush stdout
+    gets stdin num1
+    puts -nonewline "last one (samXXX)? "
+    flush stdout
+    gets stdin num2
+
+    # find list of targets
+    if {![string match sam* $num1] || ![string match sam* $num2]} {
+        puts "invalid sam numbers: $num1 $num2"
+        exit
+    }
+    scan [string trimleft $num1 samw] %x n1 ;# cut out sam or samw from start, convert from hex
+    scan [string trimleft $num2 samw] %x n2 ;# cut out sam or samw from start, convert from hex
+    if {$n1 > $n2} {
+        # we're reversed, flip order
+        set n3 $n2
+        set n2 $n1
+        set n1 $n3
+        set num3 $num2
+        set num2 $num1
+        set num1 $num3
+    }
+    set w1 [string match samw* $num1] ;# remember if I was a samw
+    set w2 [string match samw* $num2] ;# remember if I was a samw
+    if {[expr $w1 + $w2] == 1} {
+        puts "can't count from $num1 to $num2"
+        exit
+    }
+    set sam "sam"
+    if {$w1} {set sam "samw"}
+
+    # generate list
+    for {set i $n1} {$i <= $n2} {incr i} {
+        lappend targets "$sam[format %x $i]"
+    }
+}
+
+# debug, put out list of targets
+#foreach target $targets {
+#    puts $target
+#}
+#exit
+
+# ask for ip address and connect port
+puts -nonewline "IP Address? "
+flush stdout
+gets stdin ip
+puts -nonewline "Connect Port? "
+flush stdout
+gets stdin port
+puts "ip: $ip, port: $port"
+
+# confirm programming
+puts "About to program $ip:$port onto $targets"
+puts -nonewline "Is this correct (y/N)? " 
+flush stdout
+gets stdin ans
+if {[string tolower [string index $ans 0]] != "y"} {
+    exit
+}
+
+# copy to each target in order
+set timeout 2
+foreach host $targets {
+    puts "####################################################################"
+    puts "# Configuring $host"
+    puts "####################################################################"
+
+    # ssh over, stop, exit ssh
+    if {[spawn telnet $host 4422] != 0} {
+        expect {
+            -re "Escape.*" { send "i i $ip\r" }
+            timeout { puts "!!! $host is down !!!" ; continue}
+        }
+        expect "I I $ip"
+        send "i c $port\r"
+        expect "I C $port"
+        send "i r\r"
+        expect "I R"
+        close
+    } else {
+        puts "!!! Couldn't configure $host !!!"
+    }
+}
+

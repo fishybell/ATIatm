@@ -1,0 +1,97 @@
+#!/usr/bin/tclsh
+package require Expect
+package require Tclx
+fconfigure stdin -blocking 1            ;#expect bug?
+
+if  {$argc == 2} {
+    lassign $argv num1 num2
+} else {
+    puts -nonewline "first one (samXXX)? "
+    flush stdout
+    gets stdin num1
+    puts -nonewline "last one (samXXX)? "
+    flush stdout
+    gets stdin num2
+}
+
+# find list of targets
+if {![string match sam* $num1] || ![string match sam* $num2]} {
+    puts "invalid sam numbers: $num1 $num2"
+    exit
+}
+scan [string trimleft $num1 samw] %x n1 ;# cut out sam or samw from start, convert from hex
+scan [string trimleft $num2 samw] %x n2 ;# cut out sam or samw from start, convert from hex
+if {$n1 > $n2} {
+    # we're reversed, flip order
+    set n3 $n2
+    set n2 $n1
+    set n1 $n3
+    set num3 $num2
+    set num2 $num1
+    set num1 $num3
+}
+set w1 [string match samw* $num1] ;# remember if I was a samw
+set w2 [string match samw* $num2] ;# remember if I was a samw
+if {[expr $w1 + $w2] == 1} {
+    puts "can't count from $num1 to $num2"
+    exit
+}
+set sam "sam"
+if {$w1} {set sam "samw"}
+
+# debug, put out list of targets
+#for {set i $n1} {$i <= $n2} {incr i} {
+#    puts "$sam[format %x $i]" 
+#}
+#exit
+
+# remember expect string for doing the ssh/scp session
+set dossh {
+    while 1 {
+        expect {
+            -re {.*word:.*} {
+                send "shoot\r"
+            }
+            -re {.*yes/no.*} {
+                send "yes\r"
+            }
+            eof {
+                break
+            }
+        }
+    }
+}
+
+# copy to each target in order
+for {set i $n1} {$i <= $n2} {incr i} {
+    set host "$sam[format %x $i]"
+    puts "####################################################################"
+    puts "# Copying to $host"
+    puts "####################################################################"
+
+    # clear out of remembered key
+    system sed -i -e "s/^$host.*//" ~/.ssh/known_hosts
+
+    # ssh over, stop, exit ssh
+    spawn ssh root@$host /usr/bin/stop
+    eval $dossh
+
+    # copy ati
+    cd oe_at91sam/recipes/ati/files/modules
+    eval spawn scp user_conn bit_button fasit_conn event_conn bcast_server bcast_client root@$host:/usr/bin
+    eval $dossh
+    eval spawn scp [glob *.ko] root@$host:/home/root
+    eval $dossh
+
+    # copy ati2
+    cd ../../../ati2
+    eval spawn scp [glob files/be_* ] [glob files/is_* ] [glob files/has_* ] files/TTMT files/BASE files/EIM files/HHC [glob files/load_*] files/unload files/SES files/SIT files/SAT files/MIT files/MAT files/start files/stop files/restart root@$host:/usr/bin
+    eval $dossh
+
+    # ssh over, start, exit ssh
+    spawn ssh root@$host /usr/bin/start
+    eval $dossh
+
+    cd ../../..
+}
+
