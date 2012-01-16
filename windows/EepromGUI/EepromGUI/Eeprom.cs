@@ -59,19 +59,22 @@ namespace EepromGUI
          * ************************************/
         public void StartProcess(String machine)
         {
-            IPHostEntry entry = Dns.GetHostEntry(machine);
-            this.ip = entry.AddressList[0].ToString();
+            //IPHostEntry entry = Dns.GetHostEntry(machine);
+            //this.ip = entry.AddressList[0].ToString();
+            this.ip = machine;
             _thread = new System.Threading.Thread(ListenForUpdates);
             _thread.IsBackground = true;
             _thread.Name = "Listen to TCP thread";
             _thread.Start();
+        }
 
+        public void StartBroadCastListen()
+        {
             //Start thread for listening for machines coming up
             broadcast_thread = new System.Threading.Thread(ListenForBroadcast);
             broadcast_thread.IsBackground = true;
             broadcast_thread.Name = "Listen for Machines";
             broadcast_thread.Start();
-
         }
 
         /*****************************************
@@ -81,8 +84,9 @@ namespace EepromGUI
         {
             // Create the pieces to make the TCP connection
             //Server server = new Server();
-            IPHostEntry entry = Dns.GetHostEntry(machine);
-            this.ip = entry.AddressList[0].ToString();
+            //IPHostEntry entry = Dns.GetHostEntry(machine);
+            //this.ip = entry.AddressList[0].ToString();
+            this.ip = machine;
 
             //Connect to a tcp socket
             try
@@ -172,21 +176,22 @@ namespace EepromGUI
         }
 
         /********************************
-         * This creates a listener on a seperate 
-         * thread to log incoming broadcast machines
+         * This creates a listener on a seperate thread to log incoming broadcast machines.
+         * It finds the IP address sending messages and sends it to the GUI
          * ******************************/
         public void ListenForBroadcast()
         {
-            IPEndPoint recvEp = new IPEndPoint(IPAddress.Any, 4227);
+            // port 4227 is the port where the targets are broadcasting hello
+            IPEndPoint recvEp = new IPEndPoint(IPAddress.Any, 4227);    
             UdpClient udpResponse = new UdpClient(4227);
             while (true)
             {
                 Byte[] recvBytes = udpResponse.Receive(ref recvEp);
-                Console.WriteLine("Received: " + recvEp.Address);
+                //recvEp.Address is the ip adress of the machine
                 UpdateStatus(recvEp.Address.ToString(), 0);
 
                 // sleep 5 seconds
-                Thread.Sleep(5000);
+                Thread.Sleep(10);
             }
 
         }
@@ -261,6 +266,10 @@ namespace EepromGUI
             {
                 _thread.Abort();
             }
+        }
+
+        public void killBroadCastThread()
+        {
             if (broadcast_thread.IsAlive)
             {
                 broadcast_thread.Abort();

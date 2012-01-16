@@ -15,13 +15,51 @@ namespace EepromGUI
         String machine = "";
         String macPassword = "change MAC";
         Eeprom conn;
+        Eeprom bconn;
         String boardType = "";
         List<Control> changedList = new List<Control>();
+        List<String> ipList = new List<String>();
         //Eeprom listener;
         public delegate void serviceGUIDelegate();
         public Form1()
         {
             InitializeComponent();
+            // Populate the drop down list with machines that are broadcasting
+            //FindMachines();
+        }
+
+        /***************************************************
+         * Find the machines that are broadcasting and add
+         * them to the drop down list
+         * *************************************************/
+        private void FindMachines()
+        {
+            bconn = new Eeprom(
+               this,
+               delegate(string message, int status)
+               {
+                   //Find the IP messages of broadcasting machines
+                   String[] group = Regex.Split(message, "\n");
+                   foreach (var item in group)
+                   {
+                       if (item != "")
+                       {
+                           String possibleIP = item.ToString();
+                           Console.WriteLine("Received message: " + item);
+                           // the first 4 characters are ###.
+                           if (Char.IsDigit(possibleIP[0]) && Char.IsDigit(possibleIP[1]) && Char.IsDigit(possibleIP[2]) && possibleIP[3] == '.')
+                           {
+                               if (!targetCB.Items.Contains(possibleIP))
+                               {
+                                   errorLBL.Text = "Available Targets";
+                                   targetCB.Items.Add(possibleIP);
+                                   targetCB.Sorted = true;
+                               }
+                           }
+                       }
+                   }
+               });
+            bconn.StartBroadCastListen();
         }
 
         /********************************************************
@@ -55,6 +93,7 @@ namespace EepromGUI
                            this.logTB.AppendText(machine + " - received: " + item + "\n");
                            logTB.ScrollToCaret();
                            parseIncoming(item + "\n");
+                           parseIP(item);
                        }
                    }
                });
@@ -896,6 +935,23 @@ namespace EepromGUI
             {
                 conn.killThread();
                 conn.CloseConnection();
+                //bconn.killBroadCastThread();
+                //bconn.CloseConnection();
+            }
+        }
+
+        private void parseIP(String message)
+        {
+            // is message an ip address
+            // the first 4 characters are ###.
+            if (Char.IsDigit(message[0]) && Char.IsDigit(message[1]) && Char.IsDigit(message[2]) && message[3] == '.')
+            {
+                if (!targetCB.Items.Contains(message))
+                {
+                    errorLBL.Text = "Available Targets";
+                    targetCB.Items.Add(message);
+                    targetCB.Sorted = true;
+                }
             }
         }
 
@@ -2202,6 +2258,17 @@ namespace EepromGUI
                 logSent("I N " + Convert.ToInt32(thm1) + " " + thm2 + " " + thm3 + " " + thm4 + " " + thm5 + " " + thm6 + " " +
                     " " + thm7 + " " + thm8 + " " + thm9 + " " + thm10);
             }
+        }
+
+        private void scan_button_Click(object sender, EventArgs e)
+        {
+            FindMachines();
+            scan_button.Enabled = false;
+        }
+
+        private void clear_button_Click(object sender, EventArgs e)
+        {
+           targetCB.Items.Clear();
         }
 
     }
