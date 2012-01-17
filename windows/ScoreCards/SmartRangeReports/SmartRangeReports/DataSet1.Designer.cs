@@ -52,9 +52,9 @@ namespace WindowsFormsApplication1 {
         
         private global::System.Data.DataRelation relationHIT_TARGET;
         
-        private global::System.Data.DataRelation relationGROUP_TASKSTART;
-        
         private global::System.Data.DataRelation relationTASKSTART_TASKEND;
+        
+        private global::System.Data.DataRelation relationGROUP_TASKSTART;
         
         private global::System.Data.SchemaSerializationMode _schemaSerializationMode = global::System.Data.SchemaSerializationMode.IncludeSchema;
         
@@ -447,8 +447,8 @@ namespace WindowsFormsApplication1 {
             this.relationID_GROUP = this.Relations["ID_GROUP"];
             this.relationTARGET_GROUP = this.Relations["TARGET_GROUP"];
             this.relationHIT_TARGET = this.Relations["HIT_TARGET"];
-            this.relationGROUP_TASKSTART = this.Relations["GROUP_TASKSTART"];
             this.relationTASKSTART_TASKEND = this.Relations["TASKSTART_TASKEND"];
+            this.relationGROUP_TASKSTART = this.Relations["GROUP_TASKSTART"];
         }
         
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -493,14 +493,14 @@ namespace WindowsFormsApplication1 {
                         this.tableHIT.NAMEColumn}, new global::System.Data.DataColumn[] {
                         this.tableTARGET.NAMEColumn}, false);
             this.Relations.Add(this.relationHIT_TARGET);
-            this.relationGROUP_TASKSTART = new global::System.Data.DataRelation("GROUP_TASKSTART", new global::System.Data.DataColumn[] {
-                        this.tableGROUP.OTHER_GROUPColumn}, new global::System.Data.DataColumn[] {
-                        this.tableTASKSTART.ROWColumn}, false);
-            this.Relations.Add(this.relationGROUP_TASKSTART);
             this.relationTASKSTART_TASKEND = new global::System.Data.DataRelation("TASKSTART_TASKEND", new global::System.Data.DataColumn[] {
                         this.tableTASKSTART.ROWColumn}, new global::System.Data.DataColumn[] {
                         this.tableTASKEND.ROWColumn}, false);
             this.Relations.Add(this.relationTASKSTART_TASKEND);
+            this.relationGROUP_TASKSTART = new global::System.Data.DataRelation("GROUP_TASKSTART", new global::System.Data.DataColumn[] {
+                        this.tableGROUP.OTHER_GROUPColumn}, new global::System.Data.DataColumn[] {
+                        this.tableTASKSTART.ROWColumn}, false);
+            this.Relations.Add(this.relationGROUP_TASKSTART);
         }
         
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -1364,6 +1364,8 @@ namespace WindowsFormsApplication1 {
             
             private global::System.Data.DataColumn columnROUND;
             
+            private global::System.Data.DataColumn columnSECONDS;
+            
             [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
             [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Data.Design.TypedDataSetGenerator", "4.0.0.0")]
             public TASKSTARTDataTable() {
@@ -1447,6 +1449,14 @@ namespace WindowsFormsApplication1 {
             
             [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
             [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Data.Design.TypedDataSetGenerator", "4.0.0.0")]
+            public global::System.Data.DataColumn SECONDSColumn {
+                get {
+                    return this.columnSECONDS;
+                }
+            }
+            
+            [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Data.Design.TypedDataSetGenerator", "4.0.0.0")]
             [global::System.ComponentModel.Browsable(false)]
             public int Count {
                 get {
@@ -1482,7 +1492,7 @@ namespace WindowsFormsApplication1 {
             
             [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
             [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Data.Design.TypedDataSetGenerator", "4.0.0.0")]
-            public TASKSTARTRow AddTASKSTARTRow(string TASK, string TIMESTAMP, string NAME, string TABLE, GROUPRow parentGROUPRowByGROUP_TASKSTART, string ROUND) {
+            public TASKSTARTRow AddTASKSTARTRow(string TASK, string TIMESTAMP, string NAME, string TABLE, GROUPRow parentGROUPRowByGROUP_TASKSTART, string ROUND, string SECONDS) {
                 TASKSTARTRow rowTASKSTARTRow = ((TASKSTARTRow)(this.NewRow()));
                 object[] columnValuesArray = new object[] {
                         TASK,
@@ -1490,7 +1500,8 @@ namespace WindowsFormsApplication1 {
                         NAME,
                         TABLE,
                         null,
-                        ROUND};
+                        ROUND,
+                        SECONDS};
                 if ((parentGROUPRowByGROUP_TASKSTART != null)) {
                     columnValuesArray[4] = parentGROUPRowByGROUP_TASKSTART[2];
                 }
@@ -1522,6 +1533,7 @@ namespace WindowsFormsApplication1 {
                 this.columnTABLE = base.Columns["TABLE"];
                 this.columnROW = base.Columns["ROW"];
                 this.columnROUND = base.Columns["ROUND"];
+                this.columnSECONDS = base.Columns["SECONDS"];
             }
             
             [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -1539,6 +1551,8 @@ namespace WindowsFormsApplication1 {
                 base.Columns.Add(this.columnROW);
                 this.columnROUND = new global::System.Data.DataColumn("ROUND", typeof(string), null, global::System.Data.MappingType.Element);
                 base.Columns.Add(this.columnROUND);
+                this.columnSECONDS = new global::System.Data.DataColumn("SECONDS", typeof(string), null, global::System.Data.MappingType.Element);
+                base.Columns.Add(this.columnSECONDS);
             }
             
             [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -3922,7 +3936,7 @@ namespace WindowsFormsApplication1 {
             public string NAME {
                 get {
                     if (this.IsNAMENull()) {
-                        return string.Empty;
+                        return null;
                     }
                     else {
                         return ((string)(this[this.tableHIT.NAMEColumn]));
@@ -4470,6 +4484,22 @@ namespace WindowsFormsApplication1 {
             
             [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
             [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Data.Design.TypedDataSetGenerator", "4.0.0.0")]
+            public string SECONDS {
+                get {
+                    try {
+                        return ((string)(this[this.tableTASKSTART.SECONDSColumn]));
+                    }
+                    catch (global::System.InvalidCastException e) {
+                        throw new global::System.Data.StrongTypingException("The value for column \'SECONDS\' in table \'TASKSTART\' is DBNull.", e);
+                    }
+                }
+                set {
+                    this[this.tableTASKSTART.SECONDSColumn] = value;
+                }
+            }
+            
+            [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Data.Design.TypedDataSetGenerator", "4.0.0.0")]
             public GROUPRow GROUPRow {
                 get {
                     return ((GROUPRow)(this.GetParentRow(this.Table.ParentRelations["GROUP_TASKSTART"])));
@@ -4549,6 +4579,18 @@ namespace WindowsFormsApplication1 {
             [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Data.Design.TypedDataSetGenerator", "4.0.0.0")]
             public void SetROUNDNull() {
                 this[this.tableTASKSTART.ROUNDColumn] = global::System.Convert.DBNull;
+            }
+            
+            [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Data.Design.TypedDataSetGenerator", "4.0.0.0")]
+            public bool IsSECONDSNull() {
+                return this.IsNull(this.tableTASKSTART.SECONDSColumn);
+            }
+            
+            [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Data.Design.TypedDataSetGenerator", "4.0.0.0")]
+            public void SetSECONDSNull() {
+                this[this.tableTASKSTART.SECONDSColumn] = global::System.Convert.DBNull;
             }
             
             [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

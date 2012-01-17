@@ -247,6 +247,24 @@ namespace WindowsFormsApplication1
                             {
                                 shooter_row["LANE"] = addTag(item);
                             }
+                            /*else if (item.IndexOf("EVID(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["EVID"] = addTag(item);
+                            } 
+                            else if (item.IndexOf("GRADER(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["GRADER"] = addTag(item);
+                            }
+                            else if (item.IndexOf("EXERCISE(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["EXERCISE"] = addTag(item);
+                            }
+                            else if (item.IndexOf("RANGE_NAME(", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                shooter_row["RANGE_NAME"] = addTag(item);
+                            }*/
+                            // Need to add to database under the Shooter table
+
                         }
                         else if (shooterType == "spotter")
                         {
@@ -715,7 +733,10 @@ namespace WindowsFormsApplication1
                 table_row["ROUND"] = "None";
                 dt12.Rows.Add(table_row);
             }*/
-            
+
+            AddTaskTimes(dt3, dt4); //dt3 = TASKSTART, dt4 = TASKEND
+            //AddHitInfo(dt3, dt2, dt11, dt1, dt5); //dt3 = TASKSTART, dt2 = HIT, dt11 = GROUP, dt1 = ID, dt5 = TARGET 
+
 
             ReportDocument cryRpt = new ReportDocument();
 
@@ -768,10 +789,88 @@ namespace WindowsFormsApplication1
             return newtime;
         }
 
+        //Add hit information for all tasks in all tables
+        private void AddHitInfo(DataTable taskStart, DataTable hit, DataTable group, DataTable id, DataTable target)
+        {
+            List<string> shooterGroupList = new List<string>();
+            // Add a target with name "M" and range 0 to be my miss target
+            DataRow target_row = target.NewRow();
+            target_row["NAME"] = "M";
+            target_row["RANGE"] = "0";
+            target.Rows.Add(target_row);
+
+            // Add a target with the name "M" to each shooter group
+            foreach (var idRow in id.Rows)
+            {
+                String shooterGroup = ((WindowsFormsApplication1.DataSet1.IDRow)(idRow)).GROUP;
+                shooterGroupList.Add(shooterGroup);
+            }
+            foreach (var taskRow in taskStart.Rows)
+            {
+                DataRow hit_row = hit.NewRow();
+                String thisTable = ((WindowsFormsApplication1.DataSet1.TASKSTARTRow)(taskRow)).TABLE;
+                String thisTask = ((WindowsFormsApplication1.DataSet1.TASKSTARTRow)(taskRow)).TASK;
+                String thisRow = ((WindowsFormsApplication1.DataSet1.TASKSTARTRow)(taskRow)).ROW;
+                // Check to see if there is already a hit in this table/task
+                String taskExpression = "TABLE_ID = '" + thisTable + "' AND TASK_ID = '" + thisTask + "'";
+                DataRow[] rows = hit.Select(taskExpression);
+                // No hits for this task
+                if (rows.Length == 0)
+                {
+                    //DataRow thisRow = rows[0];
+                    hit_row["TABLE_ID"] = thisTable;
+                    hit_row["TASK_ID"] = thisTask;
+                    hit_row["NAME"] = "M";
+                    hit.Rows.Add(hit_row);
+                }
+
+                // Add a "M" target for each possible group
+                for (int i = 0; i < shooterGroupList.Count; i++)
+                {
+                    DataRow group_row = group.NewRow();
+                    group_row["SHOOTER_GROUP"] = shooterGroupList.ElementAt(i);
+                    group_row["TARGET_NAME"] = "M";
+                    group_row["OTHER_GROUP"] = thisRow;
+                    group.Rows.Add(group_row);
+                }
+            }
+        }
+
+        //Add concrete times in seconds to the TASKSTART table
+        private void AddTaskTimes(DataTable startTask, DataTable endTask)
+        {
+            foreach (var startrow in startTask.Rows)
+            {
+                DateTime taskStartTime = ConvertDateTime(((WindowsFormsApplication1.DataSet1.TASKSTARTRow)(startrow)).TIMESTAMP);
+                String taskStartTable = ((WindowsFormsApplication1.DataSet1.TASKSTARTRow)(startrow)).TABLE;
+                String taskStartTask = ((WindowsFormsApplication1.DataSet1.TASKSTARTRow)(startrow)).TASK;
+                foreach (var endrow in endTask.Rows)
+                {
+                    String taskEndTable = ((WindowsFormsApplication1.DataSet1.TASKENDRow)(endrow)).TABLE;
+                    String taskEndTask = ((WindowsFormsApplication1.DataSet1.TASKENDRow)(endrow)).TASK;
+                    if (taskStartTable == taskEndTable && taskStartTask == taskEndTask)
+                    {
+                        DateTime taskEndTime = ConvertDateTime(((WindowsFormsApplication1.DataSet1.TASKENDRow)(endrow)).TIMESTAMP);
+                        TimeSpan diff = taskEndTime - taskStartTime;
+                        if (diff.Seconds >= 0)
+                        {
+                            String taskExpression = "TABLE = '" + taskStartTable + "' AND TASK = '" + taskStartTask + "'";
+                            DataRow[] rows = startTask.Select(taskExpression);
+                            DataRow thisRow = rows[0];
+                            thisRow["SECONDS"] = diff.Seconds.ToString();
+                            Console.WriteLine("Table: " + taskStartTable + " Task: " + taskEndTask + " Difference in time: " + diff +
+                                "\nStartTimeStamp: " + taskStartTime + " EndTimeStamp: " + taskEndTime);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            tbLogFilePath.Text = "C:\\Users\\Public\\Documents\\Log Files\\Reports Info\\Scenarios\\85-1.txt";
+            tbLogFilePath.Text = "C:\\Users\\Public\\Documents\\Log Files\\Reports Info\\Scenarios\\85-3.txt";
             //tbLogFilePath.Text = "\\\\tao\\shellyb\\Shelly's VS Projects\\Reports Info\\Scenarios\\88-12.txt";
             //tbLogFilePath.Text = "C:\\Users\\Chris\\Desktop\\Log Files\\TargetLogFiles\\85-1.txt";
             tbFileName.Text = "C:\\Users\\ATI\\Documents\\Visual Studio 2010\\Projects\\SmartRangeReports\\85_Table.rpt";
