@@ -17,6 +17,13 @@ typedef struct sockpair {
  *   - all items are a multiple of 4 bytes long
  *   */
 
+enum {
+    BLANK_ON_CONCEALED,    /* blank when fully concealed (enabled most of the time) */
+    ENABLE_ALWAYS,       /* enable full-time (even when concealed) */
+    ENABLE_AT_POSITION,  /* enable when reach next position (don't change now) */
+    DISABLE_AT_POSITION, /* disable when reach next position (don't change now) */
+    BLANK_ALWAYS,           /* hit sensor disabled blank */
+};
 
 typedef struct state_u8_item {
     uint8	 data;
@@ -95,6 +102,10 @@ typedef struct minion_state {
 #define F_exp_conceal_B	5
 #define F_exp_conceal_C	6
 
+#define F_up2date	0	// RF and internal state match
+#define F_tell_RF	0x100	// RF needs update 
+#define F_told_RF	0x200	// RF updated, waiting for ack 
+#define F_tell_RCC	0x400	// internal state right, FASIT needs update 
 
 uint64 htonll( uint64 id);
 
