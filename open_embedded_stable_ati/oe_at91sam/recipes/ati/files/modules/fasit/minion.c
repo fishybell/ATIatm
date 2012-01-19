@@ -10,6 +10,8 @@
 #include "mcp.h"
 #include "fasit_c.h"
 
+#define TIME_DEBUG 1
+
 #define BufSize 1024
 
 #define S_set(ITEM,D,ND,F,T) \
@@ -145,7 +147,7 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
     if (force==1) {
 //	msg.response.rnum = htons(hdr->num);	//  pulls the message number from the header  (htons was wrong here)
 	msg.response.rnum = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
-	msg.response.rseq = htons(hdr->seq);
+	msg.response.rseq = hdr->seq;
     } else if (force==2) {
 	msg.response.rnum = resp_num;	//  pulls the message number from the header  (htons was wrong here)
 	msg.response.rseq = resp_seq;
@@ -180,6 +182,7 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
     //    msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
     //    msg->body.hit_conf.mode = lastHitCal.type; // single, etc.
 
+    DCMSG(BLUE,"sending a 2102 status response");
     DCMSG(BLUE,"M-Num | ICD-v | seq-# | rsrvd | length  R-num  R-seq          <--- Header\n %6d  %d.%d  %6d  %6d %7d %6d %7d "
 	  ,htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htonl(hdr->seq),htonl(hdr->rsrvd),htons(hdr->length),htons(msg.response.rnum),htonl(msg.response.rseq));
     DCMSG(BLUE,\
@@ -191,6 +194,53 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
     write_FASIT_msg(minion,hdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2102));
 
 }
+
+// create and send a status messsage to the FASIT server
+void sendStatus2112(int force, FASIT_header *hdr,thread_data_t *minion) {
+    struct iovec iov[2];
+    FASIT_2112 msg;
+    int result;
+
+    defHeader(2112, hdr,minion->seq); // sets the sequence number and other data
+    hdr->length = htons(sizeof(FASIT_header) + sizeof(FASIT_2112));
+
+    // fill message
+    // start with zeroes
+    memset(&msg, 0, sizeof(FASIT_2112));
+
+    // fill out as response
+    if (force==1) {
+//	msg.response.rnum = htons(hdr->num);	//  pulls the message number from the header  (htons was wrong here)
+	msg.response.rnum = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
+	msg.response.rseq = hdr->seq;
+    } else if (force==2) {
+	msg.response.rnum = resp_num;	//  pulls the message number from the header  (htons was wrong here)
+	msg.response.rseq = resp_seq;
+    } else if (force==0) {
+	msg.response.rnum = 0;	// unsolicited
+	msg.response.rseq = 0;
+    }
+
+    msg.response.rnum = htons(2112);	// unsolicited
+    
+    msg.body.on = minion->S.mfs_on.newdata;
+    msg.body.mode = minion->S.mfs_mode.newdata;
+    msg.body.idelay = minion->S.mfs_idelay.newdata;
+    msg.body.rdelay = minion->S.mfs_rdelay.newdata;
+
+    DCMSG(BLUE,"sending a 2112 status response");
+    DCMSG(BLUE,"M-Num | ICD-v | seq-# | rsrvd | length  R-num  R-seq          <--- Header\n %6d  %d.%d  %6d  %6d %7d %6d %7d "
+	  ,htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htonl(hdr->seq),htonl(hdr->rsrvd),htons(hdr->length),htons(msg.response.rnum),htonl(msg.response.rseq));
+    DCMSG(BLUE,\
+	  "   ON | Mode  | idelay| rdelay\n"\
+	  "  %3d    %3d     %3d     %3d   ",
+	  msg.body.on,msg.body.mode,msg.body.idelay,msg.body.rdelay)
+    
+    write_FASIT_msg(minion,hdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2112));
+
+}
+
+
 //
 //   Command Acknowledge
 //
@@ -368,8 +418,18 @@ void *minion_thread(thread_data_t *minion){
 
     clock_gettime(CLOCK_MONOTONIC_RAW,&istart_time);	// get the intial current time
 
-    
     while(1) {
+#if TIME_DEBUG
+	clock_gettime(CLOCK_MONOTONIC_RAW,&elapsed_time);	// get a current time
+	elapsed_time.tv_sec-=istart_time.tv_sec;	// get the seconds right
+	if (elapsed_time.tv_nsec<istart_time.tv_nsec){
+	    elapsed_time.tv_sec--;		// carry a second over for subtracting
+	    elapsed_time.tv_nsec+=1000000000L;	// carry a second over for subtracting
+	}
+	elapsed_time.tv_nsec-=istart_time.tv_nsec;	// get the useconds right
+	DCMSG(CYAN,"MINION %d: Top of main loop at %08ld.%09ld   timestamp",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
+#endif
+	
 	clock_gettime(CLOCK_MONOTONIC_RAW,&start_time);	// mark the start time so we can run the timers
 
 	/* create a fd_set so we can monitor both the mcp and the connection to the RCC*/
@@ -391,6 +451,16 @@ void *minion_thread(thread_data_t *minion){
 	    exit(-1);
 	}
 
+#if TIME_DEBUG
+	clock_gettime(CLOCK_MONOTONIC_RAW,&elapsed_time);	// get a current time
+	elapsed_time.tv_sec-=istart_time.tv_sec;	// get the seconds right
+	if (elapsed_time.tv_nsec<istart_time.tv_nsec){
+	    elapsed_time.tv_sec--;		// carry a second over for subtracting
+	    elapsed_time.tv_nsec+=1000000000L;	// carry a second over for subtracting
+	}
+	elapsed_time.tv_nsec-=istart_time.tv_nsec;	// get the useconds right
+	DCMSG(CYAN,"MINION %d:   After 'Select' at %08ld.%09ld   timestamp",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
+#endif
 	//check to see if the MCP has any commands for us
 	if (FD_ISSET(minion->mcp_sock,&rcc_or_mcp)){
 	    msglen=read(minion->mcp_sock, buf, 1023);
@@ -410,6 +480,17 @@ void *minion_thread(thread_data_t *minion){
 		exit(-2);  /* this minion dies!  possibly it should do something else - but maybe it dies of happyness  */
 	    }
 	}
+    
+#if TIME_DEBUG
+	clock_gettime(CLOCK_MONOTONIC_RAW,&elapsed_time);	// get a current time
+	elapsed_time.tv_sec-=istart_time.tv_sec;	// get the seconds right
+	if (elapsed_time.tv_nsec<istart_time.tv_nsec){
+	    elapsed_time.tv_sec--;		// carry a second over for subtracting
+	    elapsed_time.tv_nsec+=1000000000L;	// carry a second over for subtracting
+	}
+	elapsed_time.tv_nsec-=istart_time.tv_nsec;	// get the useconds right
+	DCMSG(CYAN,"MINION %d: End of MCP Parse at %08ld.%09ld   timestamp",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
+#endif
 	/**********************************    end of reading and processing the mcp command  ***********************/
 
 	/*************** check to see if there is something to read from the rcc   **************************/
@@ -417,21 +498,20 @@ void *minion_thread(thread_data_t *minion){
 	    // now read it using the new routine    
 	    result = read_FASIT_msg(minion,buf, BufSize);
 	    if (result>0){
+		// map header and body for both message and response
+		header = (FASIT_header*)(buf);
 
 		clock_gettime(CLOCK_MONOTONIC_RAW,&elapsed_time);	// get a current time
-
 		elapsed_time.tv_sec-=istart_time.tv_sec;	// get the seconds right
 		if (elapsed_time.tv_nsec<istart_time.tv_nsec){
 		    elapsed_time.tv_sec--;		// carry a second over for subtracting
 		    elapsed_time.tv_nsec+=1000000000L;	// carry a second over for subtracting
 		}
 		elapsed_time.tv_nsec-=istart_time.tv_nsec;	// get the useconds right
-		DCMSG( MAGENTA,"Packet recieved at %08ld.%09ld   timestamp" ,elapsed_time.tv_sec, elapsed_time.tv_nsec);
+		DCMSG(CYAN,"MINION %d: Packet %d recieved at %08ld.%09ld   timestamp",minion->mID,htons(header->num),elapsed_time.tv_sec, elapsed_time.tv_nsec);
 
-		// map header and body for both message and response
-		header = (FASIT_header*)(buf);
 
-		DCMSG(BLUE,"MINION %d: Process the recieved fasit packet num=%d", minion->mID,htons(header->num));
+		DCMSG(BLUE,"MINION %d: Process the recieved fasit packet num=%d",minion->mID,htons(header->num));
 
 		// now we need to parse and respond to the message we just recieved
 		// we have received a message from the mcp, process it
@@ -536,35 +616,40 @@ void *minion_thread(thread_data_t *minion){
 
 			    case CID_Status_Request:
 				// send 2102 status
-				DCMSG(BLUE,"CID_Status_Request   send 2102 status") ; 
+				DCMSG(BLUE,"CID_Status_Request   send 2102 status") ;
+			// save response numbers
+//				resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
+//				resp_seq = header->seq;
+				
 				sendStatus2102(1,header,minion); // forces sending of a 2102
 				// AND/OR? send 2115 MILES shootback status if supported
 				//			    if (acc_conf.acc_type == ACC_NES_MFS){
 				//				DCMSG(BLUE,"we also seem to have a MFS Muzzle Flash Simulator - TODO send 2112 status eventually") ; 
 				//			    }
+//				resp_seq= htons(htons(resp_seq)+1);
+//				header->seq=htons(htons(header_seq)+1);
 				// AND/OR? send 2112 Muzzle Flash status if supported   
-
+//				sendStatus2112(2,header,minion); // forces sending of a 2112
 				break;
 
 			    case CID_Expose_Request:
 				DCMSG(BLUE,"CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",message_2100->exp) ;       
 
-				minion->S.exp.data=0;			// cheat and set the current state to 45
+//				minion->S.exp.data=0;			// cheat and set the current state to 45
 				minion->S.exp.newdata=message_2100->exp;	// set newdata to be the future state
 				if (message_2100->exp==90){
 				    minion->S.exp.flags=F_exp_expose_A;	// start it moving to expose
 				} else if (message_2100->exp==00){
 				    minion->S.exp.flags=F_exp_conceal_A;	// start it moving to conceal
 				}
-				minion->S.exp.timer=0;
+				minion->S.exp.timer=5;
 
 				// send 2101 ack  (2102's will be generated at start and stop of actuator)
 				send_2101_ACK(header,'S',minion);    // TRACR Cert complains if these are not there
 
 				// it should happen in this many deciseconds
 				//  - fasit device cert seems to come back immeadiately and ask for status again, and
-				//    that is causing a bit of trouble.   
-
+				//    that is causing a bit of trouble.
 				break;
 
 			    case CID_Reset_Device:
@@ -652,64 +737,118 @@ void *minion_thread(thread_data_t *minion){
 				// remember stated value for later
 				//				fake_sens = htons(message_2100->sens);
 			
-			if (htons(message_2100->tokill)) {
-			    minion->S.tokill.newdata = htons(message_2100->tokill);
-			    minion->S.tokill.flags |= F_tell_RF;	// just note it was set
-			}
-			minion->S.react.newdata = message_2100->react;
-			minion->S.react.flags |= F_tell_RF;	// just note it was set
+				if (htons(message_2100->tokill)) {
+				    minion->S.tokill.newdata = htons(message_2100->tokill);
+				    minion->S.tokill.flags |= F_tell_RF;	// just note it was set
+				}
 
-			minion->S.mode.newdata = message_2100->mode;
-			minion->S.mode.flags |= F_tell_RF;	// just note it was set
+//				if (htons(message_2100->hit)) {
+				    minion->S.hit.newdata = htons(message_2100->hit);
+				    minion->S.hit.flags |= F_tell_RF;
+//				}
+				minion->S.react.newdata = message_2100->react;
+				minion->S.react.flags |= F_tell_RF;	// just note it was set
 
-			minion->S.burst.newdata = htons(message_2100->burst);
-			minion->S.burst.flags |= F_tell_RF;	// just note it was set
+				minion->S.mode.newdata = message_2100->mode;
+				minion->S.mode.flags |= F_tell_RF;	// just note it was set
 
-			//				doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
-			DCMSG(BLUE,"calling doHitCal after setting values") ;
+				minion->S.burst.newdata = htons(message_2100->burst);
+				minion->S.burst.flags |= F_tell_RF;	// just note it was set
 
-			// send 2102 status or change the hit count (which will send the 2102 later)
-			if (1 /*hits == htons(message_2100->hit)*/) {
-			    sendStatus2102(2,header,minion);  // sends a 2102 as we won't if we didn't change the the hit count
-			    DCMSG(BLUE,"We will send 2102 status in response to the config hit sensor command"); 
+				//				doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
+				DCMSG(BLUE,"calling doHitCal after setting values") ;
+
+				// send 2102 status or change the hit count (which will send the 2102 later)
+				if (1 /*hits == htons(message_2100->hit)*/) {
+				    sendStatus2102(2,header,minion);  // sends a 2102 as we won't if we didn't change the the hit count
+				    DCMSG(BLUE,"We will send 2102 status in response to the config hit sensor command"); 
+				} else {
+				    //	doHits(htons(message_2100->hit));    // set hit count to something other than zero
+				    DCMSG(BLUE,"after doHits(%d) ",htons(message_2100->hit)) ;
+				}
+
+				break;
+
+			    case CID_GPS_Location_Request:
+				DCMSG(BLUE,"CID_GPS_Location_Request  send 'F'ailure ack  - because we don't support it") ;
+				send_2101_ACK(header,'F',minion);
+
+				// send 2113 GPS Location
+				break;
+
+			    case CID_Shutdown:
+				DCMSG(BLUE,"CID_Shutdown...shutting down") ; 
+				//			    doShutdown();
+				break;
+			    case CID_Sleep:
+				DCMSG(BLUE,"CID_Sleep...sleeping") ; 
+				//			    doSleep();
+				break;
+			    case CID_Wake:
+				DCMSG(BLUE,"CID_Wake...waking") ; 
+				//			    doWake();
+				break;
+			}  
+
+			break;
+
+
+
+
+		    case 2110:
+			message_2110 = (FASIT_2110*)(buf + sizeof(FASIT_header));
+			resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
+			resp_seq = header->seq;
+
+
+			DCMSG(BLUE,"MINION %d: fasit packet 2110 Configure_Muzzle_Flash, on=%d  mode=%d  idelay=%d  rdelay=%d"
+			      , minion->mID,message_2110->on,message_2110->mode,message_2110->idelay,message_2110->rdelay);
+
+			// save response numbers
+			resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
+			resp_seq = header->seq;
+
+// check to see if we have muzzle flash capability -  or just pretend
+			if (1/*start_config&PD_NES*/){
+
+			    minion->S.mfs_on.newdata  = message_2110->on;	// set the new value for 'on'
+			    minion->S.mfs_on.flags  |= F_tell_RF;	// just note it was set
+			    minion->S.mfs_mode.newdata  = message_2110->mode;	// set the new value for 'on'
+			    minion->S.mfs_mode.flags  |= F_tell_RF;	// just note it was set
+			    minion->S.mfs_idelay.newdata  = htons(message_2110->idelay);	// set the new value for 'on'
+			    minion->S.mfs_idelay.flags  |= F_tell_RF;	// just note it was set
+			    minion->S.mfs_rdelay.newdata  = htons(message_2110->rdelay);	// set the new value for 'on'
+			    minion->S.mfs_rdelay.flags  |= F_tell_RF;	// just note it was set
+			    
+			    //doMFS(msg->on,msg->mode,msg->idelay,msg->rdelay);
+// when the didMFS happens fill in the 2112, force a 2112 message to be sent
+			    sendStatus2112(2,header,minion); // forces sending of a 2112
+//			    sendStatus2102(0,header,minion); // forces sending of a 2102
+			    //sendMFSStatus = 1; // force
 			} else {
-			    //	doHits(htons(message_2100->hit));    // set hit count to something other than zero
-			    DCMSG(BLUE,"after doHits(%d) ",htons(message_2100->hit)) ;
+			    send_2101_ACK(header,'F',minion);  // no muzzle flash capability, so send a negative ack
 			}
+			
+			
+		}  /**   end of 'switch (packet_num)'   **/
 
-			break;
-
-		    case CID_GPS_Location_Request:
-			DCMSG(BLUE,"CID_GPS_Location_Request  send 'F'ailure ack  - because we don't support it") ;
-			send_2101_ACK(header,'F',minion);
-
-			// send 2113 GPS Location
-			break;
-
-		    case CID_Shutdown:
-			DCMSG(BLUE,"CID_Shutdown...shutting down") ; 
-			//			    doShutdown();
-			break;
-		    case CID_Sleep:
-			DCMSG(BLUE,"CID_Sleep...sleeping") ; 
-			//			    doSleep();
-			break;
-		    case CID_Wake:
-			DCMSG(BLUE,"CID_Wake...waking") ; 
-			//			    doWake();
-			break;
-		}   
-
-		break;
+	    } else {
+		strerror_r(errno,buf,BufSize);
+		DCMSG(BLUE,"MINION %d: read_FASIT_msg returned %d and Error: %s", minion->mID,result,buf);
+		DCMSG(BLUE,"MINION %d: which means it likely has closed!", minion->mID);
+		exit(-1);
 	    }
-
-	} else {
-	    strerror_r(errno,buf,BufSize);
-	    DCMSG(BLUE,"MINION %d: read_FASIT_msg returned %d and Error: %s", minion->mID,result,buf);
-	    DCMSG(BLUE,"MINION %d: which means it likely has closed!", minion->mID);
-	    exit(-1);
 	}
-
+#if TIME_DEBUG
+	clock_gettime(CLOCK_MONOTONIC_RAW,&elapsed_time);	// get a current time
+	elapsed_time.tv_sec-=istart_time.tv_sec;	// get the seconds right
+	if (elapsed_time.tv_nsec<istart_time.tv_nsec){
+	    elapsed_time.tv_sec--;		// carry a second over for subtracting
+	    elapsed_time.tv_nsec+=1000000000L;	// carry a second over for subtracting
+	}
+	elapsed_time.tv_nsec-=istart_time.tv_nsec;	// get the useconds right
+	DCMSG(CYAN,"MINION %d: End of RCC Parse at %08ld.%09ld   timestamp",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
+#endif    
 	/**************   end of rcc command parsing   ****************/
 
 	/**  first we just update our counter, and if less then a tenth of a second passed,
@@ -717,16 +856,16 @@ void *minion_thread(thread_data_t *minion){
 	 **
 	 **/
 
+#if TIME_DEBUG
 	clock_gettime(CLOCK_MONOTONIC_RAW,&elapsed_time);	// get a current time
-
 	elapsed_time.tv_sec-=start_time.tv_sec;	// get the seconds right
 	if (elapsed_time.tv_nsec<start_time.tv_nsec){
 	    elapsed_time.tv_sec--;		// carry a second over for subtracting
 	    elapsed_time.tv_nsec+=1000000000L;	// carry a second over for subtracting
 	}
 	elapsed_time.tv_nsec-=start_time.tv_nsec;	// get the useconds right
-	DCMSG( MAGENTA," %08ld.%09ld   timestamp" ,elapsed_time.tv_sec, elapsed_time.tv_nsec);
-
+	DCMSG(MAGENTA,"MINION %d: begin timer updates %08ld.%09ld seconds since last timer update",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
+#endif
 	/***   if the elapsed_time is greater than a tenth of a second,
 	 ***   subtract out the number of tenths to use in updating our
 	 ***   timers.    otherwise set up the timeout for the next select
@@ -761,7 +900,6 @@ void *minion_thread(thread_data_t *minion){
 	 **
 	 **  */
 
-
 	// if there is a flag set, we then need to do something
 	if (minion->S.exp.flags!=F_exp_ok) {
 
@@ -776,8 +914,8 @@ void *minion_thread(thread_data_t *minion){
 			minion->S.exp.data=45;	// make the current positon in movement
 			minion->S.exp.flags=F_exp_expose_B;	// something has to happen
 			minion->S.exp.timer=5;	// it should happen in this many deciseconds
-			DCMSG( MAGENTA,"exp_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
-			       ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
+			DCMSG(MAGENTA,"exp_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+			      ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
 			sendStatus2102(0,header,minion); // forces sending of a 2102
 
 			break;
@@ -787,8 +925,8 @@ void *minion_thread(thread_data_t *minion){
 			minion->S.exp.data=90;	// make the current positon in movement
 			minion->S.exp.flags=F_exp_expose_C;	// we have reached the exposed position, now wait for confirmation from the RF slave
 			minion->S.exp.timer=9000;	// lots of time to wait for a RF reply
-			DCMSG( MAGENTA,"exp_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
-			       ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
+			DCMSG(MAGENTA,"exp_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+			      ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
 			sendStatus2102(0,header,minion); // forces sending of a 2102
 
 			break;
@@ -800,10 +938,9 @@ void *minion_thread(thread_data_t *minion){
 			break;
 
 		    case F_exp_conceal_A:
-
 			minion->S.exp.data=45;	// make the current positon in movement
 			minion->S.exp.flags=F_exp_conceal_B;	// something has to happen
-			minion->S.exp.timer=1;	// it should happen in this many deciseconds
+			minion->S.exp.timer=5;	// it should happen in this many deciseconds
 			DCMSG( MAGENTA,"conceal_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
 			       ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
 			sendStatus2102(0,header,minion); // forces sending of a 2102
@@ -811,7 +948,6 @@ void *minion_thread(thread_data_t *minion){
 			break;
 
 		    case F_exp_conceal_B:
-
 			minion->S.exp.data=0;	// make the current positon in movement
 			minion->S.exp.flags=F_exp_conceal_C;	// we have reached the exposed position, now wait for confirmation from the RF slave
 			minion->S.exp.timer=9000;	// lots of time to wait for a RF reply
@@ -827,8 +963,19 @@ void *minion_thread(thread_data_t *minion){
 
 		}
 	    }
-
 	}
-    }
+#if TIME_DEBUG
+	clock_gettime(CLOCK_MONOTONIC_RAW,&elapsed_time);	// get a current time
+	elapsed_time.tv_sec-=start_time.tv_sec;	// get the seconds right
+	if (elapsed_time.tv_nsec<start_time.tv_nsec){
+	    elapsed_time.tv_sec--;		// carry a second over for subtracting
+	    elapsed_time.tv_nsec+=1000000000L;	// carry a second over for subtracting
+	}
+	elapsed_time.tv_nsec-=start_time.tv_nsec;	// get the useconds right
+	DCMSG(MAGENTA,"MINION %d:   end timer updates %08ld.%09ld seconds since last timer update",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
+#endif
+
     }
 }
+
+
