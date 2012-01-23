@@ -613,8 +613,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 	    resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
 	    resp_seq = header->seq;
 
-
-	    DCMSG(YELLOW,"MINION %d: fasit packet 2110 Configure_Muzzle_Flash, seq=%d  on=%d  mode=%d  idelay=%d  rdelay=%d"
+	    DCMSG(BLUE,"MINION %d: fasit packet 2110 Configure_Muzzle_Flash, seq=%d  on=%d  mode=%d  idelay=%d  rdelay=%d"
 		  , minion->mID,htonl(header->seq),message_2110->on,message_2110->mode,message_2110->idelay,message_2110->rdelay);
 
 	    // save response numbers
@@ -878,11 +877,12 @@ void *minion_thread(thread_data_t *minion){
 	    if (result>0){		
 		header = (FASIT_header*)(buf);	// find out how long of message we have
 		length=htons(header->length);	// set the length for the handle function
-		DCMSG(YELLOW,"MINION %d:  num=%d  result=%d seq=%d header->length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
-		tbuf=buf;			// use our temp pointer so we can step ahead
 		if (result>length){
-		    DCMSG(YELLOW,"MINION %d: BIG PACKET ALERT! BIG PACKET ALERT! BIG PACKET ALERT! BIG PACKET ALERT!",minion->mID);
+		    DCMSG(BLUE,"MINION %d: Multiple Packet  num=%d  result=%d seq=%d header->length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
+		} else {
+		    DCMSG(BLUE,"MINION %d:  num=%d  result=%d seq=%d header->length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
 		}
+		tbuf=buf;			// use our temp pointer so we can step ahead
 		// loop until result reaches 0
 		while((result>=length)&&(length>0)) {
 		    timestamp(&elapsed_time);
@@ -895,7 +895,9 @@ void *minion_thread(thread_data_t *minion){
 		    tbuf+=length;			// step ahead to next message
 		    header = (FASIT_header*)(tbuf);	// find out how long of message we have
 		    length=htons(header->length);	// set the length for the handle function
-		    DCMSG(YELLOW,"MINION %d: Continue processing the rest of the BIG fasit packet num=%d  result=%d seq=%d  length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);		    
+		    if (result){
+			DCMSG(BLUE,"MINION %d: Continue processing the rest of the BIG fasit packet num=%d  result=%d seq=%d  length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
+		    }
 		}
 	    } else {
 		strerror_r(errno,buf,BufSize);
