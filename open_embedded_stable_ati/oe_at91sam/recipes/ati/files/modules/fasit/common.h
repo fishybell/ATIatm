@@ -4,15 +4,12 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
-<<<<<<< common.h
-=======
 #include "nl_conn.h"
 #include "netlink_user.h"
 #include "faults.h"
 
 // version of __FILE__ without full path
 #define __FILEX__ ((strrchr(__FILE__, '/') ? : __FILE__- 1) + 1)
->>>>>>> 1.24
 
 /*
  * min()/max() macros that also do

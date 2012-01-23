@@ -1,12 +1,12 @@
-# Makefile for the RF system
+# Makefile for Action Target specific files
 
+include ../files.mk
 
+default: fasit_conn
 
-
-default: mcp
-
-mcp : mcp.c minion.c mcp.h
-	gcc -lrt -std=gnu99 -o mcp  mcp.c minion.c
+fasit_conn: $(FC_C_FILES) $(FC_H_FILES)
+	$(MAKE) -C .. fasit_conn
+	cp ../fasit_conn .
 
 clean:
-	$(RM) mcp *.o 
+	$(RM) fasit_conn
