@@ -646,12 +646,23 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 }
 
 
-//void  process_MCP_cmds(minion_state_t *minion,char *buf,int msglen){
-//
-//}
-/* shared data between threads */
-//double shared_x;
-//pthread_mutex_t lock_x;
+/*********************                                  minion_thread                               *************
+ *********************
+ *********************   Each minion thread is started by the MCP, and is pretending to be a lifter
+ *********************   or other PD (presentation device)
+ *********************      it has it's own connection to the RCC (Range Control Computer) which is
+ *********************   used for the FASIT communicaitons, and another connection to the MCP which is
+ *********************   used to pass communicaitons on down through the RF to the PD
+ *********************
+ *********************   All RF communicaitons will pass through the MCP, which is really just forwarding them to the RF process
+ *********************
+ *********************   The RF process will group and ungroup the messages automatically
+ *********************
+ *********************   When the minion recieves a FASIT command and sets up a response that simulates the real PD's
+ *********************   state, it also passes a message up to the MCP which will then send it on to the RF Process
+ *********************   which in turn radios to the slave [bosses eventually].
+ *********************   
+ *********************/
 
 void *minion_thread(thread_data_t *minion){
     struct timespec elapsed_time, start_time;
@@ -678,6 +689,16 @@ void *minion_thread(thread_data_t *minion){
 
     initialize_state( &minion->S);
 
+
+/*** actually, somehow the capabilities and the devid's will come from the MCP -
+ *** probably after it looks at a setup file or does a global RF capability message
+ ***
+ ***   For now we just make up the capability  - the devid was already passed down by the MCP
+ ***   and really just matches the minion ID right now
+ ***
+ ***/
+
+    
     minion->S.cap|=PD_NES;	// add the NES capability
     
     DCMSG(BLUE,"MINION %d state is initialized as devid %lld", minion->mID,htonll(minion->devid));
@@ -716,15 +737,9 @@ void *minion_thread(thread_data_t *minion){
     }
 #endif
 
-#if 1
-    // shouldnt neet to be non-blocking because we always use a select before reading it
-    // set the MCP socket to be non-blocking - we have other work to do
-    // besides listening to CLU!
-    fcntl(minion->mcp_sock, F_SETFL, O_NONBLOCK);
-#endif
-    
+    // shouldnt neet to be non-blocking because we always use a select before reading it   
     // now we must get a connection to the range control
-    // computer (RCC) using fasit.   make it non-blocking
+    // computer (RCC) using fasit.
 
     minion->rcc_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(minion->rcc_sock < 0)   {
@@ -749,39 +764,8 @@ void *minion_thread(thread_data_t *minion){
 
     DCMSG(BLUE,"MINION %d has a socket to a RCC", minion->mID);
 
-    // not sure why this section can't go in the main loop, but it borks up the Cert tool if it is.
-#if 1    
-    // check to see if there is something to read using select() , before actually reading
-    // now read it using the new routine    
-    result = read_FASIT_msg(minion, buf, BufSize);
 
-    // message 100 is responded with a 2111 as in st_client.cpp
-    // build a response here
-
-    defHeader(2111,&rhdr,minion->seq++);	// fills in the default values for the response header 
-    rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2111));
-
-    // set response
-    msg.response.rnum = htons(100);
-    msg.response.rseq = rhdr.seq;
-
-    // fill message
-    msg.body.devid = minion->devid; // devid = Mac address
-
-	    /** we could just copy them all over, but this is obvious  **/
-    msg.body.flags = 0; // Zero the flags
-    if (minion->S.cap&PD_NES){
-	msg.body.flags |= PD_NES;
-    }
-    if (minion->S.cap&PD_GPS){
-	msg.body.flags |= PD_GPS;
-    }
-    if (minion->S.cap&PD_MILES){
-	msg.body.flags |= PD_MILES;
-    }
-    write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2111));
-#endif
-
+    //   this is a handshake message sent back to the MCP informing it that we have a FASIT connection
 #if 0
     sprintf(mbuf,"MINION %d msg %d I am connected to an RCC",minion->mID,i);
     result=write(minion->mcp_sock, mbuf, strlen(mbuf));

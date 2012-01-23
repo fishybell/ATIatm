@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     struct timeval timeout;
 
     // MAX_NUM_Minions must be greater than minnum
-    minnum = 1;
+    minnum = 2;
 
     DCMSG(RED,"MCP will start  %d minions",minnum);
 
