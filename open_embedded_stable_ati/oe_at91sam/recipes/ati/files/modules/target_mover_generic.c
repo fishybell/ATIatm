@@ -34,15 +34,15 @@ module_param(ki_d, int, S_IRUGO);
 module_param(kd_m, int, S_IRUGO);
 module_param(kd_d, int, S_IRUGO);
 
-static char* TARGET_NAME[] = {"old infantry mover","armor mover","infantry mover","error"};
-static char* MOVER_TYPE[] = {"infantry","armor","infantry","error"};
+static char* TARGET_NAME[] = {"old infantry mover","armor mover","48v infantry mover","48v soft-reverse infantry mover","error"};
+static char* MOVER_TYPE[] = {"infantry","armor","infantry","infantry","error"};
 
 // continue moving on leg or quad interrupt or neither
-static int CONTINUE_ON[] = {2,1,2,0}; // leg = 1, quad = 2, both = 3, neither = 0
+static int CONTINUE_ON[] = {2,1,2,2,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
-static int TIMEOUT_IN_MSECONDS[] = {1000,12000,1000,0};
-static int MOVER_DELAY_MULT[] = {6,2,6,0};
+static int TIMEOUT_IN_MSECONDS[] = {1000,12000,1000,1000,0};
+static int MOVER_DELAY_MULT[] = {6,2,6,6,0};
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -54,63 +54,63 @@ static int MOVER_DELAY_MULT[] = {6,2,6,0};
 #define MOVER_DIRECTION_STOPPED_FAULT	3
 
 // the maximum allowed speed ticks
-//static int NUMBER_OF_SPEEDS[] = {10,20,10,0};
-static int NUMBER_OF_SPEEDS[] = {100,200,200,0};
-static int MIN_SPEED[] = {15,20,10,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
+//static int NUMBER_OF_SPEEDS[] = {10,20,10,10,0};
+static int NUMBER_OF_SPEEDS[] = {100,200,200,200,0};
+static int MIN_SPEED[] = {15,20,10,10,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
-static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0};
-static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0};
+static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0,0};
+static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0};
 
 // the paremeters of the velocity ramp up
 #ifdef TESTING_MAX
-static int RAMP_UP_TIME_IN_MSECONDS[] = {1,1,1,0};
-static int RAMP_DOWN_TIME_IN_MSECONDS[] = {1,1,1,0};
+static int RAMP_UP_TIME_IN_MSECONDS[] = {1,1,1,1,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {1,1,1,1,0};
 #else
-static int RAMP_UP_TIME_IN_MSECONDS[] = {5,250,5,0};
-static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,5,0};
+static int RAMP_UP_TIME_IN_MSECONDS[] = {5,250,5,5,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,5,5,0};
 #endif
-//static int RAMP_STEPS[] = {25,100,25,0};
-static int RAMP_STEPS[] = {3,5,3,0};
-static int IGNORE_RAMP[] = {0,0,0,0}; // MITs currently completely ignore the ramp function
+//static int RAMP_STEPS[] = {25,100,25,25,0};
+static int RAMP_STEPS[] = {3,5,3,3,0};
+static int IGNORE_RAMP[] = {0,0,0,0,0}; // MITs currently completely ignore the ramp function
 
 // the parameters needed for PID speed control
 // old method
 #if 0
-static int PID_HZ[]        = {20,100,20,1};
-static int PID_DELTA_T[]   = {50,10,50,1}; // inversely proportial to HZ (ie 100 dt = 1000 ms / 100 hz)
-static int PID_GAIN_MULT[] = {10,1000,1,0}; // proportional gain numerator
-static int PID_GAIN_DIV[]  = {275,1000,15,1}; // proportional gain denominator
-static int PID_TI_MULT[]   = {25,1,2500,1}; // time integral numerator
-static int PID_TI_DIV[]    = {1,1,1,1}; // time integral denominator
-static int PID_TD_MULT[]   = {1,1,2,1}; // time derivitive numerator
-static int PID_TD_DIV[]    = {10,1,1,1}; // time derivitive denominator
+static int PID_HZ[]        = {20,100,20,20,1};
+static int PID_DELTA_T[]   = {50,10,50,50,1}; // inversely proportial to HZ (ie 100 dt = 1000 ms / 100 hz)
+static int PID_GAIN_MULT[] = {10,1000,1,1,0}; // proportional gain numerator
+static int PID_GAIN_DIV[]  = {275,1000,15,15,1}; // proportional gain denominator
+static int PID_TI_MULT[]   = {25,1,2500,2500,1}; // time integral numerator
+static int PID_TI_DIV[]    = {1,1,1,1,1}; // time integral denominator
+static int PID_TD_MULT[]   = {1,1,2,1,1}; // time derivitive numerator
+static int PID_TD_DIV[]    = {10,1,1,1,1}; // time derivitive denominator
 #endif
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- standard
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- standard
-// static int PID_KP_MULT[]   = {3, 2, 3, 0}; // proportional gain numerator
-// static int PID_KP_DIV[]    = {5, 5, 5, 0}; // proportional gain denominator
-// static int PID_KI_MULT[]   = {2, 1, 2, 0}; // integral gain numerator
-// static int PID_KI_DIV[]    = {24575, 61440, 24575, 0}; // integral gain denominator
-// static int PID_KD_MULT[]   = {8847, 12288, 8847, 0}; // derivitive gain numerator
-// static int PID_KD_DIV[]    = {4, 5, 4, 0}; // derivitive gain denominator
+// static int PID_KP_MULT[]   = {3, 2, 3, 3, 0}; // proportional gain numerator
+// static int PID_KP_DIV[]    = {5, 5, 5, 5, 0}; // proportional gain denominator
+// static int PID_KI_MULT[]   = {2, 1, 2, 5, 0}; // integral gain numerator
+// static int PID_KI_DIV[]    = {24575, 61440, 24575, 24575, 0}; // integral gain denominator
+// static int PID_KD_MULT[]   = {8847, 12288, 8847, 8847, 0}; // derivitive gain numerator
+// static int PID_KD_DIV[]    = {4, 5, 4, 4, 0}; // derivitive gain denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot -- due to throttle cut-off from motor controller, had to adjust by hand afterwards
-static int PID_KP_MULT[]   = {1, 2, 1, 0}; // proportional gain numerator
-static int PID_KP_DIV[]    = {4, 15, 3, 0}; // proportional gain denominator
-static int PID_KI_MULT[]   = {15, 1, 15, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {475150, 184320, 47515, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {190060, 32768, 190060, 0}; // derivitive gain numerator
-static int PID_KD_DIV[]    = {15, 15, 15, 0}; // derivitive gain denominator
+static int PID_KP_MULT[]   = {1, 2, 1, 1, 0}; // proportional gain numerator
+static int PID_KP_DIV[]    = {4, 15, 3, 3, 0}; // proportional gain denominator
+static int PID_KI_MULT[]   = {15, 1, 15, 15, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {475150, 184320, 47515, 47515, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {190060, 32768, 190060, 190060, 0}; // derivitive gain numerator
+static int PID_KD_DIV[]    = {15, 15, 15, 15, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
-static int MIN_EFFORT[]    = {1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {1000, 1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
-static int MIN_EFFORT[]    = {115, 175, 1, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {115, 175, 1, 1, 0}; // minimum effort given to ensure motor moves
 #endif
-static int SPEED_AFTER[]   = {1, 3, 1, 0}; // clamp effort if we hit this many correct values in a row
-static int SPEED_CHANGE[]  = {40, 30, 40, 0}; // unclamp if the error is bigger than this
-static int ADJUST_PID_P[]  = {0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
-static int MAX_ACCEL[]     = {500, 500, 1000, 0}; // maximum effort change in one step
+static int SPEED_AFTER[]   = {1, 3, 1, 1, 0}; // clamp effort if we hit this many correct values in a row
+static int SPEED_CHANGE[]  = {40, 30, 40, 40, 0}; // unclamp if the error is bigger than this
+static int ADJUST_PID_P[]  = {0, 0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
+static int MAX_ACCEL[]     = {500, 500, 1000, 1000, 0}; // maximum effort change in one step
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -128,8 +128,8 @@ static int MAX_ACCEL[]     = {500, 500, 1000, 0}; // maximum effort change in on
 #define FAULT_WRONG_DIRECTION_DETECTED                     12
 #define FAULT_STOPPED_DUE_TO_STOP_COMMAND                  13
 
-static int MOTOR_PWM_FWD[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_FWD_POS if PWM on H-bridge
-static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_REV_POS if PWM on H-bridge
+static int MOTOR_PWM_FWD[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_FWD_POS if PWM on H-bridge
+static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_REV_POS if PWM on H-bridge
 #define MOTOR_PWM_F (reverse ? MOTOR_PWM_REV[mover_type] : MOTOR_PWM_FWD[mover_type])
 #define MOTOR_PWM_R (reverse ? MOTOR_PWM_FWD[mover_type] : MOTOR_PWM_REV[mover_type])
 
@@ -137,24 +137,24 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
 // RA - low time setting - cannot exceed RC
 // RB - low time setting - cannot exceed RC
-static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0};
-static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0};
-//static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
-//static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x01F0,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x01F0,0};
+static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0x1180,0};
+static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0x1180,0};
+//static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
+//static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x01F0,0x01F0,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x01F0,0x01F0,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
-static int MOTOR_PWM_CHANNEL[] = {1,1,1,0};		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,0};		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 #define ENCODER_PWM_CHANNEL		0				// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 
 #define MAX_TIME	0x10000
 #define MAX_OVER	0x10000
-static int RPM_K[] = {983040, 983040, 983040, 0}; // CLOCK * 60 seconds * 1/2 cycle
-static int VELO_K[] = {1680, 1344, 1680, 0}; // rpm/mph*10
-static int INCHES_PER_TICK[] = {314, 393, 314, 0}; // 5:1 ratio 10 inch / 2, 2:1 ratio 5 inch / 2, etc.
-static int TICKS_PER_LEG[] = {2292, 1833, 2292, 0}; // 5:1 ratio 10 inch wheel 6 ft leg, 2:1 ratio 5 inch wheel 6 ft leg, etc.
+static int RPM_K[] = {983040, 983040, 983040, 983040, 0}; // CLOCK * 60 seconds * 1/2 cycle
+static int VELO_K[] = {1680, 1344, 1680, 1680, 0}; // rpm/mph*10
+static int INCHES_PER_TICK[] = {314, 393, 314, 314, 0}; // 5:1 ratio 10 inch / 2, 2:1 ratio 5 inch / 2, etc.
+static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 0}; // 5:1 ratio 10 inch wheel 6 ft leg, 2:1 ratio 5 inch wheel 6 ft leg, etc.
 #define TICKS_DIV 100
 
 // to keep updates to the file system in check somewhat
@@ -170,7 +170,7 @@ static int TICKS_PER_LEG[] = {2292, 1833, 2292, 0}; // 5:1 ratio 10 inch wheel 6
 
 
 // external motor controller polarity
-static int OUTPUT_MOVER_PWM_SPEED_ACTIVE[] = {ACTIVE_HIGH,ACTIVE_LOW,ACTIVE_LOW,0};
+static int OUTPUT_MOVER_PWM_SPEED_ACTIVE[] = {ACTIVE_HIGH,ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,0};
 
 // structure to access the timer counter registers
 static struct atmel_tc * tc = NULL;
@@ -186,10 +186,10 @@ module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only 
 #define INPUT_MOVER_TRACK_HOME	(reverse ? INPUT_MOVER_END_OF_TRACK_1 : INPUT_MOVER_END_OF_TRACK_2)
 #define INPUT_MOVER_TRACK_END	(reverse ? INPUT_MOVER_END_OF_TRACK_2 : INPUT_MOVER_END_OF_TRACK_1)
 
-static bool PWM_H_BRIDGE[] = {false,false,false,false};
-static bool OUTPUT_H_BRIDGE[] = {false,true,true,false};
-static bool USE_BRAKE[] = {true,false,false,false};
-static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false};
+static bool PWM_H_BRIDGE[] = {false,false,false,false,false};
+static bool DIRECTIONAL_H_BRIDGE[] = {false,true,true,false,false};
+static bool USE_BRAKE[] = {true,false,false,true,false};
+static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false, false};
 
 // Non-H-Bridge : map motor controller reverse and forward signals based on the 'reverse' parameter
 #define OUTPUT_MOVER_FORWARD	(reverse ? OUTPUT_MOVER_DIRECTION_REVERSE : OUTPUT_MOVER_DIRECTION_FORWARD)
@@ -421,7 +421,7 @@ static void do_event(int etype) {
 static int hardware_motor_on(int direction)
     {
     // turn on directional lines
-    if (OUTPUT_H_BRIDGE[mover_type])
+    if (DIRECTIONAL_H_BRIDGE[mover_type])
         {
         // H-bridge handling
         // de-assert the neg inputs to the h-bridge
@@ -475,7 +475,7 @@ static int hardware_motor_on(int direction)
         {
         if (PWM_H_BRIDGE[mover_type]) {
             at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-        } else if (OUTPUT_H_BRIDGE[mover_type]) {
+        } else if (DIRECTIONAL_H_BRIDGE[mover_type]) {
             at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
@@ -493,7 +493,7 @@ static int hardware_motor_on(int direction)
         {
         if (PWM_H_BRIDGE[mover_type]) {
             at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-        } else if (OUTPUT_H_BRIDGE[mover_type]) {
+        } else if (DIRECTIONAL_H_BRIDGE[mover_type]) {
             at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
@@ -549,7 +549,7 @@ static int hardware_motor_off(void)
     atomic_set(&movement_atomic, MOVER_DIRECTION_STOP);
 
     // turn off directional lines
-    if (OUTPUT_H_BRIDGE[mover_type])
+    if (DIRECTIONAL_H_BRIDGE[mover_type])
         {
         // de-assert the all inputs to the h-bridge
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -1237,7 +1237,7 @@ static int hardware_init(void)
         }
 
     // always put the H-bridge circuitry in the right state from the beginning
-    if (OUTPUT_H_BRIDGE[mover_type]) {
+    if (DIRECTIONAL_H_BRIDGE[mover_type]) {
         // de-assert the neg inputs to the h-bridge
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -1302,7 +1302,7 @@ static int hardware_exit(void)
         }
 
     // always put the H-bridge circuitry in the right state on shutdown
-    if (OUTPUT_H_BRIDGE[mover_type]) {
+    if (DIRECTIONAL_H_BRIDGE[mover_type]) {
         // de-assert the neg inputs to the h-bridge
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -1851,7 +1851,7 @@ static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const
     __raw_writel(value, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
     __raw_writel(value, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
     // turn on directional lines
-    if (OUTPUT_H_BRIDGE[mover_type]) {
+    if (DIRECTIONAL_H_BRIDGE[mover_type]) {
         // H-bridge handling
         // de-assert the neg inputs to the h-bridge
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -1871,7 +1871,7 @@ static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const
     // forward for H-Bridge stuff
     if (PWM_H_BRIDGE[mover_type]) {
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-    } else if (OUTPUT_H_BRIDGE[mover_type]) {
+    } else if (DIRECTIONAL_H_BRIDGE[mover_type]) {
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
     }
 
