@@ -1,0 +1,2 @@
+#!/bin/bash
+./copy_group sam10a sam106 sam108 sam104 sam102 sam103 sam101 sam100

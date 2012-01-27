@@ -1,10 +1,29 @@
 #!/usr/bin/tclsh
+
+# remember expect string for doing the ssh/scp session
+set dossh {
+    while 1 {
+        expect {
+            -re {.*word:.*} {
+                send "shoot\r"
+            }
+            -re {.*yes/no.*} {
+                send "yes\r"
+            }
+            eof {
+                break
+            }
+        }
+    }
+}
+
 package require Expect
 package require Tclx
 fconfigure stdin -blocking 1            ;#expect bug?
 
-if  {$argc == 2} {
-    lassign $argv num1 num2
+set hosts {}
+if  {$argc != 0} {
+    set hosts $argv
 } else {
     puts -nonewline "first one (samXXX)? "
     flush stdout
@@ -12,7 +31,6 @@ if  {$argc == 2} {
     puts -nonewline "last one (samXXX)? "
     flush stdout
     gets stdin num2
-}
 
 # find list of targets
 if {![string match sam* $num1] || ![string match sam* $num2]} {
@@ -45,26 +63,12 @@ if {$w1} {set sam "samw"}
 #}
 #exit
 
-# remember expect string for doing the ssh/scp session
-set dossh {
-    while 1 {
-        expect {
-            -re {.*word:.*} {
-                send "shoot\r"
-            }
-            -re {.*yes/no.*} {
-                send "yes\r"
-            }
-            eof {
-                break
-            }
-        }
-    }
-}
-
 # copy to each target in order
 for {set i $n1} {$i <= $n2} {incr i} {
-    set host "$sam[format %x $i]"
+    lappend hosts "$sam[format %x $i]"
+}
+}
+foreach host $hosts {
     puts "####################################################################"
     puts "# Copying to $host"
     puts "####################################################################"
