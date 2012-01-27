@@ -1,0 +1,83 @@
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+
+<title>TCP/IP Sockets in C:  Practical Guide for Programmers</title>
+</head><body>
+
+<table>
+<tbody><tr>
+<td>
+<img src="textcode_files/cpractical.gif"></td>
+<td>Below is the example source code from "TCP/IP Sockets in C:
+Practical Guide for Programmers" by Michael J. Donahoo and Kenneth
+L. Calvert.  This book can be ordered at your favorite local bookstore
+or online.  <p> <a href="http://www.mkp.com/books_catalog/catalog.asp?ISBN=1-55860-826-5">Official
+Book Website</a>
+</p></td></tr></tbody></table>
+<p>
+
+<b>Disclaimer:</b> The purpose of this book is to provide general
+information about network programming as of the book's publication
+date. The authors have included sample code that is intended for the
+sole purpose of illustrating the use of the sockets API. Neither the
+authors nor the publisher are aware of any third party patents or
+proprietary rights that may cover any sample of any kind. The authors
+and the Publisher DISCLAIM ALL EXPRESS AND IMPLIED WARRANTIES,
+including warranties of merchantability and fitness for any particular
+purpose. Your use or reliance upon any sample code or other
+information in this book will be at your own risk. No one should use
+any sample code (or illustrations) from this book in any software
+application without first obtaining competent legal advice.
+</p><p>
+Example code: 
+</p><ul>
+<li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/TCPEchoClient.c">TCPEchoClient.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/DieWithError.c">DieWithError.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/TCPEchoServer.c">TCPEchoServer.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/HandleTCPClient.c">HandleTCPClient.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/UDPEchoClient.c">UDPEchoClient.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/UDPEchoServer.c">UDPEchoServer.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/SigAction.c">SigAction.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/UDPEchoServer-SIGIO.c">UDPEchoServer-SIGIO.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/UDPEchoClient-Timeout.c">UDPEchoClient-Timeout.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/TCPEchoServer-Fork.c">TCPEchoServer-Fork.c (without
+SIGCHLD)</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/TCPEchoServer-Fork-SIGCHLD.c">TCPEchoServer-Fork-SIGCHLD.c (with SIGCHLD)</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/TCPEchoServer.h">TCPEchoServer.h</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/CreateTCPServerSocket.c">CreateTCPServerSocket.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/AcceptTCPConnection.c">AcceptTCPConnection.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/TCPEchoServer-Thread.c">TCPEchoServer-Thread.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/TCPEchoServer-ForkN.c">TCPEchoServer-ForkN.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/TCPEchoServer-Select.c">TCPEchoServer-Select.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/BroadcastSender.c">BroadcastSender.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/BroadcastReceiver.c">BroadcastReceiver.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/MulticastSender.c">MulticastSender.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/MulticastReceiver.c">MulticastReceiver.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/ResolveName.c">ResolveName.c</a>
+</li><li><a href="http://cs.baylor.edu/%7Edonahoo/practical/CSockets/code/ResolveService.c">ResolveService.c</a>
+</li></ul>
+<li>Generally, compilation is as follows:
+<ul>
+  <li> Linux: gcc -o TCPEchoClient TCPEchoClient.c DieWithError.c </li>
+  <li> Solaris: gcc -o  TCPEchoClient TCPEchoClient.c DieWithError.c -lsocket -lnsl</li>
+  <li> Both:  Add -lpthread to both Linux and Solaris for the threads example </li>
+</ul>
+</li><li>Note for older machines (e.g., SVR4 variants such as Solaris 2.5 and before):  A few
+more include files may be necessary.  If you get compile errors about
+u_short, try editing the include files as follows (<b>order
+matters</b>):
+<listing>#include &lt;stdio.h&gt;      /* for printf() and fprintf() */
+#include &lt;sys/types.h&gt;  /* for Socket data types */
+#include &lt;sys/socket.h&gt; /* for socket(), connect(), send(), and recv() */
+#include &lt;netinet/in.h&gt; /* for IP Socket data types */
+#include &lt;arpa/inet.h&gt;  /* for sockaddr_in and inet_addr() */
+#include &lt;stdlib.h&gt;     /* for atoi() */
+#include &lt;string.h&gt;     /* for memset() */
+#include &lt;unistd.h&gt;     /* for close() */
+</listing>
+
+<p align="right">
+<a href="http://www.mkp.com/books_catalog/catalog.asp?ISBN=1-55860-686-6">
+<img src="textcode_files/MK_blue.html" border="0"></a>
+
+</p></li></body></html>
