@@ -737,7 +737,6 @@ void *minion_thread(thread_data_t *minion){
     }
 #endif
 
-    // shouldnt neet to be non-blocking because we always use a select before reading it   
     // now we must get a connection to the range control
     // computer (RCC) using fasit.
 

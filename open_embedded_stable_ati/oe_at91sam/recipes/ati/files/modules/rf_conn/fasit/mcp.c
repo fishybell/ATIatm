@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include "mcp.h"
@@ -34,24 +36,77 @@ uint64 htonll( uint64 id){
     
     return(id);
 }
+#define BufSize 1024
 
 int main(int argc, char **argv) {
     int i, rc, mID,child,result,msglen,highest_minion,minnum,error;
-    char buf[1024];
-    char cbuf[1024];
+    char buf[BufSize];
+    char RFbuf[BufSize];
+    char cbuf[BufSize];
+    struct sockaddr_in address;
+    int RF_sock;
     fd_set minion_fds;
     int minions_ready;
     struct timeval timeout;
 
-    // MAX_NUM_Minions must be greater than minnum
-    minnum = 2;
+    // MAX_NUM_Minions is defined in mcp.h, and minnum - the number of minions to create must be less.
 
+    minnum = 1;
+
+/****************************************************************
+ ******
+ ******   connect to the RF Master process.
+ ******     it might reside on different hardware
+ ******   (ie a lifter board with a radio)
+ ******    
+ ******   we send stuff to it that we want to go out the RF
+ ******   and we listen to it for responses from RF
+ ******
+ ****************************************************************/
+
+    RF_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if(RF_sock < 0)   {
+	perror("socket() failed");
+    }
+
+    /* start with a clean address structure */
+    memset(&address, 0, sizeof(struct sockaddr_in));
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = inet_addr("127.0.0.1");	// these need to be arguments, or something other than hard code
+    address.sin_port = htons(4004);				// same here
+
+    result=connect(RF_sock,(struct sockaddr *) &address, sizeof(struct sockaddr_in));
+    if (result<0){
+	strerror_r(errno,buf,BufSize);
+	DCMSG(RED,"MCP RF Master server not found! connect(...,%s:%d,...) error : %s  ", inet_ntoa(address.sin_addr),htons(address.sin_port),buf);
+	exit(-1);
+    }
+
+    // we now have a socket to the RF Master.
+
+    DCMSG(RED,"MCP has a socket to the RF Master server");
+
+
+/****************************************************************
+ ******
+ ******    start the minions
+ ******
+ ******
+ ******
+ ******
+ ******
+ ******
+ ****************************************************************/
+    
     DCMSG(RED,"MCP will start  %d minions",minnum);
 
     // loop until somebody wants to exit, or something
     while(1) {
 
-	// determine what slaves are out there
+	// determine what slaves are out there some how, and create just
+	// the number of 
+	
 	// lets only make minnum minions, so they don't take over the system like magic brooms are likely to do
 	for (mID=0; mID<minnum; mID++) {
 	    // if we have a new slave, make a minion for it
@@ -111,20 +166,10 @@ int main(int argc, char **argv) {
 #if 1
 	//  at this point we have a bunch of minions with open connections that
 	//  we should be able to exploit.
+	// this is just a communication test, really
 	for (mID=0; mID<minnum; mID++){
 	    if (minions[mID].status!=S_closed){
-		sprintf(cbuf,"minion %d  expose!", mID);
-		result=write(minions[mID].minion, cbuf, strlen(cbuf));
-		if (result >= 0){
-		    DCMSG(RED,"sent %d chars to minion %d  --%s--",strlen(cbuf), mID,cbuf);
-		} else {
-		    perror("writing stream message");
-		}
-	    }
-	}
-	for (mID=0; mID<minnum; mID++) {
-	    if (minions[mID].status!=S_closed){
-		sprintf(cbuf,"minion %d  conceal!", mID);
+		sprintf(cbuf,"minion %d  Respond!", mID);
 		result=write(minions[mID].minion, cbuf, strlen(cbuf));
 		if (result >= 0){
 		    DCMSG(RED,"sent %d chars to minion %d  --%s--",strlen(cbuf), mID,cbuf);
@@ -134,7 +179,7 @@ int main(int argc, char **argv) {
 	    }
 	}
 #endif
-	
+
 	while(1){
 
 	    /* create a fd_set so we can monitor the minions*/
