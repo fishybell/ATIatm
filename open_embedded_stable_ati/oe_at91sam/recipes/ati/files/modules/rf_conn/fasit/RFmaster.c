@@ -2,7 +2,6 @@
 #include <errno.h>
 #include <signal.h>
 #include <sys/epoll.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -11,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h> /* POSIX terminal control definitions */
+#include <unistd.h>
 
 #include "mcp.h"
 
@@ -22,11 +22,17 @@
      * Returns the file descriptor on success or -1 on error.
      */
 
+
+
 int open_port(void){
     int fd; /* File descriptor for the port */
+    struct termios my_termios;
+    struct termios new_termios;
+    
     char sport[]="/dev/ttyS0",buf[200];
     
     fd = open(sport, O_RDWR | O_NOCTTY | O_NDELAY);
+
     if (fd == -1) {
        /*
 	* Could not open the port.
@@ -35,13 +41,24 @@ int open_port(void){
 	DCMSG(RED,"RFmaster open_port: Unable to open %s - %s \n", sport,buf);
     } else {
 	fcntl(fd, F_SETFL, 0);
+
+	tcgetattr( fd, &my_termios );
+	my_termios.c_cflag &= ~CBAUD;
+	my_termios.c_cflag |= B19200;
+//	my_termios.c_cflag |= CRTSCTS;	// if we had flow control
+	
+	tcsetattr( fd, TCSANOW, &my_termios );
+	tcgetattr( fd, &new_termios );
+	if ( memcmp( (void *) &my_termios, (void *) &new_termios,sizeof( my_termios )) != 0 ) {
+	    DCMSG(RED,"RFmaster tcsetattr: Unable to set baud \n");
+	}
+
 	DCMSG(RED,"RFmaster serial port %s open and ready \n", sport);
 	
     }
     
     return (fd);
 }
-
 
 
 
