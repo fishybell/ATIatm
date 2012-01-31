@@ -189,6 +189,7 @@ module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only 
 static bool PWM_H_BRIDGE[] = {false,false,false,false,false};
 static bool DIRECTIONAL_H_BRIDGE[] = {false,true,true,false,false};
 static bool USE_BRAKE[] = {true,false,false,true,false};
+static bool CONTACTOR_H_BRIDGE[] = {false, false, false, true, false};
 static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false, false};
 
 // Non-H-Bridge : map motor controller reverse and forward signals based on the 'reverse' parameter
@@ -435,6 +436,9 @@ static int hardware_motor_on(int direction)
         }
     else
         {
+        if (CONTACTOR_H_BRIDGE[mover_type] && !MOTOR_CONTROL_H_BRIDGE[mover_type]) {
+            at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // main contacter on
+        }
         // non-H-bridge handling
         if (direction == MOVER_DIRECTION_REVERSE)
             {
@@ -562,6 +566,9 @@ static int hardware_motor_off(void)
         {
         at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
+        if (CONTACTOR_H_BRIDGE[mover_type] && !MOTOR_CONTROL_H_BRIDGE[mover_type]) {
+            at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // main contacter off
+        }
         }
 
     return 0;
@@ -2287,7 +2294,7 @@ static void movement_change(struct work_struct * work)
 //---------------------------------------------------------------------------
 int error_mfh(struct sk_buff *skb, void *msg) {
     // the msg argument is a null-terminated string
-    nla_put_string(skb, GEN_STRING_A_MSG, msg);
+    return nla_put_string(skb, GEN_STRING_A_MSG, msg);
 }
 
 //---------------------------------------------------------------------------
