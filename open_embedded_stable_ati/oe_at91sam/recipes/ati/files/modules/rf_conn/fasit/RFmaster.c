@@ -93,8 +93,8 @@ void DieWithError(char *errorMessage){
 
 void HandleRF(int MCPsock,int RFfd){
 #define MbufSize 4096
-    char Mbuf[MbufSize];        /* Buffer MCP socket */
-    int MsgSize,sock_ready;                    /* Size of received message */
+    char Mbuf[MbufSize], buf[200];        /* Buffer MCP socket */
+    int MsgSize,result,sock_ready;                    /* Size of received message */
     fd_set rf_or_mcp;
     struct timeval timeout;
     
@@ -117,6 +117,9 @@ void HandleRF(int MCPsock,int RFfd){
 	 *   the RFmaster to just pass data back and forth.
 	 */
 
+
+	DCMSG(YELLOW,"RFmaster waiting for select(rf or mcp)");
+
 	timeout.tv_sec=0;
 	timeout.tv_usec=100000;	
 	sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, NULL);
@@ -135,9 +138,11 @@ void HandleRF(int MCPsock,int RFfd){
 		DieWithError("recv() failed");
 
 	    // blidly write it  to the  radio
-	    write(RFfd,Mbuf,MsgSize);
-	    DCMSG(BLUE,"Wrote \"%s\" to the Radio",Mbuf);
-	    
+	    result=write(RFfd,Mbuf,MsgSize);
+	    sprintf(buf,"RFmaster:  attempt to write %d chars to radio, %d written",MsgSize,result);
+	    DCMSG_HEXB(BLUE,buf,Mbuf,MsgSize);
+
+	    memset(Mbuf,0,MsgSize+3);
 	}
 
 	//  if we have data to read from the RF, read it then blast it back upstream to the MCP
@@ -149,13 +154,13 @@ void HandleRF(int MCPsock,int RFfd){
 		DieWithError("read(RFfd,...) failed");
 
 	    // blidly write it  to the MCP
-	    write(MCPsock,Mbuf,MsgSize);
+	    result=write(MCPsock,Mbuf,MsgSize);
+	    sprintf(buf,"RFmaster:  attempt to write %d chars to MCP, %d written",MsgSize,result);
+	    DCMSG_HEXB(GREEN,buf,Mbuf,MsgSize);
+	    memset(Mbuf,0,MsgSize+3);
+
 	    DCMSG(BLUE,"Wrote \"%s\" to the MCP",Mbuf);
 	}
-
- //   /* Send received string and receive again until end of transmission */
- //   if (send(MCPsock, Mbuf, MsgSize, 0) != MsgSize)
-//	DieWithError("send() failed");
 
     }
     
