@@ -14,22 +14,17 @@
 
 #include "mcp.h"
 
-
-
     /*
-     * 'open_port()' - Open serial port 1.
+     * 'open_port(char *sport)' - Open serial port device 'sport'.
      *
      * Returns the file descriptor on success or -1 on error.
      */
 
-
-
-int open_port(void){
-    int fd; /* File descriptor for the port */
+int open_port(char *sport){
+    int fd,speed,myspeed; /* File descriptor for the port */
     struct termios my_termios;
     struct termios new_termios;
-    
-    char sport[]="/dev/ttyS0",buf[200];
+    char buf[200];
     
     fd = open(sport, O_RDWR | O_NOCTTY | O_NDELAY);
 
@@ -49,11 +44,15 @@ int open_port(void){
 	
 	tcsetattr( fd, TCSANOW, &my_termios );
 	tcgetattr( fd, &new_termios );
-	if ( memcmp( (void *) &my_termios, (void *) &new_termios,sizeof( my_termios )) != 0 ) {
-	    DCMSG(RED,"RFmaster tcsetattr: Unable to set baud \n");
+	speed = cfgetospeed( &new_termios );
+	myspeed = cfgetospeed( &my_termios );	
+	if ( speed != myspeed ){
+	    DCMSG(RED,"RFmaster tcsetattr: Unable to set baud to %d, currently %d \n",myspeed,speed);
+	} else {
+	    DCMSG(GREEN,"RFmaster  open and ready at %d baud (B19200=%d)\n",speed,B19200);
 	}
 
-	DCMSG(RED,"RFmaster serial port %s open and ready \n", sport);
+	DCMSG(GREEN,"RFmaster serial port %s open and ready \n", sport);
 	
     }
     
@@ -95,21 +94,68 @@ void DieWithError(char *errorMessage){
 void HandleRF(int MCPsock,int RFfd){
 #define MbufSize 4096
     char Mbuf[MbufSize];        /* Buffer MCP socket */
-    int MsgSize=1;                    /* Size of received message */
-
+    int MsgSize,sock_ready;                    /* Size of received message */
+    fd_set rf_or_mcp;
+    struct timeval timeout;
+    
 /**   loop until we lose connection  **/
-    while(MsgSize){
+    while(1){
 
 	/*   do a select to see if we have a message from either the RF or the MCP  */
 	/* then based on the source, send the message to the destination  */
-	
-    /* Receive message from MCP */
-    if ((MsgSize = recv(MCPsock, Mbuf, MbufSize, 0)) < 0)
-	DieWithError("recv() failed");
 
-    /* Send received string and receive again until end of transmission */
-    if (send(MCPsock, Mbuf, MsgSize, 0) != MsgSize)
-	DieWithError("send() failed");
+	/* create a fd_set so we can monitor both the mcp and the connection to the RCC*/
+	FD_ZERO(&rf_or_mcp);
+	FD_SET(MCPsock,&rf_or_mcp);		// we are interested hearing the mcp
+	FD_SET(RFfd,&rf_or_mcp);		// we also want to hear from the RF world
+	
+	/*   actually for now we will block until we have data - no need to timeout [yet?]
+	 *     I guess a timeout that will make sense later is if the radio is ready for data
+	 *   and we have no MCP data to send, then we should make the rounds polling
+	 *   for status.  At the moment I don't want to impliment this at the RFmaster level,
+	 *   for my initial working code I am shooting for the MCP to do all the work and
+	 *   the RFmaster to just pass data back and forth.
+	 */
+
+	timeout.tv_sec=0;
+	timeout.tv_usec=100000;	
+	sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, NULL);
+
+	if (sock_ready<0){
+	    strerror_r(errno,Mbuf,200);
+	    DCMSG(RED,"RFmaster select error: %s", Mbuf);
+	    exit(-1);
+	}
+
+	//  if we have data to read from the MCP, read it then force it down the radio
+	//    we will have to watch to make sure we don't force down too much for the radio
+	if (FD_ISSET(MCPsock,&rf_or_mcp)){
+    /* Receive message from MCP */
+	    if ((MsgSize = recv(MCPsock, Mbuf, MbufSize, 0)) < 0)
+		DieWithError("recv() failed");
+
+	    // blidly write it  to the  radio
+	    write(RFfd,Mbuf,MsgSize);
+	    DCMSG(BLUE,"Wrote \"%s\" to the Radio",Mbuf);
+	    
+	}
+
+	//  if we have data to read from the RF, read it then blast it back upstream to the MCP
+	if (FD_ISSET(RFfd,&rf_or_mcp)){
+	    /* Receive message from RF */
+	    MsgSize = read(RFfd,Mbuf,MbufSize);
+	    
+	    if ((MsgSize = read(RFfd,Mbuf,MbufSize)) < 0)
+		DieWithError("read(RFfd,...) failed");
+
+	    // blidly write it  to the MCP
+	    write(MCPsock,Mbuf,MsgSize);
+	    DCMSG(BLUE,"Wrote \"%s\" to the MCP",Mbuf);
+	}
+
+ //   /* Send received string and receive again until end of transmission */
+ //   if (send(MCPsock, Mbuf, MsgSize, 0) != MsgSize)
+//	DieWithError("send() failed");
 
     }
     
@@ -132,33 +178,38 @@ void HandleRF(int MCPsock,int RFfd){
  *************/
 
 int main(int argc, char **argv) {
-    int serversock;			 /* Socket descriptor for server connection */
-    int MCPsock;			 /* Socket descriptor to use */
-    int RFfd;				 /* File descriptor for RFmodem serial port */
-    struct sockaddr_in ServAddr;	 /* Local address */
-    struct sockaddr_in ClntAddr;	 /* Client address */
-    unsigned short RFmasterport;	 /* Server port */
-    unsigned int clntLen;                /* Length of client address data structure */
+    int serversock;			/* Socket descriptor for server connection */
+    int MCPsock;			/* Socket descriptor to use */
+    int RFfd;				/* File descriptor for RFmodem serial port */
+    struct sockaddr_in ServAddr;	/* Local address */
+    struct sockaddr_in ClntAddr;	/* Client address */
+    unsigned short RFmasterport;	/* Server port */
+    unsigned int clntLen;               /* Length of client address data structure */
+    char ttyport[32];	/* default to ttyS0  */
+    
 
-    if (argc == 1){     /* Test for correct number of arguments */
+    printf(" argc=%d argv[0]=\"%s\" argv[1]=\"%s\" argv[2]=\"%s\" argv[3]=\"%s\"\n",argc,argv[0],argv[1],argv[2],argv[3]);
+/*    if (argc == 1){
 	RFmasterport = defaultPORT;
-	printf(" Listening on default port <%d>\n", RFmasterport);
-    } else if (argc != 2){     /* Test for correct number of arguments */
-	fprintf(stderr, "Usage:  %s <Server Port>\n", argv[0]);
-	exit(1);
-    } else {	
-	RFmasterport = atoi(argv[1]);
-	if ((RFmasterport<1)||(RFmasterport>65534)){
-	    printf(" Listening on default port <%d>\n", RFmasterport);
-	} else {
-	    fprintf(stderr, "Port out of range\n",RFmasterport);
-	    exit(1);
-	}
+	printf(" Listening on default port <%d>, comm port = <%s>\n", RFmasterport,ttyport);
     }
-
+    */
+    if (argv[1]){  
+	RFmasterport = atoi(argv[1]);
+    } else {
+	RFmasterport = defaultPORT;
+    }
+    if (argv[2]){
+	strcpy(ttyport,argv[2]);
+    } else {
+	strcpy(ttyport,"/dev/ttyS0");
+    }
+    
+    printf(" Listening on port <%d>, comm port = <%s>\n", RFmasterport,ttyport);
+    
 //   Okay,   set up the RF modem link here
 
-   RFfd=open_port(); 
+   RFfd=open_port(ttyport); 
     
 
 //  now Create socket for the incoming connection */
