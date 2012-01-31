@@ -124,7 +124,7 @@ static int charge = FALSE;
 module_param(charge, bool, S_IRUGO);
 static int shutdown = TRUE;
 module_param(shutdown, bool, S_IRUGO);
-static int shutdown_wait = 1;
+static int shutdown_wait = 2;
 module_param(shutdown_wait, int, S_IRUGO);
 static int minvoltval = 12;
 module_param(minvoltval, int, S_IRUGO);
@@ -223,29 +223,28 @@ EXPORT_SYMBOL(enable_battery_check);
 //---------------------------------------------------------------------------
 static void shutdown_soon(bool lowbat) {
     u8 data = BATTERY_SHUTDOWN;
+    char *scen;
 
     // tell the debug port we're shutting down
     delay_printk("Shutting down due to %s.\n", lowbat ? "low battery" : "user command");
 
+    // check for initial shutdown message
+    if (atomic_read(&shutdown_msg) == 0) {
+        target_kill_scenario(); // abort running scenarios
+    }
+    // look for first few shutdown messages
     if (atomic_inc_return(&shutdown_msg) < 3) {
         // let attached devices know that we're shutting down
         queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
 
-        // on command (and when we're programmed to wait) shutdown after a long delay 
-        if (!lowbat || shutdown_wait <= 0) {
-            // build shutdown scenario
-            char *scen = "\
-               {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
-               {Send;R_MOVER;NL_C_MOVE;1;0080} -- Send Stop to mover";
-            target_kill_scenario(); // abort running scenarios
-            target_scenario(scen); // send shutdown scenario
+        // build shutdown scenario
+        scen = "\
+            {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
+            {Send;R_MOVER;NL_C_MOVE;1;0080} -- Send Stop to mover";
+        target_scenario(scen); // send shutdown scenario
 
-            // shutdown in a long period of time
-            mod_timer(&shutdown_timer_list, jiffies+(shutdown_wait*HZ));
-        } else {
-            // shutdown in a short period of time
-            mod_timer(&shutdown_timer_list, jiffies+((SHUTDOWN_IN_MSECONDS*HZ)/1000));
-        }
+        // shutdown in a long period of time to give the scenario time to run
+        mod_timer(&shutdown_timer_list, jiffies+(shutdown_wait*HZ));
     }
 }
 
