@@ -469,8 +469,20 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
             }
 
             break;
-        case NL_C_DMSG:
         case NL_C_CMD_EVENT:
+            genlmsg_parse(nlh, 0, attrs, CMD_EVENT_A_MAX, cmd_event_policy);
+
+            if (attrs[CMD_EVENT_A_MSG]) {
+                struct cmd_event *et;
+                memset(et, 0, sizeof(struct cmd_event));
+                et = (struct cmd_event*)nla_data(attrs[CMD_EVENT_A_MSG]);
+                snprintf(wbuf, 1024, "Command Event to %i: cmd|%i size|%i attr|%i data|%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X\n", et->role, et->cmd, et->payload_size, et->attribute, et->payload[0], et->payload[1], et->payload[2], et->payload[3], et->payload[4], et->payload[5], et->payload[6], et->payload[7], et->payload[8], et->payload[9], et->payload[10], et->payload[11], et->payload[12], et->payload[13], et->payload[14], et->payload[15]);
+            } else {
+                snprintf(wbuf, 1024, "failed to get attribute\n");
+            }
+
+            break;
+        case NL_C_DMSG:
         case NL_C_SCENARIO:
             // ignore these
             snprintf(wbuf, 1024, "ignored unknown command %i\n", ghdr->cmd);
