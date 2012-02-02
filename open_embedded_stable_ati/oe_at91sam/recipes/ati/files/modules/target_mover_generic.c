@@ -558,7 +558,6 @@ static int hardware_motor_off(void)
     __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB)); // change to smallest value
 
     // pid stop
-    pid_effort = 0;
     pid_last_effort = 0;
 
     // turn on brake?
