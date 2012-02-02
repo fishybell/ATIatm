@@ -68,12 +68,12 @@ static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0};
 static int RAMP_UP_TIME_IN_MSECONDS[] = {1,1,1,1,0};
 static int RAMP_DOWN_TIME_IN_MSECONDS[] = {1,1,1,1,0};
 #else
-static int RAMP_UP_TIME_IN_MSECONDS[] = {5,250,5,5,0};
-static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,5,5,0};
+static int RAMP_UP_TIME_IN_MSECONDS[] = {5,250,5,250,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,5,100,0};
 #endif
 //static int RAMP_STEPS[] = {25,100,25,25,0};
-static int RAMP_STEPS[] = {3,5,3,3,0};
-static int IGNORE_RAMP[] = {0,0,0,1,0}; // MITs currently completely ignore the ramp function
+static int RAMP_STEPS[] = {3,5,3,5,0};
+static int IGNORE_RAMP[] = {0,0,0,0,0}; // MITs currently completely ignore the ramp function
 
 // the parameters needed for PID speed control
 // old method
@@ -109,7 +109,7 @@ static int MIN_EFFORT[]    = {1000, 1000, 1000, 1000, 0}; // minimum effort give
 static int MIN_EFFORT[]    = {115, 175, 1, 1, 0}; // minimum effort given to ensure motor moves
 #endif
 static int SPEED_AFTER[]   = {1, 3, 1, 1, 0}; // clamp effort if we hit this many correct values in a row
-static int SPEED_CHANGE[]  = {40, 30, 40, 40, 0}; // unclamp if the error is bigger than this
+static int SPEED_CHANGE[]  = {40, 30, 40, 1, 0}; // unclamp if the error is bigger than this
 static int ADJUST_PID_P[]  = {0, 0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
 static int MAX_ACCEL[]     = {500, 500, 1000, 1000, 0}; // maximum effort change in one step
 
@@ -142,8 +142,8 @@ static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0x1180,0};
 static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0x1180,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x01F0,0x0001,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x01F0,0x0001,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x01F0,0x001,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x01F0,0x001,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -153,6 +153,7 @@ static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,0};		// channel 0 matches TIOA0 to TIO
 #define MAX_TIME	0x10000
 #define MAX_OVER	0x10000
 static int RPM_K[] = {983040, 983040, 983040, 983040, 0}; // CLOCK * 60 seconds * 1/2 cycle
+//static int ENC_PER_REV[] = {2, 2, 2, 2, 0}; // 2 = encoder click is half a revolution
 static int VELO_K[] = {1680, 1344, 1680, 1680, 0}; // rpm/mph*10
 static int INCHES_PER_TICK[] = {314, 393, 314, 314, 0}; // 5:1 ratio 10 inch / 2, 2:1 ratio 5 inch / 2, etc.
 static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 0}; // 5:1 ratio 10 inch wheel 6 ft leg, 2:1 ratio 5 inch wheel 6 ft leg, etc.
@@ -446,10 +447,7 @@ static int hardware_motor_on(int direction)
     else
         {
         if (CONTACTOR_H_BRIDGE[mover_type] && !MOTOR_CONTROL_H_BRIDGE[mover_type]) {
-          char *msg = kmalloc(128, GFP_KERNEL);
-          snprintf(msg, 128, "Contacter on!\n");
-          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
-          kfree(msg);
+          send_nl_message_multi("Contacter on!", error_mfh, NL_C_FAILURE);
             at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // main contacter on
         }
         // non-H-bridge handling
@@ -496,12 +494,14 @@ static int hardware_motor_on(int direction)
             at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
+        if (!CONTACTOR_H_BRIDGE[mover_type]) {
         // assert pwm line
         #if PWM_BLOCK == 0
             at91_set_A_periph(MOTOR_PWM_R, PULLUP_OFF);
         #else
             at91_set_B_periph(MOTOR_PWM_R, PULLUP_OFF);
         #endif
+        }
 
         atomic_set(&movement_atomic, MOVER_DIRECTION_REVERSE);
        delay_printk("%s - %s() - reverse\n",TARGET_NAME[mover_type], __func__);
@@ -514,11 +514,13 @@ static int hardware_motor_on(int direction)
             at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
+        if (!CONTACTOR_H_BRIDGE[mover_type]) {
         #if PWM_BLOCK == 0
             at91_set_A_periph(MOTOR_PWM_F, PULLUP_OFF);
         #else
             at91_set_B_periph(MOTOR_PWM_F, PULLUP_OFF);
         #endif
+        }
 
         atomic_set(&movement_atomic, MOVER_DIRECTION_FORWARD);
        delay_printk("%s - %s() - forward\n",TARGET_NAME[mover_type], __func__);
@@ -583,10 +585,7 @@ static int hardware_motor_off(void)
         at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
         if (CONTACTOR_H_BRIDGE[mover_type] && !MOTOR_CONTROL_H_BRIDGE[mover_type]) {
-          char *msg = kmalloc(128, GFP_KERNEL);
-          snprintf(msg, 128, "Contacter off!\n");
-          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
-          kfree(msg);
+          send_nl_message_multi("Contacter off!", error_mfh, NL_C_FAILURE);
             at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // main contacter off
         }
         }
@@ -665,8 +664,8 @@ static int hardware_speed_set(int new_speed)
         // are we being told to move?
         if (atomic_read(&moving_atomic))
             {
-            // start the ramp up/down of the mover immediately
-            mod_timer(&ramp_timer_list, jiffies+(((1*HZ)/1000)));
+            // start the ramp up/down of the mover soon
+            mod_timer(&ramp_timer_list, jiffies+(((250*HZ)/1000)));
             }
         }
 
@@ -869,7 +868,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         atomic_set(&last_t, this_t);
 #ifdef ACCEL_TEST
         // did we reach the target speed?
-        if (abs(current_speed10()) >= 75) { // 7.45 mph is 12 kph
+        if (abs(current_speed10()) >= 15) { // 7.45 mph is 12 kph
             // display current position
             pos = ((INCHES_PER_TICK[mover_type]*atomic_read(&position))/TICKS_DIV);
             delay_printk("\
@@ -1171,6 +1170,8 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
 
         case 1:
         // initialize armor clock
+        case 3:
+        // initialize infantry/48v soft-reverse clock
         __raw_writel(ATMEL_TC_TIMER_CLOCK2			// Master clock/8 = 132MHz/8 ~ 16MHz
                     | ATMEL_TC_WAVE					// output mode
                     | ATMEL_TC_ACPA_SET				// set TIOA high when counter reaches "A"
@@ -1182,7 +1183,7 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
                     tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
         break;
         case 2:
-        // initialize infantry/h-bridge  clock
+        // initialize infantry/48-v hard-reverse clock
         __raw_writel(ATMEL_TC_TIMER_CLOCK4			// Master clock/128 = 132MHz/128 ~ 1MHz
                     | ATMEL_TC_WAVE					// output mode
                     | ATMEL_TC_ACPA_SET				// set TIOA low when counter reaches "A"
@@ -1584,10 +1585,7 @@ int mover_speed_set(int speed) {
       hardware_movement_set(MOVER_DIRECTION_FORWARD);
    } else { 
       // setting 0 will cause the mover to "coast" if it isn't already stopped
-          char *msg = kmalloc(128, GFP_KERNEL);
-          snprintf(msg, 128, "Started coasting...\n");
-          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
-          kfree(msg);
+          send_nl_message_multi("Started coasting...", error_mfh, NL_C_FAILURE);
    }
 
    // next start ramping to desired speed
@@ -1737,7 +1735,40 @@ static void ramp_fire(unsigned long data) {
 // new method
     // call initial pid_step if we are just starting to ramp and we're moving slowly
     if (abs(goal_step) <= 1 && start_speed < 2) {
+//          char *msg = kmalloc(128, GFP_KERNEL);
+//          snprintf(msg, 128, "ramping on %i: %i => %i", goal_step, goal_start, goal_end);
+//          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+//          kfree(msg);
+        if (CONTACTOR_H_BRIDGE[mover_type]) {
+            if (direction == -1) {
+        // assert pwm line
+        #if PWM_BLOCK == 0
+            at91_set_A_periph(MOTOR_PWM_R, PULLUP_OFF);
+        #else
+            at91_set_B_periph(MOTOR_PWM_R, PULLUP_OFF);
+        #endif
+            } else {
+        #if PWM_BLOCK == 0
+            at91_set_A_periph(MOTOR_PWM_F, PULLUP_OFF);
+        #else
+            at91_set_B_periph(MOTOR_PWM_F, PULLUP_OFF);
+        #endif
+            }
+        }
         pid_step(MAX_TIME); // use maximum delta_t
+//    } else if (abs(goal_step) <= speed_steps / 2){
+//        int clock = (RPM_K[mover_type] * ENC_PER_REV[mover_type]) / 60; // RPM_K is clock ticks per minute / encoder clicks per revolution - find clock by doing reverse
+//        int ticks = (clock / ramp_time) / speed_steps;
+//          char *msg = kmalloc(128, GFP_KERNEL);
+//          snprintf(msg, 128, "ramping on %i: pid_step(%i:%i)", goal_step, ticks, new_speed);
+//          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+//          kfree(msg);
+//        pid_step(ticks); // use calculated time
+//    } else {
+//          char *msg = kmalloc(128, GFP_KERNEL);
+//          snprintf(msg, 128, "ramping on %i: %i", goal_step, new_speed);
+//          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+//          kfree(msg);
     }
 }
 
@@ -2331,12 +2362,10 @@ static void pid_step(int delta_t) {
         return;
     }
     
-send_nl_message_multi("Called pid_step", error_mfh, NL_C_FAILURE);
     new_speed = atomic_read(&pid_set_point); // read desired pid set point
 
     // read input speed (adjust speed10 value to 1000*percent)
-    //input_speed = (523 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type];
-    input_speed = (1000 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type]; // absolute velocity, no direction
+    input_speed = percent_from_speed(abs(current_speed10()));
 #ifdef DEBUG_PID
     delay_printk("s:%i; i:%i;", new_speed, input_speed);
 #endif
@@ -2410,16 +2439,22 @@ send_nl_message_multi("Called pid_step", error_mfh, NL_C_FAILURE);
     // are we correct?
     if (pid_error == 0) {
        pid_correct_count++; // correct one more time
-    } else if (pid_correct_count < SPEED_AFTER[mover_type] || abs(pid_error) >= SPEED_CHANGE[mover_type]) {
+    } else if (abs(pid_error) >= SPEED_CHANGE[mover_type]) {
+if (pid_correct_count > 0) {
+send_nl_message_multi("UN-CLAMPED!", error_mfh, NL_C_FAILURE);
 //delay_printk("UN-CLAMPED!");
+}
        pid_correct_count = 0; // no longer correct
     }
 
     // check to see if we've found the right effort for this speed (and haven't left the given error range)
     if (pid_correct_count >= SPEED_AFTER[mover_type] && abs(pid_error) < SPEED_CHANGE[mover_type]) {
        // clamp effort to same as last time
+          char *msg = kmalloc(128, GFP_KERNEL);
+          snprintf(msg, 128, "Clamped at correct speed: %i %i-%i\n", pid_correct_count, new_speed, input_speed);
+          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+          kfree(msg);
        pid_effort = pid_last_effort;
-send_nl_message_multi("Clamped at correct speed", error_mfh, NL_C_FAILURE);
 //delay_printk("CLAMPED!");
     } else {
        // do the PID calculations
