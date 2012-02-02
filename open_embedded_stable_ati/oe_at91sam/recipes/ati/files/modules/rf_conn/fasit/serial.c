@@ -65,7 +65,7 @@ int open_port(char *sport){
 	if ( speed != myspeed ){
 	    DCMSG(RED,"open_port: tcsetattr: Unable to set baud to %d, currently %d \n",myspeed,speed);
 	} else {
-	    DCMSG(GREEN,"open_port: open and ready at %d baud (B19200=%d)\n",speed,B19200);
+//	    DCMSG(GREEN,"open_port: open and ready at %d baud (B19200=%d)\n",speed,B19200);
 	}
 	DCMSG(GREEN,"open_port: serial port %s open and ready \n", sport);
     }

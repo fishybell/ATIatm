@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
     char ttyport[32];	/* default to ttyS0  */
     
 
-    printf(" argc=%d argv[0]=\"%s\" argv[1]=\"%s\" argv[2]=\"%s\" argv[3]=\"%s\"\n",argc,argv[0],argv[1],argv[2],argv[3]);
+    printf(" argc=%d argv[0]=\"%s\" argv[1]=\"%s\" \n",argc,argv[0],argv[1]);
 /*    if (argc == 1){
 	RFslaveport = defaultPORT;
 	printf(" Listening on default port <%d>, comm port = <%s>\n", RFslaveport,ttyport);
