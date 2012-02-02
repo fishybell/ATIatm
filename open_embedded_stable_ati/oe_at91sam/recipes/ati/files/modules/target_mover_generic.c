@@ -26,13 +26,14 @@
 //---------------------------------------------------------------------------
 static int mover_type = 1; // 0 = infantry/36v KBB controller, 1 = armor, 2 = infantry/36v KDZ controller, 3 = error
 module_param(mover_type, int, S_IRUGO);
-static int kp_m = -1, kp_d = -1,  ki_m = -1, ki_d = -1, kd_m = -1, kd_d = -1;
+static int kp_m = -1, kp_d = -1,  ki_m = -1, ki_d = -1, kd_m = -1, kd_d = -1, min_effort = -1;
 module_param(kp_m, int, S_IRUGO);
 module_param(kp_d, int, S_IRUGO);
 module_param(ki_m, int, S_IRUGO);
 module_param(ki_d, int, S_IRUGO);
 module_param(kd_m, int, S_IRUGO);
 module_param(kd_d, int, S_IRUGO);
+module_param(min_effort, int, S_IRUGO);
 
 static char* TARGET_NAME[] = {"old infantry mover","armor mover","48v infantry mover","48v soft-reverse infantry mover","error"};
 static char* MOVER_TYPE[] = {"infantry","armor","infantry","infantry","error"};
@@ -72,7 +73,7 @@ static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,5,5,0};
 #endif
 //static int RAMP_STEPS[] = {25,100,25,25,0};
 static int RAMP_STEPS[] = {3,5,3,3,0};
-static int IGNORE_RAMP[] = {0,0,0,0,0}; // MITs currently completely ignore the ramp function
+static int IGNORE_RAMP[] = {0,0,0,1,0}; // MITs currently completely ignore the ramp function
 
 // the parameters needed for PID speed control
 // old method
@@ -141,8 +142,8 @@ static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0x1180,0};
 static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0x1180,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x01F0,0x01F0,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x01F0,0x01F0,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x01F0,0x0001,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x01F0,0x0001,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -377,6 +378,14 @@ static const char * mover_movement[] =
     };
 
 //---------------------------------------------------------------------------
+// Message filler handler for failure messages
+//---------------------------------------------------------------------------
+int error_mfh(struct sk_buff *skb, void *msg) {
+    // the msg argument is a null-terminated string
+    return nla_put_string(skb, GEN_STRING_A_MSG, msg);
+}
+
+//---------------------------------------------------------------------------
 // Starts the timeout timer.
 //---------------------------------------------------------------------------
 static void timeout_timer_start(int mult) {
@@ -437,6 +446,10 @@ static int hardware_motor_on(int direction)
     else
         {
         if (CONTACTOR_H_BRIDGE[mover_type] && !MOTOR_CONTROL_H_BRIDGE[mover_type]) {
+          char *msg = kmalloc(128, GFP_KERNEL);
+          snprintf(msg, 128, "Contacter on!\n");
+          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+          kfree(msg);
             at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // main contacter on
         }
         // non-H-bridge handling
@@ -544,6 +557,10 @@ static int hardware_motor_off(void)
     __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA)); // change to smallest value
     __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB)); // change to smallest value
 
+    // pid stop
+    pid_effort = 0;
+    pid_last_effort = 0;
+
     // turn on brake?
     if (USE_BRAKE[mover_type])
         {
@@ -567,6 +584,10 @@ static int hardware_motor_off(void)
         at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_REVERSE, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_DIRECTION_FORWARD, !OUTPUT_MOVER_DIRECTION_ACTIVE_STATE);
         if (CONTACTOR_H_BRIDGE[mover_type] && !MOTOR_CONTROL_H_BRIDGE[mover_type]) {
+          char *msg = kmalloc(128, GFP_KERNEL);
+          snprintf(msg, 128, "Contacter off!\n");
+          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+          kfree(msg);
             at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // main contacter off
         }
         }
@@ -1562,7 +1583,13 @@ int mover_speed_set(int speed) {
       hardware_movement_set(MOVER_DIRECTION_REVERSE);
    } else if (speed > 0) {
       hardware_movement_set(MOVER_DIRECTION_FORWARD);
-   } // setting 0 will cause the mover to "coast" if it isn't already stopped
+   } else { 
+      // setting 0 will cause the mover to "coast" if it isn't already stopped
+          char *msg = kmalloc(128, GFP_KERNEL);
+          snprintf(msg, 128, "Started coasting...\n");
+          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+          kfree(msg);
+   }
 
    // next start ramping to desired speed
    hardware_speed_set(abs(speed));
@@ -2290,14 +2317,6 @@ static void movement_change(struct work_struct * work)
     }
 
 //---------------------------------------------------------------------------
-// Message filler handler for failure messages
-//---------------------------------------------------------------------------
-int error_mfh(struct sk_buff *skb, void *msg) {
-    // the msg argument is a null-terminated string
-    return nla_put_string(skb, GEN_STRING_A_MSG, msg);
-}
-
-//---------------------------------------------------------------------------
 // PID loop step
 //---------------------------------------------------------------------------
 // old method
@@ -2313,6 +2332,7 @@ static void pid_step(int delta_t) {
         return;
     }
     
+send_nl_message_multi("Called pid_step", error_mfh, NL_C_FAILURE);
     new_speed = atomic_read(&pid_set_point); // read desired pid set point
 
     // read input speed (adjust speed10 value to 1000*percent)
@@ -2400,7 +2420,7 @@ static void pid_step(int delta_t) {
     if (pid_correct_count >= SPEED_AFTER[mover_type] && abs(pid_error) < SPEED_CHANGE[mover_type]) {
        // clamp effort to same as last time
        pid_effort = pid_last_effort;
-//send_nl_message_multi("Clamped at correct speed", error_mfh, NL_C_FAILURE);
+send_nl_message_multi("Clamped at correct speed", error_mfh, NL_C_FAILURE);
 //delay_printk("CLAMPED!");
     } else {
        // do the PID calculations
@@ -2426,8 +2446,8 @@ static void pid_step(int delta_t) {
     if (new_speed == 0) {
        pid_effort = max(pid_effort, 0); // minimum when stopping is 0
     } else {
-       pid_effort = max(pid_effort, MIN_EFFORT[mover_type]); // minimum when moving
-       if (pid_effort == MIN_EFFORT[mover_type]) {
+       pid_effort = max(pid_effort, min_effort); // minimum when moving
+       if (pid_effort == min_effort) {
           char *msg = kmalloc(128, GFP_KERNEL);
           snprintf(msg, 128, "Used minimum effort: %i\n", pid_last_effort);
           send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
@@ -2463,6 +2483,12 @@ static void pid_step(int delta_t) {
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
 
+    if (pid_effort != pid_last_effort) {
+        char *msg = kmalloc(128, GFP_KERNEL);
+        snprintf(msg, 128, "Changed effort: %i => %i\n", pid_last_effort, pid_effort);
+        send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+        kfree(msg);
+    }
     // These change the pwm duty cycle
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
@@ -2515,6 +2541,7 @@ static int __init target_mover_generic_init(void)
     if (ki_d < 0) {ki_d = PID_KI_DIV[mover_type];}
     if (kd_m < 0) {kd_m = PID_KD_MULT[mover_type];}
     if (kd_d < 0) {kd_d = PID_KD_DIV[mover_type];}
+    if (min_effort < 0) {min_effort = MIN_EFFORT[mover_type];}
 
     // initialize hardware registers
     hardware_init();
