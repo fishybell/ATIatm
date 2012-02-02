@@ -108,6 +108,7 @@ typedef struct minion_state {
 #define F_tell_RCC	0x400	// internal state right, FASIT needs update 
 
 uint64 htonll( uint64 id);
+int open_port(char *sport);
 
 /* create thread argument struct for thr_func() */
 typedef struct _thread_data_t {

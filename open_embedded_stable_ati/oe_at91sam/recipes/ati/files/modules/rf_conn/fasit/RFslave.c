@@ -47,6 +47,7 @@ unsigned char crc8(void *buf, int start, int end) {
     return crc;
 }
 
+
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
 
@@ -56,7 +57,7 @@ unsigned char crc8(void *buf, int start, int end) {
 void DieWithError(char *errorMessage){
     char buf[200];
     strerror_r(errno,buf,200);
-    DCMSG(RED,"RFmaster %s %s \n", errorMessage,buf);
+    DCMSG(RED,"RFslave %s %s \n", errorMessage,buf);
     exit(1);
 }
 
@@ -68,15 +69,14 @@ void DieWithError(char *errorMessage){
  *************  Just pass messages between the two...
  *************  
  *************  if we have a socket to an MCP, we act as a driver/link to the RF modem
- *************  through our serial port.  for now the RFmaster will only forward comms in
+ *************  through our serial port.  for now the RFslave will only forward comms in
  *************  both directions - TCP connection to RF, and RF to TCP.
- *************    At some point it might be best if the RFmaster does some data massaging,
+ *************    At some point it might be best if the RFslave does some data massaging,
  *************  but until that is clear to me what it would need to do, for now we just pass comms
  *************
  *************/
 
-
-void HandleRF(int MCPsock,int RFfd){
+void HandleRF(int RFfd){
 #define MbufSize 4096
     char Mbuf[MbufSize], buf[200];        /* Buffer MCP socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
@@ -85,70 +85,26 @@ void HandleRF(int MCPsock,int RFfd){
     
 /**   loop until we lose connection  **/
     while(1){
-	/*   do a select to see if we have a message from either the RF or the MCP  */
-	/* then based on the source, send the message to the destination  */
-	/* create a fd_set so we can monitor both the mcp and the connection to the RCC*/
-	FD_ZERO(&rf_or_mcp);
-	FD_SET(MCPsock,&rf_or_mcp);		// we are interested hearing the mcp
-	FD_SET(RFfd,&rf_or_mcp);		// we also want to hear from the RF world
+
+	/* Receive message from RF */
+	if ((MsgSize = read(RFfd,Mbuf,MbufSize)) < 0)
+	    DieWithError("read(RFfd,...) failed");
+
+	sprintf(buf,"RFslave: pcount=%4d  read %d chars from RF.",pcount++,MsgSize);
+	DCMSG_HEXB(GREEN,buf,Mbuf,MsgSize);
+
+	// try to echo the message to see what happens
+	sprintf(buf,"Echo %s Echo\n",Mbuf);
+	write(RFfd,buf,MsgSize+11);
+
 	
-	/*   actually for now we will block until we have data - no need to timeout [yet?]
-	 *     I guess a timeout that will make sense later is if the radio is ready for data
-	 *   and we have no MCP data to send, then we should make the rounds polling
-	 *   for status.  At the moment I don't want to impliment this at the RFmaster level,
-	 *   for my initial working code I am shooting for the MCP to do all the work and
-	 *   the RFmaster to just pass data back and forth.
-	 */
-
-	DCMSG(YELLOW,"RFmaster waiting for select(rf or mcp)");
-
-	timeout.tv_sec=0;
-	timeout.tv_usec=100000;	
-	sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, NULL);
-
-	if (sock_ready<0){
-	    strerror_r(errno,Mbuf,200);
-	    DCMSG(RED,"RFmaster select error: %s", Mbuf);
-	    exit(-1);
-	}
-
-	//  if we have data to read from the RF, read it then blast it back upstream to the MCP
-	if (FD_ISSET(RFfd,&rf_or_mcp)){
-	    /* Receive message from RF */
-	    if ((MsgSize = read(RFfd,Mbuf,MbufSize)) < 0)
-		DieWithError("read(RFfd,...) failed");
-
-	    sprintf(buf,"RFmaster: read %d chars from RF. Copy to MCP",MsgSize);
-	    DCMSG_HEXB(GREEN,buf,Mbuf,MsgSize);
-	    // blindly write it  to the MCP
-	    result=write(MCPsock,Mbuf,MsgSize);
-	    DCMSG(BLUE,"Wrote %d chars to to the MCP",result);
-	    memset(Mbuf,0,MsgSize+3);
-	}
-
-	//  if we have data to read from the MCP, read it then force it down the radio
-	//    we will have to watch to make sure we don't force down too much for the radio
-	if (FD_ISSET(MCPsock,&rf_or_mcp)){
-    /* Receive message from MCP */
-	    if ((MsgSize = recv(MCPsock, Mbuf, MbufSize, 0)) < 0)
-		DieWithError("recv() failed");
-
-	    sprintf(buf,"RFmaster: pcount=%4d  read %d chars from MCP. Copy to RF",pcount++,MsgSize);
-	    DCMSG_HEXB(BLUE,buf,Mbuf,MsgSize);
-	    
-	    // blindly write it  to the  radio
-	    result=write(RFfd,Mbuf,MsgSize);
-	    memset(Mbuf,0,MsgSize+3);
-	}
-
+	memset(Mbuf,0,MsgSize+15);
     }
-    
-    close(MCPsock);    /* Close socket */    
 }
 
 /*************
- *************  RFmaster stand-alone program.
- *************
+ *************  RFslave stand-alone program.
+ *************   
  *************  if there is no argument, use defaultPORT
  *************  otherwise use the first are as the port number to listen on.
  *************
@@ -166,73 +122,35 @@ int main(int argc, char **argv) {
     int RFfd;				/* File descriptor for RFmodem serial port */
     struct sockaddr_in ServAddr;	/* Local address */
     struct sockaddr_in ClntAddr;	/* Client address */
-    unsigned short RFmasterport;	/* Server port */
+    unsigned short RFslaveport;	/* Server port */
     unsigned int clntLen;               /* Length of client address data structure */
     char ttyport[32];	/* default to ttyS0  */
     
 
     printf(" argc=%d argv[0]=\"%s\" argv[1]=\"%s\" argv[2]=\"%s\" argv[3]=\"%s\"\n",argc,argv[0],argv[1],argv[2],argv[3]);
 /*    if (argc == 1){
-	RFmasterport = defaultPORT;
-	printf(" Listening on default port <%d>, comm port = <%s>\n", RFmasterport,ttyport);
+	RFslaveport = defaultPORT;
+	printf(" Listening on default port <%d>, comm port = <%s>\n", RFslaveport,ttyport);
     }
     */
-    if (argv[1]){  
-	RFmasterport = atoi(argv[1]);
-    } else {
-	RFmasterport = defaultPORT;
-    }
-    if (argv[2]){
-	strcpy(ttyport,argv[2]);
+    if (argv[1]){
+	strcpy(ttyport,argv[1]);
     } else {
 	strcpy(ttyport,"/dev/ttyS0");
     }
     
-    printf(" Listening on port <%d>, comm port = <%s>\n", RFmasterport,ttyport);
+    printf(" Watching comm port = <%s>\n",ttyport);
     
 //   Okay,   set up the RF modem link here
 
    RFfd=open_port(ttyport); 
-
-
-//  now Create socket for the incoming connection */
-
-    if ((serversock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-	DieWithError("socket() failed");
-
-	/* Construct local address structure */
-    memset(&ServAddr, 0, sizeof(ServAddr));   /* Zero out structure */
-    ServAddr.sin_family = AF_INET;                /* Internet address family */
-    ServAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
-    ServAddr.sin_port = htons(RFmasterport);      /* Local port */
-
-	/* Bind to the local address */
-    if (bind(serversock, (struct sockaddr *) &ServAddr, sizeof(ServAddr)) < 0)
-	DieWithError("bind() failed");
-
-	/* Set the size of the in-out parameter */
-    clntLen = sizeof(ClntAddr);
-
-	/* Mark the socket so it will listen for incoming connections */
-	/* the '1' for MAXPENDINF might need to be a '0')  */
-    if (listen(serversock, 2) < 0)
-	DieWithError("listen() failed");
-
-    for (;;) {
-
-	/* Wait for a client to connect */
-	if ((MCPsock = accept(serversock, (struct sockaddr *) &ClntAddr,  &clntLen)) < 0)
-	    DieWithError("accept() failed");
-
-	/* MCPsock is connected to a Master Control Program! */
-
-	DCMSG(BLUE,"Good connection to MCP %s", inet_ntoa(ClntAddr.sin_addr));
-	HandleRF(MCPsock,RFfd);
-	DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");
+    
+   HandleRF(RFfd);
+   DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");
 	
-    }
-    /* NOT REACHED */
 }
+    /* NOT REACHED */
+
 
 
 
