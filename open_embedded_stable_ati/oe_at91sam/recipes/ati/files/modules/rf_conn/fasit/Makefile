@@ -1,7 +1,12 @@
 # Makefile for the RF system
+#
+#   the root of the oe directory will probably have to change if your not me
+#
 
-SYSROOT=/home/brynn/ActionTarget/oe/oe/tmp/staging/armv5te-angstrom-linux-gnueabi
-XGCC = /home/brynn/ActionTarget/oe/oe/tmp/cross/armv5te/bin/arm-angstrom-linux-gnueabi-gcc
+OE =/home/brynn/ActionTarget/oe/oe
+
+SYSROOT=$(OE)/tmp/staging/armv5te-angstrom-linux-gnueabi
+XGCC = $(OE)/tmp/cross/armv5te/bin/arm-angstrom-linux-gnueabi-gcc
 
 default: mcp RFmaster RFmaster.arm RFslave RFslave.arm
 
