@@ -1649,7 +1649,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Request MGL defaults\nFormat: I G\nChange MGL defaults\nFormat: I G (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
                                 break;
                             case 'H': case 'h':
-                                snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: I H\nChange hit calibration parameters\nFormat: I H (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_on_concealed, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_always)\n");
+                                snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: I H\nChange hit calibration parameters\nFormat: I H (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-50000)milliseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_always, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_on_concealed)\n");
                                 break;
                             case 'J': case 'j':
                                 snprintf(wbuf, 1024, "Request SES defaults\nFormat: I J\nChange SES defaults\nFormat: I J (1-No Loop|0xFFFFFFFF-Infinite Loop) (0-maintenance|1-testing|2-record|3-lifefire|4-Error|5-Stop|6-record started|7-encoding started|8-recording/encoding finished|9-copying)\n");
@@ -1690,7 +1690,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Shutdown device\nFormat: K\n");
                         break;
                     case 'L': case 'l':
-                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-1024)tenthseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_on_concealed, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_always)\n");
+                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-1000)hit_desensitivity (0-1024)tenthseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_always, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_on_concealed)\n");
                         break;
                     case 'M': case 'm':
                         snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-32767 to 32766)speed_in_mph\n");
