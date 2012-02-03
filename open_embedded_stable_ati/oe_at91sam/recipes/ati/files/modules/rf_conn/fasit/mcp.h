@@ -13,6 +13,12 @@
 #include <time.h>
 #include <termios.h> /* POSIX terminal control definitions */
 
+#define NO_DEBUG	0
+#define TIME_DEBUG	1
+#define MORE_DEBUG	2
+#define MUCHO_DEBUG	4
+
+
 
 typedef unsigned char uint8;
 typedef char int8;
@@ -128,8 +134,7 @@ typedef struct minion_state {
 
 uint64 htonll( uint64 id);
 int open_port(char *sport);
-void timestamp(struct timespec *elapsed_time, struct timespec *istart_time);
-
+void timestamp(struct timespec *elapsed_time, struct timespec *istart_time, struct timespec *time_diff);
 
 
 
@@ -160,7 +165,7 @@ typedef struct minion {
 	FILE	pipe;
 } minion_t;
 
-void *minion_thread(thread_data_t * );
+void *minion_thread(thread_data_t * ,int verbose);
 
 #define MAX_NUM_Minions 100
 

@@ -1,5 +1,8 @@
 #include "mcp.h"
 
+
+
+
 // based on polynomial x^8 + x^2 + x^1 + x^0
 unsigned char crc8(void *buf, int start, int end) {
     static __uint8_t crc8_table[256] = {
@@ -62,15 +65,26 @@ void DieWithError(char *errorMessage){
  *************/
 
 
-void HandleRF(int MCPsock,int RFfd){
 #define MbufSize 4096
+
+void HandleRF(int MCPsock,int RFfd,int verbose){
+    struct timespec elapsed_time, start_time, istart_time,delta_time;
     char Mbuf[MbufSize], buf[200];        /* Buffer MCP socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
     fd_set rf_or_mcp;
     struct timeval timeout;
+    int maxcps=500,rfcount=0;		/*  characters per second that we can transmit without melting - 1000 is about 100% */
+    double cps;
     
 /**   loop until we lose connection  **/
-    while(1){
+    clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
+    while(1) {
+	timestamp(&elapsed_time,&istart_time,&delta_time);	
+	if (verbose&TIME_DEBUG){
+	    DCMSG(CYAN,"RFmaster top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
+		  ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+	}
+
 	/*   do a select to see if we have a message from either the RF or the MCP  */
 	/* then based on the source, send the message to the destination  */
 	/* create a fd_set so we can monitor both the mcp and the connection to the RCC*/
@@ -98,6 +112,10 @@ void HandleRF(int MCPsock,int RFfd){
 	    exit(-1);
 	}
 
+	//  Testing has shown that we generally get 8 character chunks from the serial port
+	//  when set up the way it is right now.
+	// we must splice them back together
+	//  which means we have to be aware of the Low Bandwidth protocol
 	//  if we have data to read from the RF, read it then blast it back upstream to the MCP
 	if (FD_ISSET(RFfd,&rf_or_mcp)){
 	    /* Receive message from RF */
@@ -119,14 +137,42 @@ void HandleRF(int MCPsock,int RFfd){
 	    if ((MsgSize = recv(MCPsock, Mbuf, MbufSize, 0)) < 0)
 		DieWithError("recv() failed");
 
-	    sprintf(buf,"RFmaster: pcount=%4d  read %d chars from MCP. Copy to RF",pcount++,MsgSize);
-	    DCMSG_HEXB(BLUE,buf,Mbuf,MsgSize);
-	    
-	    // blindly write it  to the  radio
-	    result=write(RFfd,Mbuf,MsgSize);
-	    memset(Mbuf,0,MsgSize+3);
-	}
+	    if (MsgSize){
+		sprintf(buf,"RFmaster: pcount=%4d  read %d chars from MCP. Copy to RF",pcount++,MsgSize);
+		DCMSG_HEXB(BLUE,buf,Mbuf,MsgSize);
 
+		// we need a buffer that we can use to stage output to the radio in
+		// plus, we probably need some kind of handshake back to the MCP so
+		// we can throttle it down
+
+		// we will keep a count of chars, and at the next transmission we will know if it will be
+		// above or below the duty cycle limit.  But we can also transmit up to burst time limit
+		// before we care.  we should keep a moving average of about a minute for CPS, and watch the burst times
+		// IIR average should work.
+		
+
+		// blindly write it  to the  radio
+
+		
+		result=write(RFfd,Mbuf,MsgSize);
+
+		rfcount+=MsgSize;
+		timestamp(&elapsed_time,&istart_time,&delta_time);
+
+		cps=(double) rfcount/(double)elapsed_time.tv_sec;
+		if (verbose&TIME_DEBUG){
+		    DCMSG(CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
+		}
+
+		
+		memset(Mbuf,0,MsgSize+3);
+	    } else {
+		// the socket to the MCP seems to have closed...
+		break;
+
+	    }
+	    
+	}
     }
     
     close(MCPsock);    /* Close socket */    
@@ -150,12 +196,14 @@ int main(int argc, char **argv) {
     int serversock;			/* Socket descriptor for server connection */
     int MCPsock;			/* Socket descriptor to use */
     int RFfd;				/* File descriptor for RFmodem serial port */
+    int verbose;
     struct sockaddr_in ServAddr;	/* Local address */
     struct sockaddr_in ClntAddr;	/* Client address */
     unsigned short RFmasterport;	/* Server port */
     unsigned int clntLen;               /* Length of client address data structure */
     char ttyport[32];	/* default to ttyS0  */
-    
+
+    verbose=TIME_DEBUG;
 
     printf(" argc=%d argv[0]=\"%s\" argv[1]=\"%s\" argv[2]=\"%s\" argv[3]=\"%s\"\n",argc,argv[0],argv[1],argv[2],argv[3]);
 /*    if (argc == 1){
@@ -212,9 +260,9 @@ int main(int argc, char **argv) {
 
 	/* MCPsock is connected to a Master Control Program! */
 
-	DCMSG(BLUE,"Good connection to MCP %s", inet_ntoa(ClntAddr.sin_addr));
-	HandleRF(MCPsock,RFfd);
-	DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");
+	DCMSG(BLUE,"Good connection to MCP <%s>  (or telnet or somebody)", inet_ntoa(ClntAddr.sin_addr));
+	HandleRF(MCPsock,RFfd,verbose);
+	DCMSG(RED,"Connection to MCP closed.   listening for a new MCP");
 	
     }
     /* NOT REACHED */

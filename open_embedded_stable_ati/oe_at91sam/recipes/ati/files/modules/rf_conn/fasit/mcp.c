@@ -3,7 +3,6 @@
 thread_data_t minions[MAX_NUM_Minions];
 
 
-
 #define BufSize 1024
 
 int main(int argc, char **argv) {
@@ -14,13 +13,16 @@ int main(int argc, char **argv) {
     struct sockaddr_in address;
     int RF_sock;
     fd_set minion_fds;
-    int minions_ready;
+    int minions_ready,verbose;
     struct timeval timeout;
 
     // MAX_NUM_Minions is defined in mcp.h, and minnum - the number of minions to create must be less.
-
     minnum = 1;
+    // verbose  will be an argument option to turn up the debugging.
+    // right now it is just set and passed to the minions
+    verbose=TIME_DEBUG;
 
+    
 /****************************************************************
  ******
  ******   connect to the RF Master process.
@@ -125,7 +127,7 @@ int main(int argc, char **argv) {
 	    } else {
 		/* This is the child. */
 		close(minions[mID].minion);
-		minion_thread(&minions[mID]);
+		minion_thread(&minions[mID],verbose);
 
 		//	close(minions[mID].mcp);
 	    }

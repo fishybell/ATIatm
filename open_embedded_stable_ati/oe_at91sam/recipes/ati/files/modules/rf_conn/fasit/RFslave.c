@@ -96,7 +96,7 @@ void HandleRF(int RFfd){
 	// try to echo the message to see what happens
 	sprintf(buf,"Echo %s Echo\n",Mbuf);
 	write(RFfd,buf,MsgSize+11);
-
+	DCMSG(BLUE,"Wrote %d chars to MCP.",MsgSize+11);
 	
 	memset(Mbuf,0,MsgSize+15);
     }
