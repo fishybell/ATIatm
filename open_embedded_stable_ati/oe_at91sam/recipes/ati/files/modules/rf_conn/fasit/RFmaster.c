@@ -1,17 +1,3 @@
-#include <stdio.h>
-#include <errno.h>
-#include <signal.h>
-#include <sys/epoll.h>
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <termios.h> /* POSIX terminal control definitions */
-#include <unistd.h>
-
 #include "mcp.h"
 
 // based on polynomial x^8 + x^2 + x^1 + x^0

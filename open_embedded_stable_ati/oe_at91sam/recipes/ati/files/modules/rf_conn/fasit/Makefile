@@ -8,22 +8,26 @@ OE =/home/brynn/ActionTarget/oe/oe
 SYSROOT=$(OE)/tmp/staging/armv5te-angstrom-linux-gnueabi
 XGCC = $(OE)/tmp/cross/armv5te/bin/arm-angstrom-linux-gnueabi-gcc
 
+HFILES = mcp.h fasit_c.h
+MCFILES = serial.c timestamp.c htonll.c
+SCFILES = serial.c
+
 default: mcp RFmaster RFmaster.arm RFslave RFslave.arm
 
-mcp : mcp.c minion.c mcp.h fasit_c.h
-	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c
+mcp : mcp.c minion.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c $(MCFILES)
 
-RFmaster : RFmaster.c mcp.h fasit_c.h serial.c
-	gcc -lrt -std=gnu99 -o RFmaster RFmaster.c serial.c
+RFmaster : RFmaster.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o RFmaster RFmaster.c $(MCFILES)
 
-RFmaster.arm : RFmaster.c mcp.h fasit_c.h
-	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFmaster.arm RFmaster.c serial.c
+RFmaster.arm : RFmaster.c $(HFILES) $(MCFILES)
+	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFmaster.arm RFmaster.c $(MCFILES)
 
-RFslave : RFslave.c mcp.h fasit_c.h serial.c
-	gcc -lrt -std=gnu99 -o RFslave RFslave.c serial.c
+RFslave : RFslave.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o RFslave RFslave.c $(MCFILES)
 
-RFslave.arm : RFslave.c mcp.h fasit_c.h serial.c
-	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.arm RFslave.c serial.c
+RFslave.arm : RFslave.c $(HFILES) $(MCFILES)
+	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.arm RFslave.c $(MCFILES)
 
 clean:
 	$(RM) mcp *.o RFmaster RFmaster.arm RFslave RFslave.arm

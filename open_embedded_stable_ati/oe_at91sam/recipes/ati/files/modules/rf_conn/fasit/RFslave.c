@@ -136,10 +136,11 @@ int main(int argc, char **argv) {
     if (argv[1]){
 	strcpy(ttyport,argv[1]);
     } else {
-	strcpy(ttyport,"/dev/ttyS0");
+	strcpy(ttyport,"/dev/ttyS1");
     }
     
     printf(" Watching comm port = <%s>\n",ttyport);
+
 
     // turn power to low for the radio A/B pin
     RFfd=open("/sys/class/gpio/export",O_WRONLY,"w");
@@ -155,7 +156,7 @@ int main(int argc, char **argv) {
     write(RFfd,"39",1);		// this lets any kernel modules use the pin from now on
     close(RFfd);
     
-
+    DCMSG(YELLOW,"A/B set for Low power.\n");
     
 //   Okay,   set up the RF modem link here
 

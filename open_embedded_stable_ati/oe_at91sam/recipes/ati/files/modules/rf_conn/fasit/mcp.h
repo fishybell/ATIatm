@@ -1,3 +1,19 @@
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/epoll.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <time.h>
+#include <termios.h> /* POSIX terminal control definitions */
+
+
 typedef unsigned char uint8;
 typedef char int8;
 typedef unsigned short uint16;
@@ -107,8 +123,15 @@ typedef struct minion_state {
 #define F_told_RF	0x200	// RF updated, waiting for ack 
 #define F_tell_RCC	0x400	// internal state right, FASIT needs update 
 
+
+
+
 uint64 htonll( uint64 id);
 int open_port(char *sport);
+void timestamp(struct timespec *elapsed_time, struct timespec *istart_time);
+
+
+
 
 /* create thread argument struct for thr_func() */
 typedef struct _thread_data_t {

@@ -1,41 +1,9 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <fcntl.h>
 #include "mcp.h"
 
 thread_data_t minions[MAX_NUM_Minions];
 
 
-uint64 htonll( uint64 id){
-    unsigned char *bytes,temp;
 
-    bytes=(unsigned char *)&id;
-
-    temp=bytes[0];
-    bytes[0]=bytes[7];
-    bytes[7]=temp;
-    
-    temp=bytes[1];
-    bytes[1]=bytes[6];
-    bytes[6]=temp;
-    
-    temp=bytes[2];
-    bytes[2]=bytes[5];
-    bytes[5]=temp;
-    
-    temp=bytes[3];
-    bytes[3]=bytes[4];
-    bytes[4]=temp;
-    
-    return(id);
-}
 #define BufSize 1024
 
 int main(int argc, char **argv) {

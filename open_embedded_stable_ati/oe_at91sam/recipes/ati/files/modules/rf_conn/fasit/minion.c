@@ -1,12 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <time.h>
 #include "mcp.h"
 #include "fasit_c.h"
 
@@ -277,16 +268,6 @@ int send_2101_ACK(FASIT_header *hdr,int response,thread_data_t *minion) {
 
     write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&rmsg,sizeof(FASIT_2101));
     return 0;
-}
-
-void timestamp(struct timespec *elapsed_time){
-    clock_gettime(CLOCK_MONOTONIC_RAW,elapsed_time);	// get a current time
-    elapsed_time->tv_sec-=istart_time.tv_sec;	// get the seconds right
-    if (elapsed_time->tv_nsec<istart_time.tv_nsec){
-	elapsed_time->tv_sec--;		// carry a second over for subtracting
-	elapsed_time->tv_nsec+=1000000000L;	// carry a second over for subtracting
-    }
-    elapsed_time->tv_nsec-=istart_time.tv_nsec;	// get the useconds right
 }
 
 /********
@@ -796,7 +777,7 @@ void *minion_thread(thread_data_t *minion){
 
     while(1) {
 
-	timestamp(&elapsed_time);
+	timestamp(&elapsed_time,&istart_time);
 	
 	if (verbose&TIME_DEBUG){
 	    DCMSG(CYAN,"MINION %d: Top of main loop at %08ld.%09ld   timestamp",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
@@ -824,7 +805,7 @@ void *minion_thread(thread_data_t *minion){
 	}
 
 
-	timestamp(&elapsed_time);	
+	timestamp(&elapsed_time,&istart_time);	
 	if (verbose&TIME_DEBUG){
 	    DCMSG(CYAN,"MINION %d:   After 'Select' at %08ld.%09ld   timestamp",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
 	}
@@ -848,7 +829,7 @@ void *minion_thread(thread_data_t *minion){
 	    }
 	}
 
-	timestamp(&elapsed_time);    
+	timestamp(&elapsed_time,&istart_time);    
 	if (verbose&TIME_DEBUG){
 	    DCMSG(CYAN,"MINION %d: End of MCP Parse at %08ld.%09ld   timestamp",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
 	}
@@ -868,7 +849,7 @@ void *minion_thread(thread_data_t *minion){
 		tbuf=buf;			// use our temp pointer so we can step ahead
 		// loop until result reaches 0
 		while((result>=length)&&(length>0)) {
-		    timestamp(&elapsed_time);
+		    timestamp(&elapsed_time,&istart_time);
 		    if (verbose&TIME_DEBUG){
 			DCMSG(CYAN,"MINION %d: Packet %d recieved at %08ld.%09ld   timestamp"
 			      ,minion->mID,htons(header->num),elapsed_time.tv_sec, elapsed_time.tv_nsec);
@@ -889,7 +870,7 @@ void *minion_thread(thread_data_t *minion){
 		exit(-1);
 	    }
 	}
-	timestamp(&elapsed_time);
+	timestamp(&elapsed_time,&istart_time);
 	if (verbose&TIME_DEBUG){
 	    DCMSG(CYAN,"MINION %d: End of RCC Parse at %08ld.%09ld   timestamp",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
 	}
@@ -899,7 +880,7 @@ void *minion_thread(thread_data_t *minion){
 	 **
 	 **/
 	
-	timestamp(&elapsed_time);
+	timestamp(&elapsed_time,&istart_time);
 	if (verbose&TIME_DEBUG){
 	    DCMSG(MAGENTA,"MINION %d: begin timer updates %08ld.%09ld seconds since last timer update",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
 	}
@@ -1002,7 +983,7 @@ void *minion_thread(thread_data_t *minion){
 	    }
 	}
 
-	timestamp(&elapsed_time);	
+	timestamp(&elapsed_time,&istart_time);	
 	if (verbose&TIME_DEBUG){
 	    DCMSG(MAGENTA,"MINION %d:   end timer updates %08ld.%09ld seconds since last timer update",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec);
 	}
