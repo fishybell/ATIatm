@@ -715,9 +715,9 @@ static void hit_enable_change(struct work_struct * work) {
         case 1:
             // new action
             switch (enable_at) {
-                case BLANK_ON_CONCEALED:
-                case ENABLE_ALWAYS:
                 case BLANK_ALWAYS:
+                    break;
+                case ENABLE_ALWAYS:
                     // nothing
                     break;
                 case ENABLE_AT_POSITION:
@@ -728,11 +728,26 @@ static void hit_enable_change(struct work_struct * work) {
                     // we're at position, blanking on == sensor disabled
                     hit_blanking_on();
                     break;
+                case BLANK_ON_CONCEALED:
+                    break;
             }
             break;
         case 2:
             // new calibration
             switch (enable_at) {
+                case BLANK_ALWAYS:
+                    // blank always == blank now
+                    hit_blanking_on();
+                    break;
+                case ENABLE_ALWAYS:
+                    // blanking off == sensor enabled
+                    hit_blanking_off();
+                    break;
+                case ENABLE_AT_POSITION:
+                    break;
+                case DISABLE_AT_POSITION:
+                    // nothing
+                    break;
                 case BLANK_ON_CONCEALED:
                     if (lifter_position_get() == LIFTER_POSITION_DOWN) {
                         // down, so blank
@@ -741,18 +756,6 @@ static void hit_enable_change(struct work_struct * work) {
                         // not down, don't blank
                         hit_blanking_off();
                     }
-                    break;
-                case ENABLE_ALWAYS:
-                    // blanking off == sensor enabled
-                    hit_blanking_off();
-                    break;
-                case BLANK_ALWAYS:
-                    // blank always == blank now
-                    hit_blanking_on();
-                    break;
-                case ENABLE_AT_POSITION:
-                case DISABLE_AT_POSITION:
-                    // nothing
                     break;
             }
             break;
@@ -842,6 +845,10 @@ void lift_event_internal(int etype, bool upload) {
 		case EVENT_DOWN:
             enable_battery_check(1); // enable battery checking while motor is off
 			switch (enable_at) {
+				case BLANK_ALWAYS:
+					// we always blank
+					hit_blanking_on();
+					break;
 				case ENABLE_ALWAYS:
 					// we never blank
 					hit_blanking_off();
@@ -851,10 +858,6 @@ void lift_event_internal(int etype, bool upload) {
 					// we reached a new position; change hit sensor enabled state
 					atomic_set(&enable_doing, 1); // an action, not a calibration is changing the sensor
 					schedule_work(&hit_enable_work);
-					break;
-				case BLANK_ALWAYS:
-					// we always blank
-					hit_blanking_on();
 					break;
 				case BLANK_ON_CONCEALED:
 					if (etype == EVENT_DOWN) {

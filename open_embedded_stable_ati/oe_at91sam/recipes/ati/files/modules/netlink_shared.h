@@ -68,11 +68,11 @@ typedef struct hit_calibration {
     u8 set:4;                                  /* explained below */
 } hit_calibration_t;
 enum {
-    BLANK_ON_CONCEALED,    /* blank when fully concealed (enabled most of the time) */
+    BLANK_ALWAYS,           /* hit sensor disabled blank */
     ENABLE_ALWAYS,       /* enable full-time (even when concealed) */
     ENABLE_AT_POSITION,  /* enable when reach next position (don't change now) */
     DISABLE_AT_POSITION, /* disable when reach next position (don't change now) */
-    BLANK_ALWAYS,           /* hit sensor disabled blank */
+    BLANK_ON_CONCEALED,    /* blank when fully concealed (enabled most of the time) */
 };
 enum {
     HIT_OVERWRITE_NONE,  /* overwrite nothing (gets reply with current values) */
