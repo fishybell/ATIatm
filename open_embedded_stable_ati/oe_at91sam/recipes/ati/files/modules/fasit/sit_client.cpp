@@ -143,11 +143,11 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
     // hit record
     msg->body.hit = htons(hits);     
     switch (lastHitCal.enable_on) {
-        case BLANK_ON_CONCEALED: msg->body.hit_conf.on = 1; break; // on
+        case BLANK_ALWAYS: msg->body.hit_conf.on = 0; break; // off
         case ENABLE_ALWAYS: msg->body.hit_conf.on = 1; break; // on
         case ENABLE_AT_POSITION: msg->body.hit_conf.on = 2; break; // on at
         case DISABLE_AT_POSITION: msg->body.hit_conf.on = 3; break; // off at
-        case BLANK_ALWAYS: msg->body.hit_conf.on = 0; break; // off
+        case BLANK_ON_CONCEALED: msg->body.hit_conf.on = 4; break; // on
     }
     msg->body.hit_conf.react = lastHitCal.after_kill;
     msg->body.hit_conf.tokill = htons(lastHitCal.hits_to_kill);
@@ -585,9 +585,10 @@ int SIT_Client::handle_2100(int start, int end) {
             // TODO I believe a 2100 config hit sensor is supposed to set the hit count
             switch (msg->on) {
                 case 0: lastHitCal.enable_on = BLANK_ALWAYS; break; // hit sensor Off
-                case 1: lastHitCal.enable_on = BLANK_ON_CONCEALED; break; // hit sensor On Immediately
+                case 1: lastHitCal.enable_on = ENABLE_ALWAYS; break; // hit sensor On
                 case 2: lastHitCal.enable_on = ENABLE_AT_POSITION; break; // hit sensor On at Position
                 case 3: lastHitCal.enable_on = DISABLE_AT_POSITION; break; // hit sensor Off at Position
+                case 4: lastHitCal.enable_on = BLANK_ON_CONCEALED; break; // hit sensor On Immediately
             }
             if (htons(msg->burst)) lastHitCal.seperation = htons(msg->burst);      // spec says we only set if non-Zero
             if (htons(msg->sens)) {
