@@ -772,7 +772,7 @@ void *minion_thread(thread_data_t *minion, int verbose){
 
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
 	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: Top of main loop at %08ld.%09ld timestamp, delta=%08ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+	    DCMSG(CYAN,"MINION %d: Top of main loop at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	}
 	
 	clock_gettime(CLOCK_MONOTONIC_RAW,&start_time);	// mark the start time so we can run the timers
@@ -798,7 +798,7 @@ void *minion_thread(thread_data_t *minion, int verbose){
 
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
 	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d:  After Select at %08ld.%09ld timestamp, delta=%08ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+	    DCMSG(CYAN,"MINION %d:  After Select at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	}
 	//check to see if the MCP has any commands for us
 	if (FD_ISSET(minion->mcp_sock,&rcc_or_mcp)){
@@ -822,7 +822,7 @@ void *minion_thread(thread_data_t *minion, int verbose){
 
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
 	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: End of MCP Parse at %08ld.%09ld timestamp, delta=%08ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+	    DCMSG(CYAN,"MINION %d: End of MCP Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	}
 	/**********************************    end of reading and processing the mcp command  ***********************/
 	/*************** check to see if there is something to read from the rcc   **************************/
@@ -842,7 +842,7 @@ void *minion_thread(thread_data_t *minion, int verbose){
 		while((result>=length)&&(length>0)) {
 		    timestamp(&elapsed_time,&istart_time,&delta_time);	
 		    if (verbose&TIME_DEBUG){
-			DCMSG(CYAN,"MINION %d:  Packet %d recieved at %08ld.%09ld timestamp, delta=%08ld.%09ld"
+			DCMSG(CYAN,"MINION %d:  Packet %d recieved at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 			      ,minion->mID,htons(header->num),elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 		    }
 		    handle_FASIT_msg(minion,tbuf,length);
@@ -863,7 +863,7 @@ void *minion_thread(thread_data_t *minion, int verbose){
 	}
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
 	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: End of RCC Parse at %08ld.%09ld timestamp, delta=%08ld.%09ld"
+	    DCMSG(CYAN,"MINION %d: End of RCC Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 		  ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	}
 	/**************   end of rcc command parsing   ****************/
@@ -874,7 +874,7 @@ void *minion_thread(thread_data_t *minion, int verbose){
 	
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
 	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: Begin timer updates at %08ld.%09ld timestamp, delta=%08ld.%09ld"
+	    DCMSG(CYAN,"MINION %d: Begin timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 		  ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	}
 	/***   if the elapsed_time is greater than a tenth of a second,
@@ -978,7 +978,7 @@ void *minion_thread(thread_data_t *minion, int verbose){
 
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
 	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: End timer updates at %08ld.%09ld timestamp, delta=%08ld.%09ld"
+	    DCMSG(CYAN,"MINION %d: End timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 		  ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	}
     }

@@ -3,26 +3,109 @@
 thread_data_t minions[MAX_NUM_Minions];
 
 
+
+
+void print_help(int exval) {
+    printf("mcp [-h] [-v num] [-f ip] [-p port] [-r ip] [-m port] [-n minioncount]\n\n");
+    printf("  -h            print this help and exit\n");
+    printf("  -f 127.0.0.1  set FASIT server IP address\n");
+    printf("  -p 4000       set FASIT server port address\n");
+    printf("  -r 127.0.0.1  set RFmaster server IP address\n");
+    printf("  -m 4004       set RFmaster server port address\n");
+    printf("  -v 2          set verbosity bits\n");
+    printf("  -n 1          set number of minions to start\n\n");
+    exit(exval);
+}
+
+
 #define BufSize 1024
 
 int main(int argc, char **argv) {
+    int opt;
     int i, rc, mID,child,result,msglen,highest_minion,minnum,error;
     char buf[BufSize];
     char RFbuf[BufSize];
     char cbuf[BufSize];
-    struct sockaddr_in address;
+    struct sockaddr_in fasit_addr;
+    struct sockaddr_in RF_addr;
     int RF_sock;
     fd_set minion_fds;
     int minions_ready,verbose;
     struct timeval timeout;
 
+
+// process the arguments
+//  -f 192.168.10.203   RCC ip address
+//  -p 4000		RCC port number
+//  -r 127.0.0.1	RFmaster ip address
+//  -m 4004		RFmaster port number
+//  -n 1		Number of minions to fire up
+//  -v 1		Verbosity level
+
+
     // MAX_NUM_Minions is defined in mcp.h, and minnum - the number of minions to create must be less.
     minnum = 1;
-    // verbose  will be an argument option to turn up the debugging.
-    // right now it is just set and passed to the minions
-    verbose=TIME_DEBUG;
-
+    fasit_addr.sin_addr.s_addr = inet_addr("192.168.10.203");	// fasit server the minions will connect to
+    fasit_addr.sin_port = htons(4000);				// fasit server port number
+    RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");		// RFmaster server the MCP connects to
+    RF_addr.sin_port = htons(4004);				// RFmaster server port number
+    verbose=0;
     
+    while((opt = getopt(argc, argv, "hv:n:m:r:p:f:")) != -1) {
+	switch(opt) {
+	    case 'h':
+		print_help(0);
+		break;
+		
+	    case 'v':
+		verbose = atoi(optarg);
+		printf("verbosity is set to 0x%x\n", verbose);
+		break;
+		
+	    case 'f':
+		fasit_addr.sin_addr.s_addr = inet_addr(optarg);
+		printf("FASIT SERVER ip = `%s'\n", optarg);
+		break;
+		
+	    case 'p':
+		fasit_addr.sin_port = htons(atoi(optarg));
+		printf("FASIT SERVER port = %d\n", atoi(optarg));
+		break;
+		
+	    case 'r':
+		RF_addr.sin_addr.s_addr = inet_addr(optarg);
+		printf("RFmaster SERVER ip = `%s'\n", optarg);
+		break;
+
+	    case 'm':
+		RF_addr.sin_port = htons(atoi(optarg));
+		printf("RFmaster SERVER port = %d\n", atoi(optarg));
+		break;
+
+	    case 'n':
+		minnum = atoi(optarg);
+		printf("number of minions to start =%d\n", minnum);
+		break;
+
+	    case ':':
+		fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+		print_help(1);
+		break;
+		
+	    case '?':
+		fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+		print_help(1);
+
+		break;
+	}
+    }
+    printf("verbosity is set to 0x%x\n", verbose);
+    printf("FASIT SERVER address = %s<%d>\n", inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port));
+    printf("RFmaster SERVER address = %s<%d>\n", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port));
+
+
+
+   
 /****************************************************************
  ******
  ******   connect to the RF Master process.
@@ -40,16 +123,16 @@ int main(int argc, char **argv) {
     }
 
     /* start with a clean address structure */
-    memset(&address, 0, sizeof(struct sockaddr_in));
+    memset(&RF_addr, 0, sizeof(struct sockaddr_in));
 
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr("127.0.0.1");	// these need to be arguments, or something other than hard code
-    address.sin_port = htons(4004);				// same here
+    RF_addr.sin_family = AF_INET;
+    RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");	// these need to be arguments, or something other than hard code
+    RF_addr.sin_port = htons(4004);				// same here
 
-    result=connect(RF_sock,(struct sockaddr *) &address, sizeof(struct sockaddr_in));
+    result=connect(RF_sock,(struct sockaddr *) &RF_addr, sizeof(struct sockaddr_in));
     if (result<0){
 	strerror_r(errno,buf,BufSize);
-	DCMSG(RED,"MCP RF Master server not found! connect(...,%s:%d,...) error : %s  ", inet_ntoa(address.sin_addr),htons(address.sin_port),buf);
+	DCMSG(RED,"MCP RF Master server not found! connect(...,%s:%d,...) error : %s  ", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port),buf);
 	exit(-1);
     }
 
