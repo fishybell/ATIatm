@@ -1,9 +1,9 @@
 #include "mcp.h"
+#include "rf.h"
 
 thread_data_t minions[MAX_NUM_Minions];
-
-
-
+struct sockaddr_in fasit_addr;
+int verbose;
 
 void print_help(int exval) {
     printf("mcp [-h] [-v num] [-f ip] [-p port] [-r ip] [-m port] [-n minioncount]\n\n");
@@ -13,27 +13,27 @@ void print_help(int exval) {
     printf("  -r 127.0.0.1  set RFmaster server IP address\n");
     printf("  -m 4004       set RFmaster server port address\n");
     printf("  -v 2          set verbosity bits\n");
-    printf("  -n 1          set number of minions to start\n\n");
     exit(exval);
 }
 
-
+#define BufSize 1024
 #define BufSize 1024
 
 int main(int argc, char **argv) {
-    int opt;
-    int i, rc, mID,child,result,msglen,highest_minion,minnum,error;
+    struct epoll_event ev, events[MAX_NUM_Minions];    
+    int opt,fds,nfds;
+    int i, rc, mID,child,result,msglen,maxminion,minnum,error;
     char buf[BufSize];
     char RFbuf[BufSize];
     char cbuf[BufSize];
-    struct sockaddr_in fasit_addr;
     struct sockaddr_in RF_addr;
     int RF_sock;
-    fd_set minion_fds;
-    int minions_ready,verbose;
-    struct timeval timeout;
+    int ready;
+    int timeout;
+    LB_packet_t *LB;
+    int cmd,crcFlag,plength,dev_addr;
 
-
+    
 // process the arguments
 //  -f 192.168.10.203   RCC ip address
 //  -p 4000		RCC port number
@@ -42,16 +42,20 @@ int main(int argc, char **argv) {
 //  -n 1		Number of minions to fire up
 //  -v 1		Verbosity level
 
-
-    // MAX_NUM_Minions is defined in mcp.h, and minnum - the number of minions to create must be less.
-    minnum = 1;
+    // MAX_NUM_Minions is defined in mcp.h, and minnum - the current number of minions.
+    minnum = 0;	// now start with no minions
+    verbose=0;
+    /* start with a clean address structures */
+    memset(&fasit_addr, 0, sizeof(struct sockaddr_in));
+    fasit_addr.sin_family = AF_INET;
     fasit_addr.sin_addr.s_addr = inet_addr("192.168.10.203");	// fasit server the minions will connect to
     fasit_addr.sin_port = htons(4000);				// fasit server port number
+    memset(&RF_addr, 0, sizeof(struct sockaddr_in));
+    RF_addr.sin_family = AF_INET;
     RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");		// RFmaster server the MCP connects to
     RF_addr.sin_port = htons(4004);				// RFmaster server port number
-    verbose=0;
     
-    while((opt = getopt(argc, argv, "hv:n:m:r:p:f:")) != -1) {
+    while((opt = getopt(argc, argv, "hv:m:r:p:f:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
@@ -59,32 +63,22 @@ int main(int argc, char **argv) {
 		
 	    case 'v':
 		verbose = atoi(optarg);
-		printf("verbosity is set to 0x%x\n", verbose);
 		break;
 		
 	    case 'f':
 		fasit_addr.sin_addr.s_addr = inet_addr(optarg);
-		printf("FASIT SERVER ip = `%s'\n", optarg);
 		break;
 		
 	    case 'p':
 		fasit_addr.sin_port = htons(atoi(optarg));
-		printf("FASIT SERVER port = %d\n", atoi(optarg));
 		break;
 		
 	    case 'r':
 		RF_addr.sin_addr.s_addr = inet_addr(optarg);
-		printf("RFmaster SERVER ip = `%s'\n", optarg);
 		break;
 
 	    case 'm':
 		RF_addr.sin_port = htons(atoi(optarg));
-		printf("RFmaster SERVER port = %d\n", atoi(optarg));
-		break;
-
-	    case 'n':
-		minnum = atoi(optarg);
-		printf("number of minions to start =%d\n", minnum);
 		break;
 
 	    case ':':
@@ -99,13 +93,10 @@ int main(int argc, char **argv) {
 		break;
 	}
     }
-    printf("verbosity is set to 0x%x\n", verbose);
-    printf("FASIT SERVER address = %s<%d>\n", inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port));
-    printf("RFmaster SERVER address = %s<%d>\n", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port));
+    DCMSG(YELLOW,"MCP: verbosity is set to 0x%x", verbose);
+    DCMSG(YELLOW,"MCP: FASIT SERVER address = %s:%d", inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port));
+    DCMSG(YELLOW,"MCP: RFmaster SERVER address = %s:%d", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port));
 
-
-
-   
 /****************************************************************
  ******
  ******   connect to the RF Master process.
@@ -122,13 +113,7 @@ int main(int argc, char **argv) {
 	perror("socket() failed");
     }
 
-    /* start with a clean address structure */
-    memset(&RF_addr, 0, sizeof(struct sockaddr_in));
-
-    RF_addr.sin_family = AF_INET;
-    RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");	// these need to be arguments, or something other than hard code
-    RF_addr.sin_port = htons(4004);				// same here
-
+    // use the RF_addr structure that was set by default or option arguments
     result=connect(RF_sock,(struct sockaddr *) &RF_addr, sizeof(struct sockaddr_in));
     if (result<0){
 	strerror_r(errno,buf,BufSize);
@@ -137,123 +122,159 @@ int main(int argc, char **argv) {
     }
 
     // we now have a socket to the RF Master.
-
     DCMSG(RED,"MCP has a socket to the RF Master server");
-
 
 /****************************************************************
  ******
- ******    start the minions
- ******
- ******
- ******
- ******
+ ******    Acutally we need to wait for the RF master to report
+ ******  registered Slaves, and then we spawn a minion for each
+ ******  new one of those.
  ******
  ******
  ****************************************************************/
-    
-    DCMSG(RED,"MCP will start  %d minions",minnum);
 
-    // loop until somebody wants to exit, or something
+  /* set up polling so we can monitor the minions and the RFmaster*/
+    fds = epoll_create(MAX_NUM_Minions);
+    memset(&ev, 0, sizeof(ev));
+    ev.events = EPOLLIN;
+   // listen to the RFmaster
+    ev.data.fd = RF_sock; // indicates listener fd
+    if (epoll_ctl(fds, EPOLL_CTL_ADD, RF_sock, &ev) < 0) {
+	perror("epoll RF_sock insertion error:\n");
+	return 1;
+    }
+
+    
+//    DCMSG(RED,"MCP all the minions have been De-Rezzed.   ");
+    // loop until we lose connection to the rfmaster.
     while(1) {
 
-	// determine what slaves are out there some how, and create just
-	// the number of 
-	
-	// lets only make minnum minions, so they don't take over the system like magic brooms are likely to do
+	//  if we have no minions, or we have been idle long enough - so we
+	//      build a LB packet "request new devices"
+	//  send_LB();   // send it
+	//
+
+
+	// wait for data from either the RFmaster or from a minion
+	timeout = 3000;
+	DCMSG(RED,"epoll_wait with %i timeout\n", timeout);
+	nfds = epoll_wait(fds, events, MAX_NUM_Minions, timeout);
+
+	// check for ready minions and send the data down to the RF
 	for (mID=0; mID<minnum; mID++) {
-	    // if we have a new slave, make a minion for it
-	    // with minion ID = mID
+	    msglen=read(minions[mID].minion, buf, 1023);
+	}
+	// if we have data from RF, it is a LB packet we need to decode and pass on,
+	// or one of our 'special packets' that means something else - regardless we have to
+	// have a case statement to process it properly
+	if (RF_sock,&fds){
+	    msglen=read(RF_sock, buf, 1023);
 
-	    /* open a bidirectional pipe for communication with the minion  */
-	    if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &minions[mID].mcp_sock))){
-		perror("opening stream socket pair");
-		minions[mID].status=S_closed;
-	    } else {
-		minions[mID].status=S_open;
-	    }
+	    LB=(LB_packet_t *)buf;
+	    // do some checking - like to see if the CRC is OKAY
+	    // although the CRC could be done in the RFmaster process
+
+	    // Iff the CRC is okay we can process it, otherwise throw it away
+	    dev_addr=(LB->header&0xffe0)>>5;
+	    plength=(LB->header&0x1E)>>1;
+	    crcFlag=(LB->header&1);
+
+	    cmd=(LB->payload[0]&0xF);
 	    
-	    minions[mID].mID=mID;	// make sure we pass the minion ID down
-	    minions[mID].devid=htonll(1+mID);	// make sure we pass some unique number for devid down
-	    
-	    /*   fork a minion */    
-	    if ((child = fork()) == -1) perror("fork");
-	    else if (child) {
-		/* This is the parent. */
-		DCMSG(RED,"MCP forked minion %d", mID);
-		close(minions[mID].mcp_sock);
-		
-		msglen=read(minions[mID].minion, buf, 1023);
-		error=errno;
-		if (msglen > 0) {
-		    buf[msglen]=0;
-		    DCMSG(RED,"MCP received %d chars from minion %d -->%s<--",msglen, mID, buf);
-		} else if (!msglen) {
-		    DCMSG(RED,"MCP minion %d socket closed, minion has been DE-REZZED !  errno=%d", mID,error);
-		    close(minions[mID].minion);
-		    minions[mID].status=S_closed;
+	    //   process the different LB packets we might see
+	    switch (cmd) {
+
+		case LB_STATUS_REQUEST:
+
 		    break;
-		} else {
-		    perror("reading stream message");
-		}
+		    
+		case LB_EXPOSE_REQUEST:
 
-		DCMSG(RED,"minion %d said -->%s<--", mID,buf);
-		sprintf(cbuf,"Bow to the MCP, you are minion %d now", mID);
-		result=write(minions[mID].minion, cbuf, strlen(cbuf));
-		if (result >= 0){
-		    DCMSG(RED,"sent %d chars to minion %d  --%s--",strlen(cbuf), mID,cbuf);
-		} else {
-		    perror("writing stream message");
-		}
-		//	close(minions[mID].minion);
+		    break;
+		    
+		case LB_MOVE_REQUEST:
 
-	    } else {
-		/* This is the child. */
-		close(minions[mID].minion);
-		minion_thread(&minions[mID],verbose);
+		    break;
+		    
+		case LB_CONFIGURE_HIT:
 
-		//	close(minions[mID].mcp);
+		    break;
+		    
+		case LB_GROUP_CONTROL:
+
+		    break;
+		    
+		case LB_AUDIO_CONTROL:
+
+		    break;
+		    
+		case LB_POWER_CONTROL:
+
+		    break;
+		    
+		case LB_DEVICE_CAP:
+
+		    break;
+		    
+		case LB_REQUEST_NEW:
+
+		    break;
+		    
+		case LB_DEVICE_ADDR:
+		    /***  if we have a newly registered slave,
+		     ***  create a minion for it and make sure the minion ID  matches the new device address (1-1700)
+		     ***  also the devid should reflect the actual slave MAC address
+		     ***
+		     ***   create a new minion - mID = slave registration address
+		     ***                       devid = MAC address
+		     ****************************************************************************/
+
+		    /* open a bidirectional pipe for communication with the minion  */
+		    if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &minions[mID].mcp_sock))){
+			perror("opening stream socket pair");
+			minions[mID].status=S_closed;
+		    } else {
+			minions[mID].status=S_open;
+		    }
+
+		    minions[mID].mID=mID;	// make sure we pass the minion ID down
+		    minions[mID].devid=htonll(1+mID);	// make sure we pass some unique number for devid down
+
+		    /*   fork a minion */    
+		    if ((child = fork()) == -1) perror("fork");
+
+		    if (child) {
+			/* This is the parent. */
+			DCMSG(RED,"MCP forked minion %d", mID);
+			close(minions[mID].mcp_sock);
+
+		    } else {
+			/* This is the child. */
+			close(minions[mID].minion);
+			minion_thread(&minions[mID]);
+
+		    }
+		    minnum++;	// increment our minion count
+
+		    // add the minion to the set of file descriptors
+		    // that are monitored by epoll
+		    ev.events = EPOLLIN;
+		    ev.data.ptr = mID;
+		    if (epoll_ctl(fds, EPOLL_CTL_ADD, minions[mID].minion, &ev) < 0) {
+			perror("epoll set insertion error: \n");
+			return 1;
+		    }
+		    
+		    /***   end of create a new minion 
+		     ****************************************************************************/
+		    break;
 	    }
+
 	}
 
-#if 1
-	//  at this point we have a bunch of minions with open connections that
-	//  we should be able to exploit.
-	// this is just a communication test, really
-	for (mID=0; mID<minnum; mID++){
-	    if (minions[mID].status!=S_closed){
-		sprintf(cbuf,"minion %d  Respond!", mID);
-		result=write(minions[mID].minion, cbuf, strlen(cbuf));
-		if (result >= 0){
-		    DCMSG(RED,"sent %d chars to minion %d  --%s--",strlen(cbuf), mID,cbuf);
-		} else {
-		    perror("writing stream message");
-		}
-	    }
-	}
-#endif
 
-	while(1){
 
-	    /* create a fd_set so we can monitor the minions*/
-	    FD_ZERO(&minion_fds);
-
-	    highest_minion=0;
-	    for (mID=0; mID<minnum; mID++) {
-		if (minions[mID].status!=S_closed){
-		    FD_SET(minions[mID].minion,&minion_fds);
-		    highest_minion=minions[mID].minion;
-		}
-	    }
-	    if (!highest_minion){
-		DCMSG(RED,"MCP all the minions have been De-Rezzed.   ");
-		// normally we would wait for them to re-attach or go look for more of them or something
-		exit(-2);
-	    }
-	    
-	    timeout.tv_sec=3;
-	    timeout.tv_usec=0;
-
+#if 0    
 	    minions_ready=select(FD_SETSIZE,&minion_fds,(fd_set *) 0,(fd_set *) 0, &timeout);	
 	    /* block until a minion wants something */
 
@@ -261,7 +282,7 @@ int main(int argc, char **argv) {
 		perror("select");
 		return EXIT_FAILURE;
 	    }
-
+	    
 	    for (mID=0; mID<minnum; mID++) {
 		if (FD_ISSET(minions[mID].minion,&minion_fds)){
 		    msglen=read(minions[mID].minion, buf, 1023);
@@ -277,12 +298,9 @@ int main(int argc, char **argv) {
 		    }
 		}
 	    }
-
-
-
-	}
-
-
-	return EXIT_SUCCESS;
+#endif   
     }
+    
+    return EXIT_SUCCESS;
 }
+

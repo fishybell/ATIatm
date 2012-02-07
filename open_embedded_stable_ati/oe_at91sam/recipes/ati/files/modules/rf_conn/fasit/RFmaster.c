@@ -1,7 +1,6 @@
 #include "mcp.h"
 
-
-
+int verbose;	// so debugging works right in all modules
 
 // based on polynomial x^8 + x^2 + x^1 + x^0
 unsigned char crc8(void *buf, int start, int end) {
@@ -52,6 +51,14 @@ void DieWithError(char *errorMessage){
 /*************
  *************  HandleRF
  *************
+ *************  when we first start, or if the we are idle for some amount of time,
+ *************  we need to send 'request new devices' on the radio,
+ *************  and register those devices.
+ *************
+ *************  At the MCP level, it really shouldn't start any minions until and unless
+ *************  we have a registered slave device, and if that registered device dissappears
+ *************  then after some suitable time the minion for it should die or hibernate or something
+ *************
  *************  We have a socket to the MCP,  and Serial connection to the RF
  *************
  *************  Just pass messages between the two...
@@ -67,7 +74,7 @@ void DieWithError(char *errorMessage){
 
 #define MbufSize 4096
 
-void HandleRF(int MCPsock,int RFfd,int verbose){
+void HandleRF(int MCPsock,int RFfd){
     struct timespec elapsed_time, start_time, istart_time,delta_time;
     char Mbuf[MbufSize], buf[200];        /* Buffer MCP socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
@@ -79,11 +86,9 @@ void HandleRF(int MCPsock,int RFfd,int verbose){
 /**   loop until we lose connection  **/
     clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
     while(1) {
-	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"RFmaster top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
-		  ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-	}
+	timestamp(&elapsed_time,&istart_time,&delta_time);
+	DDCMSG(D_TIME,CYAN,"RFmaster top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
+	       ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 
 	/*   do a select to see if we have a message from either the RF or the MCP  */
 	/* then based on the source, send the message to the destination  */
@@ -160,10 +165,8 @@ void HandleRF(int MCPsock,int RFfd,int verbose){
 		timestamp(&elapsed_time,&istart_time,&delta_time);
 
 		cps=(double) rfcount/(double)elapsed_time.tv_sec;
-		if (verbose&TIME_DEBUG){
-		    DCMSG(CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
-		}
-
+		
+		DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
 		
 		memset(Mbuf,0,MsgSize+3);
 	    } else {
@@ -171,11 +174,20 @@ void HandleRF(int MCPsock,int RFfd,int verbose){
 		break;
 
 	    }
-	    
 	}
     }
-    
     close(MCPsock);    /* Close socket */    
+}
+
+
+void print_help(int exval) {
+    printf("RFmaster [-h] [-v num] [-t comm] [-p port] \n\n");
+    printf("  -h            print this help and exit\n");
+    printf("  -p 4000       set listen port\n");
+    printf("  -t /dev/ttyS1 set serial port device\n");
+    printf("  -v 2          set verbosity bits\n");
+    printf("  -s 10         max number of slaves to look for\n");
+    exit(exval);
 }
 
 /*************
@@ -196,38 +208,60 @@ int main(int argc, char **argv) {
     int serversock;			/* Socket descriptor for server connection */
     int MCPsock;			/* Socket descriptor to use */
     int RFfd;				/* File descriptor for RFmodem serial port */
-    int verbose;
     struct sockaddr_in ServAddr;	/* Local address */
     struct sockaddr_in ClntAddr;	/* Client address */
     unsigned short RFmasterport;	/* Server port */
     unsigned int clntLen;               /* Length of client address data structure */
     char ttyport[32];	/* default to ttyS0  */
+    int opt,slave_count;
 
-    verbose=TIME_DEBUG;
-
-    printf(" argc=%d argv[0]=\"%s\" argv[1]=\"%s\" argv[2]=\"%s\" argv[3]=\"%s\"\n",argc,argv[0],argv[1],argv[2],argv[3]);
-/*    if (argc == 1){
-	RFmasterport = defaultPORT;
-	printf(" Listening on default port <%d>, comm port = <%s>\n", RFmasterport,ttyport);
-    }
-    */
-    if (argv[1]){  
-	RFmasterport = atoi(argv[1]);
-    } else {
-	RFmasterport = defaultPORT;
-    }
-    if (argv[2]){
-	strcpy(ttyport,argv[2]);
-    } else {
-	strcpy(ttyport,"/dev/ttyS0");
-    }
+    slave_count=10;
+    verbose=0;
+    RFmasterport = defaultPORT;
+    strcpy(ttyport,"/dev/ttyS0");
     
-    printf(" Listening on port <%d>, comm port = <%s>\n", RFmasterport,ttyport);
+    while((opt = getopt(argc, argv, "hv:t:p:s:")) != -1) {
+	switch(opt) {
+	    case 'h':
+		print_help(0);
+		break;
+
+	    case 'v':
+		verbose = atoi(optarg);
+		break;
+
+	    case 't':
+		strcpy(ttyport,optarg);
+		break;
+
+	    case 'p':
+		RFmasterport = atoi(optarg);
+		break;
+
+	    case 's':
+		slave_count = atoi(optarg);
+		break;
+
+	    case ':':
+		fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+		print_help(1);
+		break;
+
+	    case '?':
+		fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+		print_help(1);
+
+		break;
+	}
+    }
+    DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);
+    DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
+    DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
+    DCMSG(YELLOW,"RFmaster: will look for up to %d Slave devices",slave_count);
     
 //   Okay,   set up the RF modem link here
 
    RFfd=open_port(ttyport); 
-
 
 //  now Create socket for the incoming connection */
 
@@ -261,7 +295,7 @@ int main(int argc, char **argv) {
 	/* MCPsock is connected to a Master Control Program! */
 
 	DCMSG(BLUE,"Good connection to MCP <%s>  (or telnet or somebody)", inet_ntoa(ClntAddr.sin_addr));
-	HandleRF(MCPsock,RFfd,verbose);
+	HandleRF(MCPsock,RFfd);
 	DCMSG(RED,"Connection to MCP closed.   listening for a new MCP");
 	
     }

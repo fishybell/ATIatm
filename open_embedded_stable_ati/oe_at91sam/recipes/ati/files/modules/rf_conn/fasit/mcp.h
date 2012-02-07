@@ -11,14 +11,16 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
+#include <sys/time.h>
 #include <termios.h> /* POSIX terminal control definitions */
 
-#define NO_DEBUG	0
-#define TIME_DEBUG	1
-#define MORE_DEBUG	2
+#define D_NONE		0
+#define D_TIME		1
+#define D_PACKET	2
 #define MUCHO_DEBUG	4
 
-
+// because the Minion ID's match the LB addressing
+#define MAX_NUM_Minions 2048
 
 typedef unsigned char uint8;
 typedef char int8;
@@ -130,13 +132,9 @@ typedef struct minion_state {
 #define F_tell_RCC	0x400	// internal state right, FASIT needs update 
 
 
-
-
 uint64 htonll( uint64 id);
 int open_port(char *sport);
 void timestamp(struct timespec *elapsed_time, struct timespec *istart_time, struct timespec *time_diff);
-
-
 
 /* create thread argument struct for thr_func() */
 typedef struct _thread_data_t {
@@ -146,10 +144,10 @@ typedef struct _thread_data_t {
     /*  okay for changes again */
     int status;
     int PID;
-    int mID;
+    int mID;		// minion ID which matches the slave registration
     int rcc_sock;	// socket to RCC
     int seq;		// sequence number of this minion  for fasit messages
-    uint64 devid;	// mac address of this minion
+    uint64 devid;	// mac address of this minion which we got back from the RF
     minion_state_t S;	// the whol state of this minion
 } thread_data_t;
 
@@ -165,9 +163,8 @@ typedef struct minion {
 	FILE	pipe;
 } minion_t;
 
-void *minion_thread(thread_data_t * ,int verbose);
+void *minion_thread(thread_data_t *);
 
-#define MAX_NUM_Minions 100
 
 //  colors for the DCMSG  
 #define black	0
@@ -191,6 +188,7 @@ void *minion_thread(thread_data_t * ,int verbose);
 
 #define C_DEBUG 1
 
+#define DDCMSG(DEB,SC, FMT, ...) { if ((DEB)&verbose) { fprintf(stdout, "\x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
 #define DCMSG(SC, FMT, ...) { if (C_DEBUG) { fprintf(stdout, "\x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
 #define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
 #define DCOLOR(SC) { if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm",SC&7,(SC>>3)&1); fflush(stdout);}}

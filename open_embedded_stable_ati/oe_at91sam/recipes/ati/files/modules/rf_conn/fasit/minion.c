@@ -16,6 +16,10 @@ struct timespec istart_time;
 
 const int cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,1};
 
+// globals that get inherited from the parent (MCP)
+extern int verbose;
+extern struct sockaddr_in fasit_addr;
+
 
 // initialize our state to default values
 void initialize_state(minion_state_t *S){
@@ -293,7 +297,6 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 	    // message 100 is responded with a 2111 as in sit_client.cpp
 	    // build a response here
-
 	    defHeader(2111,&rhdr,minion->seq++);	// fills in the default values for the response header 
 	    rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2111));
 
@@ -318,13 +321,12 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		msg.body.flags |= PD_MILES;
 	    }
 
-	    DCMSG(RED,"Prepared to send 2111 device capabilites message response to a 100:");
-	    DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n"\
-		  "%4d    %d.%d     %5d    %3d     %3d"
-		  ,htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htons(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
-	    DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n Device ID (mac address backwards) | flag_bits == GPS=4,Muzzle Flash=2,MILES Shootback=1\n0x%8.8llx           0x%2x"
-		  ,msg.body.devid,msg.body.flags);
-
+	    DDCMSG(D_PACKET,RED,"Prepared to send 2111 device capabilites message response to a 100:");
+	    DDCMSG(D_PACKET,BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n"\
+		   "%4d    %d.%d     %5d    %3d     %3d"
+		   ,htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htons(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
+	    DDCMSG(D_PACKET,BLUE,"\t\t\t\t\t\t\tmessage body\n Device ID (mac address backwards) | flag_bits == GPS=4,Muzzle Flash=2,MILES Shootback=1\n0x%8.8llx           0x%2x"
+		   ,msg.body.devid,msg.body.flags);
 	    write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2111));
 	    break;
 
@@ -375,18 +377,17 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    DCMSG(RED,"CID_Shutdown") ;
 		    break;
 	    }
-#if 1
-	    DCMSG(CYAN,"Full message decomposition....");
-	    DCMSG(CYAN,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d"
+
+	    DDCMSG(D_PACKET,CYAN,"Full message decomposition....");
+	    DDCMSG(D_PACKET,CYAN,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d"
 		  ,htons(header->num),htons(header->icd1),htons(header->icd2),htons(header->seq),htons(header->rsrvd),htons(header->length));
 
-	    DCMSG(CYAN,"\t\t\t\t\t\t\tmessage body\n"\
+	    DDCMSG(D_PACKET,CYAN,"\t\t\t\t\t\t\tmessage body\n"\
 		  "C-ID | Expos | Aspct |  Dir | Move |  Speed | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n"\
 		  "%3d    %3d     %3d     %2d    %3d    %7.2f     %4d     %2d     %3d     %3d     %3d    %3d   %5d ",
 		  message_2100->cid,message_2100->exp,message_2100->asp,message_2100->dir,message_2100->move,message_2100->speed
 		  ,message_2100->on,htons(message_2100->hit),message_2100->react,htons(message_2100->tokill),htons(message_2100->sens)
 		  ,message_2100->mode,htons(message_2100->burst));
-#endif
 	    // do the event that was requested
 
 	    switch (message_2100->cid) {
@@ -432,6 +433,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 			minion->S.exp.flags=F_exp_conceal_A;	// start it moving to conceal
 		    }
 		    minion->S.exp.timer=5;
+
+//		    send_LB();
 
 		    // send 2101 ack  (2102's will be generated at start and stop of actuator)
 		    send_2101_ACK(header,'S',minion);    // TRACR Cert complains if these are not there
@@ -638,10 +641,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
  *********************   
  *********************/
 
-void *minion_thread(thread_data_t *minion, int verbose){
+
+
+void *minion_thread(thread_data_t *minion){
     struct timespec elapsed_time, start_time,delta_time;
     struct timeval timeout;
-    struct sockaddr_in address;
     int sock_ready,error;
     long elapsed_tenths;
 
@@ -719,24 +723,15 @@ void *minion_thread(thread_data_t *minion, int verbose){
 	perror("socket() failed");
     }
 
-    /* start with a clean address structure */
-    memset(&address, 0, sizeof(struct sockaddr_in));
-
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr("192.168.10.203");	// these need to be arguments, or something other than hard code
-    address.sin_port = htons(4000);				// same here
-
-    result=connect(minion->rcc_sock,(struct sockaddr *) &address, sizeof(struct sockaddr_in));
+    result=connect(minion->rcc_sock,(struct sockaddr *) &fasit_addr, sizeof(struct sockaddr_in));
     if (result<0){
 	strerror_r(errno,buf,BufSize);
-	DCMSG(BLUE,"MINION %d fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(address.sin_addr),htons(address.sin_port),buf);
+	DCMSG(BLUE,"MINION %d fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),buf);
 	exit(-1);
     }
 
     // we now have a socket.
-
     DCMSG(BLUE,"MINION %d has a socket to a RCC", minion->mID);
-
 
     //   this is a handshake message sent back to the MCP informing it that we have a FASIT connection
 #if 0
@@ -769,11 +764,8 @@ void *minion_thread(thread_data_t *minion, int verbose){
     clock_gettime(CLOCK_MONOTONIC_RAW,&istart_time);	// get the intial current time
 
     while(1) {
-
-	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: Top of main loop at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-	}
+	timestamp(&elapsed_time,&istart_time,&delta_time);
+	DDCMSG(D_TIME,CYAN,"MINION %d: Top of main loop at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	
 	clock_gettime(CLOCK_MONOTONIC_RAW,&start_time);	// mark the start time so we can run the timers
 
@@ -797,9 +789,8 @@ void *minion_thread(thread_data_t *minion, int verbose){
 	}
 
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d:  After Select at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-	}
+	DDCMSG(D_TIME,CYAN,"MINION %d:  After Select at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+
 	//check to see if the MCP has any commands for us
 	if (FD_ISSET(minion->mcp_sock,&rcc_or_mcp)){
 	    msglen=read(minion->mcp_sock, buf, 1023);
@@ -821,9 +812,7 @@ void *minion_thread(thread_data_t *minion, int verbose){
 	}
 
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: End of MCP Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-	}
+	DDCMSG(D_TIME,CYAN,"MINION %d: End of MCP Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	/**********************************    end of reading and processing the mcp command  ***********************/
 	/*************** check to see if there is something to read from the rcc   **************************/
 	if (FD_ISSET(minion->rcc_sock,&rcc_or_mcp)){
@@ -841,10 +830,8 @@ void *minion_thread(thread_data_t *minion, int verbose){
 		// loop until result reaches 0
 		while((result>=length)&&(length>0)) {
 		    timestamp(&elapsed_time,&istart_time,&delta_time);	
-		    if (verbose&TIME_DEBUG){
-			DCMSG(CYAN,"MINION %d:  Packet %d recieved at %6ld.%09ld timestamp, delta=%1ld.%09ld"
-			      ,minion->mID,htons(header->num),elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-		    }
+		    DDCMSG(D_TIME,CYAN,"MINION %d:  Packet %d recieved at %6ld.%09ld timestamp, delta=%1ld.%09ld"
+			   ,minion->mID,htons(header->num),elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 		    handle_FASIT_msg(minion,tbuf,length);
 		    result-=length;			// reset the length to handle a possible next message in this packet
 		    tbuf+=length;			// step ahead to next message
@@ -862,21 +849,19 @@ void *minion_thread(thread_data_t *minion, int verbose){
 	    }
 	}
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: End of RCC Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld"
-		  ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-	}
+	DDCMSG(D_TIME,CYAN,"MINION %d: End of RCC Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld"
+	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+
 	/**************   end of rcc command parsing   ****************/
 	/**  first we just update our counter, and if less then a tenth of a second passed,
 	 **  skip the timer updates and reloop, using a new select value that is a fraction of a tenth
 	 **
 	 **/
 	
-	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: Begin timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
-		  ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-	}
+	timestamp(&elapsed_time,&istart_time,&delta_time);
+	DDCMSG(D_TIME,CYAN,"MINION %d: Begin timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
+	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+
 	/***   if the elapsed_time is greater than a tenth of a second,
 	 ***   subtract out the number of tenths to use in updating our
 	 ***   timers.    otherwise set up the timeout for the next select
@@ -976,11 +961,9 @@ void *minion_thread(thread_data_t *minion, int verbose){
 	    }
 	}
 
-	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	if (verbose&TIME_DEBUG){
-	    DCMSG(CYAN,"MINION %d: End timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
-		  ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-	}
+	timestamp(&elapsed_time,&istart_time,&delta_time);
+	DDCMSG(D_TIME,CYAN,"MINION %d: End timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
+	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
     }
 }
 
