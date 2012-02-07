@@ -17,12 +17,14 @@ if {[string match -nocase *w* $num]} {
     set delay 10
 }
 
-# grab the host by default via samXX or avahi host
+# grab the host by default via samXX or avahi host or cpe
 set host sam$num
 if {$num == {av}} {
     set f [open "|avahi-resolve-host-name -n server.local | cut -f2" r]
     set host [lindex [split [read $f] \n] 0]
     close $f
+} elseif {[string match -nocase cpe* $num]} {
+    set host $num
 }
 
 system sed -i -e "s/^sam$num.*//" ~/.ssh/known_hosts
