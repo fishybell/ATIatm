@@ -667,19 +667,15 @@ void *minion_thread(thread_data_t *minion){
 
     initialize_state( &minion->S);
 
-
-/*** actually, somehow the capabilities and the devid's will come from the MCP -
- *** probably after it looks at a setup file or does a global RF capability message
- ***
- ***   For now we just make up the capability  - the devid was already passed down by the MCP
- ***   and really just matches the minion ID right now
- ***
+/*** actually, the capabilities and the devid's will come from the MCP -
+ ***   it gets them when it sends out the request new devices over the RF
+ *** so when we are spawned, those state fields are already filled in 
  ***/
 
     
     minion->S.cap|=PD_NES;	// add the NES capability
     
-    DCMSG(BLUE,"MINION %d state is initialized as devid %lld", minion->mID,htonll(minion->devid));
+    DCMSG(BLUE,"MINION %d state is initialized as devid %llx", minion->mID,htonll(minion->devid));
     if (minion->S.cap&PD_NES) {
 	DCMSG(BLUE,"MINION %d has Night Effects Simulator (NES) capability", minion->mID);
     }
@@ -693,9 +689,9 @@ void *minion_thread(thread_data_t *minion){
     i=0;
 
     // the mcp is expecting a response
-#if 1
+#if 0
     i++;
-    sprintf(mbuf,"msg %d I am minion %d with devid %lld", i,minion->mID,htonll(minion->devid));
+    sprintf(mbuf,"msg %d I am minion %d with devid %llx", i,minion->mID,htonll(minion->devid));
 
     result=write(minion->mcp_sock, mbuf, strlen(mbuf));
     if (result >= 0){

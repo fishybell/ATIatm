@@ -17,7 +17,7 @@
 #define D_NONE		0
 #define D_TIME		1
 #define D_PACKET	2
-#define MUCHO_DEBUG	4
+#define D_POLL		4
 
 // because the Minion ID's match the LB addressing
 #define MAX_NUM_Minions 2048

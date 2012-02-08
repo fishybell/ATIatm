@@ -9,7 +9,7 @@ SYSROOT=$(OE)/tmp/staging/armv5te-angstrom-linux-gnueabi
 XGCC = $(OE)/tmp/cross/armv5te/bin/arm-angstrom-linux-gnueabi-gcc
 
 HFILES = mcp.h fasit_c.h
-MCFILES = serial.c timestamp.c htonll.c
+MCFILES = serial.c timestamp.c htonll.c rf.c
 SCFILES = serial.c
 
 default: mcp RFmaster RFmaster.arm RFslave RFslave.arm
