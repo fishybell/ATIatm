@@ -85,6 +85,7 @@ atomic_t hits_to_kill = ATOMIC_INIT(0); // infinite hits to kill
 atomic_t kill_counter = ATOMIC_INIT(-1); // invalid hit count for hits_to_kill
 atomic_t hit_type = ATOMIC_INIT(1); // single-fire mechanical
 atomic_t after_kill = ATOMIC_INIT(0); // stay down on kill
+atomic_t bob_type = ATOMIC_INIT(-1); // invalid hit count for bob_type
 static struct timer_list kill_timer; // TODO -- stay down for a little while?
 atomic_t blank_time = ATOMIC_INIT(0); // no blanking time
 atomic_t enable_on = ATOMIC_INIT(BLANK_ON_CONCEALED); // blank when fully concealed
@@ -623,7 +624,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
             switch (hit_c->set) {
                 case HIT_GET_CAL:        /* overwrites nothing (gets calibration values) */
                 case HIT_GET_TYPE:       /* overwrites nothing (gets type value) */
-                case HIT_GET_KILL:       /* overwrites nothing (gets hits_to_kill value) */
+                case HIT_GET_KILL:       /* overwrites nothing (gets hi ts_to_kill value) */
                 case HIT_OVERWRITE_NONE: /* overwrite nothing (gets reply with current values) */
                     // fill in all data, the unused portions will be ignored
                     get_hit_calibration(&hit_c->seperation, &hit_c->sensitivity); // use existing hit_c structure
@@ -640,6 +641,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
                     atomic_set(&hits_to_kill, hit_c->hits_to_kill);
                     atomic_set(&after_kill, hit_c->after_kill);
+                    atomic_set(&bob_type, hit_c->bob_type);
                     atomic_set(&hit_type, hit_c->type);
                     set_hit_invert(hit_c->invert);
                     atomic_set(&blank_time, hit_c->blank_time*100); // convert to milliseconds
@@ -715,9 +717,9 @@ static void hit_enable_change(struct work_struct * work) {
         case 1:
             // new action
             switch (enable_at) {
-                case BLANK_ALWAYS:
-                    break;
+                case BLANK_ON_CONCEALED:
                 case ENABLE_ALWAYS:
+                case BLANK_ALWAYS:
                     // nothing
                     break;
                 case ENABLE_AT_POSITION:
@@ -728,26 +730,11 @@ static void hit_enable_change(struct work_struct * work) {
                     // we're at position, blanking on == sensor disabled
                     hit_blanking_on();
                     break;
-                case BLANK_ON_CONCEALED:
-                    break;
             }
             break;
         case 2:
             // new calibration
             switch (enable_at) {
-                case BLANK_ALWAYS:
-                    // blank always == blank now
-                    hit_blanking_on();
-                    break;
-                case ENABLE_ALWAYS:
-                    // blanking off == sensor enabled
-                    hit_blanking_off();
-                    break;
-                case ENABLE_AT_POSITION:
-                    break;
-                case DISABLE_AT_POSITION:
-                    // nothing
-                    break;
                 case BLANK_ON_CONCEALED:
                     if (lifter_position_get() == LIFTER_POSITION_DOWN) {
                         // down, so blank
@@ -756,6 +743,18 @@ static void hit_enable_change(struct work_struct * work) {
                         // not down, don't blank
                         hit_blanking_off();
                     }
+                    break;
+                case ENABLE_ALWAYS:
+                    // blanking off == sensor enabled
+                    hit_blanking_off();
+                    break;
+                case BLANK_ALWAYS:
+                    // blank always == blank now
+                    hit_blanking_on();
+                    break;
+                case ENABLE_AT_POSITION:
+                case DISABLE_AT_POSITION:
+                    // nothing
                     break;
             }
             break;
@@ -845,10 +844,6 @@ void lift_event_internal(int etype, bool upload) {
 		case EVENT_DOWN:
             enable_battery_check(1); // enable battery checking while motor is off
 			switch (enable_at) {
-				case BLANK_ALWAYS:
-					// we always blank
-					hit_blanking_on();
-					break;
 				case ENABLE_ALWAYS:
 					// we never blank
 					hit_blanking_off();
@@ -858,6 +853,10 @@ void lift_event_internal(int etype, bool upload) {
 					// we reached a new position; change hit sensor enabled state
 					atomic_set(&enable_doing, 1); // an action, not a calibration is changing the sensor
 					schedule_work(&hit_enable_work);
+					break;
+				case BLANK_ALWAYS:
+					// we always blank
+					hit_blanking_on();
 					break;
 				case BLANK_ON_CONCEALED:
 					if (etype == EVENT_DOWN) {
@@ -881,7 +880,10 @@ void lift_event_internal(int etype, bool upload) {
 
 	// reset kill counter on start of raise
 	if (etype == EVENT_RAISE) {
-		atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+        //if (atomic_read(&after_kill) != 5) {  // not set to fasit bob
+        if (atomic_read(&bob_type) != 1) {
+		   atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+        }
 	}
 
 	// do bob?
@@ -918,6 +920,7 @@ void hit_event(int line) {
 
 void hit_event_internal(int line, bool upload) {
 	struct hit_item *new_hit;
+    struct hit_calibration *hit_c;
 	int stay_up = 1;
 	u8 hits = 0, kdata;
 	u8 data = EVENT_HIT; // cast to 8-bits
@@ -963,6 +966,12 @@ void hit_event_internal(int line, bool upload) {
 	// go down if we need to go down
 	if (atomic_read(&hits_to_kill) > 0) {
 		stay_up = !atomic_dec_and_test(&kill_counter);
+        // If fasit bob then bob after each hit until killed
+        if (atomic_read(&bob_type) == 1 && stay_up) {
+           enable_battery_check(0); // disable battery checking while motor is on
+           set_target_conceal();
+           lifter_position_set(LIFTER_POSITION_DOWN); // conceal now 
+        }
 	}
 	if (!stay_up) {
 		atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
@@ -991,13 +1000,16 @@ void hit_event_internal(int line, bool upload) {
 				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
 				// TODO -- send stop movement message to mover
 				break;
-			case 4: /* bob */
-				// put down
-                enable_battery_check(0); // disable battery checking while motor is on
-//				atomic_set(&at_conceal, 1); // when we get a CONCEAL event, go back up
-            set_target_conceal();
-				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-//				lifter_position_set(LIFTER_POSITION_UP); // conceal now
+			case 4: 
+                if (atomic_read(&bob_type) == 0) { /* ats bob */
+				   // put down
+                   enable_battery_check(0); // disable battery checking while motor is on
+                   set_target_conceal();
+				   lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+                } else if (atomic_read(&bob_type) == 1) { /* fasit bob */
+                   enable_battery_check(0); // disable battery checking while motor is on
+				   lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+                }
 				break;
 		}
 	}
