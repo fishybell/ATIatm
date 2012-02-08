@@ -30,11 +30,16 @@
 // Fall Reaction defaults
 #define FALL_KILL_AT_X_HITS 1
 #define FALL_KILL_AT_X_HITS_LOC 0x2C0
-#define FALL_KILL_AT_X_HITS_SIZE 0x20
+#define FALL_KILL_AT_X_HITS_SIZE 0x10
 
 #define FALL_AT_FALL 3
-#define FALL_AT_FALL_LOC 0x2E0
-#define FALL_AT_FALL_SIZE 0x20
+#define FALL_AT_FALL_LOC 0x2D0
+#define FALL_AT_FALL_SIZE 0x10
+
+// Bob type defaults
+#define BOB_TYPE 1
+#define BOB_TYPE_LOC 0X2E0
+#define BOB_TYPE_SIZE 0X10
 
 // Serial Number defaults
 #define SERIAL_NUMBER "00000-0-0"
