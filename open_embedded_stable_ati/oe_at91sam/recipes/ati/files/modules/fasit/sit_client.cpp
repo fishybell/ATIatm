@@ -101,6 +101,8 @@ FUNCTION_START("::reInit()");
      lastHitCal.enable_on = Eeprom::ReadEeprom(HIT_ENABLE_ON_LOC, HIT_ENABLE_ON_SIZE, HIT_ENABLE_ON); // hit sensor off
      lastHitCal.hits_to_kill = Eeprom::ReadEeprom(FALL_KILL_AT_X_HITS_LOC, FALL_KILL_AT_X_HITS_SIZE, FALL_KILL_AT_X_HITS); // kill on first hit
      lastHitCal.after_kill = Eeprom::ReadEeprom(FALL_AT_FALL_LOC, FALL_AT_FALL_SIZE, FALL_AT_FALL); // 0 for fall
+     lastHitCal.bob_type = Eeprom::ReadEeprom(BOB_TYPE_LOC, BOB_TYPE_SIZE, BOB_TYPE); // 1 for bob at each hit until killed
+     DCMSG(YELLOW,"Bob Type: %i", lastHitCal.bob_type) ;
      lastHitCal.type = Eeprom::ReadEeprom(HIT_SENSOR_TYPE_LOC, HIT_SENSOR_TYPE_SIZE, HIT_SENSOR_TYPE); // mechanical sensor
      lastHitCal.invert = Eeprom::ReadEeprom(HIT_SENSOR_INVERT_LOC, HIT_SENSOR_INVERT_SIZE, HIT_SENSOR_INVERT); // don't invert sensor input line
      lastHitCal.set = HIT_OVERWRITE_ALL;   // nothing will change without this
@@ -137,8 +139,7 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
     msg->body.type = 1; // SIT. TODO -- SIT vs. SAT vs. HSAT
 
     //   DCMSG(YELLOW,"before  doHits(-1)   hits = %d",hits) ;    
-    //doHits(-1);  // request the hit count ... or not, it isn't needed or wanted
-    //   DCMSG(YELLOW,"retrieved hits with doHits(-1) and setting to %d",hits) ; 
+    //doHits(-1);  // request the hit count ... or not, it isn't needed or wanted 
 
     // hit record
     msg->body.hit = htons(hits);     
@@ -1399,6 +1400,7 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
                             lastHitCal.invert = hit_c->invert;
                             lastHitCal.hits_to_kill = hit_c->hits_to_kill;
                             lastHitCal.after_kill = hit_c->after_kill;
+                            lastHitCal.bob_type = hit_c->bob_type;           
                             break;
                         case HIT_OVERWRITE_TYPE:
                         case HIT_GET_TYPE:
@@ -1409,6 +1411,7 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
                         case HIT_GET_KILL:
                             lastHitCal.hits_to_kill = hit_c->hits_to_kill;
                             lastHitCal.after_kill = hit_c->after_kill;
+                            lastHitCal.bob_type = hit_c->bob_type;  
                             break;
                     }
                     sit_client->didHitCal(lastHitCal); // tell client
