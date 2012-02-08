@@ -567,6 +567,17 @@ namespace EepromGUI
             }
         }
 
+
+        private void accCB0_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (conn != null)
+            {
+                String acc = Convert.ToString(accCB0.SelectedItem);
+                conn.sendMessage("Q " + acc);
+                logSent("Q " + acc);
+            }
+        }
+
         /******************************************************
         * Set the accessory details
         * ***************************************************/
@@ -924,6 +935,7 @@ namespace EepromGUI
             accTB3.Text = "";
             accTB4.Text = "";
             accTB5.Text = "";
+            errorTB.Text = "";
         }
 
         /****************************************************
@@ -1076,9 +1088,19 @@ namespace EepromGUI
                         expSTB.Text = "moving";
                     }
                     break;
+                case 'U':   // error messages
+                    errorTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    String eMessage = getMessageValue(message, 2);
+                    String[] eSplit = eMessage.Split(' ');
+                    errorTB.Text = eMessage;
+                    errorTB.Update();
+                    break;
                 case 'V':   // current event being called
                     eventCB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
-                    eventCB.SelectedIndex = Convert.ToInt32(getMessageValue(message, 2));
+                    String vMessage = getMessageValue(message, 2);
+                    String[] vSplit = vMessage.Split(' ');
+                    eventCB.SelectedIndex = Convert.ToInt32(vSplit[0]);
+                    eventCB.Update();
                     break;
                 case 'Y':   // hit sensor
                     String sensor = getMessageValue(message, 2);
@@ -1268,6 +1290,11 @@ namespace EepromGUI
                             mfsTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             mfsTB5.ForeColor = System.Drawing.SystemColors.WindowText;
                             break;
+                        case 'O':   // Bob defaults
+                            String[] bobSplit = getMessageValue(message, 4).Split(' ');
+                            bobDCB.SelectedIndex = Convert.ToInt32(bobSplit[0]);
+                            bobDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            break;
                         case 'P':   // PHI defaults
                             String[] phiSplit = getMessageValue(message, 4).Split(' ');
                             phiCheck.Checked = Convert.ToBoolean(Convert.ToInt32(phiSplit[0]));
@@ -1330,7 +1357,7 @@ namespace EepromGUI
                 default:
                     break;
             }
-            changedList.Clear();
+            //changedList.Clear();
         }
 
         /*******************************************************
@@ -1449,6 +1476,12 @@ namespace EepromGUI
         {
             changedList.Add(fallDCB);
             fallDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void bobDCB_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            changedList.Add(bobDCB);
+            bobDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
         private void sensorDCB_SelectedIndexChanged(object sender, EventArgs e)
@@ -1843,6 +1876,9 @@ namespace EepromGUI
                         case "fallDCB":
                             fallDefault(fallDTB.Text, fallDCB.SelectedIndex);
                             break;
+                        case "bobDCB":
+                            bobDefault(bobDCB.SelectedIndex);
+                            break;
                         case "sensorDCB":
                             sensorDefault(sensorDCB.SelectedIndex, sensorD2CB.SelectedIndex);
                             break;
@@ -2065,6 +2101,7 @@ namespace EepromGUI
                             break;
                     }
                 }
+                changedList.Clear();
             }
         }
 
@@ -2091,6 +2128,7 @@ namespace EepromGUI
                 conn.sendMessage("I H");
                 conn.sendMessage("I K");
                 conn.sendMessage("I N");
+                conn.sendMessage("I O");
                 conn.sendMessage("I P");
                 conn.sendMessage("I S");
                 conn.sendMessage("I T");
@@ -2158,6 +2196,18 @@ namespace EepromGUI
             {
                 conn.sendMessage("I F " + fall1 + " " + Convert.ToString(fall2));
                 logSent("I F " + fall1 + " " + Convert.ToString(fall2));
+            }
+        }
+
+        /**************************************************
+        * Sends default bob type message
+        * ***********************************************/
+        public void bobDefault(int bob1)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I O " + Convert.ToString(bob1));
+                logSent("I O " + Convert.ToString(bob1));
             }
         }
 
