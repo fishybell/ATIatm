@@ -1307,6 +1307,13 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         
                      }
                      break;
+                  case 'O': case 'o':      // Sets and Reads bob type
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "I O %s\n", writeEeprom(BOB_TYPE_LOC, arg3, BOB_TYPE_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "I O %s\n", readEeprom(BOB_TYPE_LOC, BOB_TYPE_SIZE)); // reads and prints out what it read
+                     }
+                     break;
                   case 'P': case 'p':      // PHI defaults
                      if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &pexists, &pparam1, &pparam2, &pparam3, &pparam4, &pparam5, &pparam6, &pparam7, &pparam8, &pparam9, &pparam10, &pparam11, &pparam12) == 13) {        // write
                         char phiExist[5], pbuf1[5], pbuf2[5], pbuf3[5], pbuf4[5];  
@@ -1666,6 +1673,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'N': case 'n':
                                 snprintf(wbuf, 1024, "Request MFS defaults\nFormat: I N\nChange MFS defaults\nFormat: I N (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3 (0|1)mode single_or_burst\n");
 								break;
+                            case 'O': case 'o':
+                        		snprintf(wbuf, 1024, "Get/Set Bob Style\nFormat: I O (0|1)fasit_bob_at_hit_or_ats_bob_at_kill\n");	
+                                break;
                             case 'P': case 'p':
                                 snprintf(wbuf, 1024, "Request PHI defaults\nFormat: I P\nChange PHI defaults\nFormat: I P (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
 								break;
@@ -1682,7 +1692,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                snprintf(wbuf, 1024, "Request Serial Number\nFormat: I X\nChange Serial Number\nFormat: I X <xxxxx-x-x>\n");
                                 break;
                             default:
-                                snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI J: SES defaults\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI P: PHI defaults\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI X: Serial Number\n");
+                                snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI J: SES defaults\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI O: Bob type\nI P: PHI defaults\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI X: Serial Number\n");
                                 break;
 						}
                         break; 
