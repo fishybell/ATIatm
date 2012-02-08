@@ -68,11 +68,11 @@ static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0};
 static int RAMP_UP_TIME_IN_MSECONDS[] = {1,1,1,1,0};
 static int RAMP_DOWN_TIME_IN_MSECONDS[] = {1,1,1,1,0};
 #else
-static int RAMP_UP_TIME_IN_MSECONDS[] = {5,250,5,250,0};
+static int RAMP_UP_TIME_IN_MSECONDS[] = {5,375,5,250,0};
 static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,5,100,0};
 #endif
 //static int RAMP_STEPS[] = {25,100,25,25,0};
-static int RAMP_STEPS[] = {3,5,3,5,0};
+static int RAMP_STEPS[] = {3,10,3,5,0};
 static int IGNORE_RAMP[] = {0,0,0,0,0}; // MITs currently completely ignore the ramp function
 
 // the parameters needed for PID speed control
@@ -111,7 +111,7 @@ static int MIN_EFFORT[]    = {115, 175, 1, 1, 0}; // minimum effort given to ens
 static int SPEED_AFTER[]   = {1, 3, 1, 1, 0}; // clamp effort if we hit this many correct values in a row
 static int SPEED_CHANGE[]  = {40, 30, 40, 1, 0}; // unclamp if the error is bigger than this
 static int ADJUST_PID_P[]  = {0, 0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
-static int MAX_ACCEL[]     = {500, 500, 1000, 1000, 0}; // maximum effort change in one step
+static int MAX_ACCEL[]     = {500, 1000, 1000, 1000, 0}; // maximum effort change in one step
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -142,8 +142,8 @@ static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0x1180,0};
 static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0x1180,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x01F0,0x001,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x01F0,0x001,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x0001,0x001,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x0001,0x001,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -215,6 +215,7 @@ atomic_t position = ATOMIC_INIT(0);
 atomic_t position_old = ATOMIC_INIT(0);
 atomic_t velocity_old = ATOMIC_INIT(0);
 atomic_t legs = ATOMIC_INIT(0);
+atomic_t crossed_leg = ATOMIC_INIT(0);
 atomic_t quad_direction = ATOMIC_INIT(0);
 atomic_t doing_pos = ATOMIC_INIT(FALSE);
 atomic_t doing_vel = ATOMIC_INIT(FALSE);
@@ -725,6 +726,10 @@ static void position_fire(unsigned long data)
         {
         return;
         }
+    if (atomic_read(&crossed_leg) == 1) {
+       send_nl_message_multi("Crossed Leg!", error_mfh, NL_C_FAILURE);
+       atomic_set(&crossed_leg, 0);
+    }
     atomic_set(&doing_pos, FALSE);
     schedule_work(&position_work); // notify the system
     }
@@ -770,6 +775,7 @@ static void timeout_fire(unsigned long data)
 //---------------------------------------------------------------------------
 irqreturn_t leg_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
     {
+    return IRQ_HANDLED;
     if (!atomic_read(&full_init))
         {
         return IRQ_HANDLED;
@@ -781,6 +787,7 @@ irqreturn_t leg_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
         if (CONTINUE_ON[mover_type] & 1) {
             timeout_timer_stop();
             timeout_timer_start(1);
+            atomic_set(&crossed_leg, 1); // --for debug
         }
 
         // is the sensor 2 active or not?
@@ -2376,7 +2383,8 @@ static void pid_step(int delta_t) {
     }
 
 #ifdef WOBBLE_DETECT
-    // move last speeds
+    // move last speeds if we've changed speeds
+    if (input_speed != pid_last_speeds[2]) {
     pid_last_speeds[0] = pid_last_speeds[1];
     pid_last_speeds[1] = pid_last_speeds[2];
     pid_last_speeds[2] = input_speed;
@@ -2388,12 +2396,12 @@ static void pid_step(int delta_t) {
         struct timespec time_d = timespec_sub(time_now, pid_last_time);
         char *msg = kmalloc(128, GFP_KERNEL);
         pid_last_time = time_now; // remember last time as now
-        snprintf(msg, 128, "Wobble @ %i : %i\n", (time_d.tv_sec * 1000) + (time_d.tv_nsec / 1000000), pid_last_speeds[1] - new_speed); // print wobble time and amount to track if we're wobbling steady
+        snprintf(msg, 128, "Wobble @ %i : %i=>%i (%i)\n", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_last_speeds[1], new_speed, pid_last_speeds[1] - new_speed); // print wobble time and amount to track if we're wobbling steady
         delay_printk(msg);
         // send to userspace as a "failure" message
         send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
         kfree(msg);
-    }
+    } }
 #endif
 
 
@@ -2450,10 +2458,12 @@ send_nl_message_multi("UN-CLAMPED!", error_mfh, NL_C_FAILURE);
     // check to see if we've found the right effort for this speed (and haven't left the given error range)
     if (pid_correct_count >= SPEED_AFTER[mover_type] && abs(pid_error) < SPEED_CHANGE[mover_type]) {
        // clamp effort to same as last time
+#if 0
           char *msg = kmalloc(128, GFP_KERNEL);
           snprintf(msg, 128, "Clamped at correct speed: %i %i-%i\n", pid_correct_count, new_speed, input_speed);
           send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
           kfree(msg);
+#endif
        pid_effort = pid_last_effort;
 //delay_printk("CLAMPED!");
     } else {
@@ -2517,12 +2527,14 @@ send_nl_message_multi("UN-CLAMPED!", error_mfh, NL_C_FAILURE);
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
 
+#if 0
     if (pid_effort != pid_last_effort) {
         char *msg = kmalloc(128, GFP_KERNEL);
         snprintf(msg, 128, "Changed effort: %i => %i\n", pid_last_effort, pid_effort);
         send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
         kfree(msg);
     }
+#endif
     // These change the pwm duty cycle
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
