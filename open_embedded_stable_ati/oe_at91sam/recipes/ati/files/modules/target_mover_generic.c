@@ -853,16 +853,29 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
         // change position
-        if ((status & ATMEL_TC_MTIOB && !reverse) || (!(status & ATMEL_TC_MTIOB) && reverse))
-            {
-            atomic_dec(&position);
-            atomic_set(&quad_direction, -1);
+        if (reverse) {
+            // reverse flag set
+            if (status & ATMEL_TC_MTIOB) {
+                // wheel going backwards, but reversed, so we're going forward
+                atomic_inc(&position);
+                atomic_set(&quad_direction, 1);
+            } else {
+                // wheel going forwards, but reversed, so we're going backwards
+                atomic_dec(&position);
+                atomic_set(&quad_direction, -1);
             }
-        else
-            {
-            atomic_inc(&position);
-            atomic_set(&quad_direction, 1);
+        } else {
+            // reverse flag not set
+            if (status & ATMEL_TC_MTIOB) {
+                // wheel going backwards, so we're going reversed
+                atomic_dec(&position);
+                atomic_set(&quad_direction, -1);
+            } else {
+                // wheel going forward, so we're going forward
+                atomic_inc(&position);
+                atomic_set(&quad_direction, 1);
             }
+        }
         atomic_set(&delta_t, this_t + atomic_read(&o_count));
         atomic_set(&o_count, 0);
         dn1 = atomic_read(&delta_t);
