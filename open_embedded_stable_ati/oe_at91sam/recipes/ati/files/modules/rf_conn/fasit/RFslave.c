@@ -32,61 +32,93 @@ void DieWithError(char *errorMessage){
 
 void HandleRF(int RFfd){
 #define MbufSize 4096
-    char Mbuf[MbufSize], buf[200];        /* Buffer MCP socket */
+    char Mbuf[MbufSize], buf[200], hbuf[200];        /* Buffer MCP socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
     fd_set rf_or_mcp;
     struct timeval timeout;
     LB_packet_t *LB,rLB;
-    int len,addr,cmd;
+    int len,addr,cmd,RF_addr;
 
-    LBC_device_reg *LB_devreg;
+    LB_device_reg_t *LB_devreg;
+    LB_device_addr_t *LB_addr;
+    LB_expose_t *LB_exp;
 
+    RF_addr=2047;	//  only respond to address 2047 for the request new device packet
     
 /**   loop until we lose connection  **/
     while(1){
-
 	/* Receive message from RF */
 	if ((MsgSize = read(RFfd,Mbuf,MbufSize)) < 0)
 	    DieWithError("read(RFfd,...) failed");
 
-	sprintf(buf,"RFslave: pcount=%4d  read %d chars from RF.",pcount++,MsgSize);
+	LB=(LB_packet_t *)Mbuf;
+	cmd=LB->header&0x1F;
+	addr=LB_ADDR(LB->header);
+	
+	sprintf(buf,"packet pseq=%4d read %d from RF. Cmd=%2d addr=%4d\n",pcount++,MsgSize,cmd,addr);
 	DCMSG_HEXB(GREEN,buf,Mbuf,MsgSize);
 
-	LB=(LB_packet_t *)Mbuf;
-	// check the CRC
+	// only respond if our address matches
+	if (addr==RF_addr){
 
+	// check the CRC
 	//  if good CRC, parse and respond or whatever
 
-	switch (LB->header&0x1F){
-
+	switch (cmd){
 	    case LBC_REQUEST_NEW:
 		DCMSG(BLUE,"Recieved 'request new devices' packet.");
+		// create a RESPONSE packet
 		rLB.header=LB_HEADER(0,LBC_DEVICE_REG);
 
-		LB_devreg =(LBC_device_reg *)(rLB.payload);	// map our bitfields in
+		LB_devreg =(LB_device_reg_t *)(rLB.payload);	// map our bitfields in
 		LB_devreg->dev_type=1;			// SIT with MFS
 		LB_devreg->devid=0x0a0b0c;		// mock MAC address
-		LB_devreg->temp_addr=1;
+		
+		RF_addr=1710;	//  use the fancy hash algorithm to come up with the real temp address
+		LB_devreg->temp_addr=RF_addr;
 
-
+		DCMSG(BLUE,"setting temp addr to %4d (0x%x)   RF_addr= %4d (0x%x)",LB_devreg->temp_addr,LB_devreg->temp_addr,RF_addr,RF_addr);
+		
 		// calculates the correct CRC and adds it to the end of the packet payload
-		// also fills in the length field
-		LB_CRC_add(&rLB,6);
+		LB_CRC_add(&rLB,9);
 		// now send it to the RF master
+		// after a brief wait
+		sleep(1);
 		result=write(RFfd,&rLB,rLB.length);
-		DCMSG(BLUE,"write returned %d.",result);
+		sprintf(hbuf,"new device response to RFmaster devid=%6x address=%4d (%4x) len=%2d wrote %d\n"
+			,LB_devreg->devid,LB_devreg->temp_addr,LB_devreg->temp_addr,rLB.length,result);
+		DCMSG_HEXB(BLUE,hbuf,&rLB,rLB.length);
 
 		break;
 
 	    case LBC_DEVICE_ADDR:
-	    
+		DCMSG(BLUE,"Recieved 'device address' packet.");
+		LB_addr =(LB_device_addr_t *)(&LB->payload);	// map our bitfields in
+
+		DCMSG(BLUE,"Dest addr %d matches current address, assigning new address %4d (0x%x)  (0x%x):11"
+		      ,RF_addr,LB_addr->new_addr,LB_addr->new_addr,(LB_addr->new_addr&0x3ff));
+		RF_addr=LB_addr->new_addr;	// set our new address
+		
 		break;
 
+	    case LBC_EXPOSE:
+		if (LB_ADDR(LB->header)==RF_addr){
+		    DCMSG(BLUE,"Dest addr %d matches current address, cmd= %d",RF_addr,cmd);
+		    LB_exp =(LB_expose_t *)(&LB->payload);	// map our bitfields in
+
+		    DCMSG(BLUE,"Expose: exp hitmode tokill react mfs thermal\n"
+			       "        %3d   %3d     %3d   %3d  %3d   %3d",LB_exp->expose,LB_exp->hitmode,LB_exp->tokill,LB_exp->react,LB_exp->mfs,LB_exp->thermal);
+
+		}
+		break;
+		
 	    default:
 
-
+		if (LB_ADDR(LB->header)==RF_addr){
+		    DCMSG(BLUE,"Dest addr %d matches current address, cmd = %d",RF_addr,cmd);
+		}		    
 		break;
-
+	}
 	}
     }
 }

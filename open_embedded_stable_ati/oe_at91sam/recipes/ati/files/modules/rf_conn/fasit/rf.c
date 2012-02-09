@@ -8,10 +8,7 @@ void LB_CRC_add(LB_packet_t *LB,int length){
     LB->length=length;	
     for(i=0; i<length-1; i++)  crc+=((uint8 *)LB)[i];
     LB->payload[LB->length-1]=crc;	// set the crc
-
 }
-
-
 
 // based on polynomial x^8 + x^2 + x^1 + x^0
 unsigned char crc8(void *buf, int start, int end) {

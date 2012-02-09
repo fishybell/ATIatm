@@ -1,4 +1,5 @@
 #include "mcp.h"
+#include "rf.h"
 #include "fasit_c.h"
 
 #define BufSize 1024
@@ -81,20 +82,20 @@ int read_FASIT_msg(thread_data_t *minion,char *buf, int bufsize){
     if (msglen > 0) {
 	buf[msglen]=0;
 
-	sprintf(hbuf,"MINION %d received %d from RCC       ", minion->mID,msglen);
-	DCMSG_HEXB(BLUE,hbuf,buf,msglen);
+	sprintf(hbuf,"minion %d: received %d from RCC       ", minion->mID,msglen);
+	DDCMSG_HEXB(D_PACKET,BLUE,hbuf,buf,msglen);
 
 	header=(FASIT_header *)buf; 
 	minion->seq=htonl(header->seq);
-	DCMSG(BLUE,"MINION %d FASIT packet, cmd=%d ICD=%d.%d seq=%d len=%d", minion->mID,htons(header->num),htons(header->icd1),htons(header->icd2),minion->seq,htons(header->length));
+	DDCMSG(D_PACKET,BLUE,"minion %d: FASIT packet, cmd=%d ICD=%d.%d seq=%d len=%d", minion->mID,htons(header->num),htons(header->icd1),htons(header->icd2),minion->seq,htons(header->length));
 
 	// we will return to the caller with the msglen, and they can look at the buffer and parse the message and respond to it
     } else if (msglen<0) {
 	if (errno!=EAGAIN){
-	    DCMSG(BLUE,"MINION %d read of RCC socket returned %d errno=%d socket to RCC closed",minion->mID, msglen,errno);
+	    DCMSG(RED,"minion %d: read of RCC socket returned %d errno=%d socket to RCC closed",minion->mID, msglen,errno);
 	    exit(-2);  /* this minion dies!   it should do something else maybe  */
 	} else {
-	    DCMSG(BLUE,"MINION %d socket to RCC closed, !!!", minion->mID);
+	    DCMSG(RED,"minion %d: socket to RCC closed, !!!", minion->mID);
 	    exit(-2);  /* this minion dies!  possibly it should do something else - but maybe it dies of happyness  */
 	}
     }
@@ -113,10 +114,10 @@ int write_FASIT_msg(thread_data_t *minion,void *hdr,int hlen,void *msg,int mlen)
 
     result=writev(minion->rcc_sock,iov,2);
     if (result >= 0){
-	sprintf(hbuf,"MINION %d sent %d chars header to RCC",minion->mID,iov[0].iov_len);
-	DCMSG_HEXB(BLUE,hbuf,iov[0].iov_base,iov[0].iov_len);
-	sprintf(hbuf,"MINION %d sent %d chars body to RCC  ",minion->mID,iov[1].iov_len);	
-	DCMSG_HEXB(BLUE,hbuf,iov[1].iov_base,iov[1].iov_len);
+	sprintf(hbuf,"minion %d: sent %d chars header to RCC",minion->mID,iov[0].iov_len);
+	DDCMSG_HEXB(D_PACKET,BLUE,hbuf,iov[0].iov_base,iov[0].iov_len);
+	sprintf(hbuf,"minion %d: sent %d chars body to RCC  ",minion->mID,iov[1].iov_len);	
+	DDCMSG_HEXB(D_PACKET,BLUE,hbuf,iov[1].iov_base,iov[1].iov_len);
 
     } else {
 	perror("writing stream message");
@@ -176,10 +177,10 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
     //    msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
     //    msg->body.hit_conf.mode = lastHitCal.type; // single, etc.
 
-    DCMSG(BLUE,"sending a 2102 status response");
-    DCMSG(BLUE,"M-Num | ICD-v | seq-# | rsrvd | length  R-num  R-seq          <--- Header\n %6d  %d.%d  %6d  %6d %7d %6d %7d "
+    DDCMSG(D_PACKET,BLUE,"sending a 2102 status response");
+    DDCMSG(D_PACKET,BLUE,"M-Num | ICD-v | seq-# | rsrvd | length  R-num  R-seq          <--- Header\n %6d  %d.%d  %6d  %6d %7d %6d %7d "
 	  ,htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htonl(hdr->seq),htonl(hdr->rsrvd),htons(hdr->length),htons(msg.response.rnum),htonl(msg.response.rseq));
-    DCMSG(BLUE,\
+    DDCMSG(D_PACKET,BLUE,\
 	  "PSTAT | Fault | Expos | Aspct |  Dir | Move |  Speed  | POS | Type | Hits | On/Off | React | ToKill | Sens | Mode | Burst\n"\
 	  "  %3d    %3d     %3d     %3d     %3d    %3d    %6.2f    %3d   %3d    %3d      %3d     %3d      %3d     %3d    %3d    %3d ",
 	  msg.body.pstatus,msg.body.fault,msg.body.exp,msg.body.asp,msg.body.dir,msg.body.move,msg.body.speed,msg.body.pos,msg.body.type,htons(msg.body.hit),
@@ -222,10 +223,10 @@ void sendStatus2112(int force, FASIT_header *hdr,thread_data_t *minion) {
     msg.body.idelay = minion->S.mfs_idelay.newdata;
     msg.body.rdelay = minion->S.mfs_rdelay.newdata;
 
-    DCMSG(BLUE,"sending a 2112 status response");
-    DCMSG(BLUE,"M-Num | ICD-v | seq-# | rsrvd | length  R-num  R-seq          <--- Header\n %6d  %d.%d  %6d  %6d %7d %6d %7d "
+    DDCMSG(D_PACKET,BLUE,"sending a 2112 status response");
+    DDCMSG(D_PACKET,BLUE,"M-Num | ICD-v | seq-# | rsrvd | length  R-num  R-seq          <--- Header\n %6d  %d.%d  %6d  %6d %7d %6d %7d "
 	  ,htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htonl(hdr->seq),htonl(hdr->rsrvd),htons(hdr->length),htons(msg.response.rnum),htonl(msg.response.rseq));
-    DCMSG(BLUE,\
+    DDCMSG(D_PACKET,BLUE,\
 	  "   ON | Mode  | idelay| rdelay\n"\
 	  "  %3d    %3d     %3d     %3d   ",
 	  msg.body.on,msg.body.mode,msg.body.idelay,msg.body.rdelay)
@@ -245,7 +246,7 @@ int send_2101_ACK(FASIT_header *hdr,int response,thread_data_t *minion) {
     FASIT_header rhdr;
     FASIT_2101 rmsg;
 
-    DCMSG(BLUE,"Minion %d sending 2101 ACK \"%c\"",minion->mID,response);
+    DDCMSG(D_PACKET,BLUE,"minion %d: sending 2101 ACK \"%c\"",minion->mID,response);
 
     // build the response - some CID's just reply 2101 with 'S' for received and complied 
     // and 'F' for Received and Cannot comply
@@ -277,6 +278,9 @@ int send_2101_ACK(FASIT_header *hdr,int response,thread_data_t *minion) {
 
 int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
+    int result;
+    char hbuf[100];
+    
     FASIT_header *header;
     FASIT_header rhdr;
     FASIT_2111	 msg;
@@ -284,9 +288,18 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
     FASIT_2110	 *message_2110;
     FASIT_13110	 *message_13110;
 
+    uint8 LB_buf[48];
+    LB_device_reg_t	*LB_devreg;
+    LB_expose_t		*LB_exp;
+    LB_move_t		*LB_move;
+    LB_configure_t	*LB_configure;
+    LB_audio_control_t	*LB_audio;
+    LB_pyro_fire_t	*LB_pyro;
+
+    
     // map header and body for both message and response
     header = (FASIT_header*)(buf);
-    DCMSG(BLUE,"MINION %d: Handle_FASIT_msg recieved fasit packet num=%d length=%d packetlen=%d",minion->mID,htons(header->num),htons(header->length),packetlen);
+    DDCMSG(D_PACKET,BLUE,"MINION %d: Handle_FASIT_msg recieved fasit packet num=%d length=%d packetlen=%d",minion->mID,htons(header->num),htons(header->length),packetlen);
 
     // now we need to parse and respond to the message we just recieved
     // we have received a message from the mcp, process it
@@ -333,7 +346,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 	case 2100:
 	    message_2100 = (FASIT_2100*)(buf + sizeof(FASIT_header));
 
-	    DCMSG(BLUE,"MINION %d: fasit packet 2100, CID=%d", minion->mID,message_2100->cid);
+	    DDCMSG(D_PACKET,BLUE,"MINION %d: fasit packet 2100, CID=%d", minion->mID,message_2100->cid);
 
 	    // save response numbers
 	    resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
@@ -342,39 +355,39 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 	    // Just parse out the command for now and print a pretty message
 	    switch (message_2100->cid) {
 		case CID_No_Event:
-		    DCMSG(RED,"CID_No_Event") ; 
+		    DDCMSG(D_PACKET,RED,"CID_No_Event") ; 
 		    break;
 
 		case CID_Reserved01:
-		    DCMSG(RED,"CID_Reserved01") ;
+		    DDCMSG(D_PACKET,RED,"CID_Reserved01") ;
 		    break;
 
 		case CID_Status_Request:
-		    DCMSG(RED,"CID_Status_Request") ; 
+		    DDCMSG(D_PACKET,RED,"CID_Status_Request") ; 
 		    break;
 
 		case CID_Expose_Request:
-		    DCMSG(RED,"CID_Expose_Request:  message_2100->exp=%d",message_2100->exp) ;
+		    DDCMSG(D_PACKET,RED,"CID_Expose_Request:  message_2100->exp=%d",message_2100->exp) ;
 		    break;
 
 		case CID_Reset_Device:
-		    DCMSG(RED,"CID_Reset_Device  ") ;
+		    DDCMSG(D_PACKET,RED,"CID_Reset_Device  ") ;
 		    break;
 
 		case CID_Move_Request:
-		    DCMSG(RED,"CID_Move_Request  ") ;       
+		    DDCMSG(D_PACKET,RED,"CID_Move_Request  ") ;       
 		    break;
 
 		case CID_Config_Hit_Sensor:
-		    DCMSG(RED,"CID_Config_Hit_Sensor") ;                
+		    DDCMSG(D_PACKET,RED,"CID_Config_Hit_Sensor") ;                
 		    break;
 
 		case CID_GPS_Location_Request:
-		    DCMSG(RED,"CID_GPS_Location_Request") ;
+		    DDCMSG(D_PACKET,RED,"CID_GPS_Location_Request") ;
 		    break;
 
 		case CID_Shutdown:
-		    DCMSG(RED,"CID_Shutdown") ;
+		    DDCMSG(D_PACKET,RED,"CID_Shutdown") ;
 		    break;
 	    }
 
@@ -392,20 +405,20 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 	    switch (message_2100->cid) {
 		case CID_No_Event:
-		    DCMSG(BLUE,"CID_No_Event  send 'S'uccess ack") ; 
+		    DDCMSG(D_PACKET,BLUE,"CID_No_Event  send 'S'uccess ack") ; 
 		    // send 2101 ack
 		    send_2101_ACK(header,'S',minion);
 		    break;
 
 		case CID_Reserved01:
 		    // send 2101 ack
-		    DCMSG(BLUE,"CID_Reserved01  send 'F'ailure ack") ;
+		    DDCMSG(D_PACKET,BLUE,"CID_Reserved01  send 'F'ailure ack") ;
 		    send_2101_ACK(header,'F',minion);
 		    break;
 
 		case CID_Status_Request:
 		    // send 2102 status
-		    DCMSG(BLUE,"CID_Status_Request   send 2102 status") ;
+		    DDCMSG(D_PACKET,BLUE,"CID_Status_Request   send 2102 status") ;
 		    // save response numbers
 		    resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
 		    resp_seq = header->seq;
@@ -416,26 +429,45 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    //				DCMSG(BLUE,"we also seem to have a MFS Muzzle Flash Simulator - TODO send 2112 status eventually") ; 
 		    //			    }
 		    if (minion->S.cap&PD_NES){
-			DCMSG(RED,"we also seem to have a MFS Muzzle Flash Simulator - send 2112 status") ; 
+			DDCMSG(D_PACKET,BLUE,"we also seem to have a MFS Muzzle Flash Simulator - send 2112 status") ; 
 			// AND/OR? send 2112 Muzzle Flash status if supported   
 			sendStatus2112(2,header,minion); // forces sending of a 2112, 2 means use saved resp and seq numbers
 		    }
 		    break;
 
 		case CID_Expose_Request:
-		    DCMSG(BLUE,"CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",message_2100->exp) ;       
+		    DDCMSG(D_PACKET,BLUE,"CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",message_2100->exp) ;       
+//		    also build an LB packet  to send
+		    LB_exp =(LB_expose_t *)LB_buf;	// make a pointer to our buffer so we can use the bits right
+		    LB_exp->header=LB_HEADER(minion->RF_addr,LBC_EXPOSE);
 
 		    //				minion->S.exp.data=0;			// cheat and set the current state to 45
 		    minion->S.exp.newdata=message_2100->exp;	// set newdata to be the future state
 		    if (message_2100->exp==90){
+			LB_exp->expose=1;
 			minion->S.exp.flags=F_exp_expose_A;	// start it moving to expose
 		    } else if (message_2100->exp==00){
+			LB_exp->expose=0;
 			minion->S.exp.flags=F_exp_conceal_A;	// start it moving to conceal
 		    }
 		    minion->S.exp.timer=5;
 
-//		    send_LB();
-
+		    //  really need to fill in with the right stuff
+		    LB_exp->hitmode=0;
+		    LB_exp->tokill=0;
+		    LB_exp->react=0;
+		    LB_exp->mfs=0;
+		    LB_exp->thermal=0;
+	    // calculates the correct CRC and adds it to the end of the packet payload
+	    // also fills in the length field
+		    LB_CRC_add((LB_packet_t *)LB_buf,5);
+	    // now send it to the MCP master
+		    result=write(minion->mcp_sock,&LB_buf,LB_exp->length);
+		    sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d\n",minion->mID,minion->RF_addr,LB_exp->header&0x1f,LB_exp->length);
+		    DDCMSG_HEXB(D_RF,BLUE,hbuf,&LB_buf,LB_exp->length);
+		    DDCMSG(D_RF,RED,"  Sent %d bytes to RF\n",LB_exp->length);
+//  sent LB
+    
 		    // send 2101 ack  (2102's will be generated at start and stop of actuator)
 		    send_2101_ACK(header,'S',minion);    // TRACR Cert complains if these are not there
 
@@ -446,7 +478,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 		case CID_Reset_Device:
 		    // send 2101 ack
-		    DCMSG(BLUE,"CID_Reset_Device  send 'S'uccess ack.   set lastHitCal.* to defaults") ;
+		    DDCMSG(D_PACKET,BLUE,"CID_Reset_Device  send 'S'uccess ack.   set lastHitCal.* to defaults") ;
 		    send_2101_ACK(header,'S',minion);
 		    // also supposed to reset all values to the 'initial exercise step value'
 		    //  which I am not sure if it is different than ordinary inital values 
@@ -486,24 +518,23 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 		case CID_Move_Request:
 		    // send 2101 ack  (2102's will be generated at start and stop of actuator)
-		    DCMSG(BLUE,"CID_Move_Request  send 'S'uccess ack.   TODO send the move to the kernel?") ;        
+		    DDCMSG(D_PACKET,BLUE,"CID_Move_Request  send 'S'uccess ack.   TODO send the move to the kernel?") ;        
 		    send_2101_ACK(header,'S',minion);
 		    break;
 
 		case CID_Config_Hit_Sensor:
-		    DCMSG(BLUE,"CID_Config_Hit_Sensor  send a 2102 in response") ;
-#if 1		
-		    DCMSG(CYAN,"Full message decomposition....");
-		    DCMSG(CYAN,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d"
+		    DDCMSG(D_PACKET,BLUE,"CID_Config_Hit_Sensor  send a 2102 in response") ;
+		    DDCMSG(D_PACKET,BLUE,"Full message decomposition....");
+		    DDCMSG(D_PACKET,BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d"
 			  ,htons(header->num),htons(header->icd1),htons(header->icd2),htons(header->seq),htons(header->rsrvd),htons(header->length));
 
-		    DCMSG(CYAN,"\t\t\t\t\t\t\tmessage body\n"\
+		    DDCMSG(D_PACKET,BLUE,"\t\t\t\t\t\t\tmessage body\n"\
 			  "C-ID | Expos | Aspct |  Dir | Move |  Speed | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n"\
 			  "%3d    %3d     %3d     %2d    %3d    %7.2f     %4d     %2d     %3d     %3d     %3d    %3d   %5d "
 			  ,message_2100->cid,message_2100->exp,message_2100->asp,message_2100->dir,message_2100->move,message_2100->speed
 			  ,message_2100->on,htons(message_2100->hit),message_2100->react,htons(message_2100->tokill),htons(message_2100->sens)
 			  ,message_2100->mode,htons(message_2100->burst));
-#endif				
+
 		    //      actually Riptide says that the FASIT spec is wrong and should not send an ACK here
 		    //				send_2101_ACK(header,'S',minion); // FASIT Cert seems to complain about this ACK
 
@@ -548,37 +579,37 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    minion->S.burst.flags |= F_tell_RF;	// just note it was set
 
 		    //				doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
-		    DCMSG(BLUE,"calling doHitCal after setting values") ;
+		    DDCMSG(D_PACKET,BLUE,"calling doHitCal after setting values") ;
 
 		    // send 2102 status or change the hit count (which will send the 2102 later)
 		    if (1 /*hits == htons(message_2100->hit)*/) {
 			sendStatus2102(2,header,minion);  // sends a 2102 as we won't if we didn't change the the hit count
-			DCMSG(BLUE,"We will send 2102 status in response to the config hit sensor command");
+			DDCMSG(D_PACKET,BLUE,"We will send 2102 status in response to the config hit sensor command");
 			
 		    } else {
 			//	doHits(htons(message_2100->hit));    // set hit count to something other than zero
-			DCMSG(BLUE,"after doHits(%d) ",htons(message_2100->hit)) ;
+			DDCMSG(D_PACKET,BLUE,"after doHits(%d) ",htons(message_2100->hit)) ;
 		    }
 
 		    break;
 
 		case CID_GPS_Location_Request:
-		    DCMSG(BLUE,"CID_GPS_Location_Request  send 'F'ailure ack  - because we don't support it") ;
+		    DDCMSG(D_PACKET,BLUE,"CID_GPS_Location_Request  send 'F'ailure ack  - because we don't support it") ;
 		    send_2101_ACK(header,'F',minion);
 
 		    // send 2113 GPS Location
 		    break;
 
 		case CID_Shutdown:
-		    DCMSG(BLUE,"CID_Shutdown...shutting down") ; 
+		    DDCMSG(D_PACKET,BLUE,"CID_Shutdown...shutting down") ; 
 		    //			    doShutdown();
 		    break;
 		case CID_Sleep:
-		    DCMSG(BLUE,"CID_Sleep...sleeping") ; 
+		    DDCMSG(D_PACKET,BLUE,"CID_Sleep...sleeping") ; 
 		    //			    doSleep();
 		    break;
 		case CID_Wake:
-		    DCMSG(BLUE,"CID_Wake...waking") ; 
+		    DDCMSG(D_PACKET,BLUE,"CID_Wake...waking") ; 
 		    //			    doWake();
 		    break;
 	    }  
@@ -590,7 +621,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 	    resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
 	    resp_seq = header->seq;
 
-	    DCMSG(BLUE,"MINION %d: fasit packet 2110 Configure_Muzzle_Flash, seq=%d  on=%d  mode=%d  idelay=%d  rdelay=%d"
+	    DDCMSG(D_PACKET,BLUE,"MINION %d: fasit packet 2110 Configure_Muzzle_Flash, seq=%d  on=%d  mode=%d  idelay=%d  rdelay=%d"
 		  , minion->mID,htonl(header->seq),message_2110->on,message_2110->mode,message_2110->idelay,message_2110->rdelay);
 
 	    // save response numbers
@@ -642,7 +673,6 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
  *********************/
 
 
-
 void *minion_thread(thread_data_t *minion){
     struct timespec elapsed_time, start_time,delta_time;
     struct timeval timeout;
@@ -652,6 +682,7 @@ void *minion_thread(thread_data_t *minion){
     char buf[BufSize];
     char *tbuf;
     char mbuf[BufSize];
+    char hbuf[100];
     int i,msglen,result,seq,length;
     fd_set rcc_or_mcp;
 
@@ -664,7 +695,6 @@ void *minion_thread(thread_data_t *minion){
     FASIT_2110	 *message_2110;
     FASIT_13110	 *message_13110;
 
-
     initialize_state( &minion->S);
 
 /*** actually, the capabilities and the devid's will come from the MCP -
@@ -672,18 +702,19 @@ void *minion_thread(thread_data_t *minion){
  *** so when we are spawned, those state fields are already filled in 
  ***/
 
-    
     minion->S.cap|=PD_NES;	// add the NES capability
     
-    DCMSG(BLUE,"MINION %d state is initialized as devid %llx", minion->mID,htonll(minion->devid));
+    DCMSG(BLUE,"minion %d: state is initialized as devid %llx", minion->mID,htonll(minion->devid));
+    DCMSG(BLUE,"minion %d: RF_addr = %d", minion->mID,minion->RF_addr);
+    
     if (minion->S.cap&PD_NES) {
-	DCMSG(BLUE,"MINION %d has Night Effects Simulator (NES) capability", minion->mID);
+	DCMSG(BLUE,"minion %d: has Night Effects Simulator (NES) capability", minion->mID);
     }
     if (minion->S.cap&PD_MILES) {
-	DCMSG(BLUE,"MINION %d has MILES (shootback) capability", minion->mID);
+	DCMSG(BLUE,"minion %d: has MILES (shootback) capability", minion->mID);
     }
     if (minion->S.cap&PD_GPS) {
-	DCMSG(BLUE,"MINION %d has Global Positioning System (GPS) capability", minion->mID);
+	DCMSG(BLUE,"minion %d: has Global Positioning System (GPS) capability", minion->mID);
     }
 
     i=0;
@@ -695,7 +726,7 @@ void *minion_thread(thread_data_t *minion){
 
     result=write(minion->mcp_sock, mbuf, strlen(mbuf));
     if (result >= 0){
-	DCMSG(BLUE,"MINION %d sent %d chars to MCP   --%s--",minion->mID,strlen(mbuf),mbuf);
+	DCMSG(BLUE,"minion %d: sent %d chars to MCP   --%s--",minion->mID,strlen(mbuf),mbuf);
     } else {
 	perror("writing stream message");
     }
@@ -703,11 +734,11 @@ void *minion_thread(thread_data_t *minion){
     msglen=read(minion->mcp_sock, buf, 1023);
     if (msglen > 0) {
 	buf[msglen]=0;
-	DCMSG(BLUE,"MINION %d received from MCP %d chars-->%s<--", minion->mID,msglen,buf);
+	DCMSG(BLUE,"minion %d: received from MCP %d chars-->%s<--", minion->mID,msglen,buf);
     } else if (!msglen) {
 	perror("reading stream message");
     } else {
-	DCMSG(BLUE,"MINION %d socket to MCP closed, we are FREEEEEeeee!!!", minion->mID);
+	DCMSG(BLUE,"minion %d: socket to MCP closed, we are FREEEEEeeee!!!", minion->mID);
     }
 #endif
 
@@ -722,23 +753,23 @@ void *minion_thread(thread_data_t *minion){
     result=connect(minion->rcc_sock,(struct sockaddr *) &fasit_addr, sizeof(struct sockaddr_in));
     if (result<0){
 	strerror_r(errno,buf,BufSize);
-	DCMSG(BLUE,"MINION %d fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),buf);
+	DCMSG(RED,"minion %d: fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),buf);
 	exit(-1);
     }
 
     // we now have a socket.
-    DCMSG(BLUE,"MINION %d has a socket to a RCC", minion->mID);
+    DCMSG(BLUE,"minion %d: has a socket to a RCC", minion->mID);
 
     //   this is a handshake message sent back to the MCP informing it that we have a FASIT connection
 #if 0
-    sprintf(mbuf,"MINION %d msg %d I am connected to an RCC",minion->mID,i);
+    sprintf(mbuf,"minion %d: msg %d I am connected to an RCC",minion->mID,i);
     result=write(minion->mcp_sock, mbuf, strlen(mbuf));
     error=errno;
     if (result >= 0){
-	DCMSG(BLUE,"MINION %d sent %d chars to MCP   --%s--",minion->mID,strlen(mbuf),mbuf);
+	DCMSG(BLUE,"minion %d: sent %d chars to MCP   --%s--",minion->mID,strlen(mbuf),mbuf);
     } else {
 	strerror_r(errno,buf,BufSize);
-	DCMSG(BLUE,"MINION %d   Error writing message to MCP : %s  ", minion->mID,buf);
+	DCMSG(BLUE,"minion %d:   Error writing message to MCP : %s  ", minion->mID,buf);
 	exit(-1);
     }
 
@@ -792,17 +823,28 @@ void *minion_thread(thread_data_t *minion){
 	    msglen=read(minion->mcp_sock, buf, 1023);
 	    if (msglen > 0) {
 		buf[msglen]=0;
-		DCMSG(BLUE,"MINION %d received %d chars-->%s<--", minion->mID,msglen,buf);
+		sprintf(hbuf,"Minion %d: received %d from MCP (RF) ", minion->mID,msglen);
+		DDCMSG_HEXB(D_PACKET,BLUE,hbuf,buf,msglen);
+		
 		// we have received a message from the mcp, process it
 		// it is either a command, or it is an RF response from our slave
 		//		process_MCP_cmds(&state,buf,msglen);
+
+
+		DCMSG(YELLOW,"MINION %d:  this is where a LB packet gets parsed", minion->mID);
+
+
+
+
+
+		
 	    } else if (msglen<0) {
 		if (errno!=EAGAIN){
-		    DCMSG(BLUE,"MINION %d read returned %d errno=%d socket to MCP closed, we are FREEEEEeeee!!!",minion->mID,msglen,errno);
+		    DCMSG(RED,"minion %d: read returned %d errno=%d socket to MCP closed, we are FREEEEEeeee!!!",minion->mID,msglen,errno);
 		    exit(-2);  /* this minion dies!   it should do something else maybe  */
 		}
 	    }else {
-		DCMSG(BLUE,"MINION %d socket to MCP closed, we are FREEEEEeeee!!!", minion->mID);
+		DCMSG(RED,"minion %d: socket to MCP closed, we are FREEEEEeeee!!!", minion->mID);
 		exit(-2);  /* this minion dies!  possibly it should do something else - but maybe it dies of happyness  */
 	    }
 	}
@@ -810,6 +852,7 @@ void *minion_thread(thread_data_t *minion){
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
 	DDCMSG(D_TIME,CYAN,"MINION %d: End of MCP Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	/**********************************    end of reading and processing the mcp command  ***********************/
+	
 	/*************** check to see if there is something to read from the rcc   **************************/
 	if (FD_ISSET(minion->rcc_sock,&rcc_or_mcp)){
 	    // now read it using the new routine    
@@ -818,9 +861,9 @@ void *minion_thread(thread_data_t *minion){
 		header = (FASIT_header*)(buf);	// find out how long of message we have
 		length=htons(header->length);	// set the length for the handle function
 		if (result>length){
-		    DCMSG(BLUE,"MINION %d: Multiple Packet  num=%d  result=%d seq=%d header->length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
+		    DDCMSG(D_PACKET,BLUE,"MINION %d: Multiple Packet  num=%d  result=%d seq=%d header->length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
 		} else {
-		    DCMSG(BLUE,"MINION %d:  num=%d  result=%d seq=%d header->length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
+		    DDCMSG(D_PACKET,BLUE,"MINION %d:  num=%d  result=%d seq=%d header->length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
 		}
 		tbuf=buf;			// use our temp pointer so we can step ahead
 		// loop until result reaches 0
@@ -834,13 +877,13 @@ void *minion_thread(thread_data_t *minion){
 		    header = (FASIT_header*)(tbuf);	// find out how long of message we have
 		    length=htons(header->length);	// set the length for the handle function
 		    if (result){
-			DCMSG(BLUE,"MINION %d: Continue processing the rest of the BIG fasit packet num=%d  result=%d seq=%d  length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
+			DDCMSG(D_PACKET,BLUE,"MINION %d: Continue processing the rest of the BIG fasit packet num=%d  result=%d seq=%d  length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
 		    }
 		}
 	    } else {
 		strerror_r(errno,buf,BufSize);
-		DCMSG(BLUE,"MINION %d: read_FASIT_msg returned %d and Error: %s", minion->mID,result,buf);
-		DCMSG(BLUE,"MINION %d: which means it likely has closed!", minion->mID);
+		DCMSG(RED,"MINION %d: read_FASIT_msg returned %d and Error: %s", minion->mID,result,buf);
+		DCMSG(RED,"MINION %d: which means it likely has closed!", minion->mID);
 		exit(-1);
 	    }
 	}
@@ -906,7 +949,7 @@ void *minion_thread(thread_data_t *minion){
 			minion->S.exp.data=45;	// make the current positon in movement
 			minion->S.exp.flags=F_exp_expose_B;	// something has to happen
 			minion->S.exp.timer=5;	// it should happen in this many deciseconds
-			DCMSG(MAGENTA,"exp_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+			DDCMSG(D_TIME,MAGENTA,"exp_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
 			      ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
 			sendStatus2102(0,header,minion); // forces sending of a 2102
 
@@ -917,7 +960,7 @@ void *minion_thread(thread_data_t *minion){
 			minion->S.exp.data=90;	// make the current positon in movement
 			minion->S.exp.flags=F_exp_expose_C;	// we have reached the exposed position, now wait for confirmation from the RF slave
 			minion->S.exp.timer=9000;	// lots of time to wait for a RF reply
-			DCMSG(MAGENTA,"exp_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+			DDCMSG(D_TIME,MAGENTA,"exp_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
 			      ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
 			sendStatus2102(0,header,minion); // forces sending of a 2102
 
@@ -933,7 +976,7 @@ void *minion_thread(thread_data_t *minion){
 			minion->S.exp.data=45;	// make the current positon in movement
 			minion->S.exp.flags=F_exp_conceal_B;	// something has to happen
 			minion->S.exp.timer=5;	// it should happen in this many deciseconds
-			DCMSG( MAGENTA,"conceal_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+			DDCMSG(D_TIME,MAGENTA,"conceal_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
 			       ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
 			sendStatus2102(0,header,minion); // forces sending of a 2102
 
@@ -943,7 +986,7 @@ void *minion_thread(thread_data_t *minion){
 			minion->S.exp.data=0;	// make the current positon in movement
 			minion->S.exp.flags=F_exp_conceal_C;	// we have reached the exposed position, now wait for confirmation from the RF slave
 			minion->S.exp.timer=9000;	// lots of time to wait for a RF reply
-			DCMSG( MAGENTA,"conceal_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+			DDCMSG(D_TIME,MAGENTA,"conceal_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
 			       ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
 			sendStatus2102(0,header,minion); // forces sending of a 2102
 
@@ -953,14 +996,16 @@ void *minion_thread(thread_data_t *minion){
 
 			break;
 
-		}
-	    }
-	}
+		}  // end of switch
+	    }   // else clause - exp flag
+	} // if clause - exp flag not set
 
 	timestamp(&elapsed_time,&istart_time,&delta_time);
 	DDCMSG(D_TIME,CYAN,"MINION %d: End timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-    }
-}
+    }  // while forever
+}  // end of minon thread
+
+
 
 

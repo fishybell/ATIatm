@@ -39,6 +39,7 @@
 // used to create a header
 #define LB_HEADER(LBADDR,LBCMD) (((LBADDR)&0x7FF)<<5|((LBCMD)&0x1F))
 
+#define LB_ADDR(LBHEADER) ((LBHEADER>>5)&0x7FF)
 
 /********************************************/
 /* Low Bandwidth Message Header             */
@@ -49,72 +50,91 @@ typedef struct LB_packet_tag {
     int length;	// total length - not sent/ not part of the actual packet
 } LB_packet_t;
 
-
-
 // LBC_DEVICE_REG packet
 //
 // since this packet happens so seldom I see no good reason to try and
 // bit pack smaller than this
-typedef struct LBC_device_reg {
+typedef struct LB_device_reg_t {
+    uint16 header;
     uint32 dev_type:8;
     uint32 devid:24;	// last 3 byte of the MAC address
-    uint8 temp_addr;    
-} LBC_device_reg;
+    uint32 temp_addr:11;
+    uint32 pad:21;
+    uint8 crc;
+    int length;
+} LB_device_reg_t;
 
-
-// LBC_DEVICE_NEW packet
+// LBC_DEVICE_ADDR packet
 //
 // this packet assigns the Slave at the responding address (temp or
 // not)  a new address.   it is two bytes long and can range from 1-1700
 
-typedef struct LBC_device_new {
+typedef struct LB_device_addr_t {
+    uint16 header;
     uint16 new_addr;
-} LBC_device_new;
-
+//    uint16 pad:5;
+    uint8 crc;
+    int length;
+} LB_device_addr_t;
 
 // LBC_EXPOSE
 //    we still have 4 more bits
-typedef struct LBC_expose {
+typedef struct LB_expose {
+    uint16 header;    
     uint16 expose:1;
     uint16 hitmode:1;
     uint16 tokill:4;
     uint16 react:3;
     uint16 mfs:2;
     uint16 thermal:1;
-} LBC_expose_t;
+    uint8 crc;
+    int length;
+} LB_expose_t;
 
 // LBC_MOVE
 //    we still have 4 more bits
-typedef struct LBC_move {
+typedef struct LB_move {
+    uint16 header;
     uint16 direction:1;
     uint16 speed:11;
-} LBC_move_t;
+    uint8 crc;
+    int length;
+} LB_move_t;
 
 // LBC_CONFIGURE
 //    we have 2 too many or 6 short
-typedef struct LBC_configure {
+typedef struct LB_configure {
+    uint16 header;
     uint16 hitmode:1;
     uint16 tokill:4;
     uint16 react:3;
     uint16 hitcountset:2;
     uint16 sensitivity:4;
     uint16 timehits:4;    
-} LBC_configure_t;
+    uint8 crc;
+    int length;
+} LB_configure_t;
 
 // LBC_AUDIO_CONTROL
 //    we have 5 short
-typedef struct LBC_audio_control {
+typedef struct LB_audio_control {
+    uint16 header;
     uint16 function:2;
     uint16 track:8;
     uint16 volume:7;
     uint16 playmode:2;
-} LBC_audio_control_t;
+    uint8 crc;
+    int length;
+} LB_audio_control_t;
 
 // LBC_PYRO_FIRE
 //    we have 5 short
-typedef struct LBC_pyro_fire {
+typedef struct LB_pyro_fire {
+    uint16 header;
     uint8 zone:2;
-} LBC_pyro_fire_t;
+    uint8 crc;
+    int length;
+} LB_pyro_fire_t;
 
 
 void LB_CRC_add(LB_packet_t *LB,int len);

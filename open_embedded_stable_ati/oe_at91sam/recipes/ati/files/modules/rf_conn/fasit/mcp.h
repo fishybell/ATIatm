@@ -15,9 +15,10 @@
 #include <termios.h> /* POSIX terminal control definitions */
 
 #define D_NONE		0
-#define D_TIME		1
-#define D_PACKET	2
+#define D_PACKET	1
+#define D_RF		2
 #define D_POLL		4
+#define D_TIME		8
 
 // because the Minion ID's match the LB addressing
 #define MAX_NUM_Minions 2048
@@ -147,9 +148,19 @@ typedef struct _thread_data_t {
     int mID;		// minion ID which matches the slave registration
     int rcc_sock;	// socket to RCC
     int seq;		// sequence number of this minion  for fasit messages
+    int RF_addr;	// current RF address 
     uint64 devid;	// mac address of this minion which we got back from the RF
     minion_state_t S;	// the whol state of this minion
 } thread_data_t;
+
+/* create simple struct to keep track of temporary addresses */
+typedef struct taddr_t {
+    int fd;
+    int addr;
+    uint64 devid;
+    int mID;
+    int inuse;
+} taddr_t;
 
 //   possible status for thread_data status that we need to deal with
 #define S_closed 0
@@ -199,20 +210,27 @@ void *minion_thread(thread_data_t *);
 //   I always like to include the trailing ';' so my editor can indent automatically
 
 #define CPRINT_HEXB(SC,data, size)  { if (C_DEBUG) {{ \
-					fprintf(stdout, "DEBUG:\x1B[3%d;%dm 0x",(SC)&7,((SC)>>3)&1); \
+					fprintf(stdout, "DEBUG:\x1B[3%d;%dm",(SC)&7,((SC)>>3)&1); \
 					char *_data = (char*)data; \
-					for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
+					for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
 					fprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
 				    }; fflush(stdout); }}
 
 
 
 #define DCMSG_HEXB(SC,hbuf,data, size)  { if (C_DEBUG) {{ \
-					fprintf(stdout, "%s:\x1B[3%d;%dm 0x",hbuf,(SC)&7,((SC)>>3)&1); \
+					fprintf(stdout, "\x1B[3%d;%dm%s",(SC)&7,((SC)>>3)&1,hbuf); \
 					char *_data = (char*)data; \
-					for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x", (__uint8_t)_data[_i]); \
+					for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
 					fprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
 				    }; fflush(stdout); }}
+
+#define DDCMSG_HEXB(DBG,SC,hbuf,data, size)  { if (verbose&(DBG)) {{ \
+					    fprintf(stdout, "\x1B[3%d;%dm%s",(SC)&7,((SC)>>3)&1,hbuf); \
+					    char *_data = (char*)data; \
+					    for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
+					    fprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
+					}; fflush(stdout); }}
 
 
 
