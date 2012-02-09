@@ -844,15 +844,16 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
     // Pin A going high caused IRQ?
-    if ( status & ATMEL_TC_LDRAS )
-        {
+    if ( status & ATMEL_TC_LDRAS ) {
+//    if (at91_get_gpio_value(INPUT_MOVER_SPEED_SENSOR_1) == NPUT_MOVER_SPEED_SENSOR_ACTIVE_STATE)
+//        {
         // reset the timeout timer?
         if (CONTINUE_ON[mover_type] & 2) {
             timeout_timer_stop();
             timeout_timer_start(1);
         }
 
-        // change position
+        // detect direction, change position
         if (reverse) {
             // reverse flag set
             if (status & ATMEL_TC_MTIOB) {
@@ -1573,8 +1574,13 @@ static int speed_from_pwm(int ra) {
 
 static int current_speed10() {
     int vel = atomic_read(&velocity);
-    if (vel != 0) {
+//    if (vel != 0) {
+//        vel = (100*RPM_K[mover_type]/vel)/VELO_K[mover_type];
+//    }
+    if (vel > 0) {
         vel = (100*RPM_K[mover_type]/vel)/VELO_K[mover_type];
+    } else if (vel < 0) {
+        vel = -1 * ((100*RPM_K[mover_type]/abs(vel))/VELO_K[mover_type]);
     }
 
     return vel;
