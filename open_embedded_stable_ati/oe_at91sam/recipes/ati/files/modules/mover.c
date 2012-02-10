@@ -10,6 +10,7 @@
 
 #include "target.h"
 #include "mover.h"
+#include "scenario.h"
 
 //---------------------------------------------------------------------------
 // For external functions
@@ -45,6 +46,14 @@ static struct work_struct position_work;
 //---------------------------------------------------------------------------
 static void move_change(unsigned long data); // forward declaration
 static struct timer_list moved_timer = TIMER_INITIALIZER(move_change, 0, 0);
+
+//---------------------------------------------------------------------------
+// Message filler handler for failure messages
+//---------------------------------------------------------------------------
+int error_mfh(struct sk_buff *skb, void *msg) {
+    // the msg argument is a null-terminated string
+    return nla_put_string(skb, GEN_STRING_A_MSG, msg);
+}
 
 //---------------------------------------------------------------------------
 // Message filler handler for expose functions
@@ -215,12 +224,31 @@ delay_printk("Mover: handling move command\n");
                 delay_printk("Mover: could not create return message\n");
                 rc = HANDLE_FAILURE;
             }
-        } //else if ((mover_speed_get() > 0 && value-32768 < 0) || (mover_speed_get() < 0 && value-32768 > 0)) {
-	    //delay_printk("mover is reversing direction\n");
-	    //enable_battery_check(0); // disable battery checking while motor is on
-	    //mover_speed_set(0);  // set speed to 0 first to make easier on equipment
-	    //mover_speed_set(value-32768); // unsigned value to signed speed (0 will coast)
-	 else {
+        }// else if ((mover_speed_get() > 0 && value-32768 < 0) || (mover_speed_get() < 0 && value-32768 > 0)) { // moving from positive to negative, or negative to positive
+//            char *msg = kmalloc(512, GFP_KERNEL);
+//            char *nothing_buf = msg + 256; // share same buffer
+//            int speed = value-32768; // unsigned value to signed value
+//            escape_scen_call("{Nothing;;;;}", 13, nothing_buf);
+//            //delay_printk("mover is reversing direction\n");
+//            send_nl_message_multi("mover is scenario reversing direction", error_mfh, NL_C_FAILURE);
+//            enable_battery_check(0); // disable battery checking while motor is on
+//            
+//            snprintf(msg, 256, " \
+//              {Send;R_MOVER;NL_C_MOVE;1;0080} -- Send Stop to mover \
+//              {DoWait;%s;EVENT_STOPPED;15000;%s} -- Wait 15 seconds for stop (cmd installed below)\
+//              {Send;R_MOVER;NL_C_MOVE;1;%04X} -- Send Stop to mover",
+//              nothing_buf, nothing_buf, value & 0xffff
+//                ); // use only bottom half of buffer, install "nothing" cmd, verify 16 bits on move value
+//            send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+//
+//            // send reverse scenario
+//            if (target_scenario(msg) == -1) {
+//               // failed to do in scenario, just slam it on backwards
+//	            mover_speed_set(value-32768); // unsigned value to signed speed (0 will coast)
+//               send_nl_message_multi("aborted scenario reversing direction", error_mfh, NL_C_FAILURE);
+//            }
+//            kfree(msg);
+        else {
             // move
             enable_battery_check(0); // disable battery checking while motor is on
             delay_printk("NL_MOVE_HANDLER: value1: %d value2: %d\n", value, value-32768);
