@@ -439,7 +439,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    DDCMSG(D_PACKET,BLUE,"CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",message_2100->exp) ;       
 //		    also build an LB packet  to send
 		    LB_exp =(LB_expose_t *)LB_buf;	// make a pointer to our buffer so we can use the bits right
-		    LB_exp->header=LB_HEADER(minion->RF_addr,LBC_EXPOSE);
+		    LB_exp->cmd=LBC_EXPOSE;
+		    LB_exp->addr=minion->RF_addr;
 
 		    //				minion->S.exp.data=0;			// cheat and set the current state to 45
 		    minion->S.exp.newdata=message_2100->exp;	// set newdata to be the future state
@@ -460,10 +461,10 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    LB_exp->thermal=0;
 	    // calculates the correct CRC and adds it to the end of the packet payload
 	    // also fills in the length field
-		    LB_CRC_add((LB_packet_t *)LB_buf,5);
+		    set_crc8(&LB_exp,RF_size(LB_exp->cmd));
 	    // now send it to the MCP master
 		    result=write(minion->mcp_sock,&LB_buf,LB_exp->length);
-		    sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d\n",minion->mID,minion->RF_addr,LB_exp->header&0x1f,LB_exp->length);
+		    sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d\n",minion->mID,minion->RF_addr,LB_exp->cmd,LB_exp->length);
 		    DDCMSG_HEXB(D_RF,BLUE,hbuf,&LB_buf,LB_exp->length);
 		    DDCMSG(D_RF,RED,"  Sent %d bytes to RF\n",LB_exp->length);
 //  sent LB

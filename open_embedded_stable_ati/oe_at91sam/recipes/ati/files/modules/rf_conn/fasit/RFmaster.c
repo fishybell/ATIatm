@@ -40,21 +40,31 @@ void DieWithError(char *errorMessage){
  *************
  *************/
 
-
 #define MbufSize 4096
 
 void HandleRF(int MCPsock,int RFfd){
     struct timespec elapsed_time, start_time, istart_time,delta_time;
-    char Mbuf[MbufSize], buf[200];        /* Buffer MCP socket */
+    char Mbuf[MbufSize],Rbuf[256], buf[200];        /* Buffer MCP socket */
+    int Rptr,Rstart,size;
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
     fd_set rf_or_mcp;
     struct timeval timeout;
     int maxcps=500,rfcount=0;		/*  characters per second that we can transmit without melting - 1000 is about 100% */
     double cps;
+
+    // packet header so we can determine the length from the command in the header
+    LB_packet_t *LB;
+
     
+
+
+    Rstart=0;	// start position in the Rbuf of this packet - in case we get more than 1 packet
+    Rptr=0;	// position in the Rbuf - so we can join split packets
 /**   loop until we lose connection  **/
     clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
     while(1) {
+
+	
 	timestamp(&elapsed_time,&istart_time,&delta_time);
 	DDCMSG(D_TIME,CYAN,"RFmaster top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 	       ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
@@ -74,7 +84,7 @@ void HandleRF(int MCPsock,int RFfd){
 	 *   the RFmaster to just pass data back and forth.
 	 */
 
-	DCMSG(YELLOW,"RFmaster waiting for select(rf or mcp)");
+//	DCMSG(YELLOW,"RFmaster waiting for select(rf or mcp)");
 
 	timeout.tv_sec=0;
 	timeout.tv_usec=100000;	
@@ -92,15 +102,38 @@ void HandleRF(int MCPsock,int RFfd){
 	//  which means we have to be aware of the Low Bandwidth protocol
 	//  if we have data to read from the RF, read it then blast it back upstream to the MCP
 	if (FD_ISSET(RFfd,&rf_or_mcp)){
-	    /* Receive message from RF */
-	    if ((MsgSize = read(RFfd,Mbuf,MbufSize)) < 0)
-		DieWithError("read(RFfd,...) failed");
+	    /* Receive message, or continue to recieve message from RF */
+	    if ((MsgSize = read(RFfd,&Rbuf[Rptr],MbufSize)) < 0) DieWithError("read(RFfd,...) failed");
+	    Rptr+=MsgSize;	// accumulate the packet size
 
-	    sprintf(buf,"RFmaster: read %d chars from RF. Copy to MCP",MsgSize);
-	    DCMSG_HEXB(GREEN,buf,Mbuf,MsgSize);
-	    // blindly write it  to the MCP
-	    result=write(MCPsock,Mbuf,MsgSize);
-	    DCMSG(BLUE,"Wrote %d chars to to the MCP",result);
+	    if (Rptr-Rstart<3){
+		// no chance of complete packet, so just increment the Rptr and keep waiting
+	    } else {
+		// we have a chance of a compelete packet
+		LB=&Rbuf[Rstart];	// map the header in
+		size=RF_size(LB->cmd);
+		if ((Rstart-Rptr) <= size){
+		    //  we do have a complete packet
+		    // we could check the CRC and dump it here
+		    
+		    result=write(MCPsock,&Rbuf[Rstart],size);
+		    if (result==size) {
+			sprintf(buf,"RF ->MCP  [%2d]  ",size);
+			DCMSG_HEXB(GREEN,buf,&Rbuf[Rstart],size);
+		    } else {
+			sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
+			DCMSG_HEXB(RED,buf,&Rbuf[Rstart],size);
+		    }
+		    if ((Rstart-Rptr) > size){
+			Rstart+=size;	// step ahead to the next packet
+		    } else {
+			Rstart=0;	// step ahead to the next packet
+
+		    }
+		}
+	    }
+	
+
 	    memset(Mbuf,0,MsgSize+3);
 	}
 
@@ -112,8 +145,6 @@ void HandleRF(int MCPsock,int RFfd){
 		DieWithError("recv() failed");
 
 	    if (MsgSize){
-		sprintf(buf,"RFmaster: pcount=%4d  read %d chars from MCP. Copy to RF",pcount++,MsgSize);
-		DCMSG_HEXB(BLUE,buf,Mbuf,MsgSize);
 
 		// we need a buffer that we can use to stage output to the radio in
 		// plus, we probably need some kind of handshake back to the MCP so
@@ -123,12 +154,16 @@ void HandleRF(int MCPsock,int RFfd){
 		// above or below the duty cycle limit.  But we can also transmit up to burst time limit
 		// before we care.  we should keep a moving average of about a minute for CPS, and watch the burst times
 		// IIR average should work.
-		
-
 		// blindly write it  to the  radio
-
 		
 		result=write(RFfd,Mbuf,MsgSize);
+		if (result==MsgSize) {
+		    sprintf(buf,"MCP-> RF  [%2d]  ",MsgSize);
+		    DCMSG_HEXB(BLUE,buf,Mbuf,MsgSize);
+		} else {
+		    sprintf(buf,"MCP-> RF  [%d!=%d]  ",MsgSize,result);
+		    DCMSG_HEXB(RED,buf,Mbuf,MsgSize);
+		}
 
 		rfcount+=MsgSize;
 		timestamp(&elapsed_time,&istart_time,&delta_time);
@@ -140,11 +175,10 @@ void HandleRF(int MCPsock,int RFfd){
 		memset(Mbuf,0,MsgSize+3);
 	    } else {
 		// the socket to the MCP seems to have closed...
-		break;
 
 	    }
-	}
-    }
+	}  // end of MCP_sock
+    } // end while 1
     close(MCPsock);    /* Close socket */    
 }
 
