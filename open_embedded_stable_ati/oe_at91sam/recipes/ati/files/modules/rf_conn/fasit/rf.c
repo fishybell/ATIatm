@@ -48,6 +48,76 @@ uint8 RF_size(int cmd){
     }
 }
 
+// utility function to get Device ID (mac address)
+__uint64_t getDevID () {
+    struct ifreq ifr;
+    struct ifreq *IFR;
+    struct ifconf ifc;
+    char buf[1024];
+    int sock, i;
+    u_char addr[6];
+
+   // this function only actually finds the mac once, but remembers it
+    static bool found = false;
+    static __uint64_t retval = 0;
+
+   // did we find it before?
+    if (!found) {
+      // find mac by looking at the network interfaces
+	sock = socket(AF_INET, SOCK_DGRAM, 0); // need a valid socket to look at interfaces
+	if (sock == -1) {
+	    perror("getDevID-socket() SOCK_DGRAM error");
+	    return 0;
+	}
+      // only look at the first ethernet device
+	if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, "eth0", 5) == -1) {
+	    perror("getDevID-setsockopt() BINDTO error");
+	    return 0;
+	}
+
+      // grab all interface configs
+	ifc.ifc_len = sizeof(buf);
+	ifc.ifc_buf = buf;
+	ioctl(sock, SIOCGIFCONF, &ifc);
+
+      // find first interface with a valid mac
+	IFR = ifc.ifc_req;
+	for (i = ifc.ifc_len / sizeof(struct ifreq); --i >= 0; IFR++) {
+
+	    strcpy(ifr.ifr_name, IFR->ifr_name);
+	    if (ioctl(sock, SIOCGIFFLAGS, &ifr) == 0) {
+	    // found an interface ...
+		if (!(ifr.ifr_flags & IFF_LOOPBACK)) {
+	       // and it's not the loopback ...
+		    if (ioctl(sock, SIOCGIFHWADDR, &ifr) == 0) {
+		  // and it has a mac address
+			found = true;
+			break;
+		    }
+		}
+	    }
+	}
+
+      // close our socket
+	close(sock);
+
+      // did we find one? (this time?)
+	if (found) {
+	 // copy to static address so we don't look again
+	    memcpy(addr, ifr.ifr_hwaddr.sa_data, 6);
+	    DMSG("FOUND MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+	    for (int i=0; i<6; i++) {
+		retval |= (__uint64_t)(addr[i]) << ((i+2)*8); // copy offset 2 bytes
+	    }
+	}
+    }
+
+   // return whatever we found before (if anything)
+    return retval;
+}
+
+
+
 
 // based on polynomial x^8 + x^2 + x^1 + x^0
 

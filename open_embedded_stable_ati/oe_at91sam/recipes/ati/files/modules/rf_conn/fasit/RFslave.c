@@ -34,6 +34,7 @@ void HandleRF(int RFfd){
 #define MbufSize 4096
     char Mbuf[MbufSize], buf[200], hbuf[200];        /* Buffer MCP socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
+    char *Mptr, Mstart, Mend; 
     fd_set rf_or_mcp;
     struct timeval timeout;
     LB_packet_t *LB,rLB;
@@ -44,14 +45,24 @@ void HandleRF(int RFfd){
     LB_expose_t *LB_exp;
 
     RF_addr=2047;	//  only respond to address 2047 for the request new device packet
+
+
     
 /**   loop until we lose connection  **/
     while(1){
-	/* Receive message from RF */
-	if ((MsgSize = read(RFfd,Mbuf,MbufSize)) < 0)
-	    DieWithError("read(RFfd,...) failed");
-
+	/* Receive only the first two bytes of the message from RF */
+	//  fail!  stupidly reading a byte at a time to see it work
+	MsgSize = read(RFfd,Mbuf,2);
+	if (MsgSize==1) MsgSize = 1+read(RFfd,&Mbuf[1],1);
+	
 	LB=(LB_packet_t *)Mbuf;
+	for (Mstart=2, Mstart<=RF_size(LB->cmd),Mstart++)
+	    read(RFfd,&Mbuf[Mstart],RF_size(LB->cmd)-2);
+	
+
+	// of course we might be getting packets that are either split up or glommed together,
+	// and we need to parse complete ones individually
+	
 	sprintf(buf,"packet pseq=%4d read %d from RF. Cmd=%2d addr=%4d RF_addr=%4d\n",pcount++,MsgSize,LB->cmd,LB->addr,RF_addr);
 	DCMSG_HEXB(GREEN,buf,Mbuf,MsgSize);
 	
