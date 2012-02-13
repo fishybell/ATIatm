@@ -158,10 +158,10 @@ static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,0};		// channel 0 matches TIOA0 to TIO
 
 #define MAX_TIME	0x10000
 #define MAX_OVER	0x10000
-static int RPM_K[] = {983040, 983040, 983040, 983040, 0}; // CLOCK * 60 seconds * 1/2 cycle
-static int ENC_PER_REV[] = {2, 2, 2, 2, 0}; // 2 = encoder click is half a revolution
+static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
+static int ENC_PER_REV[] = {2, 360, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
 static int VELO_K[] = {1680, 1344, 1680, 1680, 0}; // rpm/mph*10
-static int INCHES_PER_TICK[] = {314, 393, 314, 314, 0}; // 5:1 ratio 10 inch / 2, 2:1 ratio 5 inch / 2, etc.
+static int INCHES_PER_TICK[] = {628, 786, 628, 628, 0}; // 5:1 ratio 10 inch, 2:1 ratio 5 inch, etc.
 static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 0}; // 5:1 ratio 10 inch wheel 6 ft leg, 2:1 ratio 5 inch wheel 6 ft leg, etc.
 #define TICKS_DIV 100
 
@@ -952,7 +952,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         // did we reach the target speed?
         if (abs(current_speed10()) >= 15) { // 7.45 mph is 12 kph
             // display current position
-            pos = ((INCHES_PER_TICK[mover_type]*atomic_read(&position))/TICKS_DIV);
+            pos = ((INCHES_PER_TICK[mover_type]*atomic_read(&position))/(ENC_PER_REV[mover_type]*TICKS_DIV));
             delay_printk("\
 #************************************#\n\
 # Reached 14kph @ %2i feet, %2i inches #\n\
@@ -1675,9 +1675,9 @@ static int current_speed10() {
 //        vel = (100*RPM_K[mover_type]/vel)/VELO_K[mover_type];
 //    }
     if (vel > 0) {
-        vel = (100*RPM_K[mover_type]/vel)/VELO_K[mover_type];
+        vel = (100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel)/VELO_K[mover_type];
     } else if (vel < 0) {
-        vel = -1 * ((100*RPM_K[mover_type]/abs(vel))/VELO_K[mover_type]);
+        vel = -1 * ((100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/abs(vel))/VELO_K[mover_type]);
     }
 
     return vel;
@@ -1759,7 +1759,7 @@ EXPORT_SYMBOL(mover_speed_stop);
 
 extern int mover_position_get() {
     int pos = atomic_read(&position);
-    return ((INCHES_PER_TICK[mover_type]*pos)/TICKS_DIV)/12; // inches to feet
+    return ((INCHES_PER_TICK[mover_type]*pos)/(ENC_PER_REV[mover_type]*TICKS_DIV))/12; // inches to feet
 }
 EXPORT_SYMBOL(mover_position_get);
 
@@ -1918,7 +1918,7 @@ static void ramp_fire(unsigned long data) {
         }
         pid_step(MAX_TIME); // use maximum delta_t
     } else if (atomic_read(&moving_atomic) < 3) {
-        int clock = (RPM_K[mover_type] * ENC_PER_REV[mover_type]) / 60; // RPM_K is clock ticks per minute / encoder clicks per revolution - find clock by doing reverse
+        int clock = RPM_K[mover_type] / 60; // RPM_K is clock ticks per minute - find clock by doing reverse
         int ticks = (clock / ramp_time) / speed_steps;
 #ifndef DEBUG_PID
 //          char *msg = kmalloc(128, GFP_KERNEL);
@@ -1961,7 +1961,7 @@ static ssize_t rpm_show(struct device *dev, struct device_attribute *attr, char 
     {
     int vel = atomic_read(&velocity);
     if (vel != 0) {
-        return sprintf(buf, "%i\n", RPM_K[mover_type]/vel);
+        return sprintf(buf, "%i\n", (RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel);
     } else {
         return sprintf(buf, "%i\n", 0);
     }
