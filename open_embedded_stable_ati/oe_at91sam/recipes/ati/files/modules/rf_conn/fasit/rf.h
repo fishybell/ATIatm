@@ -55,11 +55,11 @@ typedef struct LB_packet_tag {
 // LBC_REQUEST_NEW packet
 //
 typedef struct LB_request_new_t {
-    uint16 cmd:5;
-    uint16 addr:11;
-    //    uint16 header;
-    uint8 crc;
-    uint8 length;
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+    
+    uint16 crc:8 __attribute__ ((packed));
+    uint16 length:8 __attribute__ ((packed));
 } LB_request_new_t;
 
 // LBC_DEVICE_REG packet
@@ -67,15 +67,17 @@ typedef struct LB_request_new_t {
 // since this packet happens so seldom I see no good reason to try and
 // bit pack smaller than this
 typedef struct LB_device_reg_t {
-    uint16 cmd:5;
-    uint16 addr:11;    
-//    uint16 header;
-    uint32 dev_type:8;
-    uint32 devid:24;	// last 3 byte of the MAC address
-    uint16 temp_addr:11;
-    uint16 pad:5;
-    uint8 crc;
-    uint8 length;
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));    
+
+    uint32 dev_type:8 __attribute__ ((packed));
+    uint32 devid:24 __attribute__ ((packed));
+    
+    uint16 temp_addr:11 __attribute__ ((packed));
+    uint16 pad:5 __attribute__ ((packed));
+    
+    uint16 crc:8 __attribute__ ((packed));
+    uint16 length:8 __attribute__ ((packed));
 } LB_device_reg_t;
 
 // LBC_DEVICE_ADDR packet
@@ -84,86 +86,101 @@ typedef struct LB_device_reg_t {
 // not)  a new address.   it is two bytes long and can range from 1-1700
 
 typedef struct LB_device_addr_t {
-    uint16 cmd:5;
-    uint16 addr:11;
-//    uint16 header;
-    uint16 new_addr;
-//    uint16 pad:5;
-    uint8 crc;
-    uint8 length;
-} LB_device_addr_t;
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+
+    uint16 new_addr:11 __attribute__ ((packed));
+    uint16 pad:5 __attribute__ ((packed));
+    
+    uint16 crc:8 __attribute__ ((packed));
+    uint16 length:8 __attribute__ ((packed));
+} __attribute__ ((packed)) LB_device_addr_t;
 
 // LBC_EXPOSE
 //    we still have 4 more bits
 typedef struct LB_expose {
-    uint16 cmd:5;
-    uint16 addr:11;
-//    uint16 header;    
-    uint16 expose:1;
-    uint16 hitmode:1;
-    uint16 tokill:4;
-    uint16 react:3;
-    uint16 mfs:2;
-    uint16 thermal:1;
-    uint8 crc;
-    uint8 length;
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+
+    uint16 expose:1 __attribute__ ((packed));
+    uint16 hitmode:1 __attribute__ ((packed));
+    uint16 tokill:4 __attribute__ ((packed));
+    uint16 react:3 __attribute__ ((packed));
+    uint16 mfs:2 __attribute__ ((packed));
+    uint16 thermal:1 __attribute__ ((packed));
+    uint16 pad:4 __attribute__ ((packed));
+
+    uint16 crc:8 __attribute__ ((packed));
+    uint16 length:8 __attribute__ ((packed));
 } LB_expose_t;
 
 // LBC_MOVE
 //    we still have 4 more bits
 typedef struct LB_move {
-    uint16 cmd:5;
-    uint16 addr:11;
-//  uint16 header;
-    uint16 direction:1;
-    uint16 speed:11;
-    uint8 crc;
-    uint8 length;
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+
+    uint16 direction:1 __attribute__ ((packed));
+    uint16 speed:11 __attribute__ ((packed));
+    uint16 pad:4 __attribute__ ((packed));
+
+    uint16 crc:8 __attribute__ ((packed));
+    uint16 length:8 __attribute__ ((packed));
 } LB_move_t;
 
 // LBC_CONFIGURE
 //    we have 2 too many or 6 short
 typedef struct LB_configure {
-    uint16 cmd:5;
-    uint16 addr:11;
-//    uint16 header;
-    uint16 hitmode:1;
-    uint16 tokill:4;
-    uint16 react:3;
-    uint16 hitcountset:2;
-    uint16 sensitivity:4;
-    uint16 timehits:4;    
-    uint8 crc;
-    uint8 length;
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+
+    uint16 hitmode:1 __attribute__ ((packed));
+    uint16 tokill:4 __attribute__ ((packed));
+    uint16 react:3 __attribute__ ((packed));
+    uint16 sensitivity:4 __attribute__ ((packed));
+    uint16 timehits:4 __attribute__ ((packed));
+
+    uint16 hitcountset:2 __attribute__ ((packed));
+    uint16 pad:6 __attribute__ ((packed));
+    uint16 crc:8 __attribute__ ((packed));
+    
+    uint16 length:8 __attribute__ ((packed));
+    uint16 pad2:8 __attribute__ ((packed));
 } LB_configure_t;
 
 // LBC_AUDIO_CONTROL
 //    we have 5 short
 typedef struct LB_audio_control {
-    uint16 cmd:5;
-    uint16 addr:11;
-//    uint16 header;
-    uint16 function:2;
-    uint16 track:8;
-    uint16 volume:7;
-    uint16 playmode:2;
-    uint8 crc;
-    uint8 length;
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+
+    uint16 function:2 __attribute__ ((packed));
+    uint16 track:8 __attribute__ ((packed));
+    uint16 volume:7 __attribute__ ((packed));
+    uint16 playmode:2 __attribute__ ((packed));
+    uint16 pad:5 __attribute__ ((packed));    
+    uint16 crc:8 __attribute__ ((packed));
+    
+    uint16 length:8 __attribute__ ((packed));
+    uint16 pad2:8 __attribute__ ((packed));
 } LB_audio_control_t;
 
 // LBC_PYRO_FIRE
 //    we have 5 short
 typedef struct LB_pyro_fire {
-    uint16 cmd:5;
-    uint16 addr:11;
-//    uint16 header;
-    uint8 zone:2;
-    uint8 crc;
-    uint8 length;
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+
+    uint16 zone:2 __attribute__ ((packed));
+    uint16 pad:6 __attribute__ ((packed));
+    uint16 crc:8 __attribute__ ((packed));
+    
+    uint16 length:8 __attribute__ ((packed));
+    uint16 pad2:8 __attribute__ ((packed));
 } LB_pyro_fire_t;
 
-uint8 set_crc8(void *buf, int length);
-uint8 crc8(void *buf, int length);
-int RF_size(int cmd);
+void set_crc8(void *buf, uint8 length);
+uint8 crc8(void *buf, uint8 length);
+uint8 RF_size(int cmd);
 
 

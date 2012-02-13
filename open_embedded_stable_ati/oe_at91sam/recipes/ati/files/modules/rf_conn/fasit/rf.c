@@ -1,7 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 
-int RF_size(int cmd){
+uint8 RF_size(int cmd){
     // set LB_size  based on which command it is
     switch (cmd){
 	case  LBC_STATUS:
@@ -72,24 +72,32 @@ static __uint8_t crc8_table[256] = {
 
 
 // calculates the crc, adds it and the length to the end of the packet
-uint8 set_crc8(void *buf, int length) {
+void set_crc8(void *buf, uint8 length) {
+    static char hbuf[100];
     char *data = (char*)buf;
     int size = length-1;
     unsigned char crc = 0; // initial value of 0
 
+
+//    sprintf(hbuf,"set_crc8: length=%d - displaying len+1\n",length);
+//    DCMSG_HEXB(YELLOW,hbuf,buf,length+1);
+    
     while (size--) {
 	crc = crc8_table[(__uint8_t)(crc ^ *data)];
 	data++;
     }
 
     *data++=crc;	// add on the CRC we just calculated
-    *data=length;	// add the length at the end
+    *data++=length;	// add the length at the end
+    *data=0;		// tack a zero after that
 
-    return crc;
+//    sprintf(hbuf,"set_crc8: length=%d - displaying len+1\n",length);
+//    DCMSG_HEXB(YELLOW,hbuf,buf,length+1);
+    
 }
 
 // just calculates the crc
-uint8 crc8(void *buf, int length) {
+uint8 crc8(void *buf, uint8 length) {
     char *data = (char*)buf;
     int size = length-1;
     unsigned char crc = 0; // initial value of 0

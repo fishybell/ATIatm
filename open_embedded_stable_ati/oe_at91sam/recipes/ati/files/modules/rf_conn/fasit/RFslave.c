@@ -54,13 +54,12 @@ void HandleRF(int RFfd){
 	LB=(LB_packet_t *)Mbuf;
 	sprintf(buf,"packet pseq=%4d read %d from RF. Cmd=%2d addr=%4d RF_addr=%4d\n",pcount++,MsgSize,LB->cmd,LB->addr,RF_addr);
 	DCMSG_HEXB(GREEN,buf,Mbuf,MsgSize);
-
+	
 	// only respond if our address matches
 	if (RF_addr==LB->addr){
-
+	    
 	// check the CRC
 	//  if good CRC, parse and respond or whatever
-
 	switch (LB->cmd){
 	    case LBC_REQUEST_NEW:
 		DCMSG(BLUE,"Recieved 'request new devices' packet.");
@@ -71,22 +70,12 @@ void HandleRF(int RFfd){
 		LB_devreg->dev_type=1;			// SIT with MFS
 		LB_devreg->devid=0x0a0b0c;		// mock MAC address
 
-		rLB.addr=1710;		
 		RF_addr=1710;	//  use the fancy hash algorithm to come up with the real temp address
-		LB_devreg->temp_addr=LB->addr;
-
+		LB_devreg->temp_addr=RF_addr;
+		
 		// calculates the correct CRC and adds it to the end of the packet payload
-
-		sprintf(hbuf,"before set_crc8\n");
-		DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
+		set_crc8(&rLB,RF_size(LB_devreg->cmd));
 		
-		LB_devreg->crc=set_crc8(&rLB,RF_size(LB_devreg->cmd));
-		sprintf(hbuf,"after set_crc8\n");
-		DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
-
-		
-//		LB_devreg->length=9;
-
 		DCMSG(BLUE,"setting temp addr to %4d (0x%x) after CRC calc  RF_addr= %4d (0x%x)",RF_addr,RF_addr,LB_devreg->temp_addr,LB_devreg->temp_addr);
 
 		// now send it to the RF master

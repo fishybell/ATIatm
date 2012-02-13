@@ -198,7 +198,6 @@ int main(int argc, char **argv) {
 
 		    // actually can't check until we know how long it is
 //		    DDCMSG(D_RF,RED,"crc=%d  checked = %d",LB->crc,crc8(&LB,2));
-		    
 		    // Iff the CRC is okay we can process it, otherwise throw it away
 
 		    sprintf(hbuf,"MCP: read of LB packet from RFmaster address=%d  cmd=%d  msglen=%d \n",LB->addr,LB->cmd,msglen);
@@ -209,7 +208,8 @@ int main(int argc, char **argv) {
 		    //  mcp also has to pass new_address LB packets on to the minion so it can figure out it's own RF_address
 		    //  mcp passes all other LB packets on to the minions they are destined for
 ///////////////////////////////////////////
-		    if  (cmd==LBC_DEVICE_REG){
+
+		    if  (LB->cmd==LBC_DEVICE_REG){
 			LB_devreg =(LB_device_reg_t *)(LB);	// change our pointer to the correct packet type
 			LB_devreg->length=RF_size(LB_devreg->cmd);	
 
@@ -292,17 +292,17 @@ int main(int argc, char **argv) {
 
 	    // calculates the correct CRC and adds it to the end of the packet payload
 	    // also fills in the length field
-			    set_crc8(&LB_addr,5);
-			    sprintf(hbuf,"MCP: LB packet: RF_addr=%4d cmd=%2d msglen=%d\n",LB_addr->addr,LB_addr->cmd,LB_addr->length);
-			    DDCMSG_HEXB(D_RF,BLUE,hbuf,&LB_addr,LB_addr->length);
+			    set_crc8(&LB_addr,RF_size(LB_addr->cmd));
+			    sprintf(hbuf,"MCP: LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",LB_addr->addr,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
+			    DDCMSG_HEXB(D_RF,BLUE,hbuf,&LB_addr,7);
 
             // this packet must also get sent to the minion
-			    result=write(taddr[taddr_cnt].fd,&LB_addr,LB_addr->length);
-			    DDCMSG(D_RF,BLUE,"MCP: 2 Sent %d bytes to minion %d  fd=%d\n",result,mID,taddr[taddr_cnt].fd);
+			    result=write(taddr[taddr_cnt].fd,&LB_addr,RF_size(LB_addr->cmd));
+			    DDCMSG(D_RF,BLUE,"MCP: 2 Sent %d bytes to minion %d  fd=%d",result,mID,taddr[taddr_cnt].fd);
 			    
 	    // now send it to the RF master
-			    result=write(RF_sock,&LB_addr,LB_addr->length);
-			    DDCMSG(D_RF,RED,"MCP: 1 Sent %d bytes to RF fd=%d\n",result,RF_sock);
+			    result=write(RF_sock,&LB_addr,RF_size(LB_addr->cmd));
+			    DDCMSG(D_RF,RED,"MCP: 1 Sent %d bytes to RF fd=%d",result,RF_sock);
 
 			    /***   end of create a new minion 
 			     ****************************************************************************/
@@ -317,8 +317,8 @@ int main(int argc, char **argv) {
 
 			
 		    // do the copy down here
-			result=write(taddr[rf_addr].fd,&LB,RF_size(LB->cmd));
-			DDCMSG(D_RF,BLUE,"MCP: 3 Sent %d bytes to minion %d\n",result,mID);
+			result=write(ev.data.fd,&LB,RF_size(LB->cmd));
+			DDCMSG(D_RF,BLUE,"MCP: 3 Sent %d bytes to minion %d at fd=%d\n",result,mID,ev.data.fd);
 			
 		    }  // all the commands from RF should have been handled
 		} // it is from the rf
@@ -347,7 +347,7 @@ int main(int argc, char **argv) {
 		    LB=(LB_packet_t *)buf;
 
 		    sprintf(hbuf,"MCP: passing Minion %d's LB packet to RFmaster address=%d  cmd=%d  length=%d msglen=%d \n",mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
-		    DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,msglen);
+		    DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,RF_size(LB->cmd));
 
 		    // do the copy down here
 
