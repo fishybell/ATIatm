@@ -73,7 +73,7 @@ static int RAMP_UP_TIME_IN_MSECONDS[] = {1,1,1,1,0};
 static int RAMP_DOWN_TIME_IN_MSECONDS[] = {1,1,1,1,0};
 #else
 static int RAMP_UP_TIME_IN_MSECONDS[] = {5,1000,5,250,0};
-static int RAMP_DOWN_TIME_IN_MSECONDS[] = {5,100,5,1,0};
+static int RAMP_DOWN_TIME_IN_MSECONDS[] = {1,100,1,200,0};
 #endif
 //static int RAMP_STEPS[] = {25,100,25,25,0};
 static int RAMP_STEPS[] = {3,5,3,5,0};
@@ -213,6 +213,7 @@ static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false, false};
 //---------------------------------------------------------------------------
 // These atomic variables is use to indicate global position changes
 //---------------------------------------------------------------------------
+atomic_t found_home = ATOMIC_INIT(0);
 atomic_t velocity = ATOMIC_INIT(0);
 atomic_t last_t = ATOMIC_INIT(0);
 atomic_t o_count = ATOMIC_INIT(0);
@@ -507,6 +508,9 @@ static int hardware_motor_on(int direction)
         if (PWM_H_BRIDGE[mover_type]) {
             at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         } else if (DIRECTIONAL_H_BRIDGE[mover_type]) {
+#ifndef DEBUG_PID
+          //send_nl_message_multi("Reverse contacter on!", error_mfh, NL_C_FAILURE);
+#endif
             at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
@@ -527,6 +531,9 @@ static int hardware_motor_on(int direction)
         if (PWM_H_BRIDGE[mover_type]) {
             at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         } else if (DIRECTIONAL_H_BRIDGE[mover_type]) {
+#ifndef DEBUG_PID
+          //send_nl_message_multi("Forward contacter on!", error_mfh, NL_C_FAILURE);
+#endif
             at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
@@ -586,6 +593,9 @@ static int hardware_motor_off(void)
     // turn off directional lines
     if (DIRECTIONAL_H_BRIDGE[mover_type])
         {
+#ifndef DEBUG_PID
+          //send_nl_message_multi("Directional contacters off!", error_mfh, NL_C_FAILURE);
+#endif
         // de-assert the all inputs to the h-bridge
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
@@ -641,6 +651,9 @@ static int hardware_speed_set(int new_speed)
         old_speed = atomic_read(&goal_atomic);
         if (old_speed == new_speed)
             {
+#ifndef DEBUG_PID
+//send_nl_message_multi("Ignored speed, was already going to that speed", error_mfh, NL_C_FAILURE);
+#endif
             return TRUE;
             }
         }
@@ -677,9 +690,15 @@ static int hardware_speed_set(int new_speed)
             do_event(EVENT_MOVE); // start of moving
         }
 
+#ifndef DEBUG_PID
+//send_nl_message_multi("Might do ramp while moving", error_mfh, NL_C_FAILURE);
+#endif
         // are we being told to change movement?
-        if (atomic_read(&moving_atomic) >= 2)
+        if (atomic_read(&moving_atomic) >= 1)
             {
+#ifndef DEBUG_PID
+//send_nl_message_multi("Going to do ramp while moving", error_mfh, NL_C_FAILURE);
+#endif
             // start the ramp up/down of the mover immediately
             mod_timer(&ramp_timer_list, jiffies+(((10*HZ)/1000)));
             }
@@ -723,6 +742,9 @@ static int hardware_movement_stop(int stop_timer)
     hardware_motor_off();
 
     // signal that an operation is done
+#ifndef DEBUG_PID
+//send_nl_message_multi("\n---------Changing moving_atomic to 0\n", error_mfh, NL_C_FAILURE);
+#endif
     atomic_set(&moving_atomic, 0);
 
     // reset speed ramping
@@ -866,6 +888,9 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
 // new method
         // no longer considered moving, ramp will adjust accordingly if it's still running
         if (atomic_read(&moving_atomic) == 3) {
+#ifndef DEBUG_PID
+//send_nl_message_multi("\n---------Changing moving_atomic to 2 from 3\n", error_mfh, NL_C_FAILURE);
+#endif
             atomic_set(&moving_atomic, 2);
         }
 
@@ -884,6 +909,9 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
         // now considered moving, ramp will now only adjust the PID number
+#ifndef DEBUG_PID
+//send_nl_message_multi("\n---------Changing moving_atomic to 3\n", error_mfh, NL_C_FAILURE);
+#endif
         atomic_set(&moving_atomic, 3);
 
         // detect direction, change position
@@ -994,8 +1022,18 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
    delay_printk("%s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&movement_atomic));
 
     // reset to "home" position
-    atomic_set(&legs, 0);
-    atomic_set(&position, 0);
+    if (atomic_read(&found_home) == 0) {
+#ifndef DEBUG_PID
+send_nl_message_multi("Did home reset", error_mfh, NL_C_FAILURE);
+#endif
+        atomic_set(&found_home, 1); // only "home" the mover once per reset
+        atomic_set(&legs, 0);
+        atomic_set(&position, 0);
+#ifndef DEBUG_PID
+    } else {
+send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
+#endif
+    }
 
     // check to see if this one needs to be ignored
     if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)
@@ -1433,6 +1471,9 @@ static int hardware_movement_set(int movement)
         {
 
         // signal that an operation is in progress
+#ifndef DEBUG_PID
+//send_nl_message_multi("\n---------Changing moving_atomic to 1\n", error_mfh, NL_C_FAILURE);
+#endif
         atomic_set(&moving_atomic, 1);
 
         hardware_motor_on(movement);
@@ -1478,6 +1519,9 @@ static void horn_on_fire(unsigned long data)
    delay_printk("%s - %s()\n",TARGET_NAME[mover_type], __func__);
 
     // signal that an operation is in progress
+#ifndef DEBUG_PID
+//send_nl_message_multi("\n---------Changing moving_atomic to 2\n", error_mfh, NL_C_FAILURE);
+#endif
     atomic_set(&moving_atomic, 2); // now considered moving
 
     // start the ramp up/down of the mover
@@ -1643,10 +1687,18 @@ static int mover_speed_reverse(int speed) {
 //   send_nl_message_multi("Started reversing...", error_mfh, NL_C_FAILURE);
    atomic_set(&reverse_speed, speed);
    if (RAMP_DOWN_TIME_IN_MSECONDS[mover_type] > 1) {
+#ifndef DEBUG_PID
+          //send_nl_message_multi("Slow reverse", error_mfh, NL_C_FAILURE);
+#endif
+      // coast if we're ramping
       hardware_speed_set(0);
    } else {
-    atomic_set(&goal_atomic, 0); // reset goal speed
-    hardware_movement_stop(FALSE);
+#ifndef DEBUG_PID
+          //send_nl_message_multi("Quick reverse", error_mfh, NL_C_FAILURE);
+#endif
+      // stop "now" if we're not
+      atomic_set(&goal_atomic, 0); // reset goal speed
+      hardware_movement_stop(FALSE);
    }
    return 1;
 }
@@ -1743,6 +1795,10 @@ static void ramp_fire(unsigned long data) {
     if (!atomic_read(&full_init)) {
         return;
     }
+
+#ifndef DEBUG_PID
+//send_nl_message_multi("...doing ramp...", error_mfh, NL_C_FAILURE);
+#endif
 
     goal_start = atomic_read(&goal_start_atomic);
     goal_step = atomic_read(&goal_step_atomic);
@@ -2576,7 +2632,7 @@ static void pid_step(int delta_t) {
     } else if (abs(pid_error) >= SPEED_CHANGE[mover_type]) {
 if (pid_correct_count > 0) {
 #ifndef DEBUG_PID
-send_nl_message_multi("UN-CLAMPED!", error_mfh, NL_C_FAILURE);
+//send_nl_message_multi("UN-CLAMPED!", error_mfh, NL_C_FAILURE);
 #endif
 //delay_printk("UN-CLAMPED!");
 }
@@ -2621,10 +2677,10 @@ send_nl_message_multi("UN-CLAMPED!", error_mfh, NL_C_FAILURE);
        pid_effort = max(pid_effort, min_effort); // minimum when moving
        if (pid_effort == min_effort) {
 #ifndef DEBUG_PID
-          char *msg = kmalloc(128, GFP_KERNEL);
-          snprintf(msg, 128, "Used minimum effort: %i\n", pid_last_effort);
-          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
-          kfree(msg);
+//          char *msg = kmalloc(128, GFP_KERNEL);
+//          snprintf(msg, 128, "Used minimum effort: %i\n", pid_last_effort);
+//          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+//          kfree(msg);
 #endif
        }
     }
@@ -2632,10 +2688,10 @@ send_nl_message_multi("UN-CLAMPED!", error_mfh, NL_C_FAILURE);
     // if we're accelerating (not negative acceleration) check maximum acceleration allowed
     if (pid_effort > pid_last_effort && (pid_effort - pid_last_effort) > max_accel) {
 #ifndef DEBUG_PID
-        char *msg = kmalloc(128, GFP_KERNEL);
-        snprintf(msg, 128, "Clamped at max accel: %i+%i\n", pid_last_effort, pid_effort - pid_last_effort);
-        send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
-        kfree(msg);
+//        char *msg = kmalloc(128, GFP_KERNEL);
+//        snprintf(msg, 128, "Clamped at max accel: %i+%i\n", pid_last_effort, pid_effort - pid_last_effort);
+//        send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+//        kfree(msg);
 #endif
         // clamp at max acceleration...
         pid_effort = pid_last_effort + max_accel;
@@ -2644,10 +2700,10 @@ send_nl_message_multi("UN-CLAMPED!", error_mfh, NL_C_FAILURE);
     // if we're deccelerating (negative acceleration) check maximum decceleration allowed
     if (pid_effort < pid_last_effort && (pid_last_effort - pid_effort) > max_deccel) {
 #ifndef DEBUG_PID
-        char *msg = kmalloc(128, GFP_KERNEL);
-        snprintf(msg, 128, "Clamped at max deccel: %i+%i\n", pid_last_effort, pid_effort - pid_last_effort);
-        send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
-        kfree(msg);
+//        char *msg = kmalloc(128, GFP_KERNEL);
+//        snprintf(msg, 128, "Clamped at max deccel: %i+%i\n", pid_last_effort, pid_effort - pid_last_effort);
+//        send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+//        kfree(msg);
 #endif
         // clamp at max acceleration...
         pid_effort = pid_last_effort - max_deccel;
