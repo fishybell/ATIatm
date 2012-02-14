@@ -318,7 +318,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 	    msg.response.rseq = rhdr.seq;
 
 	    // fill message
-	    msg.body.devid = minion->devid; // devid = MAC address
+	    msg.body.devid = htonll(0x705eaa000000L+ minion->devid); // MAC address  70:5E:AA:xx.xx.xx  devid is the last 3 bytes
+
 
 	    // get the capability flags from the cap field
 
@@ -705,7 +706,7 @@ void *minion_thread(thread_data_t *minion){
 
     minion->S.cap|=PD_NES;	// add the NES capability
     
-    DCMSG(BLUE,"minion %d: state is initialized as devid %llx", minion->mID,htonll(minion->devid));
+    DCMSG(BLUE,"minion %d: state is initialized as devid 0x%06X", minion->mID,minion->devid);
     DCMSG(BLUE,"minion %d: RF_addr = %d", minion->mID,minion->RF_addr);
     
     if (minion->S.cap&PD_NES) {
@@ -723,7 +724,7 @@ void *minion_thread(thread_data_t *minion){
     // the mcp is expecting a response
 #if 0
     i++;
-    sprintf(mbuf,"msg %d I am minion %d with devid %llx", i,minion->mID,htonll(minion->devid));
+    sprintf(mbuf,"msg %d I am minion %d with devid 0x%06X", i,minion->mID,minion->devid);
 
     result=write(minion->mcp_sock, mbuf, strlen(mbuf));
     if (result >= 0){

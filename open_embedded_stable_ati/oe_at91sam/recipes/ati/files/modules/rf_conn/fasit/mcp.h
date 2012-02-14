@@ -149,7 +149,7 @@ typedef struct _thread_data_t {
     int rcc_sock;	// socket to RCC
     int seq;		// sequence number of this minion  for fasit messages
     int RF_addr;	// current RF address 
-    uint64 devid;	// mac address of this minion which we got back from the RF
+    uint32 devid;	// mac address of this minion which we got back from the RF
     minion_state_t S;	// the whol state of this minion
 } thread_data_t;
 
@@ -157,7 +157,7 @@ typedef struct _thread_data_t {
 typedef struct taddr_t {
     int fd;
     int addr;
-    uint64 devid;
+    uint32 devid;
     int mID;
     int inuse;
 } taddr_t;

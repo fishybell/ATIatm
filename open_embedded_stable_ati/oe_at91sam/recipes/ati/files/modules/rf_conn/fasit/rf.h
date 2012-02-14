@@ -182,5 +182,5 @@ typedef struct LB_pyro_fire {
 void set_crc8(void *buf, uint8 length);
 uint8 crc8(void *buf, uint8 length);
 uint8 RF_size(int cmd);
-
+uint32 getDevID (void);
 
