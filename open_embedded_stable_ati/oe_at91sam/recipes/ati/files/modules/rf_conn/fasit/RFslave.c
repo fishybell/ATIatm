@@ -34,36 +34,88 @@ void HandleRF(int RFfd){
 #define MbufSize 4096
     char Mbuf[MbufSize], buf[200], hbuf[200];        /* Buffer MCP socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
-    char *Mptr, Mstart, Mend; 
+    char *Mptr, Mstart, Mend;
+    char *Rptr, *Rstart;    
+    int ready;
+    
     fd_set rf_or_mcp;
     struct timeval timeout;
     LB_packet_t *LB,rLB;
     int len,addr,cmd,RF_addr;
 
+    uint32 DevID;
     LB_device_reg_t *LB_devreg;
     LB_device_addr_t *LB_addr;
     LB_expose_t *LB_exp;
-
     RF_addr=2047;	//  only respond to address 2047 for the request new device packet
 
+    DevID=getDevID();
+    DCMSG(BLUE,"RFslave: DevID = 0x%06X",DevID);
 
     
 /**   loop until we lose connection  **/
     while(1){
 	/* Receive only the first two bytes of the message from RF */
 	//  fail!  stupidly reading a byte at a time to see it work
-	MsgSize = read(RFfd,Mbuf,2);
-	if (MsgSize==1) MsgSize = 1+read(RFfd,&Mbuf[1],1);
+
+#if 0
+//	this is how the RFmaster gathers the packet
+//    since the RFslave needs to do pretty much the same, it should do the same thing.
+// actually I should have one function that works in both places - because it is critical that it
+// works right all the time
+//   and in fact, there needs to be more error checking, and throwing away of bad checksum packets
+//   not sure how to re-sync after a garbage packet - probably have to zero it out.
+
+
+	gathered = gather_rf(RFfd,&Rbuf[Rptr],&Rbuf[Rstart],100);
 	
-	LB=(LB_packet_t *)Mbuf;
-	for (Mstart=2; Mstart<=RF_size(LB->cmd);Mstart++)
-	    read(RFfd,&Mbuf[Mstart],RF_size(LB->cmd)-2);
+	/* Receive message, or continue to recieve message from RF */
 	
 
-	// of course we might be getting packets that are either split up or glommed together,
-	// and we need to parse complete ones individually
+	DCMSG(GREEN,"RF gathering packet MsgSize =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
+	      MsgSize,Rptr,Rstart,Rptr-Rstart);
+
+	if (Rptr-Rstart<3){
+		// no chance of complete packet, so just increment the Rptr and keep waiting
+	} else {
+		// we have a chance of a compelete packet
+	    LB=&Rbuf[Rstart];	// map the header in
+	    size=RF_size(LB->cmd);
+	    if ((Rptr-Rstart) >= size){
+		    //  we do have a complete packet
+		    // we could check the CRC and dump it here
+
+		result=write(MCPsock,&Rbuf[Rstart],size);
+		if (result==size) {
+		    sprintf(buf,"RF ->MCP  [%2d]  ",size);
+		    DCMSG_HEXB(GREEN,buf,&Rbuf[Rstart],size);
+		} else {
+		    sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
+		    DCMSG_HEXB(RED,buf,&Rbuf[Rstart],size);
+		}
+		if ((Rptr-Rstart) > size){
+		    Rstart+=size;	// step ahead to the next packet
+		} else {
+		    Rstart=0;	// step ahead to the next packet
+
+		}
+	    }
+	}
+
+#endif
 	
-	sprintf(buf,"packet pseq=%4d read %d from RF. Cmd=%2d addr=%4d RF_addr=%4d\n",pcount++,MsgSize,LB->cmd,LB->addr,RF_addr);
+	MsgSize = read(RFfd,Mbuf,2);
+	if (MsgSize==1) read(RFfd,&Mbuf[1],1);
+	LB=(LB_packet_t *)Mbuf;
+	
+	DCMSG(GREEN,"LB header recieved. Cmd=%2d addr=%4d total size should be %d",LB->cmd,LB->addr,RF_size(LB->cmd));
+	for (Mstart=2; Mstart<RF_size(LB->cmd);Mstart++){
+	    read(RFfd,&Mbuf[Mstart],1);
+	}
+
+	MsgSize=RF_size(LB->cmd);
+	
+	sprintf(buf,"LB packet pseq=%4d read %d from RF. Cmd=%2d addr=%4d RF_addr=%4d\n",pcount++,MsgSize,LB->cmd,LB->addr,RF_addr);
 	DCMSG_HEXB(GREEN,buf,Mbuf,MsgSize);
 	
 	// only respond if our address matches
@@ -79,7 +131,7 @@ void HandleRF(int RFfd){
 
 		LB_devreg =(LB_device_reg_t *)(&rLB);	// map our bitfields in
 		LB_devreg->dev_type=1;			// SIT with MFS
-		LB_devreg->devid=0x0a0b0c;		// mock MAC address
+		LB_devreg->devid=DevID;		// mock MAC address
 
 		RF_addr=1710;	//  use the fancy hash algorithm to come up with the real temp address
 		LB_devreg->temp_addr=RF_addr;
