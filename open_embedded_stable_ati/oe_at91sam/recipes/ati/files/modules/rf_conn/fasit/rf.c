@@ -4,6 +4,10 @@
 
 #include "mcp.h"
 #include "rf.h"
+#include <signal.h>
+#include <sys/ioctl.h>
+#include <linux/if.h>
+#include <netinet/tcp.h>
 
 uint8 RF_size(int cmd){
     // set LB_size  based on which command it is
@@ -52,8 +56,38 @@ uint8 RF_size(int cmd){
     }
 }
 
-// utility function to get Device ID (mac address)
-__uint64_t getDevID () {
+//	this is how the RFmaster gathers the packet
+//    since the RFslave needs to do pretty much the same, it should do the same thing.
+// actually I should have one function that works in both places - because it is critical that it
+// works right all the time
+//   and in fact, there needs to be more error checking, and throwing away of bad checksum packets
+//   not sure how to re-sync after a garbage packet - probably have to zero it out.
+
+int gather_rf(int fd, char *pos, char *start,int max){
+    int ready;
+
+    /* Receive as much as we can from the non-blocking fd. */
+    ready=read(fd,pos,max);
+
+    if (ready<=0) { /* parse the error message   */
+
+    } else {
+	pos+=ready;	// increment the position pointer	
+	DCMSG(GREEN,"gather_rf:  new bytes=%2d new total=%2d ",
+	      ready,pos-start);
+
+	return(pos-start);
+
+    }
+}
+
+
+
+#define false 0
+#define true ~false
+
+// utility function to get Device ID (mac address) and return just the 3 unique Action target bytes
+uint32 getDevID () {
     struct ifreq ifr;
     struct ifreq *IFR;
     struct ifconf ifc;
@@ -62,7 +96,11 @@ __uint64_t getDevID () {
     u_char addr[6];
 
    // this function only actually finds the mac once, but remembers it
+<<<<<<< rf.c
+    static int found = false;
+=======
     static int found = 0;
+>>>>>>> 1.6
     static __uint64_t retval = 0;
 
    // did we find it before?
@@ -109,10 +147,18 @@ __uint64_t getDevID () {
 	if (found) {
 	 // copy to static address so we don't look again
 	    memcpy(addr, ifr.ifr_hwaddr.sa_data, 6);
+<<<<<<< rf.c
+	    DCMSG(GREEN,"getDevID:  FOUND MAC: %02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+	    retval=(addr[3]<<16)|(addr[4]<<8)|addr[5];
+	} else {
+	    DCMSG(RED,"getDevID:  Mac address not found");
+	    retval=0xffffff;
+=======
 	    //DMSG("FOUND MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 	    for (int i=0; i<6; i++) {
 		retval |= (__uint64_t)(addr[i]) << ((i+2)*8); // copy offset 2 bytes
 	    }
+>>>>>>> 1.6
 	}
     }
 
