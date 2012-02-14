@@ -109,7 +109,7 @@ void HandleRF(int MCPsock,int RFfd){
 		// no chance of complete packet, so just increment the Rptr and keep waiting
 	    } else {
 		// we have a chance of a compelete packet
-		LB=&Rbuf[Rstart];	// map the header in
+		LB=(LB_packet_t *)&Rbuf[Rstart];	// map the header in
 		size=RF_size(LB->cmd);
 		if ((Rptr-Rstart) >= size){
 		    //  we do have a complete packet

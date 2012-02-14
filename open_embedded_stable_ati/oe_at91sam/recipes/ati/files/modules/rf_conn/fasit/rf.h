@@ -38,18 +38,13 @@
 #define LBC_REQUEST_NEW		30
 #define LBC_DEVICE_ADDR		31
 
-// used to create a header
-#define LB_HEADER(LBADDR,LBCMD) (((LBADDR)&0x7FF)<<5|((LBCMD)&0x1F))
-
-#define LB_ADDR(LBHEADER) ((LBHEADER>>5)&0x7FF)
-
 /********************************************/
 /* Low Bandwidth Message Header             */
 /********************************************/
 typedef struct LB_packet_tag {
-    uint16 cmd:5;
-    uint16 addr:11;    
-    uint8 payload[42] ;	// has room for max payload and the CRC byte    
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+    uint16 payload[24] __attribute__ ((packed)); // has room for max payload and the CRC byte    
 } LB_packet_t;
 
 // LBC_REQUEST_NEW packet
@@ -181,6 +176,7 @@ typedef struct LB_pyro_fire {
 
 void set_crc8(void *buf, uint8 length);
 uint8 crc8(void *buf, uint8 length);
-uint8 RF_size(int cmd);
+int RF_size(int cmd);
 uint32 getDevID (void);
+int gather_rf(int fd, char *pos, char *start,int max);
 

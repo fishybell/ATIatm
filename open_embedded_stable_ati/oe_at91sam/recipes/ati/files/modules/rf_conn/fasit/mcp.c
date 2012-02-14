@@ -294,7 +294,7 @@ int main(int argc, char **argv) {
 	    // also fills in the length field
 			    set_crc8(&LB_addr,RF_size(LB_addr->cmd));
 			    sprintf(hbuf,"MCP: LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",LB_addr->addr,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
-			    DDCMSG_HEXB(D_RF,BLUE,hbuf,&LB_addr,7);
+			    DDCMSG_HEXB(D_RF,BLUE,hbuf,&LB_buf,7);
 
             // this packet must also get sent to the minion
 			    result=write(taddr[taddr_cnt].fd,&LB_addr,RF_size(LB_addr->cmd));

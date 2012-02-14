@@ -9,7 +9,7 @@
 #include <linux/if.h>
 #include <netinet/tcp.h>
 
-uint8 RF_size(int cmd){
+int RF_size(int cmd){
     // set LB_size  based on which command it is
     switch (cmd){
 	case  LBC_STATUS:
@@ -52,7 +52,7 @@ uint8 RF_size(int cmd){
 	    return (5);
 
 	default:
-	    return (1);
+	    return (2);
     }
 }
 
@@ -94,14 +94,9 @@ uint32 getDevID () {
     char buf[1024];
     int sock, i;
     u_char addr[6];
-
+    uint32 retval=0;
    // this function only actually finds the mac once, but remembers it
-<<<<<<< rf.c
     static int found = false;
-=======
-    static int found = 0;
->>>>>>> 1.6
-    static __uint64_t retval = 0;
 
    // did we find it before?
     if (!found) {
@@ -147,18 +142,12 @@ uint32 getDevID () {
 	if (found) {
 	 // copy to static address so we don't look again
 	    memcpy(addr, ifr.ifr_hwaddr.sa_data, 6);
-<<<<<<< rf.c
 	    DCMSG(GREEN,"getDevID:  FOUND MAC: %02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 	    retval=(addr[3]<<16)|(addr[4]<<8)|addr[5];
 	} else {
 	    DCMSG(RED,"getDevID:  Mac address not found");
 	    retval=0xffffff;
-=======
-	    //DMSG("FOUND MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
-	    for (int i=0; i<6; i++) {
-		retval |= (__uint64_t)(addr[i]) << ((i+2)*8); // copy offset 2 bytes
-	    }
->>>>>>> 1.6
+
 	}
     }
 
