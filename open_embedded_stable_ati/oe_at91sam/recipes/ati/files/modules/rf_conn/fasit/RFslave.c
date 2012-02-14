@@ -56,7 +56,7 @@ void HandleRF(int RFfd){
 	if (MsgSize==1) MsgSize = 1+read(RFfd,&Mbuf[1],1);
 	
 	LB=(LB_packet_t *)Mbuf;
-	for (Mstart=2, Mstart<=RF_size(LB->cmd),Mstart++)
+	for (Mstart=2; Mstart<=RF_size(LB->cmd);Mstart++)
 	    read(RFfd,&Mbuf[Mstart],RF_size(LB->cmd)-2);
 	
 
