@@ -1,3 +1,7 @@
+#include <arpa/inet.h>
+#include <sys/ioctl.h>
+#include <linux/if.h>
+
 #include "mcp.h"
 #include "rf.h"
 
@@ -58,7 +62,7 @@ __uint64_t getDevID () {
     u_char addr[6];
 
    // this function only actually finds the mac once, but remembers it
-    static bool found = false;
+    static int found = 0;
     static __uint64_t retval = 0;
 
    // did we find it before?
@@ -91,7 +95,7 @@ __uint64_t getDevID () {
 	       // and it's not the loopback ...
 		    if (ioctl(sock, SIOCGIFHWADDR, &ifr) == 0) {
 		  // and it has a mac address
-			found = true;
+			found = 1;
 			break;
 		    }
 		}
@@ -105,7 +109,7 @@ __uint64_t getDevID () {
 	if (found) {
 	 // copy to static address so we don't look again
 	    memcpy(addr, ifr.ifr_hwaddr.sa_data, 6);
-	    DMSG("FOUND MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+	    //DMSG("FOUND MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
 	    for (int i=0; i<6; i++) {
 		retval |= (__uint64_t)(addr[i]) << ((i+2)*8); // copy offset 2 bytes
 	    }
