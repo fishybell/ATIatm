@@ -55,16 +55,12 @@ void HandleRF(int MCPsock,int RFfd){
     // packet header so we can determine the length from the command in the header
     LB_packet_t *LB;
 
-    
-
-
     Rstart=0;	// start position in the Rbuf of this packet - in case we get more than 1 packet
     Rptr=0;	// position in the Rbuf - so we can join split packets
 /**   loop until we lose connection  **/
     clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
     while(1) {
 
-	
 	timestamp(&elapsed_time,&istart_time,&delta_time);
 	DDCMSG(D_TIME,CYAN,"RFmaster top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 	       ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
@@ -106,13 +102,16 @@ void HandleRF(int MCPsock,int RFfd){
 	    if ((MsgSize = read(RFfd,&Rbuf[Rptr],MbufSize)) < 0) DieWithError("read(RFfd,...) failed");
 	    Rptr+=MsgSize;	// accumulate the packet size
 
+	    DCMSG(GREEN,"RF gathering packet MsgSize =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
+		   MsgSize,Rptr,Rstart,Rptr-Rstart);
+
 	    if (Rptr-Rstart<3){
 		// no chance of complete packet, so just increment the Rptr and keep waiting
 	    } else {
 		// we have a chance of a compelete packet
-		LB=(LB_packet_t*)&Rbuf[Rstart];	// map the header in
+		LB=&Rbuf[Rstart];	// map the header in
 		size=RF_size(LB->cmd);
-		if ((Rstart-Rptr) <= size){
+		if ((Rptr-Rstart) >= size){
 		    //  we do have a complete packet
 		    // we could check the CRC and dump it here
 		    
@@ -124,7 +123,7 @@ void HandleRF(int MCPsock,int RFfd){
 			sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
 			DCMSG_HEXB(RED,buf,&Rbuf[Rstart],size);
 		    }
-		    if ((Rstart-Rptr) > size){
+		    if ((Rptr-Rstart) > size){
 			Rstart+=size;	// step ahead to the next packet
 		    } else {
 			Rstart=0;	// step ahead to the next packet
@@ -132,9 +131,6 @@ void HandleRF(int MCPsock,int RFfd){
 		    }
 		}
 	    }
-	
-
-	    memset(Mbuf,0,MsgSize+3);
 	}
 
 	//  if we have data to read from the MCP, read it then force it down the radio
