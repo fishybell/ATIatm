@@ -123,7 +123,7 @@ typedef struct LB_move {
     uint16 length:8 __attribute__ ((packed));
 } LB_move_t;
 
-// LBC_CONFIGURE
+// LBC_CONFIGURE_HIT
 //    we have 2 too many or 6 short
 typedef struct LB_configure {
     uint16 cmd:5 __attribute__ ((packed));
