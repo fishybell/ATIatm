@@ -82,9 +82,11 @@ void HandleRF(int RFfd){
 		// we could check the CRC and dump it here
 
 		crc=crc8(LB,size);
-		sprintf(buf,"LB packet pseq=%4d read from RF. Cmd=%2d size=%2d addr=%4d RF_addr=%4d  Rstart[0..1]=%02x.%02x\n"
-			,pcount++,LB->cmd,RF_size(LB->cmd),LB->addr,RF_addr,Rstart[0],Rstart[1]);
-		DCMSG_HEXB(GREEN,buf,Rstart,size);
+		if (verbose&D_RF){	// don't do the sprintf if we don't need to
+		    sprintf(buf,"LB packet pseq=%4d read from RF. Cmd=%2d size=%2d addr=%4d RF_addr=%4d\n"
+			    ,pcount++,LB->cmd,RF_size(LB->cmd),LB->addr,RF_addr);
+		    DCMSG_HEXB(GREEN,buf,Rstart,size);
+		}
 		
 	// only respond if our address matches AND the crc was good
 		if (!crc && (RF_addr==LB->addr)){
@@ -107,23 +109,24 @@ void HandleRF(int RFfd){
 		// calculates the correct CRC and adds it to the end of the packet payload
 			    set_crc8(&rLB,RF_size(LB_devreg->cmd));
 
-			    DCMSG(BLUE,"setting temp addr to %4d (0x%x) after CRC calc  RF_addr= %4d (0x%x)",RF_addr,RF_addr,LB_devreg->temp_addr,LB_devreg->temp_addr);
+			    DDCMSG(D_RF,BLUE,"setting temp addr to %4d (0x%x) after CRC calc  RF_addr= %4d (0x%x)",RF_addr,RF_addr,LB_devreg->temp_addr,LB_devreg->temp_addr);
 
 		// now send it to the RF master
 		// after a brief wait
 			    sleep(1); DCMSG(BLUE,"sleeping for a second");
 			    result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
-			    sprintf(hbuf,"new device response to RFmaster devid=0x%06X address=%4d (0x%4x) len=%2d wrote %d\n"
-				    ,LB_devreg->devid,LB_devreg->temp_addr,LB_devreg->temp_addr,LB_devreg->length,result);
-			    DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
-
+			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
+				sprintf(hbuf,"new device response to RFmaster devid=0x%06X address=%4d (0x%4x) len=%2d wrote %d\n"
+					,LB_devreg->devid,LB_devreg->temp_addr,LB_devreg->temp_addr,LB_devreg->length,result);
+				DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
+			    }
 			    break;
 
 			case LBC_DEVICE_ADDR:
-			    DCMSG(BLUE,"Recieved 'device address' packet.");
+			    DDCMSG(D_RF,BLUE,"Recieved 'device address' packet.");
 			    LB_addr =(LB_device_addr_t *)(LB);	// map our bitfields in
 
-			    DCMSG(BLUE,"Dest addr %d matches current address, assigning new address %4d (0x%x)  (0x%x):11"
+			    DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, assigning new address %4d (0x%x)  (0x%x):11"
 				  ,RF_addr,LB_addr->new_addr,LB_addr->new_addr,LB_addr->new_addr);
 			    RF_addr=LB_addr->new_addr;	// set our new address
 
@@ -131,10 +134,10 @@ void HandleRF(int RFfd){
 
 			case LBC_EXPOSE:
 			    if (LB->addr==RF_addr){
-				DCMSG(BLUE,"Dest addr %d matches current address, cmd= %d",RF_addr,cmd);
+				DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd= %d",RF_addr,cmd);
 				LB_exp =(LB_expose_t *)(LB);	// map our bitfields in
 
-				DCMSG(BLUE,"Expose: exp hitmode tokill react mfs thermal\n"
+				DDCMSG(D_RF,BLUE,"Expose: exp hitmode tokill react mfs thermal\n"
 				      "        %3d   %3d     %3d   %3d  %3d   %3d",LB_exp->expose,LB_exp->hitmode,LB_exp->tokill,LB_exp->react,LB_exp->mfs,LB_exp->thermal);
 			    }
 			    break;
@@ -142,20 +145,20 @@ void HandleRF(int RFfd){
 			default:
 
 			    if (LB->addr==RF_addr){
-				DCMSG(BLUE,"Dest addr %d matches current address, cmd = %d",RF_addr,LB->cmd);
+				DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd = %d",RF_addr,LB->cmd);
 			    }		    
 			    break;
 		    }  // switch LB cmd
 		}  // if our address matched and the CRC was good
 
-		DCMSG(BLUE,"clean up Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);		
+		DDCMSG(D_VERY,BLUE,"clean up Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);		
 		if ((Rptr-Rstart) > size){
 		    Rstart+=size;	// step ahead to the next packet
 		    //  it is possible here if things are slow that we might never reset to the beginning of the buffer.  that would be bad.
 		} else {
 		    Rptr=Rstart=Rbuf;	// reset to the beginning of the buffer
 		}
-		DCMSG(BLUE,"Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);		
+		DDCMSG(D_VERY,BLUE,"Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);		
 		
 
 	    } // if there was a full packet

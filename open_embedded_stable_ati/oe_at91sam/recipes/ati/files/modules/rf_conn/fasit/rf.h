@@ -6,6 +6,7 @@
 #define D_CRC		4
 #define D_POLL		8
 #define D_TIME		0x10
+#define D_VERY		0x20
 
 
 // definitions of the low-bandwith RF packets

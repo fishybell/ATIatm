@@ -19,9 +19,9 @@ void print_verbosity(void){
     printf("  -v 4	    sets D_CRC   \n");
     printf("  -v 8	    sets D_POLL  \n");
     printf("  -v 10	    sets D_TIME  \n");
-    printf("  -v 1F	    sets all of the above  \n");
+    printf("  -v 20	    sets D_VERY  \n");
+    printf("  -v 3F	    sets all of the above  \n");
 }
-
 
 int RF_size(int cmd){
     // set LB_size  based on which command it is
