@@ -52,7 +52,6 @@ int open_port(char *sport){
 	my_termios.c_cc[VMIN] = 1;      /* read a minimum of 1 character */
 	tcflush (fd, TCIFLUSH);		/* something from Nate's old code */
 
-	
 	tcsetattr( fd, TCSANOW, &my_termios );
 	tcgetattr( fd, &new_termios );
 	/*  we did not make the fd non-blocking, because we use a select to test for data on multiple fd's and

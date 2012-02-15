@@ -1,6 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 
+int verbose;
 
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
@@ -37,6 +38,7 @@ void HandleRF(int RFfd){
     char *Mptr, Mstart, Mend;
     char *Rptr, *Rstart;    
     int gathered;
+    uint8 crc;
     
     fd_set rf_or_mcp;
     struct timeval timeout;
@@ -76,15 +78,16 @@ void HandleRF(int RFfd){
 	    // we have a chance of a compelete packet
 	    size=RF_size(LB->cmd);
 	    if ((Rptr-Rstart) >= size){
-		    //  we do have a complete packet
-		    // we could check the CRC and dump it here
+		//  we do have a complete packet
+		// we could check the CRC and dump it here
 
+		crc=crc8(LB,size);
 		sprintf(buf,"LB packet pseq=%4d read from RF. Cmd=%2d size=%2d addr=%4d RF_addr=%4d  Rstart[0..1]=%02x.%02x\n"
 			,pcount++,LB->cmd,RF_size(LB->cmd),LB->addr,RF_addr,Rstart[0],Rstart[1]);
 		DCMSG_HEXB(GREEN,buf,Rstart,size);
 		
-	// only respond if our address matches
-		if (RF_addr==LB->addr){
+	// only respond if our address matches AND the crc was good
+		if (!crc && (RF_addr==LB->addr)){
 
 	// check the CRC
 	//  if good CRC, parse and respond or whatever
@@ -143,8 +146,7 @@ void HandleRF(int RFfd){
 			    }		    
 			    break;
 		    }  // switch LB cmd
-		}  // if our address matched
-
+		}  // if our address matched and the CRC was good
 
 		DCMSG(BLUE,"clean up Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);		
 		if ((Rptr-Rstart) > size){
@@ -161,7 +163,15 @@ void HandleRF(int RFfd){
     } // while forever
 }// end of handleRF
 
-	
+
+void print_help(int exval) {
+    printf("mcp [-h] [-v num] [-f ip] [-p port] [-r ip] [-m port] [-n minioncount]\n\n");
+    printf("  -h            print this help and exit\n");
+    printf("  -t /dev/ttyS1 set serial port device\n");
+    print_verbosity();    
+    exit(exval);
+}
+
 /*************
  *************  RFslave stand-alone program.
  *************   
@@ -176,30 +186,48 @@ void HandleRF(int RFfd){
  *************    
  *************/
 
+
 int main(int argc, char **argv) {
     int serversock;			/* Socket descriptor for server connection */
     int MCPsock;			/* Socket descriptor to use */
     int RFfd;				/* File descriptor for RFmodem serial port */
+    int opt;
     struct sockaddr_in ServAddr;	/* Local address */
     struct sockaddr_in ClntAddr;	/* Client address */
-    unsigned short RFslaveport;	/* Server port */
+//    unsigned short RFslaveport;	/* Server port */
     unsigned int clntLen;               /* Length of client address data structure */
     char ttyport[32];	/* default to ttyS0  */
 
+    verbose=0;
+    strcpy(ttyport,"/dev/ttyS1");
     
+    while((opt = getopt(argc, argv, "hv:t:")) != -1) {
+	switch(opt) {
+	    case 'h':
+		print_help(0);
+		break;
 
-    printf(" argc=%d argv[0]=\"%s\" argv[1]=\"%s\" \n",argc,argv[0],argv[1]);
-/*    if (argc == 1){
-	RFslaveport = defaultPORT;
-	printf(" Listening on default port <%d>, comm port = <%s>\n", RFslaveport,ttyport);
+	    case 'v':
+		verbose = strtoul(optarg,NULL,16);
+		break;
+
+	    case 't':
+		strcpy(ttyport,optarg);
+		break;
+		
+	    case ':':
+		fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+		print_help(1);
+		break;
+
+	    case '?':
+		fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+		print_help(1);
+
+		break;
+	}
     }
-    */
-    if (argv[1]){
-	strcpy(ttyport,argv[1]);
-    } else {
-	strcpy(ttyport,"/dev/ttyS1");
-    }
-    
+
     printf(" Watching comm port = <%s>\n",ttyport);
 
 
@@ -222,7 +250,8 @@ int main(int argc, char **argv) {
 //   Okay,   set up the RF modem link here
 
    RFfd=open_port(ttyport); 
-    
+   DCMSG(RED,"opened port %s for serial link to radio as fd %d.  CURRENTLY BLOCKING IO",ttyport,RFfd);
+   
    HandleRF(RFfd);
    DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");
 	

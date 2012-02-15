@@ -82,8 +82,10 @@ int read_FASIT_msg(thread_data_t *minion,char *buf, int bufsize){
     if (msglen > 0) {
 	buf[msglen]=0;
 
-	sprintf(hbuf,"minion %d: received %d from RCC       ", minion->mID,msglen);
-	DDCMSG_HEXB(D_PACKET,BLUE,hbuf,buf,msglen);
+	if (verbose&D_PACKET){	// don't do the sprintf if we don't need to
+	    sprintf(hbuf,"minion %d: received %d from RCC        ", minion->mID,msglen);
+	    DDCMSG_HEXB(D_PACKET,BLUE,hbuf,buf,msglen);
+	}
 
 	header=(FASIT_header *)buf; 
 	minion->seq=htonl(header->seq);
@@ -113,10 +115,10 @@ int write_FASIT_msg(thread_data_t *minion,void *hdr,int hlen,void *msg,int mlen)
     iov[1].iov_len=mlen;
 
     result=writev(minion->rcc_sock,iov,2);
-    if (result >= 0){
-	sprintf(hbuf,"minion %d: sent %d chars header to RCC",minion->mID,iov[0].iov_len);
+    if ((verbose&D_PACKET)&&(result >= 0)){	// don't do the sprintf if we don't need to
+	sprintf(hbuf,"minion %d: sent %d chars header to RCC ",minion->mID,iov[0].iov_len);
 	DDCMSG_HEXB(D_PACKET,BLUE,hbuf,iov[0].iov_base,iov[0].iov_len);
-	sprintf(hbuf,"minion %d: sent %d chars body to RCC  ",minion->mID,iov[1].iov_len);	
+	sprintf(hbuf,"minion %d: sent %d chars body to RCC   ",minion->mID,iov[1].iov_len);	
 	DDCMSG_HEXB(D_PACKET,BLUE,hbuf,iov[1].iov_base,iov[1].iov_len);
 
     } else {
@@ -465,9 +467,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    set_crc8(LB_exp,RF_size(LB_exp->cmd));
 	    // now send it to the MCP master
 		    result=write(minion->mcp_sock,LB_exp,LB_exp->length);
-		    sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d\n",minion->mID,minion->RF_addr,LB_exp->cmd,LB_exp->length);
-		    DDCMSG_HEXB(D_RF,YELLOW,hbuf,LB_exp,LB_exp->length);
-		    DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",LB_exp->length,minion->mcp_sock);
+		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
+			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d\n",minion->mID,minion->RF_addr,LB_exp->cmd,LB_exp->length);
+			DDCMSG_HEXB(D_RF,YELLOW,hbuf,LB_exp,LB_exp->length);
+			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",LB_exp->length,minion->mcp_sock);
+		    }
 //  sent LB
     
 		    // send 2101 ack  (2102's will be generated at start and stop of actuator)
@@ -681,6 +685,7 @@ void *minion_thread(thread_data_t *minion){
     int sock_ready,error;
     long elapsed_tenths;
 
+    uint8 crc;
     char buf[BufSize];
     char *tbuf;
     char mbuf[BufSize];
@@ -833,16 +838,17 @@ void *minion_thread(thread_data_t *minion){
 	    msglen=read(minion->mcp_sock, buf, 1023);
 	    if (msglen > 0) {
 		buf[msglen]=0;
-		sprintf(hbuf,"Minion %d: received %d from MCP (RF) ", minion->mID,msglen);
-		DDCMSG_HEXB(D_PACKET,BLUE,hbuf,buf,msglen);
-		
+		if (verbose&D_PACKET){	// don't do the sprintf if we don't need to		
+		    sprintf(hbuf,"Minion %d: received %d from MCP (RF) ", minion->mID,msglen);
+		    DDCMSG_HEXB(D_PACKET,YELLOW,hbuf,buf,msglen);
+		}
 		// we have received a message from the mcp, process it
 		// it is either a command, or it is an RF response from our slave
 		//		process_MCP_cmds(&state,buf,msglen);
 
 		LB=(LB_packet_t *)buf;	// map the header in
-		
-		DCMSG(YELLOW,"MINION %d:  this is where LB packet (cmd=%2d addr=%d) gets parsed", minion->mID,LB->cmd,LB->addr);
+		crc= crc8(LB,RF_size(LB->cmd));
+		DCMSG(YELLOW,"MINION %d: LB packet (cmd=%2d addr=%d crc=%d)", minion->mID,LB->cmd,LB->addr,crc);
 		switch (LB->cmd){
 		    case LBC_REQUEST_NEW:
 			DCMSG(YELLOW,"Recieved 'request new devices' packet.");
@@ -854,12 +860,12 @@ void *minion_thread(thread_data_t *minion){
 			LB_addr =(LB_device_addr_t *)(LB);	// map our bitfields in
 
 			minion->RF_addr=LB_addr->new_addr;	// set our new address
-			DCMSG(BLUE,"Recieved 'device address' packet. set minion->RF_addr=%d",minion->RF_addr);
+			DCMSG(YELLOW,"Minion %d: parsed 'device address' packet.  new minion->RF_addr=%d",minion->mID,minion->RF_addr);
 			
 			break;
 
 		    default:
-			DCMSG(BLUE,"Minion %d:  don't do anything",minion->mID);
+			DCMSG(YELLOW,"Minion %d:  don't do anything",minion->mID);
 
 			break;
 		}  // switch LB cmd

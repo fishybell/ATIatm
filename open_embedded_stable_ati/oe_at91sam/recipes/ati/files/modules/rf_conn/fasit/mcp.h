@@ -14,11 +14,6 @@
 #include <sys/time.h>
 #include <termios.h> /* POSIX terminal control definitions */
 
-#define D_NONE		0
-#define D_PACKET	1
-#define D_RF		2
-#define D_POLL		4
-#define D_TIME		8
 
 // because the Minion ID's match the LB addressing
 #define MAX_NUM_Minions 2048

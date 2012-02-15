@@ -9,6 +9,20 @@
 #include <linux/if.h>
 #include <netinet/tcp.h>
 
+
+extern int verbose;
+
+void print_verbosity(void){
+    printf("  -v xx         set verbosity bits.   Examples:\n");
+    printf("  -v 1	    sets D_PACKET  for packet info\n");
+    printf("  -v 2	    sets D_RF    \n");
+    printf("  -v 4	    sets D_CRC   \n");
+    printf("  -v 8	    sets D_POLL  \n");
+    printf("  -v 10	    sets D_TIME  \n");
+    printf("  -v 1F	    sets all of the above  \n");
+}
+
+
 int RF_size(int cmd){
     // set LB_size  based on which command it is
     switch (cmd){
@@ -156,8 +170,6 @@ uint32 getDevID () {
 }
 
 
-
-
 // based on polynomial x^8 + x^2 + x^1 + x^0
 
 static __uint8_t crc8_table[256] = {
@@ -187,7 +199,6 @@ void set_crc8(void *buf, uint8 length) {
     int size = length-1;
     unsigned char crc = 0; // initial value of 0
 
-
 //    sprintf(hbuf,"set_crc8: length=%d - displaying len+1\n",length);
 //    DCMSG_HEXB(YELLOW,hbuf,buf,length+1);
     
@@ -200,15 +211,17 @@ void set_crc8(void *buf, uint8 length) {
     *data++=length;	// add the length at the end
     *data=0;		// tack a zero after that
 
-//    sprintf(hbuf,"set_crc8: length=%d - displaying len+1\n",length);
-//    DCMSG_HEXB(YELLOW,hbuf,buf,length+1);
-    
+    if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
+	sprintf(hbuf,"set_crc8: LB len=%d set crc=0x%x  ",length,crc);
+	DCMSG_HEXB(YELLOW,hbuf,buf,length);
+    }
 }
 
 // just calculates the crc
 uint8 crc8(void *buf, uint8 length) {
+    static char hbuf[100];
     char *data = (char*)buf;
-    int size = length-1;
+    int size = length;
     unsigned char crc = 0; // initial value of 0
 
     while (size--) {
@@ -216,6 +229,15 @@ uint8 crc8(void *buf, uint8 length) {
 	data++;
     }
 
+    if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
+	if (crc) {
+	    sprintf(hbuf,"crc8: LB len=%d  BAD CRC=0x%x  ",length,crc);
+	    DCMSG_HEXB(RED,hbuf,buf,length);
+	} else {
+	    sprintf(hbuf,"crc8: LB len=%d  GOOD CRC=0x%x  ",length,crc);
+	    DCMSG_HEXB(YELLOW,hbuf,buf,length);
+	}
+    }
     return crc;
 }
 

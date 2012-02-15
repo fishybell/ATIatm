@@ -51,6 +51,7 @@ void HandleRF(int MCPsock,int RFfd){
     struct timeval timeout;
     int maxcps=500,rfcount=0;		/*  characters per second that we can transmit without melting - 1000 is about 100% */
     double cps;
+    uint8 crc;
 
     // packet header so we can determine the length from the command in the header
     LB_packet_t *LB;
@@ -114,14 +115,19 @@ void HandleRF(int MCPsock,int RFfd){
 		if ((Rptr-Rstart) >= size){
 		    //  we do have a complete packet
 		    // we could check the CRC and dump it here
-		    
-		    result=write(MCPsock,&Rbuf[Rstart],size);
-		    if (result==size) {
-			sprintf(buf,"RF ->MCP  [%2d]  ",size);
-			DCMSG_HEXB(GREEN,buf,&Rbuf[Rstart],size);
+
+		    crc=crc8(LB,size);
+		    if (!crc) {
+			result=write(MCPsock,&Rbuf[Rstart],size);
+			if (result==size) {
+			    sprintf(buf,"RF ->MCP  [%2d]  ",size);
+			    DCMSG_HEXB(GREEN,buf,&Rbuf[Rstart],size);
+			} else {
+			    sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
+			    DCMSG_HEXB(RED,buf,&Rbuf[Rstart],size);
+			}
 		    } else {
-			sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
-			DCMSG_HEXB(RED,buf,&Rbuf[Rstart],size);
+			DCMSG(RED,"RF packet with BAD CRC ignored");
 		    }
 		    if ((Rptr-Rstart) > size){
 			Rstart+=size;	// step ahead to the next packet
@@ -151,6 +157,7 @@ void HandleRF(int MCPsock,int RFfd){
 		// before we care.  we should keep a moving average of about a minute for CPS, and watch the burst times
 		// IIR average should work.
 		// blindly write it  to the  radio
+
 		
 		result=write(RFfd,Mbuf,MsgSize);
 		if (result==MsgSize) {
@@ -184,8 +191,8 @@ void print_help(int exval) {
     printf("  -h            print this help and exit\n");
     printf("  -p 4000       set listen port\n");
     printf("  -t /dev/ttyS1 set serial port device\n");
-    printf("  -v 2          set verbosity bits\n");
     printf("  -s 10         max number of slaves to look for\n");
+    print_verbosity();
     exit(exval);
 }
 
@@ -226,7 +233,7 @@ int main(int argc, char **argv) {
 		break;
 
 	    case 'v':
-		verbose = atoi(optarg);
+		verbose = strtoul(optarg,NULL,16);
 		break;
 
 	    case 't':

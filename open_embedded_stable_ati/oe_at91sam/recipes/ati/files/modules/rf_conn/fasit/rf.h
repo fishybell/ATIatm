@@ -1,6 +1,11 @@
 
-
-
+//  these are the verbosity bits.   fix the print_verbosity in rf.c if you change any
+#define D_NONE		0
+#define D_PACKET	1
+#define D_RF		2
+#define D_CRC		4
+#define D_POLL		8
+#define D_TIME		0x10
 
 
 // definitions of the low-bandwith RF packets
@@ -179,4 +184,5 @@ uint8 crc8(void *buf, uint8 length);
 int RF_size(int cmd);
 uint32 getDevID (void);
 int gather_rf(int fd, char *pos, char *start,int max);
+void print_verbosity(void);
 
