@@ -40,13 +40,13 @@ void HandleRF(int RFfd){
     
     fd_set rf_or_mcp;
     struct timeval timeout;
-    volatile LB_packet_t *LB,rLB;
+    LB_packet_t *LB,rLB;
     int len,addr,cmd,RF_addr,size;
 
     uint32 DevID;
-    volatile LB_device_reg_t *LB_devreg;
-    volatile LB_device_addr_t *LB_addr;
-    volatile LB_expose_t *LB_exp;
+    LB_device_reg_t *LB_devreg;
+    LB_device_addr_t *LB_addr;
+    LB_expose_t *LB_exp;
     
     RF_addr=2047;	//  only respond to address 2047 for the request new device packet
 
@@ -118,7 +118,7 @@ void HandleRF(int RFfd){
 
 			case LBC_DEVICE_ADDR:
 			    DCMSG(BLUE,"Recieved 'device address' packet.");
-			    LB_addr =(LB_device_addr_t *)(&LB);	// map our bitfields in
+			    LB_addr =(LB_device_addr_t *)(LB);	// map our bitfields in
 
 			    DCMSG(BLUE,"Dest addr %d matches current address, assigning new address %4d (0x%x)  (0x%x):11"
 				  ,RF_addr,LB_addr->new_addr,LB_addr->new_addr,LB_addr->new_addr);
@@ -129,7 +129,7 @@ void HandleRF(int RFfd){
 			case LBC_EXPOSE:
 			    if (LB->addr==RF_addr){
 				DCMSG(BLUE,"Dest addr %d matches current address, cmd= %d",RF_addr,cmd);
-				LB_exp =(LB_expose_t *)(&LB);	// map our bitfields in
+				LB_exp =(LB_expose_t *)(LB);	// map our bitfields in
 
 				DCMSG(BLUE,"Expose: exp hitmode tokill react mfs thermal\n"
 				      "        %3d   %3d     %3d   %3d  %3d   %3d",LB_exp->expose,LB_exp->hitmode,LB_exp->tokill,LB_exp->react,LB_exp->mfs,LB_exp->thermal);

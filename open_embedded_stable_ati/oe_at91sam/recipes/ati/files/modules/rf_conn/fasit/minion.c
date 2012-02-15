@@ -462,12 +462,12 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    LB_exp->thermal=0;
 	    // calculates the correct CRC and adds it to the end of the packet payload
 	    // also fills in the length field
-		    set_crc8(&LB_exp,RF_size(LB_exp->cmd));
+		    set_crc8(LB_exp,RF_size(LB_exp->cmd));
 	    // now send it to the MCP master
-		    result=write(minion->mcp_sock,&LB_buf,LB_exp->length);
+		    result=write(minion->mcp_sock,LB_exp,LB_exp->length);
 		    sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d\n",minion->mID,minion->RF_addr,LB_exp->cmd,LB_exp->length);
-		    DDCMSG_HEXB(D_RF,BLUE,hbuf,&LB_buf,LB_exp->length);
-		    DDCMSG(D_RF,RED,"  Sent %d bytes to RF\n",LB_exp->length);
+		    DDCMSG_HEXB(D_RF,YELLOW,hbuf,LB_exp,LB_exp->length);
+		    DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",LB_exp->length,minion->mcp_sock);
 //  sent LB
     
 		    // send 2101 ack  (2102's will be generated at start and stop of actuator)
@@ -697,6 +697,14 @@ void *minion_thread(thread_data_t *minion){
     FASIT_2110	 *message_2110;
     FASIT_13110	 *message_13110;
 
+    LB_packet_t *LB;
+    LB_device_reg_t *LB_devreg;
+    LB_device_addr_t *LB_addr;
+    LB_expose_t *LB_exp;
+
+
+
+    
     initialize_state( &minion->S);
 
 /*** actually, the capabilities and the devid's will come from the MCP -
@@ -832,12 +840,29 @@ void *minion_thread(thread_data_t *minion){
 		// it is either a command, or it is an RF response from our slave
 		//		process_MCP_cmds(&state,buf,msglen);
 
+		LB=(LB_packet_t *)buf;	// map the header in
+		
+		DCMSG(YELLOW,"MINION %d:  this is where LB packet (cmd=%2d addr=%d) gets parsed", minion->mID,LB->cmd,LB->addr);
+		switch (LB->cmd){
+		    case LBC_REQUEST_NEW:
+			DCMSG(YELLOW,"Recieved 'request new devices' packet.");
+		// the response was created when the MCP spawned us, so we do nothing for this packet
 
-		DCMSG(YELLOW,"MINION %d:  this is where a LB packet gets parsed", minion->mID);
+			break;
 
+		    case LBC_DEVICE_ADDR:
+			LB_addr =(LB_device_addr_t *)(LB);	// map our bitfields in
 
+			minion->RF_addr=LB_addr->new_addr;	// set our new address
+			DCMSG(BLUE,"Recieved 'device address' packet. set minion->RF_addr=%d",minion->RF_addr);
+			
+			break;
 
+		    default:
+			DCMSG(BLUE,"Minion %d:  don't do anything",minion->mID);
 
+			break;
+		}  // switch LB cmd
 
 		
 	    } else if (msglen<0) {
