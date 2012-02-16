@@ -1,6 +1,5 @@
-#define MAX_CONNECTIONS 8
+#define MAX_CONNECTIONS 16
 #define MAX_GROUPS 32
-#define MAX_SLOTS (MAX_CONNECTIONS*MAX_GROUPS)
 
 #define FASIT_BUF_SIZE 1024
 #define RF_BUF_SIZE 128
@@ -8,7 +7,7 @@
 typedef struct fasit_connection {
    int rf; // the file descriptor to talk low-bandwidth rf on
    int fasit; // the file descriptor to talk fasit on
-   int id; // the id to listen for (group or temp or standard)
+   int id; // the id to listen for (temp or standard)
    char rf_obuf[RF_BUF_SIZE]; // outgoing buffer for rf messages
    char fasit_obuf[FASIT_BUF_SIZE]; // outgoing buffer for fasit messages
    char rf_ibuf[RF_BUF_SIZE]; // incoming buffer for rf messages
@@ -18,9 +17,10 @@ typedef struct fasit_connection {
    int rf_ilen; // length of incoming rf buffer
    int fasit_ilen; // length of incoming fasit buffer
    int index; // the index that this one is in the array
+   int groups[MAX_GROUPS]; // a list of group ids to listen for in addition to the main id
 } fasit_connection_t;
 
-extern fasit_connection_t fconns[MAX_SLOTS]; // a slot available for each connection with max groups
+extern fasit_connection_t fconns[MAX_CONNECTIONS]; // a slot available for each connection with max groups
 extern int last_slot; // the last slot used
 
 // read/write function helpers

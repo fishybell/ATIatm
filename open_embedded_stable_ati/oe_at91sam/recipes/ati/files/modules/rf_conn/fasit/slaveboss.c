@@ -4,7 +4,7 @@
 
 int verbose = 0;    // so debugging works right in all modules
 int last_slot = -1; // last slot used starts at no slot used
-fasit_connection_t fconns[MAX_SLOTS];
+fasit_connection_t fconns[MAX_CONNECTIONS];
 
 #define MAX_EVENTS 16
 
@@ -263,7 +263,7 @@ int main(int argc, char **argv) {
                }
 
                // find slot to put it in
-               for (i = 0; i < MAX_SLOTS && index == -1; i++) {
+               for (i = 0; i < MAX_CONNECTIONS && index == -1; i++) {
                   if (fconns[i].rf == 0 && fconns[i].fasit == 0) {
                      // found a slot
                      index = i;
