@@ -57,13 +57,37 @@ int fasitWrite(fasit_connection_t *fc) {
          return rem_fasitEpoll;
       }
    } else if (s < fc->fasit_olen) {
-      // move data backwards if we didn't write everything
-      char *tbuf;
-      fc->fasit_olen -= s;
-      tbuf = malloc(fc->fasit_olen);
-      memcpy(tbuf, fc->fasit_obuf + (sizeof(char) * s), fc->fasit_olen); // copy to temp
-      memcpy(fc->fasit_obuf, tbuf, fc->fasit_olen); // copy back
-      free(tbuf);
+      // we can't leave only a partial message going out, finish writing even if we block
+      int opts;
+
+      // change to blocking from non-blocking
+      opts = fcntl(fc->fasit, F_GETFL); // grab existing flags
+      if (opts < 0) {
+         return rem_fasitEpoll;
+      }
+      opts = (opts ^ O_NONBLOCK); // remove nonblock from existing flags
+      if (fcntl(fc->fasit, F_SETFL, opts) < 0) {
+         return rem_fasitEpoll;
+      }
+
+      // loop until written (since we're blocking, it won't loop forever, just until timeout)
+      while (s >= 0) {
+         int ns = write(fc->fasit, fc->fasit_obuf + (sizeof(char) * s), fc->fasit_olen - s);
+         if (ns < 0 && errno != EAGAIN) {
+            // connection dead, remove it
+            return rem_fasitEpoll;
+         }
+         s += ns; // increase total written, possibly by zero
+      }
+
+      // change to non-blocking from blocking
+      opts = (opts | O_NONBLOCK); // add nonblock back into existing flags
+      if (fcntl(fc->fasit, F_SETFL, opts) < 0) {
+         return rem_fasitEpoll;
+      }
+
+      // don't try writing again
+      return mark_fasitRead;
    } else {
       // everything was written, clear write buffer
       fc->fasit_olen = 0;
@@ -75,3 +99,4 @@ int fasitWrite(fasit_connection_t *fc) {
    // partial success, leave writeable so we try again
    return doNothing;
 }
+
