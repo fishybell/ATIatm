@@ -1001,7 +1001,7 @@ void hit_event_internal(int line, bool upload) {
 				// TODO -- send stop movement message to mover
 				break;
 			case 4: 
-                if (atomic_read(&bob_type) == 0) { /* ats bob */
+                if (atomic_read(&bob_type) != 1) { /* ats bob */
 				   // put down
                    enable_battery_check(0); // disable battery checking while motor is on
                    set_target_conceal();
