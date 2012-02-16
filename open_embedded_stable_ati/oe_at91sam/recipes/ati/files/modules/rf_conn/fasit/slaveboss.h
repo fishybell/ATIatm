@@ -17,19 +17,20 @@ typedef struct fasit_connection {
    int fasit_olen; // length of outgoing fasit buffer
    int rf_ilen; // length of incoming rf buffer
    int fasit_ilen; // length of incoming fasit buffer
+   int index; // the index that this one is in the array
 } fasit_connection_t;
 
 extern fasit_connection_t fconns[MAX_SLOTS]; // a slot available for each connection with max groups
 extern int last_slot; // the last slot used
 
 // read/write function helpers
-int rfRead(int fd, char **dest); // read a single RF message into given buffer, return msg num
-int fasitRead(int fd, char **dest); // same as above, but for FASIT messages
-int rfWrite(int index); // write all RF messages for given index in fconns
-int fasitWrite(int index); // same as above, but for FASIT messages
+int rfRead(int fd, char **dest, int *dests); // read a single RF message into given buffer, return msg num
+int fasitRead(int fd, char **dest, int *dests); // same as above, but for FASIT messages
+int rfWrite(fasit_connection_t *fc); // write all RF messages for connection in fconns
+int fasitWrite(fasit_connection_t *fc); // same as above, but for FASIT messages
 
 // mangling/demangling functions
-//  all: pass index to fconns array, return bit flags:
+//  all: pass connection from fconns array, return bit flags:
 //       0) do nothing
 //       1) mark rf as writeable in epoll
 //       2) mark fasit as writeable in epoll
@@ -37,8 +38,8 @@ int fasitWrite(int index); // same as above, but for FASIT messages
 //       4) unmark fasit as writeable in epoll
 //       5) remove rf from epoll and close
 //       6) remove fasit from epoll and close
-int rf2fasit(int index, int rfnum); // mangle an rf message into 1 or more fasit messages
-int fasit2rf(int index, int fasitnum); // mangle one or more fasit message into 1 rf message
+int rf2fasit(fasit_connection_t *fc, char *buf, int s, int rfnum); // mangle an rf message into 1 or more fasit messages
+int fasit2rf(fasit_connection_t *fc, char *buf, int s, int fasitnum); // mangle one or more fasit message into 1 rf message
 #define doNothing 0
 #define mark_rfWrite (1<<1)
 #define mark_fasitWrite (1<<2)
