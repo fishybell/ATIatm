@@ -23,6 +23,6 @@ extern int mover_sleep_set(int);
 
 // register a callback for the lift event
 typedef void (*move_event_callback)(int); // called on finished, starting, and error (passing an EVENT_### value)
-extern void set_move_callback(move_event_callback handler);
+extern void set_move_callback(move_event_callback handler, move_event_callback faulthandler);
 
 #endif // __TARGET_MOVER_GENERIC_H__

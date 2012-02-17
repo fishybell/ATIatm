@@ -11,6 +11,7 @@
 
 #include "netlink_kernel.h"
 #include "target.h"
+#include "fasit/faults.h"
 #include "target_mover_generic.h"
 
 #include "target_generic_output.h" /* for EVENT_### definitions */
@@ -425,19 +426,37 @@ static void timeout_timer_stop(void)
 // Callback for move events
 //---------------------------------------------------------------------------
 static move_event_callback move_callback = NULL;
-void set_move_callback(move_event_callback handler) {
+static move_event_callback move_fault_callback = NULL;
+void set_move_callback(move_event_callback handler, move_event_callback faulthandler) {
     // only allow setting the callback once
     if (handler != NULL && move_callback == NULL) {
         move_callback = handler;
         delay_printk("GENERIC MOVER: Registered callback function for move events\n");
     }
+    if (faulthandler != NULL && move_fault_callback == NULL) {
+        move_fault_callback = faulthandler;
+        delay_printk("GENERIC MOVER: Registered callback function for move faults\n");
+    }
 }
 EXPORT_SYMBOL(set_move_callback);
+
+void set_move_fault_callback(move_event_callback handler) {
+    // only allow setting the callback once
+}
+EXPORT_SYMBOL(set_move_fault_callback);
 
 static void do_event(int etype) {
 #ifndef DEBUG_PID
     if (move_callback != NULL) {
         move_callback(etype);
+    }
+#endif
+}
+
+static void do_fault(int etype) {
+#ifndef DEBUG_PID
+    if (move_fault_callback != NULL) {
+        move_fault_callback(etype);
     }
 #endif
 }
@@ -1043,7 +1062,9 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
         }
 
     do_event(EVENT_HOME_LIMIT); // triggered on home limit
+    do_fault(ERR_stop_left_limit); // triggered on home limit
     do_event(EVENT_STOP); // started stopping
+    do_fault(ERR_stop); // triggered on home limit
 #ifndef TESTING_MAX
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(FALSE);
@@ -1072,7 +1093,9 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
     do_event(EVENT_END_LIMIT); // triggered on end limit
+    do_fault(ERR_stop_right_limit); // triggered on home limit
     do_event(EVENT_STOP); // started stopping
+    do_fault(ERR_stop); // triggered on home limit
 #ifndef TESTING_MAX
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(FALSE);

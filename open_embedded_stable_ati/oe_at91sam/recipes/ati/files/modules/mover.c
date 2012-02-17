@@ -101,6 +101,16 @@ static void move_change(unsigned long data) {
     send_nl_message_multi(&move_data, pos_mfh, NL_C_MOVE);
 }
 
+static void move_faults(int movefault) {
+	u8 fault = 0;
+
+   if (movefault) {
+      fault = movefault; 
+	   // send fault upstream always
+	   queue_nl_multi(NL_C_FAULT, &fault, sizeof(fault));
+   }
+}
+
 //---------------------------------------------------------------------------
 // event handler for moves
 //---------------------------------------------------------------------------
@@ -407,7 +417,7 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     atomic_set(&driver_id, d_id);
 
     // set callback handlers
-    set_move_callback(move_event);
+    set_move_callback(move_event, move_faults);
 
     INIT_WORK(&position_work, position_change);
 
