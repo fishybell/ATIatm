@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
 	   if(gathered>1){
 	       for (int i=0; i<gathered-1; i++) printf("%02x.", Rstart[i]);
 	   }
-	   printf("%02x\n", Rstart[i]);
+	   printf("%02x\n", Rstart[gathered-1]);
 	   Rptr=Rstart=Rbuf;
        }
    }
