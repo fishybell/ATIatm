@@ -12,7 +12,7 @@ HFILES = mcp.h fasit_c.h
 MCFILES = serial.c timestamp.c htonll.c rf.c
 
 
-default: mcp RFmaster RFmaster.arm RFslave RFslave.arm
+default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump.arm
 
 mcp : mcp.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c $(MCFILES)
@@ -29,6 +29,9 @@ RFslave : RFslave.c $(HFILES) $(MCFILES)
 RFslave.arm : RFslave.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.arm RFslave.c $(MCFILES)
 
+RFdump.arm : RFdump.c $(HFILES) $(MCFILES)
+	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFdump.arm RFdump.c $(MCFILES)
+
 clean:
-	$(RM) mcp *.o RFmaster RFmaster.arm RFslave RFslave.arm
+	$(RM) mcp *.o RFmaster RFmaster.arm RFslave RFslave.arm RFdump.arm
 

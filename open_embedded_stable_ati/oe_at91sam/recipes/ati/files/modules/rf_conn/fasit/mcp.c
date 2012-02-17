@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
 	return 1;
     }
 
-    mID=1;
+    mID=0;
     timeout = 3;	// quick the first time
     
     //    DCMSG(RED,"MCP all the minions have been De-Rezzed.   ");
@@ -208,7 +208,6 @@ int main(int argc, char **argv) {
 		    //  mcp only handles registration and addressing packets,
 		    //  mcp also has to pass new_address LB packets on to the minion so it can figure out it's own RF_address
 		    //  mcp passes all other LB packets on to the minions they are destined for
-///////////////////////////////////////////
 
 		    if  (LB->cmd==LBC_DEVICE_REG){
 			LB_devreg =(LB_device_reg_t *)(LB);	// change our pointer to the correct packet type
@@ -216,103 +215,104 @@ int main(int argc, char **argv) {
 
 			DDCMSG(D_RF,YELLOW,"MCP: RFslave sent LB DEVICE_REG packet.   devtype=%d devid=%06x tempaddr=%d"
 			       ,LB_devreg->dev_type,LB_devreg->devid,LB_devreg->temp_addr);
-			    
-			    /***  if we have a newly registered slave,
-			     ***  create a minion for it
-			     ***    add it to the list of temp addresses - they need to get asssigned
-			     ***  real addresses
-			     ***  It currently has a temporary address in the range 1705-1799
-			     ***  the devid should is the last 3 bytes of the actual slave MAC address
-			     ***  
-			     ***   create a new minion - mID = slave registration address
-			     ***                       devid = MAC address
-			     ****************************************************************************/
-			    
-			    /* open a bidirectional pipe for communication with the minion  */
-			    if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &minions[mID].mcp_sock))){
-				perror("opening stream socket pair");
-				minions[mID].status=S_closed;
-			    } else {
-				minions[mID].status=S_open;
-			    }
 
-			    minions[mID].mID=mID;	// make sure we pass the minion ID down
-			    minions[mID].devid=LB_devreg->devid;	// use the actual device id (MAC address)
+			/***  we have a newly registered slave,
+			 ***  create a minion for it
+			 ***    add it to the list of temp addresses - they need to get asssigned
+			 ***  real addresses
+			 ***  It currently has a temporary address in the range 1705-1799
+			 ***  the devid should is the last 3 bytes of the actual slave MAC address
+			 ***  
+			 ***   create a new minion - mID = slave registration address
+			 ***                       devid = MAC address
+			 ****************************************************************************/
+			mID+=1;	// increment our minion count
 
-			    if (LB_devreg->dev_type==1)
-				minions[mID].S.cap|=PD_NES;	// add the NES capability
+			/* open a bidirectional pipe for communication with the minion  */
+			if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &minions[mID].mcp_sock))){
+			    perror("opening stream socket pair");
+			    minions[mID].status=S_closed;
+			} else {
+			    minions[mID].status=S_open;
+			}
 
-			    /*   fork a minion */    
-			    if ((child = fork()) == -1) perror("fork");
+			minions[mID].mID=mID;	// make sure we pass the minion ID down
+			minions[mID].devid=LB_devreg->devid;	// use the actual device id (MAC address)
 
-			    if (child) {
-				/* This is the parent. */
-				DCMSG(RED,"MCP forked minion %d", mID);
-				close(minions[mID].mcp_sock);
+			if (LB_devreg->dev_type==1)
+			    minions[mID].S.cap|=PD_NES;	// add the NES capability
 
-			    } else {
-				/* This is the child. */
-				close(minions[mID].minion);
-				minion_thread(&minions[mID]);
-				DCMSG(RED,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
-				
-				break;	// if we come back , bail to another level or something more fatal
-			    }
+			/*   fork a minion */    
+			if ((child = fork()) == -1) perror("fork");
 
-			    // add the minion to the set of file descriptors
-			    // that are monitored by epoll
-			    ev.events = EPOLLIN;
-			    ev.data.fd = minions[mID].minion;
-			    ev.data.ptr = (void *) &minions[mID]; 
-			    
-			    if (epoll_ctl(fds, EPOLL_CTL_ADD, minions[mID].minion, &ev) < 0) {
-				perror("MCP: epoll set insertion error: \n");
-				return 1;
-			    }
+			if (child) {
+			    /* This is the parent. */
+			    DCMSG(RED,"MCP forked minion %d", mID);
+			    close(minions[mID].mcp_sock);
 
-			    taddr_cnt=1;	// look for an unused address slot
-			    while(taddr_cnt<1700&&(taddr[taddr_cnt].inuse)) taddr_cnt++;			    
-			    taddr[taddr_cnt].addr=LB_devreg->temp_addr;
-			    taddr[taddr_cnt].devid=LB_devreg->devid;
-			    taddr[taddr_cnt].fd=minions[mID].minion;
-			    taddr[taddr_cnt].mID=mID;
-			    taddr[taddr_cnt].inuse=1;
-			    
-			    DDCMSG(D_RF,RED,"MCP: assigning an address slot #%d temp=%d fd=%d mID=%d inuse=%d "
-				   ,taddr_cnt,taddr[taddr_cnt].addr,taddr[taddr_cnt].fd,taddr[taddr_cnt].mID,taddr[taddr_cnt].inuse);
-			    
-			    // building a new LB packet for the RF
-			    LB_buf.addr=LB_devreg->temp_addr;
-			    LB_buf.cmd=LBC_DEVICE_ADDR;
-			    LB_addr =(LB_device_addr_t *)(&LB_buf);	// map our bitfields in
+			} else {
+			    /* This is the child. */
+			    close(minions[mID].minion);
+			    minion_thread(&minions[mID]);
+			    DCMSG(RED,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
 
-			    LB_addr->new_addr=taddr_cnt;	// the actual slot is the perm address
+			    break;	// if we come back , bail to another level or something more fatal
+			}
 
-			    DDCMSG(D_RF,RED,"MCP: Build a LB device addr packet to assign the address slot %4d (0x%x)  %4d (0x%x)"
-				   ,taddr_cnt,taddr_cnt,LB_addr->new_addr,LB_addr->new_addr);
+			// add the minion to the set of file descriptors
+			// that are monitored by epoll
+			ev.events = EPOLLIN;
+			ev.data.fd = minions[mID].minion;
+			ev.data.ptr = (void *) &minions[mID]; 
 
-	    // calculates the correct CRC and adds it to the end of the packet payload
-	    // also fills in the length field
-			    set_crc8(LB_addr,RF_size(LB_addr->cmd));
-			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-				sprintf(hbuf,"MCP: LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",LB_addr->addr,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
-				DDCMSG_HEXB(D_RF,BLUE,hbuf,LB_addr,7);
-			    }
-            // this packet must also get sent to the minion
-			    result=write(taddr[taddr_cnt].fd,LB_addr,RF_size(LB_addr->cmd));
-			    DDCMSG(D_RF,BLUE,"MCP: 2 Sent %d bytes to minion %d  fd=%d",result,mID,taddr[taddr_cnt].fd);
-			    
-	    // now send it to the RF master
-			    result=write(RF_sock,LB_addr,RF_size(LB_addr->cmd));
-			    DDCMSG(D_RF,RED,"MCP: 1 Sent %d bytes to RF fd=%d",result,RF_sock);
+			if (epoll_ctl(fds, EPOLL_CTL_ADD, minions[mID].minion, &ev) < 0) {
+			    perror("MCP: epoll set insertion error: \n");
+			    return 1;
+			}
 
-			    /***   end of create a new minion 
-			     ****************************************************************************/
+			taddr_cnt=1;	// look for an unused address slot
+			while(taddr_cnt<1700&&(taddr[taddr_cnt].inuse)) taddr_cnt++;			    
+			taddr[taddr_cnt].addr=LB_devreg->temp_addr;
+			taddr[taddr_cnt].devid=LB_devreg->devid;
+			taddr[taddr_cnt].fd=minions[mID].minion;
+			taddr[taddr_cnt].mID=mID;
+			taddr[taddr_cnt].inuse=1;
+
+			DDCMSG(D_RF,RED,"MCP: assigning an address slot #%d temp=%d fd=%d mID=%d inuse=%d "
+			       ,taddr_cnt,taddr[taddr_cnt].addr,taddr[taddr_cnt].fd,taddr[taddr_cnt].mID,taddr[taddr_cnt].inuse);
+
+			// building a new LB packet for the RF
+			LB_buf.addr=LB_devreg->temp_addr;
+			LB_buf.cmd=LBC_DEVICE_ADDR;
+			LB_addr =(LB_device_addr_t *)(&LB_buf);	// map our bitfields in
+
+			LB_addr->new_addr=taddr_cnt;	// the actual slot is the perm address
+
+			DDCMSG(D_RF,RED,"MCP: Build a LB device addr packet to assign the address slot %4d (0x%x)  %4d (0x%x)"
+			       ,taddr_cnt,taddr_cnt,LB_addr->new_addr,LB_addr->new_addr);
+
+			// calculates the correct CRC and adds it to the end of the packet payload
+			// also fills in the length field
+			set_crc8(LB_addr,RF_size(LB_addr->cmd));
+			if (verbose&D_RF){	// don't do the sprintf if we don't need to
+			    sprintf(hbuf,"MCP: LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",LB_addr->addr,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
+			    DDCMSG_HEXB(D_RF,BLUE,hbuf,LB_addr,7);
+			}
+			// this packet must also get sent to the minion
+			result=write(taddr[taddr_cnt].fd,LB_addr,RF_size(LB_addr->cmd));
+			DDCMSG(D_RF,BLUE,"MCP: 2 Sent %d bytes to minion %d  fd=%d",result,mID,taddr[taddr_cnt].fd);
+
+			// now send it to the RF master
+			result=write(RF_sock,LB_addr,RF_size(LB_addr->cmd));
+			DDCMSG(D_RF,RED,"MCP: 1 Sent %d bytes to RF fd=%d",result,RF_sock);
+
+			/***   end of create a new minion 
+			 ****************************************************************************/
 
 		    } else {	// it is any other command than dev regx
-				// which means we just copy it on to the minion so it can process it
+			// which means we just copy it on to the minion so it can process it
 
-		    // just display the packet for debugging
+			// just display the packet for debugging
 			LB=(LB_packet_t *)buf;
 			if (verbose&D_RF){	// don't do the sprintf if we don't need to
 			    sprintf(hbuf,"MCP: passing RF packet from RF_addr %4d on to Minion %d.   cmd=%2d  length=%d msglen=%d \n"
@@ -320,11 +320,10 @@ int main(int argc, char **argv) {
 			    DDCMSG_HEXB(D_RF,BLUE,hbuf,LB,RF_size(LB->cmd));
 			}
 
-			
-		    // do the copy down here
+			// do the copy down here
 			result=write(ev.data.fd,LB,RF_size(LB->cmd));
 			DDCMSG(D_RF,BLUE,"MCP: 3 Sent %d bytes to minion %d at fd=%d\n",result,mID,ev.data.fd);
-			
+
 		    }  // all the commands from RF should have been handled
 		} // it is from the rf
 		else { // it is from a minion
@@ -338,14 +337,14 @@ int main(int argc, char **argv) {
 		     ***
 		     ***/
 
-//		    minion_fd=events[ready_fd].data.fd;	// don't know what this is , but it aint right
+		    //		    minion_fd=events[ready_fd].data.fd;	// don't know what this is , but it aint right
 		    minion=(thread_data_t *)events[ready_fd].data.ptr;
 		    minion_fd=minion->minion;		    
 		    mID=minion->mID;
 		    DDCMSG(D_POLL,YELLOW,"MCP: fd %d for minion %d ready  [RF_addr=%d]\n",minion_fd,mID,minion->RF_addr);
 
 		    if(minion_fd>2048) exit(-1);
-		    
+
 		    msglen=read(minion_fd, buf, 1023);
 
 		    // just display the packet for debugging
@@ -358,7 +357,6 @@ int main(int argc, char **argv) {
 				,mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
 			DDCMSG_HEXB(D_RF,YELLOW,hbuf,buf,RF_size(LB->cmd));
 		    }
-
 
 		} // it is from a minion
 	    } //  for all the ready fd's

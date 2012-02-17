@@ -31,8 +31,10 @@ void DieWithError(char *errorMessage){
  *************
  *************/
 
-void HandleRF(int RFfd){
+void HandleSlaveRF(int RFfd){
 #define MbufSize 4096
+    struct timespec elapsed_time, start_time, istart_time,delta_time;
+    int slottime;
     char Mbuf[MbufSize], Rbuf[1024],buf[200], hbuf[200];        /* Buffer MCP socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
     char *Mptr, Mstart, Mend;
@@ -59,8 +61,13 @@ void HandleRF(int RFfd){
     Rptr=Rbuf;
     Rstart=Rptr;
     
-/**   loop until we lose connection  **/
-    while(1){
+    /**   loop until we lose connection  **/
+    clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
+    
+    while(1) {
+	timestamp(&elapsed_time,&istart_time,&delta_time);
+	DDCMSG(D_TIME,CYAN,"RFslave top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
+	       ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 
 //    MAKE SURE THE RFfd is non-blocking!!!	
 	gathered = gather_rf(RFfd,Rptr,Rstart,300);
@@ -69,7 +76,7 @@ void HandleRF(int RFfd){
 	    Rptr+=gathered;
 	}
 	/* Receive message, or continue to recieve message from RF */
-
+	
 	DCMSG(GREEN,"RFslave: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
 	      gathered,Rptr-Rbuf,Rstart-Rbuf,Rptr-Rstart);
 
@@ -80,17 +87,18 @@ void HandleRF(int RFfd){
 	    if ((Rptr-Rstart) >= size){
 		//  we do have a complete packet
 		// we could check the CRC and dump it here
-
 		crc=crc8(LB,size);
 		if (verbose&D_RF){	// don't do the sprintf if we don't need to
 		    sprintf(buf,"LB packet pseq=%4d read from RF. Cmd=%2d size=%2d addr=%4d RF_addr=%4d\n"
 			    ,pcount++,LB->cmd,RF_size(LB->cmd),LB->addr,RF_addr);
 		    DCMSG_HEXB(GREEN,buf,Rstart,size);
 		}
-		
 	// only respond if our address matches AND the crc was good
 		if (!crc && (RF_addr==LB->addr)){
-
+		    timestamp(&elapsed_time,&istart_time,&delta_time);
+		    DDCMSG(D_TIME,CYAN,"RFslave top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
+			   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+		    
 	// check the CRC
 	//  if good CRC, parse and respond or whatever
 		    switch (LB->cmd){
@@ -101,19 +109,22 @@ void HandleRF(int RFfd){
 
 			    LB_devreg =(LB_device_reg_t *)(&rLB);	// map our bitfields in
 			    LB_devreg->dev_type=1;			// SIT with MFS
-			    LB_devreg->devid=DevID;		// mock MAC address
+			    LB_devreg->devid=DevID;		// Actual 3 significant bytes of MAC address
 
-			    RF_addr=1710;	//  use the fancy hash algorithm to come up with the real temp address
+			    RF_addr=1710+(DevID&0x7);	//  use the fancy hash algorithm to come up with the real temp address
 			    LB_devreg->temp_addr=RF_addr;
 
 		// calculates the correct CRC and adds it to the end of the packet payload
 			    set_crc8(&rLB,RF_size(LB_devreg->cmd));
-
 			    DDCMSG(D_RF,BLUE,"setting temp addr to %4d (0x%x) after CRC calc  RF_addr= %4d (0x%x)",RF_addr,RF_addr,LB_devreg->temp_addr,LB_devreg->temp_addr);
 
 		// now send it to the RF master
-		// after a brief wait
-			    sleep(1); DCMSG(BLUE,"sleeping for a second");
+		// after waiting for our timeslot:   which is slottime*(MAC&MASK) for now
+		
+			    slottime=1000000;	// try 100ms
+			    usleep(slottime*(DevID&0x7));		// just try 63 hard slots now
+			    DDCMSG(D_TIME,CYAN,"usleep for %d",slottime*(DevID&0x7));
+			    
 			    result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 				sprintf(hbuf,"new device response to RFmaster devid=0x%06X address=%4d (0x%4x) len=%2d wrote %d\n"
@@ -164,11 +175,11 @@ void HandleRF(int RFfd){
 	    } // if there was a full packet
 	} //  if we gathered 3 or more bytes
     } // while forever
-}// end of handleRF
+}// end of handleSlaveRF
 
 
 void print_help(int exval) {
-    printf("mcp [-h] [-v num] [-f ip] [-p port] [-r ip] [-m port] [-n minioncount]\n\n");
+    printf("RFslave [-h] [-v verbosity] [-t serial_device] \n\n");
     printf("  -h            print this help and exit\n");
     printf("  -t /dev/ttyS1 set serial port device\n");
     print_verbosity();    
@@ -184,7 +195,7 @@ void print_help(int exval) {
  *************  Also we first set up our connection to the RF modem on the serial port.
  *************
  *************  then we loop until we have a connection, and then when we get one we call the
- *************  handleRF routine which does all the communicating.
+ *************  handleSlaveRF routine which does all the communicating.
  *************    when the socket dies, we come back here and listen for a new MCP
  *************    
  *************/
@@ -255,7 +266,7 @@ int main(int argc, char **argv) {
    RFfd=open_port(ttyport); 
    DCMSG(RED,"opened port %s for serial link to radio as fd %d.  CURRENTLY BLOCKING IO",ttyport,RFfd);
    
-   HandleRF(RFfd);
+   HandleSlaveRF(RFfd);
    DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");
 	
 }

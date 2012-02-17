@@ -44,8 +44,9 @@ void DieWithError(char *errorMessage){
 
 void HandleRF(int MCPsock,int RFfd){
     struct timespec elapsed_time, start_time, istart_time,delta_time;
-    char Mbuf[MbufSize],Rbuf[256], buf[200];        /* Buffer MCP socket */
-    int Rptr,Rstart,size;
+    char Mbuf[MbufSize],Rbuf[512], buf[200];        /* Buffer MCP socket */
+    char  *Rptr,*Rstart;
+    int size,gathered;
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
     fd_set rf_or_mcp;
     struct timeval timeout;
@@ -56,8 +57,10 @@ void HandleRF(int MCPsock,int RFfd){
     // packet header so we can determine the length from the command in the header
     LB_packet_t *LB;
 
-    Rstart=0;	// start position in the Rbuf of this packet - in case we get more than 1 packet
-    Rptr=0;	// position in the Rbuf - so we can join split packets
+    // initialize our gathering buffer
+    Rptr=Rbuf;
+    Rstart=Rptr;
+    
 /**   loop until we lose connection  **/
     clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
     while(1) {
@@ -100,17 +103,22 @@ void HandleRF(int MCPsock,int RFfd){
 	//  if we have data to read from the RF, read it then blast it back upstream to the MCP
 	if (FD_ISSET(RFfd,&rf_or_mcp)){
 	    /* Receive message, or continue to recieve message from RF */
-	    if ((MsgSize = read(RFfd,&Rbuf[Rptr],MbufSize)) < 0) DieWithError("read(RFfd,...) failed");
-	    Rptr+=MsgSize;	// accumulate the packet size
 
-	    DCMSG(GREEN,"RF gathering packet MsgSize =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
-		   MsgSize,Rptr,Rstart,Rptr-Rstart);
+//    MAKE SURE THE RFfd is non-blocking!!!	
+	    gathered = gather_rf(RFfd,Rptr,Rstart,300);
+	    if (gathered>0){  // increment our current pointer
+		Rptr+=gathered;
+	    }
+	/* Receive message, or continue to recieve message from RF */
+	    DCMSG(GREEN,"RFmaster: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
+		  gathered,Rptr-Rbuf,Rstart-Rbuf,Rptr-Rstart);
 
-	    if (Rptr-Rstart<3){
-		// no chance of complete packet, so just increment the Rptr and keep waiting
-	    } else {
+	    sprintf(buf,"Rbuf[0..%d]=  ",gathered+10);
+	    DCMSG_HEXB(RED,buf,Rbuf,gathered+10);
+	    
+	    if (gathered>=3){
 		// we have a chance of a compelete packet
-		LB=(LB_packet_t *)&Rbuf[Rstart];	// map the header in
+		LB=(LB_packet_t *)Rstart;	// map the header in
 		size=RF_size(LB->cmd);
 		if ((Rptr-Rstart) >= size){
 		    //  we do have a complete packet
@@ -118,26 +126,34 @@ void HandleRF(int MCPsock,int RFfd){
 
 		    crc=crc8(LB,size);
 		    if (!crc) {
-			result=write(MCPsock,&Rbuf[Rstart],size);
+			result=write(MCPsock,Rstart,size);
 			if (result==size) {
 			    sprintf(buf,"RF ->MCP  [%2d]  ",size);
-			    DCMSG_HEXB(GREEN,buf,&Rbuf[Rstart],size);
+			    DCMSG_HEXB(GREEN,buf,Rstart,size);
 			} else {
 			    sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
-			    DCMSG_HEXB(RED,buf,&Rbuf[Rstart],size);
+			    DCMSG_HEXB(RED,buf,Rstart,size);
 			}
 		    } else {
 			DCMSG(RED,"RF packet with BAD CRC ignored");
 		    }
+		    
 		    if ((Rptr-Rstart) > size){
 			Rstart+=size;	// step ahead to the next packet
-		    } else {
-			Rstart=0;	// step ahead to the next packet
+			DDCMSG(D_VERY,RED,"Stepping to next packet, Rstart=%d Rptr=%d size=%d ",Rstart-Rbuf,Rptr-Rbuf,size);
+			sprintf(buf,"  Next 8 chars in Rbuf at Rstart  ");
+			DCMSG_HEXB(RED,buf,Rstart,8);
 
+		    } else {
+			Rptr=Rstart=Rbuf;	// reset to the beginning of the buffer
+			DDCMSG(D_VERY,RED,"Resetting to beginning of Rbuf, Rstart=%d Rptr=%d size=%d ",Rstart-Rbuf,Rptr-Rbuf,size);
 		    }
+		    
+		} else { // if (Rptr-Rstart) > size)
+		    DDCMSG(D_VERY,RED,"we do not have a complete RF packet ");
 		}
-	    }
-	}
+	    }  // if gathered >=3
+	} // if this fd is ready
 
 	//  if we have data to read from the MCP, read it then force it down the radio
 	//    we will have to watch to make sure we don't force down too much for the radio

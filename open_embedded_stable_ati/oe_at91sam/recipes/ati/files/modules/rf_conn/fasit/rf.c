@@ -86,15 +86,14 @@ int gather_rf(int fd, char *pos, char *start,int max){
     if (ready<=0) { /* parse the error message   */
 
     } else {
-	pos+=ready;	// increment the position pointer	
-	DCMSG(GREEN,"gather_rf:  new bytes=%2d new total=%2d ",
+	pos+=ready;	// increment the position pointer
+	DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",
 	      ready,pos-start);
 
 	return(pos-start);
 
     }
 }
-
 
 
 #define false 0
