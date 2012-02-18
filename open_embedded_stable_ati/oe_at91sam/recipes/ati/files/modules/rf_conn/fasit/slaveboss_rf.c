@@ -2,13 +2,14 @@
 #include "slaveboss.h"
 #include "rf.h"
 
-// read a single RF message into given buffer, return msg num
+// read a single RF message into given buffer, return do next
 int rfRead(int fd, char **dest, int *dests) {
    // read as much as possible
    *dests = read(fd, *dest, RF_BUF_SIZE);
 
    // did we read nothing?
    if (*dests <= 0) {
+      *dests = 0;
       if (*dests == 0 || errno == EAGAIN) {
          // try again later
          return doNothing;
@@ -18,26 +19,8 @@ int rfRead(int fd, char **dest, int *dests) {
       }
    }
 
-   // find message number
-   if (*dests >= sizeof(LB_packet_t)) {
-      LB_packet_t *hdr = (LB_packet_t*)(*dest);
-      int s = RF_size(hdr->cmd);
-      if (*dests < s) {
-         // if message not big enough, return none (handlers will keep partial message)
-         return -1;
-      }
-      // check crc -- TODO -- make sure we're only checking it once
-      if (crc8(*dest, s) != 0) {
-         // bad crc, ignore data completely
-         *dests = 0;
-         return -1;
-      }
-      // found good message, return number
-      return hdr->cmd;
-   } else {
-      // if no message found, return none (handlers will keep partial message)
-      return -1;
-   }
+   // data found, let the handler parse it
+   return doNothing;
 }
 
 // write all RF messages for connection in fconns
