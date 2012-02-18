@@ -221,16 +221,19 @@ int main(int argc, char **argv) {
                // reading?
                if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
                   char tbuf[RF_BUF_SIZE]; // temporary read buffer
-                  int mnum; // message number
                   int ms; // message size
+                  int ret; // do next
                   // read message once into temporary buffer
                   memset(tbuf,0,RF_BUF_SIZE);
-                  mnum = rfRead(rfclient, (char**)&tbuf, &ms);
-               
-                  // de-mangle and send to all fasit connections
-                  for (i = 0; !done && i < last_slot; i++) {
-                     // rf2fasit will decide whether to handle the packet or not
-                     done = handleRet(rf2fasit(&fconns[i], tbuf, ms, mnum), &fconns[i], efd);
+                  ret = rfRead(rfclient, (char**)&tbuf, &ms);
+                  if (ret != doNothing) {
+                     handleRet(ret, &fconns[i], efd);
+                  } else {
+                     // de-mangle and send to all fasit connections
+                     for (i = 0; !done && i < last_slot; i++) {
+                        // rf2fasit will decide whether to handle the packet or not
+                        done = handleRet(rf2fasit(&fconns[i], tbuf, ms), &fconns[i], efd);
+                     }
                   }
                }
 
@@ -294,6 +297,9 @@ int main(int argc, char **argv) {
                   DCMSG(RED, "slaveboss epoll add fasit client failed");
                   continue;
                }
+
+               // send 100 message
+               handleRet(send_100(&fconns[index]), &fconns[index], efd);
             } else if (ev.data.ptr != NULL) {
                // mangle and send to to rf connection
                fasit_connection_t *fc = (fasit_connection_t*) ev.data.ptr;
@@ -307,16 +313,19 @@ int main(int argc, char **argv) {
                // reading?
                if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
                   char tbuf[FASIT_BUF_SIZE]; // temporary read buffer
-                  int mnum; // message number
                   int ms; // message size
+                  int ret; // do next
                   // read message once into temporary buffer
                   memset(tbuf,0,FASIT_BUF_SIZE);
-                  mnum = fasitRead(fc->fasit, (char**)&tbuf, &ms);
-               
-                  // de-mangle and send to all fasit connections
-                  for (i = 0; !done && i < last_slot; i++) {
-                     // rf2fasit will decide whether to handle the packet or not
-                     done = handleRet(fasit2rf(fc, tbuf, ms, mnum), fc, efd);
+                  ret = fasitRead(fc->fasit, (char**)&tbuf, &ms);
+                  if (ret != doNothing) {
+                     handleRet(ret, fc, efd);
+                  } else {
+                     // de-mangle and send to all fasit connections
+                     for (i = 0; !done && i < last_slot; i++) {
+                        // rf2fasit will decide whether to handle the packet or not
+                        done = handleRet(fasit2rf(fc, tbuf, ms), fc, efd);
+                     }
                   }
                }
 
