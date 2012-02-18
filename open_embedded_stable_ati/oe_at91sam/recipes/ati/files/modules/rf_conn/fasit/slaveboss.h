@@ -1,8 +1,10 @@
+#include "fasit_c.h"
+
 #define MAX_CONNECTIONS 16
 #define MAX_GROUPS 32
 
-#define FASIT_BUF_SIZE 1024
-#define RF_BUF_SIZE 128
+#define FASIT_BUF_SIZE 4096
+#define RF_BUF_SIZE 1024
 
 typedef struct fasit_connection {
    int rf; // the file descriptor to talk low-bandwidth rf on
@@ -18,19 +20,70 @@ typedef struct fasit_connection {
    int fasit_ilen; // length of incoming fasit buffer
    int index; // the index that this one is in the array
    int groups[MAX_GROUPS]; // a list of group ids to listen for in addition to the main id
+
+   // Data for FASIT handling
+   int seq; // this connections fasit sequence number
+
+   // for pyro commands
+   int p_zone; // last zone commanded
+   int p_fire; // sent "set" fire command (1) or not (0)
+
+   // for 2100 commands
+   int hit_on;
+   int hit_hit;
+   int hit_react;
+   int hit_tokill;
+   int hit_sens;
+   int hit_mode;
+   int hit_burst;
+
+   // cached responses
+   FASIT_2101 f2101_resp;
+   FASIT_2102 f2102_resp;
+   FASIT_2111 f2111_resp;
+   FASIT_2112 f2112_resp;
+   FASIT_2113 f2113_resp;
+
+   // Data for RF handling
+   
 } fasit_connection_t;
 
-extern fasit_connection_t fconns[MAX_CONNECTIONS]; // a slot available for each connection with max groups
+extern fasit_connection_t fconns[MAX_CONNECTIONS]; // a slot available for each connection
 extern int last_slot; // the last slot used
 
 // read/write function helpers
-int rfRead(int fd, char **dest, int *dests); // read a single RF message into given buffer, return msg num
+int rfRead(int fd, char **dest, int *dests); // read a single RF message into given buffer, return do next
 int fasitRead(int fd, char **dest, int *dests); // same as above, but for FASIT messages
 int rfWrite(fasit_connection_t *fc); // write all RF messages for connection in fconns
 int fasitWrite(fasit_connection_t *fc); // same as above, but for FASIT messages
 
+int send_100(fasit_connection_t *fc);
+int send_2000(fasit_connection_t *fc, int zone);
+int handle_2004(fasit_connection_t *fc, int start, int end);
+int handle_2005(fasit_connection_t *fc, int start, int end);
+int handle_2006(fasit_connection_t *fc, int start, int end);
+int send_2100_status_req(fasit_connection_t *fc);
+int send_2100_exposure(fasit_connection_t *fc, int exp);
+int send_2100_movement(fasit_connection_t *fc, int move, float speed);
+int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int tokill, int sens, int mode, int burst);
+int handle_2101(fasit_connection_t *fc, int start, int end);
+int handle_2102(fasit_connection_t *fc, int start, int end);
+int send_2110(fasit_connection_t *fc, int on, int mode, int idelay, int rdelay);
+int handle_2111(fasit_connection_t *fc, int start, int end);
+int handle_2112(fasit_connection_t *fc, int start, int end);
+int handle_2113(fasit_connection_t *fc, int start, int end);
+int send_2114(fasit_connection_t *fc);
+int handle_2115(fasit_connection_t *fc, int start, int end);
+int send_13110(fasit_connection_t *fc);
+int handle_13112(fasit_connection_t *fc, int start, int end);
+int send_14110(fasit_connection_t *fc, int on);
+int handle_14112(fasit_connection_t *fc, int start, int end);
+int send_14200(fasit_connection_t *fc, int blank);
+int send_14400(fasit_connection_t *fc, int cid, int length, char *data);
+int handle_14401(fasit_connection_t *fc, int start, int end);
+
 // mangling/demangling functions
-//  all: pass connection from fconns array, return bit flags:
+//  all: pass connection from fconns array and new message data, return bit flags:
 //       0) do nothing
 //       1) mark rf as writeable in epoll
 //       2) mark fasit as writeable in epoll
@@ -38,8 +91,8 @@ int fasitWrite(fasit_connection_t *fc); // same as above, but for FASIT messages
 //       4) unmark fasit as writeable in epoll
 //       5) remove rf from epoll and close
 //       6) remove fasit from epoll and close
-int rf2fasit(fasit_connection_t *fc, char *buf, int s, int rfnum); // mangle an rf message into 1 or more fasit messages
-int fasit2rf(fasit_connection_t *fc, char *buf, int s, int fasitnum); // mangle one or more fasit message into 1 rf message
+int rf2fasit(fasit_connection_t *fc, char *buf, int s); // mangle an rf message into 1 or more fasit messages
+int fasit2rf(fasit_connection_t *fc, char *buf, int s); // mangle one or more fasit message into 1 rf message
 #define doNothing 0
 #define mark_rfWrite (1<<1)
 #define mark_fasitWrite (1<<2)
@@ -47,4 +100,9 @@ int fasit2rf(fasit_connection_t *fc, char *buf, int s, int fasitnum); // mangle 
 #define mark_fasitRead (1<<4)
 #define rem_rfEpoll (1<<5)
 #define rem_fasitEpoll (1<<6)
+
+// for some reason we have a ntohs/htons, but no ntohf/htonf
+float ntohf(float f);
+
+#define htonf(f) (ntohf(f))
 
