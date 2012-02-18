@@ -19,7 +19,6 @@ typedef struct fasit_connection {
    int rf_ilen; // length of incoming rf buffer
    int fasit_ilen; // length of incoming fasit buffer
    int index; // the index that this one is in the array
-   int groups[MAX_GROUPS]; // a list of group ids to listen for in addition to the main id
 
    // Data for FASIT handling
    int seq; // this connections fasit sequence number
@@ -45,6 +44,7 @@ typedef struct fasit_connection {
    FASIT_2113 f2113_resp;
 
    // Data for RF handling
+   int groups[MAX_GROUPS]; // a list of group ids to listen for in addition to the main id
    
 } fasit_connection_t;
 
@@ -57,6 +57,7 @@ int fasitRead(int fd, char **dest, int *dests); // same as above, but for FASIT 
 int rfWrite(fasit_connection_t *fc); // write all RF messages for connection in fconns
 int fasitWrite(fasit_connection_t *fc); // same as above, but for FASIT messages
 
+// fasit commands
 int send_100(fasit_connection_t *fc);
 int send_2000(fasit_connection_t *fc, int zone);
 int handle_2004(fasit_connection_t *fc, int start, int end);
@@ -82,6 +83,22 @@ int send_14200(fasit_connection_t *fc, int blank);
 int send_14400(fasit_connection_t *fc, int cid, int length, char *data);
 int handle_14401(fasit_connection_t *fc, int start, int end);
 
+// rf commands
+int handle_STATUS(fasit_connection_t *fc, int start, int end);
+int handle_EXPOSE(fasit_connection_t *fc, int start, int end);
+int handle_MOVE(fasit_connection_t *fc, int start, int end);
+int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end);
+int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end);
+int handle_AUDIO_CONTROL(fasit_connection_t *fc, int start, int end);
+int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end);
+int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end);
+int handle_QEXPOSE(fasit_connection_t *fc, int start, int end);
+int handle_QCONCEAL(fasit_connection_t *fc, int start, int end);
+int send_DEVICE_REG(fasit_connection_t *fc);
+int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end);
+int handle_DEVICE_ADDR(fasit_connection_t *fc, int start, int end);
+
+
 // mangling/demangling functions
 //  all: pass connection from fconns array and new message data, return bit flags:
 //       0) do nothing
@@ -91,8 +108,8 @@ int handle_14401(fasit_connection_t *fc, int start, int end);
 //       4) unmark fasit as writeable in epoll
 //       5) remove rf from epoll and close
 //       6) remove fasit from epoll and close
-int rf2fasit(fasit_connection_t *fc, char *buf, int s); // mangle an rf message into 1 or more fasit messages
-int fasit2rf(fasit_connection_t *fc, char *buf, int s); // mangle one or more fasit message into 1 rf message
+int rf2fasit(fasit_connection_t *fc, char *buf, int s); // mangle an rf message into 1 or more fasit messages, and potentially respond with rf message
+int fasit2rf(fasit_connection_t *fc, char *buf, int s); // mangle one or more fasit messages into 1 rf message (often just caches information until needed by rf2fasit)
 #define doNothing 0
 #define mark_rfWrite (1<<1)
 #define mark_fasitWrite (1<<2)

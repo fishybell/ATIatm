@@ -75,7 +75,6 @@ static void defHeader(fasit_connection_t *fc, int mnum, FASIT_header *fhdr) {
 static int validMessage(fasit_connection_t *fc, int *start, int *end) {
    FASIT_header hdr;
    int hl = sizeof(FASIT_header); // keep for later
-   memcpy(&hdr, fc->fasit_ibuf + *start, hl);
    *start = 0;
    // loop through entire buffer, parsing starting at each character
    while (*start < fc->fasit_ilen) {
@@ -85,6 +84,9 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          *start = *start + 1;
          continue;
       }
+      // use copy so I can manipulate it
+      memcpy(&hdr, fc->fasit_ibuf + *start, hl);
+
       // convert header from network byte order to host byte order
       hdr.num = ntohs(hdr.num);
       hdr.icd1 = ntohs(hdr.icd1);
@@ -221,10 +223,10 @@ void addToBuffer(fasit_connection_t *fc, char *buf, int s) {
    }
 }
 
- // macro used in fasit2rf
+// macro used in fasit2rf
 #define HANDLE_FASIT(FASIT_NUM) case FASIT_NUM : return handle_ ## FASIT_NUM (fc, start, end) ; break;
 
-// mangle one or more fasit message into 1 rf message
+// mangle one or more fasit messages into 1 rf message (often just caches information until needed by rf2fasit)
 int fasit2rf(fasit_connection_t *fc, char *buf, int s) {
    int start, end, mnum;
 
