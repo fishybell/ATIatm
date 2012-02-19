@@ -39,13 +39,13 @@ int RF_size(int cmd){
 	    return (6);
 	    
 	case  LBC_GROUP_CONTROL:
-	    return (3);
+	    return (6);
 	    
 	case  LBC_AUDIO_CONTROL:
 	    return (6);
 	    
 	case  LBC_POWER_CONTROL:
-	    return (3);
+	    return (4);
 
 	case  LBC_PYRO_FIRE:
 	    return (4);
@@ -207,8 +207,9 @@ void set_crc8(void *buf, uint8 length) {
     }
 
     *data++=crc;	// add on the CRC we just calculated
-    *data++=length;	// add the length at the end
-    *data=0;		// tack a zero after that
+// don't do this: it will mess up the crc we just calculated
+//    *data++=length;	// add the length at the end
+//    *data=0;		// tack a zero after that
 
     if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
 	sprintf(hbuf,"set_crc8: LB len=%d set crc=0x%x  ",length,crc);
