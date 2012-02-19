@@ -299,7 +299,10 @@ int handle_2004(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_2005(fasit_connection_t *fc, int start, int end) {
-   // do nothing with this information
+   // copy until for later potential sending over RF
+   memcpy(&fc->f2005_resp, fc->fasit_ibuf, end-start);
+   // remember target type
+   fc->target_type = RF_Type_BES;
    return doNothing;
 }
 
@@ -401,6 +404,31 @@ int handle_2101(fasit_connection_t *fc, int start, int end) {
 int handle_2102(fasit_connection_t *fc, int start, int end) {
    // copy until for later potential sending over RF
    memcpy(&fc->f2102_resp, fc->fasit_ibuf, end-start);
+   // remember target type
+   switch (fc->f2102_resp.body.type) {
+      case Type_SIT:
+         if (fc->has_MFS) {
+            fc->target_type = RF_Type_SIT_W_MFS;
+         } else {
+            fc->target_type = RF_Type_SIT;
+         }
+         break;
+      case Type_MIT:
+         fc->target_type = RF_Type_MIT;
+         break;
+      case Type_SAT:
+         fc->target_type = RF_Type_SAT;
+         break;
+      case Type_HSAT:
+         fc->target_type = RF_Type_HSAT;
+         break;
+      case Type_MAT:
+         fc->target_type = RF_Type_MAT;
+         break;
+      case Type_SES:
+         fc->target_type = RF_Type_SES;
+         break;
+   }
    return doNothing;
 }
 
@@ -426,6 +454,12 @@ int send_2110(fasit_connection_t *fc, int on, int mode, int idelay, int rdelay) 
 int handle_2111(fasit_connection_t *fc, int start, int end) {
    // copy until for later potential sending over RF
    memcpy(&fc->f2111_resp, fc->fasit_ibuf, end-start);
+   // remember if I have an MFS or not
+   if (fc->f2111_resp.body.flags & PD_NES) {
+      fc->has_MFS = 1;
+   }
+   // send out a status request to get target type
+   send_2100_status_req(fc);
    return doNothing;
 }
 

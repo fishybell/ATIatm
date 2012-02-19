@@ -6,6 +6,29 @@
 #define FASIT_BUF_SIZE 4096
 #define RF_BUF_SIZE 1024
 
+typedef enum fasit_target_type {
+   Type_Default,
+   Type_SIT,
+   Type_MIT,
+   Type_SAT,
+   Type_HSAT,
+   Type_MAT,
+   Type_BES,
+   Type_SES = 200,
+} target_type_t;
+
+typedef enum rf_target_type {
+   RF_Type_SIT_W_MFS,
+   RF_Type_SIT,
+   RF_Type_SAT,
+   RF_Type_HSAT,
+   RF_Type_SES,
+   RF_Type_BES,
+   RF_Type_MIT,
+   RF_Type_MAT,
+   RF_Type_Unknown,
+} rf_target_type_t;
+
 typedef struct fasit_connection {
    int rf; // the file descriptor to talk low-bandwidth rf on
    int fasit; // the file descriptor to talk fasit on
@@ -37,6 +60,9 @@ typedef struct fasit_connection {
    int hit_burst;
 
    // cached responses
+   rf_target_type_t target_type;
+   int has_MFS;
+   FASIT_2005 f2005_resp;
    FASIT_2101 f2101_resp;
    FASIT_2102 f2102_resp;
    FASIT_2111 f2111_resp;

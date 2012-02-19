@@ -274,6 +274,7 @@ int main(int argc, char **argv) {
                      fconns[i].fasit = fasitsock;
                      fconns[i].id = 2047; // TODO -- random number
                      fconns[i].index = i; // remember its own index
+                     fconns[i].target_type = RF_Type_Unknown; // unknown target type
 
                      // are we the last slot?
                      if ((last_slot - 1) == index) {
