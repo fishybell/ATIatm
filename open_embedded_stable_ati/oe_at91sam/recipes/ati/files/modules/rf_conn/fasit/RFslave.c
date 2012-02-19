@@ -128,7 +128,7 @@ void HandleSlaveRF(int RFfd){
 			    result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 				sprintf(hbuf,"new device response to RFmaster devid=0x%06X address=%4d (0x%4x) len=%2d wrote %d\n"
-					,LB_devreg->devid,LB_devreg->temp_addr,LB_devreg->temp_addr,LB_devreg->length,result);
+					,LB_devreg->devid,LB_devreg->temp_addr,LB_devreg->temp_addr,RF_size(LB_devreg->cmd),result);
 				DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
 			    }
 			    break;

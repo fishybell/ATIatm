@@ -211,7 +211,7 @@ int main(int argc, char **argv) {
 
 		    if  (LB->cmd==LBC_DEVICE_REG){
 			LB_devreg =(LB_device_reg_t *)(LB);	// change our pointer to the correct packet type
-			LB_devreg->length=RF_size(LB_devreg->cmd);	
+			//LB_devreg->length=RF_size(LB_devreg->cmd);	
 
 			DDCMSG(D_RF,YELLOW,"MCP: RFslave sent LB DEVICE_REG packet.   devtype=%d devid=%06x tempaddr=%d"
 			       ,LB_devreg->dev_type,LB_devreg->devid,LB_devreg->temp_addr);

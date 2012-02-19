@@ -466,11 +466,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 	    // also fills in the length field
 		    set_crc8(LB_exp,RF_size(LB_exp->cmd));
 	    // now send it to the MCP master
-		    result=write(minion->mcp_sock,LB_exp,LB_exp->length);
+		    result=write(minion->mcp_sock,LB_exp,RF_size(LB_exp->cmd));
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d\n",minion->mID,minion->RF_addr,LB_exp->cmd,LB_exp->length);
-			DDCMSG_HEXB(D_RF,YELLOW,hbuf,LB_exp,LB_exp->length);
-			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",LB_exp->length,minion->mcp_sock);
+			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d\n",minion->mID,minion->RF_addr,LB_exp->cmd,RF_size(LB_exp->cmd));
+			DDCMSG_HEXB(D_RF,YELLOW,hbuf,LB_exp,RF_size(LB_exp->cmd));
+			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_exp->cmd),minion->mcp_sock);
 		    }
 //  sent LB
     
