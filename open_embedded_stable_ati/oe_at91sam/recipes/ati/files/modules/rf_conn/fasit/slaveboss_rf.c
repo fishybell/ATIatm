@@ -153,7 +153,7 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
 
       *end = *start + hl;
       switch (hdr->cmd) {
-         // these have a crc, check it
+         // they all have a crc, check it
          case LBC_EXPOSE:
          case LBC_MOVE:
          case LBC_CONFIGURE_HIT:
@@ -161,20 +161,16 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_PYRO_FIRE:
          case LBC_DEVICE_REG:
          case LBC_DEVICE_ADDR:
-            if (crc8(hdr, hl) == 0) {
-               mnum = hdr->cmd;
-               break;
-            }
-            break;
-
-         // these don't have a crc to check
          case LBC_STATUS:
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
          case LBC_QEXPOSE:
          case LBC_QCONCEAL	:
          case LBC_REQUEST_NEW:
-            mnum = hdr->cmd;
+            if (crc8(hdr, hl) == 0) {
+               mnum = hdr->cmd;
+               break;
+            }
             break;
 
          // not a valid number, not a valid header
@@ -264,28 +260,53 @@ int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(fc->rf_ibuf + start);
+   // send pyro fire request (will handle "set" and "fire" commands to BES)
+   send_2000(fc, pkt->zone);
    return doNothing;
 }
 
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   // send exposure request
+   send_2100_exposure(fc, 90); // 90^ = exposed
    return doNothing;
 }
 
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   // send exposure request
+   send_2100_exposure(fc, 0); // 0^ = concealed
    return doNothing;
 }
 
 int send_DEVICE_REG(fasit_connection_t *fc) {
-   return doNothing;
+   // create a message packet with most significant bytes of the FASIT device ID
+   LB_device_reg_t bdy;
+   memset(&bdy, 0, sizeof(LB_device_reg_t));
+   bdy.cmd = LBC_DEVICE_REG;
+   bdy.addr = 0; // destined for base station
+   bdy.dev_type = fc->target_type;
+   bdy.temp_addr = fc->id & 0x7FF;
+   if (fc->target_type == RF_Type_BES) {
+      bdy.devid = fc->f2111_resp.body.devid & 0xffffff;
+   } else {
+      bdy.devid = fc->f2005_resp.body.devid & 0xffffff;
+   }
+
+   // put in the crc and send
+   set_crc8(&bdy, sizeof(LB_device_reg_t));
+   queueMsg(fc, &bdy, sizeof(LB_device_reg_t));
+   return mark_rfWrite;
 }
 
 // a request for new messages has arrived, send back "DEVICE_REG"
 int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
    LB_request_new_t *pkt = (LB_request_new_t *)(fc->rf_ibuf + start);
-   return doNothing;
+   // only send a registry if I have a fully connected fasit client
+   if (fc->target_type == RF_Type_Unknown) {
+      return doNothing;
+   }
+   // register -- TODO -- what about if I'm already registered?
+   return send_DEVICE_REG(fc);
 }
 
 int handle_DEVICE_ADDR(fasit_connection_t *fc, int start, int end) {
