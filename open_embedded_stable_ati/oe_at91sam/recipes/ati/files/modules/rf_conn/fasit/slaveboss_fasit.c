@@ -327,6 +327,22 @@ int send_2100_status_req(fasit_connection_t *fc) {
    return mark_fasitWrite;
 }
 
+int send_2100_power(fasit_connection_t *fc, int cmd) {
+   FASIT_header hdr;
+   FASIT_2100 bdy;
+   defHeader(fc, 2100, &hdr); // sets the sequence number and other data
+   hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
+
+   // fill in body
+   memset(&bdy, 0, sizeof(FASIT_2100));
+   bdy.cid = cmd;
+
+   // send
+   queueMsg(fc, &hdr, sizeof(FASIT_header));
+   queueMsg(fc, &bdy, sizeof(FASIT_2100));
+   return mark_fasitWrite;
+}
+
 int send_2100_exposure(fasit_connection_t *fc, int exp) {
    FASIT_header hdr;
    FASIT_2100 bdy;

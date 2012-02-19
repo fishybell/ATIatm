@@ -46,6 +46,9 @@ typedef struct fasit_connection {
    // Data for FASIT handling
    int seq; // this connections fasit sequence number
 
+   // for power control
+   int sleeping;
+
    // for pyro commands
    int p_zone; // last zone commanded
    int p_fire; // sent "set" fire command (1) or not (0)
@@ -71,6 +74,7 @@ typedef struct fasit_connection {
 
    // Data for RF handling
    int groups[MAX_GROUPS]; // a list of group ids to listen for in addition to the main id
+   int groups_disabled[MAX_GROUPS]; // a list of group ids that are disabled for me
    
 } fasit_connection_t;
 
@@ -91,6 +95,7 @@ int handle_2005(fasit_connection_t *fc, int start, int end);
 int handle_2006(fasit_connection_t *fc, int start, int end);
 int send_2100_status_req(fasit_connection_t *fc);
 int send_2100_exposure(fasit_connection_t *fc, int exp);
+int send_2100_power(fasit_connection_t *fc, int cmd);
 int send_2100_movement(fasit_connection_t *fc, int move, float speed);
 int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int tokill, int sens, int mode, int burst);
 int handle_2101(fasit_connection_t *fc, int start, int end);
