@@ -36,12 +36,17 @@ static void queueMsg(fasit_connection_t *fc, void *msg, int size) {
 // see if the given packet is for this fasit connection
 static int packetForMe(fasit_connection_t *fc, int start) {
    LB_packet_t *hdr = (LB_packet_t*)(fc->rf_ibuf + start);
-   int i;
+   int i, j;
    if (hdr->addr == fc->id) { return 1; } // directly for me
 
    for (i = 0; i<MAX_GROUPS; i++) {
       if (hdr->addr == fc->groups[i]) {
-         return 1; // for one of my groups
+         for (j = 0; j<MAX_GROUPS; j++) {
+            if (hdr->addr == fc->groups_disabled[j]) {
+               return 0; // is one of my groups, but it's disabled
+            }
+         }
+         return 1; // is one of my groups
       }
    }
 
@@ -202,21 +207,26 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
          DCMSG(RED,"Ignored RF message %d",mnum);
       } else {
          DCMSG(RED,"Recieved RF message %d",mnum);
-         switch (mnum) {
-            HANDLE_RF (STATUS);
-            HANDLE_RF (EXPOSE);
-            HANDLE_RF (MOVE);
-            HANDLE_RF (CONFIGURE_HIT);
-            HANDLE_RF (GROUP_CONTROL);
-            HANDLE_RF (AUDIO_CONTROL);
-            HANDLE_RF (POWER_CONTROL);
-            HANDLE_RF (PYRO_FIRE);
-            HANDLE_RF (QEXPOSE);
-            HANDLE_RF (QCONCEAL);
-            HANDLE_RF (REQUEST_NEW);
-            HANDLE_RF (DEVICE_ADDR);
-            default:
-               break;
+         if (fc->sleeping && mnum != LBC_POWER_CONTROL) {
+            // ignore message when sleeping
+            DCMSG(RED,"Slept through RF message %d",mnum);
+         } else {
+            switch (mnum) {
+               HANDLE_RF (STATUS);
+               HANDLE_RF (EXPOSE);
+               HANDLE_RF (MOVE);
+               HANDLE_RF (CONFIGURE_HIT);
+               HANDLE_RF (GROUP_CONTROL);
+               HANDLE_RF (AUDIO_CONTROL);
+               HANDLE_RF (POWER_CONTROL);
+               HANDLE_RF (PYRO_FIRE);
+               HANDLE_RF (QEXPOSE);
+               HANDLE_RF (QCONCEAL);
+               HANDLE_RF (REQUEST_NEW);
+               HANDLE_RF (DEVICE_ADDR);
+               default:
+                  break;
+            }
          }
       }
       clearBuffer(fc, end); // clear out last message
@@ -226,16 +236,19 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
 
 int handle_STATUS(fasit_connection_t *fc, int start, int end) {
    LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   // TODO -- fill me in
    return doNothing;
 }
 
 int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
    LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   // TODO -- fill me in
    return doNothing;
 }
 
 int handle_MOVE(fasit_connection_t *fc, int start, int end) {
    LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   // TODO -- fill me in
    return doNothing;
 }
 
@@ -245,17 +258,87 @@ int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   LB_group_control_t *pkt = (LB_group_control_t *)(fc->rf_ibuf + start);
+   // which group command?
+   int i, j;
+   switch (pkt->gcmd) {
+      case 0: // disable command
+         for (i = 0; i<MAX_GROUPS; i++) {
+            if (hdr->addr == fc->groups[i]) {
+               // found that I am part of this group
+               for (j = 0; j<MAX_GROUPS; j++) {
+                  // clear out any existing ones in the disabled list
+                  if (groups_disabled[j] == pkt->gaddr) {
+                     groups_disabled[j] = 0;
+                  }
+               }
+               for (j = 0; j<MAX_GROUPS; j++) {
+                  if (groups_disabled[j] == 0) {
+                     // found place in group disable list that's free
+                     groups_disabled[j] = pkt->gaddr;
+                     return doNothing;
+                  }
+               }
+               return doNothing;
+            } 
+         }
+         return doNothing; break;
+   case 1: // enable command
+         for (i = 0; i<MAX_GROUPS; i++) {
+            // clear out any existing ones in the disabled list
+            if (groups_disabled[i] == pkt->gaddr) {
+               groups_disabled[i] = 0;
+            }
+         }
+         return doNothing; break;
+      case 2: // join command
+         for (i = 0; i<MAX_GROUPS; i++) {
+            // clear out any existing ones in the group list
+            if (groups[i] == pkt->gaddr) {
+               groups[i] = 0;
+            }
+         }
+         for (i = 0; i<MAX_GROUPS; i++) {
+            // find empty spot in group list
+            if (groups[i] == 0) {
+               groups[i] = pkt->gaddr;
+               return doNothing;
+            }
+         }
+         return doNothing; break;
+      case 3: // seperate command
+         for (i = 0; i<MAX_GROUPS; i++) {
+            // clear out any existing ones in the group list
+            if (groups[i] == pkt->gaddr) {
+               groups[i] = 0;
+            }
+         }
+         return doNothing; break;
+   }
    return doNothing;
 }
 
 int handle_AUDIO_CONTROL(fasit_connection_t *fc, int start, int end) {
    LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   // TODO -- fill me in
    return doNothing;
 }
 
 int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   LB_power_control_t *pkt = (LB_power_control_t *)(fc->rf_ibuf + start);
+   // send correct power command to fasit client
+   switch (pkt->pcmd) {
+      case 0: // ignore command
+         return doNothing; break;
+      case 1: // sleep command
+         fc->sleeping = 1;
+         return send_2100_power(fc, CID_Sleep); break;
+      case 2: // wake command
+         fc->sleeping = 0;
+         return send_2100_power(fc, CID_Wake); break;
+      case 3: // extended shutdown command
+         return send_2100_power(fc, CID_Shutdown); break;
+   }
    return doNothing;
 }
 
@@ -268,14 +351,12 @@ int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end) {
 
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
    // send exposure request
-   send_2100_exposure(fc, 90); // 90^ = exposed
-   return doNothing;
+   return send_2100_exposure(fc, 90); // 90^ = exposed
 }
 
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
    // send exposure request
-   send_2100_exposure(fc, 0); // 0^ = concealed
-   return doNothing;
+   return send_2100_exposure(fc, 0); // 0^ = concealed
 }
 
 int send_DEVICE_REG(fasit_connection_t *fc) {
