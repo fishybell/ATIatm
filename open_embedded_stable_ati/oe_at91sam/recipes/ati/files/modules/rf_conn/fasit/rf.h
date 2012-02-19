@@ -59,8 +59,7 @@ typedef struct LB_request_new_t {
     uint16 cmd:5 __attribute__ ((packed));
     uint16 addr:11 __attribute__ ((packed));
     
-    uint16 crc:8 __attribute__ ((packed));
-    uint16 length:8 __attribute__ ((packed));
+    uint8 crc;
 } LB_request_new_t;
 
 // LBC_DEVICE_REG packet
@@ -77,8 +76,7 @@ typedef struct LB_device_reg_t {
     uint16 temp_addr:11 __attribute__ ((packed));
     uint16 pad:5 __attribute__ ((packed));
     
-    uint16 crc:8 __attribute__ ((packed));
-    uint16 length:8 __attribute__ ((packed));
+    uint8 crc;
 } LB_device_reg_t;
 
 // LBC_DEVICE_ADDR packet
@@ -93,8 +91,7 @@ typedef struct LB_device_addr_t {
     uint16 new_addr:11 __attribute__ ((packed));
     uint16 pad:5 __attribute__ ((packed));
     
-    uint16 crc:8 __attribute__ ((packed));
-    uint16 length:8 __attribute__ ((packed));
+    uint8 crc;
 } __attribute__ ((packed)) LB_device_addr_t;
 
 // LBC_EXPOSE
@@ -111,8 +108,7 @@ typedef struct LB_expose {
     uint16 thermal:1 __attribute__ ((packed));
     uint16 pad:4 __attribute__ ((packed));
 
-    uint16 crc:8 __attribute__ ((packed));
-    uint16 length:8 __attribute__ ((packed));
+    uint8 crc;
 } LB_expose_t;
 
 // LBC_MOVE
@@ -125,8 +121,7 @@ typedef struct LB_move {
     uint16 speed:11 __attribute__ ((packed));
     uint16 pad:4 __attribute__ ((packed));
 
-    uint16 crc:8 __attribute__ ((packed));
-    uint16 length:8 __attribute__ ((packed));
+    uint8 crc;
 } LB_move_t;
 
 // LBC_CONFIGURE_HIT
@@ -145,9 +140,18 @@ typedef struct LB_configure {
     uint16 pad:6 __attribute__ ((packed));
     uint16 crc:8 __attribute__ ((packed));
     
-    uint16 length:8 __attribute__ ((packed));
-    uint16 pad2:8 __attribute__ ((packed));
 } LB_configure_t;
+
+// LBC_GROUP_CONTROL
+//    we have 11 short
+typedef struct LB_group_control {
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+    uint16 gcmd:2 __attribute__ ((packed));
+    uint16 gaddr:11 __attribute__ ((packed));
+    uint16 pad:3 __attribute__ ((packed));
+    uint8 crc;
+} LB_group_control_t;
 
 // LBC_AUDIO_CONTROL
 //    we have 5 short
@@ -161,10 +165,17 @@ typedef struct LB_audio_control {
     uint16 playmode:2 __attribute__ ((packed));
     uint16 pad:5 __attribute__ ((packed));    
     uint16 crc:8 __attribute__ ((packed));
-    
-    uint16 length:8 __attribute__ ((packed));
-    uint16 pad2:8 __attribute__ ((packed));
 } LB_audio_control_t;
+
+// LBC_POWER_CONTROL
+//    we have 6 short
+typedef struct LB_power_control {
+    uint16 cmd:5 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed));
+    uint16 pcmd:2 __attribute__ ((packed));
+    uint16 pad:6 __attribute__ ((packed));
+    uint16 crc:8 __attribute__ ((packed));
+} LB_power_control_t;
 
 // LBC_PYRO_FIRE
 //    we have 5 short
@@ -175,9 +186,6 @@ typedef struct LB_pyro_fire {
     uint16 zone:2 __attribute__ ((packed));
     uint16 pad:6 __attribute__ ((packed));
     uint16 crc:8 __attribute__ ((packed));
-    
-    uint16 length:8 __attribute__ ((packed));
-    uint16 pad2:8 __attribute__ ((packed));
 } LB_pyro_fire_t;
 
 void set_crc8(void *buf, uint8 length);
