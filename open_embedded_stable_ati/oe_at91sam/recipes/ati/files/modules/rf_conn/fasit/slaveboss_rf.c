@@ -296,9 +296,17 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_MOVE(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
-   // TODO -- fill me in
-   return doNothing;
+   LB_move_t *pkt = (LB_move_t *)(fc->rf_ibuf + start);
+   // convert speed
+   float speed = pkt->speed / 100.0;
+   if (pkt->speed == 2047) {
+      // TODO -- add emergency stop handling here
+      speed = 0.0; // just normal stop for right now
+   }
+
+   // send movement message
+   return send_2100_movement(fc, pkt->direction ? 1: 2, /* forward / reverse */
+                             speed); /* converted speed value */ 
 }
 
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
