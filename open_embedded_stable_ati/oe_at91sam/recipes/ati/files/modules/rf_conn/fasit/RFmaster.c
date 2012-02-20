@@ -60,6 +60,8 @@ void HandleRF(int MCPsock,int RFfd){
     // initialize our gathering buffer
     Rptr=Rbuf;
     Rstart=Rptr;
+
+    memset(Rstart,0,100);
     
 /**   loop until we lose connection  **/
     clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
@@ -107,7 +109,7 @@ void HandleRF(int MCPsock,int RFfd){
 //    MAKE SURE THE RFfd is non-blocking!!!	
 	    gathered = gather_rf(RFfd,Rptr,Rstart,300);
 	    if (gathered>0){  // increment our current pointer
-		Rptr+=gathered;
+		Rptr=gathered+Rstart;
 	    }
 	/* Receive message, or continue to recieve message from RF */
 	    DCMSG(GREEN,"RFmaster: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
