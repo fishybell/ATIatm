@@ -1,6 +1,7 @@
 #include "mcp.h"
 #include "slaveboss.h"
 #include "rf.h"
+#include "eeprom.h"
 
 // we don't worry about clearing the data before a valid message, just up to the end
 static void clearBuffer(fasit_connection_t *fc, int end) {
@@ -241,9 +242,57 @@ int handle_STATUS(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
-   // TODO -- fill me in
-   return doNothing;
+   LB_expose_t *pkt = (LB_expose_t *)(fc->rf_ibuf + start);
+   int retval = doNothing;
+   static int mfsSDelay = -1;
+   static int mfsRDelay = -1;
+
+   // read, once, the eeprom values for start and repeat delays
+   if (mfsSDelay == -1) {
+      mfsSDelay = ReadEeprom_int(MFS_START_DELAY_LOC, MFS_START_DELAY_SIZE, MFS_START_DELAY);
+      mfsRDelay = ReadEeprom_int(MFS_REPEAT_DELAY_LOC, MFS_REPEAT_DELAY_SIZE, MFS_REPEAT_DELAY);
+   }
+
+   // send mfs configuration
+   if (fc->has_MFS) {
+      switch (pkt->mfs) {
+         case 0:
+            // off
+            retval &= send_2110(fc, 0, 0, 0, 0);
+            break;
+         case 1:
+            // single
+            retval &= send_2110(fc, 1, 0, mfsSDelay, mfsRDelay);
+            break;
+         case 2:
+            // burst
+            retval &= send_2110(fc, 1, 1, mfsSDelay, mfsRDelay);
+            break;
+         case 3:
+            // simulate single or burst randomly
+            if (rand() % 2) {
+               retval &= send_2110(fc, 1, 0, mfsSDelay, mfsRDelay);
+            } else {
+               retval &= send_2110(fc, 1, 1, mfsSDelay, mfsRDelay);
+            }
+            break;
+      }
+   }
+
+   // send configure hit sensing
+   retval &= send_2100_conf_hit(fc, 4, /* blank on conceal */
+                                0, /* reset hit count */
+                                fc->hit_react, /* remembered hit reaction */
+                                pkt->tokill, /* hits to kill */
+                                fc->hit_sens, /* remembered hit sensitivity */
+                                pkt->hitmode ? 2 : 1, /* burst / single */
+                                fc->hit_burst); /* remembered hit burst seperation */
+
+   
+   // send expose command
+   retval &= send_2100_exposure(fc, pkt->expose ? 90 : 0);
+   
+   return retval;
 }
 
 int handle_MOVE(fasit_connection_t *fc, int start, int end) {
@@ -254,6 +303,7 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
 
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
    LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   // TODO -- fill me in
    return doNothing;
 }
 
@@ -264,18 +314,18 @@ int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end) {
    switch (pkt->gcmd) {
       case 0: // disable command
          for (i = 0; i<MAX_GROUPS; i++) {
-            if (hdr->addr == fc->groups[i]) {
+            if (pkt->gaddr == fc->groups[i]) {
                // found that I am part of this group
                for (j = 0; j<MAX_GROUPS; j++) {
                   // clear out any existing ones in the disabled list
-                  if (groups_disabled[j] == pkt->gaddr) {
-                     groups_disabled[j] = 0;
+                  if (fc->groups_disabled[j] == pkt->gaddr) {
+                     fc->groups_disabled[j] = 0;
                   }
                }
                for (j = 0; j<MAX_GROUPS; j++) {
-                  if (groups_disabled[j] == 0) {
+                  if (fc->groups_disabled[j] == 0) {
                      // found place in group disable list that's free
-                     groups_disabled[j] = pkt->gaddr;
+                     fc->groups_disabled[j] = pkt->gaddr;
                      return doNothing;
                   }
                }
@@ -283,25 +333,25 @@ int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end) {
             } 
          }
          return doNothing; break;
-   case 1: // enable command
+      case 1: // enable command
          for (i = 0; i<MAX_GROUPS; i++) {
             // clear out any existing ones in the disabled list
-            if (groups_disabled[i] == pkt->gaddr) {
-               groups_disabled[i] = 0;
+            if (fc->groups_disabled[i] == pkt->gaddr) {
+               fc->groups_disabled[i] = 0;
             }
          }
          return doNothing; break;
       case 2: // join command
          for (i = 0; i<MAX_GROUPS; i++) {
             // clear out any existing ones in the group list
-            if (groups[i] == pkt->gaddr) {
-               groups[i] = 0;
+            if (fc->groups[i] == pkt->gaddr) {
+               fc->groups[i] = 0;
             }
          }
          for (i = 0; i<MAX_GROUPS; i++) {
             // find empty spot in group list
-            if (groups[i] == 0) {
-               groups[i] = pkt->gaddr;
+            if (fc->groups[i] == 0) {
+               fc->groups[i] = pkt->gaddr;
                return doNothing;
             }
          }
@@ -309,8 +359,8 @@ int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end) {
       case 3: // seperate command
          for (i = 0; i<MAX_GROUPS; i++) {
             // clear out any existing ones in the group list
-            if (groups[i] == pkt->gaddr) {
-               groups[i] = 0;
+            if (fc->groups[i] == pkt->gaddr) {
+               fc->groups[i] = 0;
             }
          }
          return doNothing; break;
