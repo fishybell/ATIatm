@@ -30,8 +30,8 @@ RFslave : RFslave.c $(HFILES) $(MCFILES)
 RFslave.arm : RFslave.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.arm RFslave.c $(MCFILES)
 
-slaveboss : slaveboss.c slaveboss_fasit.c slaveboss_rf.c $(HFILES) $(MCFILES)
-	gcc -lrt -std=gnu99 -o slaveboss fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c $(MCFILES)
+slaveboss : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o slaveboss fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c $(MCFILES)
 
 slavetest : slavetest.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o slavetest slavetest.c $(MCFILES)
