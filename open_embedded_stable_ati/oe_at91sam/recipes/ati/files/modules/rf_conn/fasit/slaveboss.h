@@ -61,6 +61,7 @@ typedef struct fasit_connection {
    int hit_sens;
    int hit_mode;
    int hit_burst;
+   int hit_phi;
 
    // cached responses
    rf_target_type_t target_type;

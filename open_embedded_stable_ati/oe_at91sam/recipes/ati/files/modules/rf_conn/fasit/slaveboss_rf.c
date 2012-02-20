@@ -302,9 +302,63 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
-   // TODO -- fill me in
-   return doNothing;
+   LB_configure_t *pkt = (LB_configure_t *)(fc->rf_ibuf + start);
+   int retval = doNothing;
+
+   // check for thermal control only
+   if (pkt->react == 7) {
+      // TOOD -- add thermal control
+      return doNothing;
+   }
+
+   // hit count set
+   switch (pkt->hitcountset) {
+      case 0:
+         // no change
+         break;
+      case 1:
+         // reset to zero
+         fc->hit_hit = 0;
+         break;
+      case 2:
+         // incriment by one
+         fc->hit_hit++;
+         break;
+      case 3:
+         // set to hits-to-kill value
+         fc->hit_hit = pkt->tokill;
+         break;
+   }
+
+   // reaction settings
+   if (pkt->react == 6) {
+      retval &= send_14110(fc, 1); // enable PHI
+      fc->hit_phi = 1; // remember
+      fc->hit_react = 1; // kill
+   } else if (fc->hit_phi) {
+      retval &= send_14110(fc, 1); // disable previously enabled PHI
+      fc->hit_phi = 0; // forget
+      fc->hit_react = pkt->react;
+   } else {
+      fc->hit_react = pkt->react;
+   }
+
+   // remember other hit settings
+   fc->hit_tokill = pkt->tokill;
+   fc->hit_sens = pkt->sensitivity;
+   fc->hit_mode = pkt->hitmode ? 2 : 1; // burst / single
+   fc->hit_burst = pkt->timehits * 5; // each number is 5 milliseconds
+   
+   // send configure hit sensing
+   retval &= send_2100_conf_hit(fc, 4, /* blank on conceal */
+                                fc->hit_hit, /* remembered hit reset value */
+                                fc->hit_react, /* remembered hit reaction */
+                                fc->hit_tokill, /* remembered hits to kill */
+                                fc->hit_sens, /* remembered hit sensitivity */
+                                fc->hit_mode, /* remembered hit mode */
+                                fc->hit_burst); /* remembered hit burst seperation */
+
+   return retval;
 }
 
 int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end) {

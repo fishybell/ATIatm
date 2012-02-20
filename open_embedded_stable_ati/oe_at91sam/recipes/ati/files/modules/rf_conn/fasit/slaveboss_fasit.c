@@ -445,6 +445,14 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
          fc->target_type = RF_Type_SES;
          break;
    }
+   // remember hit sensing settings
+   fc->hit_on = fc->f2102_resp.body.hit_conf.on;
+   fc->hit_hit = fc->f2102_resp.body.hit;
+   fc->hit_react = fc->f2102_resp.body.hit_conf.react;
+   fc->hit_tokill = fc->f2102_resp.body.hit_conf.tokill;
+   fc->hit_sens = fc->f2102_resp.body.hit_conf.sens;
+   fc->hit_mode = fc->f2102_resp.body.hit_conf.mode;
+   fc->hit_burst = fc->f2102_resp.body.hit_conf.burst;
    return doNothing;
 }
 
