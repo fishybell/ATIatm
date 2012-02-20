@@ -36,10 +36,10 @@ int RF_size(int cmd){
 	    return (5);
 	    
 	case  LBC_CONFIGURE_HIT:
-	    return (6);
+	    return (7);
 	    
 	case  LBC_GROUP_CONTROL:
-	    return (6);
+	    return (5);
 	    
 	case  LBC_AUDIO_CONTROL:
 	    return (6);
