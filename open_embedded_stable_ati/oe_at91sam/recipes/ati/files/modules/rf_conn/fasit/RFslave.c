@@ -112,11 +112,11 @@ void HandleSlaveRF(int RFfd){
 			    LB_devreg->devid=DevID;		// Actual 3 significant bytes of MAC address
 
 			    RF_addr=1710+(DevID&0x7);	//  use the fancy hash algorithm to come up with the real temp address
-			    LB_devreg->temp_addr=RF_addr;
+			    LB_devreg->addr=RF_addr;
 
 		// calculates the correct CRC and adds it to the end of the packet payload
 			    set_crc8(&rLB,RF_size(LB_devreg->cmd));
-			    DDCMSG(D_RF,BLUE,"setting temp addr to %4d (0x%x) after CRC calc  RF_addr= %4d (0x%x)",RF_addr,RF_addr,LB_devreg->temp_addr,LB_devreg->temp_addr);
+			    DDCMSG(D_RF,BLUE,"setting temp addr to %4d (0x%x) after CRC calc  RF_addr= %4d (0x%x)",RF_addr,RF_addr,LB_devreg->addr,LB_devreg->addr);
 
 		// now send it to the RF master
 		// after waiting for our timeslot:   which is slottime*(MAC&MASK) for now
@@ -128,7 +128,7 @@ void HandleSlaveRF(int RFfd){
 			    result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 				sprintf(hbuf,"new device response to RFmaster devid=0x%06X address=%4d (0x%4x) len=%2d wrote %d\n"
-					,LB_devreg->devid,LB_devreg->temp_addr,LB_devreg->temp_addr,RF_size(LB_devreg->cmd),result);
+					,LB_devreg->devid,LB_devreg->addr,LB_devreg->addr,RF_size(LB_devreg->cmd),result);
 				DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
 			    }
 			    break;

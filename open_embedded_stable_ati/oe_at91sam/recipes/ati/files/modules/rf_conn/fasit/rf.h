@@ -1,3 +1,5 @@
+#ifndef _RF_H_
+#define _RF_H_
 
 //  these are the verbosity bits.   fix the print_verbosity in rf.c if you change any
 #define D_NONE		0
@@ -27,7 +29,7 @@
 //     that is probably bit-packed
 
 //  the command ID's
-#define LBC_STATUS		0
+#define LBC_STATUS_REQ		0
 #define LBC_EXPOSE		1
 #define LBC_MOVE		2
 #define LBC_CONFIGURE_HIT	3
@@ -36,6 +38,12 @@
 #define LBC_POWER_CONTROL	6
 
 #define LBC_PYRO_FIRE		7
+
+#define LBC_STATUS_RESP_LIFTER	8
+#define LBC_STATUS_RESP_MOVER		9
+#define LBC_STATUS_RESP_EXT		10
+#define LBC_STATUS_RESP_FAULT		11
+#define LBC_STATUS_NO_RESP			12
 
 #define LBC_QEXPOSE		16
 #define LBC_QCONCEAL		17
@@ -50,16 +58,86 @@
 typedef struct LB_packet_tag {
     // 26 * 16 bytes = 13 longs
     uint16 cmd:5 __attribute__ ((packed));
-    uint16 addr:11 __attribute__ ((packed));
+    uint16 addr:11 __attribute__ ((packed)); // source or destination address
     uint16 payload[24] __attribute__ ((packed)); // has room for max payload and the CRC byte    
 } LB_packet_t;
+
+// LBC_STATUS_REQ packet
+//
+typedef struct LB_status_req_t {
+    // 1 * 32 bytes = 1 long - padding = 3 bytes
+    uint32 cmd:5 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+    uint32 crc:8 __attribute__ ((packed));
+    uint32 padding:8 __attribute__ ((packed));
+} LB_status_req_t;
+
+// LBC_STATUS_RESP_LIFTER packet
+//
+typedef struct LB_status_resp_lifter_t {
+    // 1 * 32 bytes = 1 long - padding = 4 bytes
+    uint32 cmd:5 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
+    uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
+    uint32 expose:1 __attribute__ ((packed));
+    uint32 crc:8 __attribute__ ((packed));
+} LB_status_resp_lifter_t;
+
+// LBC_STATUS_RESP_MOVER packet
+//
+typedef struct LB_status_resp_mover_t {
+    // 2 * 32 bytes = 2 long - padding = 8 bytes
+    uint32 cmd:5 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
+    uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
+    uint32 expose:1 __attribute__ ((packed));
+    uint32 pad:8 __attribute__ ((packed));
+
+    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
+    uint32 dir:2 __attribute__ ((packed)); // 0 = stop, 1 = away from home, 2 = towards home
+    uint32 location:11 __attribute__ ((packed)); // meters from home
+    uint32 crc:8 __attribute__ ((packed));
+} LB_status_resp_mover_t;
+
+// LBC_STATUS_RESP_EXT packet
+//
+typedef struct LB_status_resp_ext_t {
+    // 3 * 32 bytes = 3 long - padding = 12 bytes
+    uint32 cmd:5 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
+    uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
+    uint32 expose:1 __attribute__ ((packed));
+    uint32 pad:8 __attribute__ ((packed));
+
+    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
+    uint32 dir:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
+    uint32 location:11 __attribute__ ((packed)); // meters from home
+    uint32 hitmode:1 __attribute__ ((packed));
+    uint32 tokill:4 __attribute__ ((packed));
+    uint32 react:3 __attribute__ ((packed));
+
+    uint32 sensitivity:4 __attribute__ ((packed));
+    uint32 timehits:4 __attribute__ ((packed));
+    uint32 fault:8 __attribute__ ((packed));
+    uint32 crc:8 __attribute__ ((packed));
+} LB_status_resp_ext_t;
+
+// LBC_STATUS_NO_RESP packet
+//
+typedef struct LB_status_no_resp_t {
+    // 1 * 32 bytes = 1 long - padding = 3 bytes
+    uint32 cmd:5 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
+    uint32 crc:8 __attribute__ ((packed));
+    uint32 padding:8 __attribute__ ((packed));
+} LB_status_no_resp_t;
 
 // LBC_REQUEST_NEW packet
 //
 typedef struct LB_request_new_t {
     // 1 * 32 bytes = 1 long - padding = 3 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:8 __attribute__ ((packed));
 } LB_request_new_t;
@@ -69,17 +147,14 @@ typedef struct LB_request_new_t {
 // since this packet happens so seldom I see no good reason to try and
 // bit pack smaller than this
 typedef struct LB_device_reg_t {
-    // 3 * 32 bytes = 3 long - padding = 9 bytes
+    // 3 * 32 bytes = 3 long - padding = 8 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));    
-    uint32 temp_addr:11 __attribute__ ((packed));
-    uint32 pad:5 __attribute__ ((packed));
-    
+    uint32 addr:11 __attribute__ ((packed));   // source address (always to basestation) 
     uint32 dev_type:8 __attribute__ ((packed));
+    uint32 pad:8 __attribute__ ((packed));
+
     uint32 devid:24 __attribute__ ((packed));
-    
     uint32 crc:8 __attribute__ ((packed));
-    uint32 padding:24 __attribute__ ((packed));
 } LB_device_reg_t;
 
 // LBC_DEVICE_ADDR packet
@@ -90,7 +165,7 @@ typedef struct LB_device_reg_t {
 typedef struct LB_device_addr_t {
     // 2 * 32 bytes = 1 long - padding = 5 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 new_addr:11 __attribute__ ((packed));
     uint32 pad:5 __attribute__ ((packed));
     
@@ -103,7 +178,7 @@ typedef struct LB_device_addr_t {
 typedef struct LB_expose {
     // 2 * 32 bytes = 2 long - padding = 5 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 expose:1 __attribute__ ((packed));
     uint32 hitmode:1 __attribute__ ((packed));
     uint32 tokill:4 __attribute__ ((packed));
@@ -121,7 +196,7 @@ typedef struct LB_expose {
 typedef struct LB_move {
     // 2 * 32 bytes = 2 long - padding = 5 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 direction:1 __attribute__ ((packed));
     uint32 speed:11 __attribute__ ((packed));
     uint32 pad:4 __attribute__ ((packed));
@@ -135,7 +210,7 @@ typedef struct LB_move {
 typedef struct LB_configure {
     // 2 * 32 bytes = 2 long - padding = 7 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 hitmode:1 __attribute__ ((packed));
     uint32 tokill:4 __attribute__ ((packed));
     uint32 react:3 __attribute__ ((packed));
@@ -153,7 +228,7 @@ typedef struct LB_configure {
 typedef struct LB_group_control {
     // 2 * 32 bytes = 2 long - padding = 5 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 gcmd:2 __attribute__ ((packed));
     uint32 gaddr:11 __attribute__ ((packed));
     uint32 pad:3 __attribute__ ((packed));
@@ -167,7 +242,7 @@ typedef struct LB_group_control {
 typedef struct LB_audio_control {
     // 2 * 32 bytes = 2 long - padding = 6 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 function:2 __attribute__ ((packed));
     uint32 volume:7 __attribute__ ((packed));
     uint32 playmode:2 __attribute__ ((packed));
@@ -183,7 +258,7 @@ typedef struct LB_audio_control {
 typedef struct LB_power_control {
     // 1 * 32 bytes = 1 long - padding = 4 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 pcmd:2 __attribute__ ((packed));
     uint32 pad:6 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
@@ -194,7 +269,7 @@ typedef struct LB_power_control {
 typedef struct LB_pyro_fire {
     // 1 * 32 bytes = 1 long - padding = 4 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 zone:2 __attribute__ ((packed));
     uint32 pad:6 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
@@ -207,3 +282,4 @@ uint32 getDevID (void);
 int gather_rf(int fd, char *pos, char *start,int max);
 void print_verbosity(void);
 
+#endif

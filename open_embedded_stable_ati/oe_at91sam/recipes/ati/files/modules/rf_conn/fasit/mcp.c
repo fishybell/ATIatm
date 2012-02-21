@@ -213,8 +213,8 @@ int main(int argc, char **argv) {
 			LB_devreg =(LB_device_reg_t *)(LB);	// change our pointer to the correct packet type
 			//LB_devreg->length=RF_size(LB_devreg->cmd);	
 
-			DDCMSG(D_RF,YELLOW,"MCP: RFslave sent LB DEVICE_REG packet.   devtype=%d devid=%06x tempaddr=%d"
-			       ,LB_devreg->dev_type,LB_devreg->devid,LB_devreg->temp_addr);
+			DDCMSG(D_RF,YELLOW,"MCP: RFslave sent LB DEVICE_REG packet.   devtype=%d devid=%06x addr=%d"
+			       ,LB_devreg->dev_type,LB_devreg->devid,LB_devreg->addr);
 
 			/***  we have a newly registered slave,
 			 ***  create a minion for it
@@ -272,7 +272,7 @@ int main(int argc, char **argv) {
 
 			taddr_cnt=1;	// look for an unused address slot
 			while(taddr_cnt<1700&&(taddr[taddr_cnt].inuse)) taddr_cnt++;			    
-			taddr[taddr_cnt].addr=LB_devreg->temp_addr;
+			taddr[taddr_cnt].addr=LB_devreg->addr;
 			taddr[taddr_cnt].devid=LB_devreg->devid;
 			taddr[taddr_cnt].fd=minions[mID].minion;
 			taddr[taddr_cnt].mID=mID;
@@ -282,7 +282,7 @@ int main(int argc, char **argv) {
 			       ,taddr_cnt,taddr[taddr_cnt].addr,taddr[taddr_cnt].fd,taddr[taddr_cnt].mID,taddr[taddr_cnt].inuse);
 
 			// building a new LB packet for the RF
-			LB_buf.addr=LB_devreg->temp_addr;
+			LB_buf.addr=LB_devreg->addr;
 			LB_buf.cmd=LBC_DEVICE_ADDR;
 			LB_addr =(LB_device_addr_t *)(&LB_buf);	// map our bitfields in
 
