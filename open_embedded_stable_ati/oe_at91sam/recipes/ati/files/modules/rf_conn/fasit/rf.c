@@ -26,7 +26,19 @@ void print_verbosity(void){
 int RF_size(int cmd){
     // set LB_size  based on which command it is
     switch (cmd){
-	case  LBC_STATUS:
+	case  LBC_STATUS_REQ:
+	    return (3);
+	    
+	case  LBC_STATUS_RESP_LIFTER:
+	    return (4);
+	    
+	case  LBC_STATUS_RESP_MOVER:
+	    return (8);
+	    
+	case  LBC_STATUS_RESP_EXT:
+	    return (12);
+	    
+	case  LBC_STATUS_NO_RESP:
 	    return (3);
 	    
 	case  LBC_EXPOSE:

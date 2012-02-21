@@ -1,4 +1,8 @@
+#ifndef _SLAVEBOSS_H_
+#define _SLAVEBOSS_H_
+
 #include "fasit_c.h"
+#include "rf.h"
 
 #define MAX_CONNECTIONS 16
 #define MAX_GROUPS 32
@@ -72,6 +76,7 @@ typedef struct fasit_connection {
    FASIT_2111 f2111_resp;
    FASIT_2112 f2112_resp;
    FASIT_2113 f2113_resp;
+   LB_status_resp_ext_t last_status; 
 
    // Data for RF handling
    int groups[MAX_GROUPS]; // a list of group ids to listen for in addition to the main id
@@ -116,7 +121,13 @@ int send_14400(fasit_connection_t *fc, int cid, int length, char *data);
 int handle_14401(fasit_connection_t *fc, int start, int end);
 
 // rf commands
-int handle_STATUS(fasit_connection_t *fc, int start, int end);
+int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end);
+int send_STATUS_RESP(fasit_connection_t *fc); // catch-all that finds the right response to send
+int send_STATUS_RESP_LIFTER(fasit_connection_t *fc);
+int send_STATUS_RESP_MOVER(fasit_connection_t *fc);
+int send_STATUS_RESP_EXT(fasit_connection_t *fc);
+int send_STATUS_RESP_FAULT(fasit_connection_t *fc);
+int send_STATUS_NO_RESP(fasit_connection_t *fc);
 int handle_EXPOSE(fasit_connection_t *fc, int start, int end);
 int handle_MOVE(fasit_connection_t *fc, int start, int end);
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end);
@@ -155,3 +166,7 @@ float ntohf(float f);
 
 #define htonf(f) (ntohf(f))
 
+#define min(a, b) ( a > b ? b : a )
+#define max(a, b) ( a > b ? a : b )
+
+#endif
