@@ -1,7 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 
-int verbose;
+int verbose,slottime;
 
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
@@ -34,7 +34,7 @@ void DieWithError(char *errorMessage){
 void HandleSlaveRF(int RFfd){
 #define MbufSize 4096
     struct timespec elapsed_time, start_time, istart_time,delta_time;
-    int slottime;
+    int holdoff;
     char Mbuf[MbufSize], Rbuf[1024],buf[200], hbuf[200];        /* Buffer MCP socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
     char *Mptr, Mstart, Mend;
@@ -94,7 +94,7 @@ void HandleSlaveRF(int RFfd){
 		    DCMSG_HEXB(GREEN,buf,Rstart,size);
 		}
 	// only respond if our address matches AND the crc was good
-		if (!crc && (RF_addr==LB->addr)){
+		if (!crc && ((RF_addr==LB->addr)||((RF_addr>1709)&&(LB->addr==2047)))){
 		    timestamp(&elapsed_time,&istart_time,&delta_time);
 		    DDCMSG(D_TIME,CYAN,"RFslave top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 			   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
@@ -121,9 +121,10 @@ void HandleSlaveRF(int RFfd){
 		// now send it to the RF master
 		// after waiting for our timeslot:   which is slottime*(MAC&MASK) for now
 		
-			    slottime=1000000;	// try 100ms
-			    usleep(slottime*(DevID&0x7));		// just try 63 hard slots now
-			    DDCMSG(D_TIME,CYAN,"usleep for %d",slottime*(DevID&0x7));
+			    // argument
+			    holdoff=100000;	// 100ms sec holdoff time
+			    usleep(holdoff+slottime*(DevID&0x3));		// just try *4* hard slots now
+			    DDCMSG(D_TIME,CYAN,"usleep for %d",holdoff+slottime*(DevID&0x3));
 			    
 			    result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
@@ -181,6 +182,7 @@ void HandleSlaveRF(int RFfd){
 void print_help(int exval) {
     printf("RFslave [-h] [-v verbosity] [-t serial_device] \n\n");
     printf("  -h            print this help and exit\n");
+    printf("  -s            slottime in ms\n");
     printf("  -t /dev/ttyS1 set serial port device\n");
     print_verbosity();    
     exit(exval);
@@ -213,9 +215,10 @@ int main(int argc, char **argv) {
     char ttyport[32];	/* default to ttyS0  */
 
     verbose=0;
+    slottime=1000000;	// try 1000ms for default
     strcpy(ttyport,"/dev/ttyS1");
     
-    while((opt = getopt(argc, argv, "hv:t:")) != -1) {
+    while((opt = getopt(argc, argv, "hv:t:s:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
@@ -223,6 +226,10 @@ int main(int argc, char **argv) {
 
 	    case 'v':
 		verbose = strtoul(optarg,NULL,16);
+		break;
+
+	    case 's':
+		slottime = 1000*strtoul(optarg,NULL,10);
 		break;
 
 	    case 't':

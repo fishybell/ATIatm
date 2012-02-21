@@ -205,11 +205,12 @@ void HandleRF(int MCPsock,int RFfd){
 
 
 void print_help(int exval) {
-    printf("RFmaster [-h] [-v num] [-t comm] [-p port] \n\n");
+    printf("RFmaster [-h] [-v num] [-t comm] [-p port] [-x delay] \n\n");
     printf("  -h            print this help and exit\n");
     printf("  -p 4000       set listen port\n");
     printf("  -t /dev/ttyS1 set serial port device\n");
     printf("  -s 10         max number of slaves to look for\n");
+    printf("  -x 800          xmit test, xmit a request devices every arg milliseconds\n");
     print_verbosity();
     exit(exval);
 }
@@ -237,14 +238,15 @@ int main(int argc, char **argv) {
     unsigned short RFmasterport;	/* Server port */
     unsigned int clntLen;               /* Length of client address data structure */
     char ttyport[32];	/* default to ttyS0  */
-    int opt,slave_count;
+    int opt,slave_count,xmit;
 
     slave_count=10;
     verbose=0;
+    xmit=0;
     RFmasterport = defaultPORT;
     strcpy(ttyport,"/dev/ttyS0");
     
-    while((opt = getopt(argc, argv, "hv:t:p:s:")) != -1) {
+    while((opt = getopt(argc, argv, "hv:t:p:s:x:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
@@ -266,6 +268,10 @@ int main(int argc, char **argv) {
 		slave_count = atoi(optarg);
 		break;
 
+	    case 'x':
+		xmit = atoi(optarg);
+		break;
+
 	    case ':':
 		fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
 		print_help(1);
@@ -274,7 +280,6 @@ int main(int argc, char **argv) {
 	    case '?':
 		fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
 		print_help(1);
-
 		break;
 	}
     }
@@ -287,6 +292,38 @@ int main(int argc, char **argv) {
 
    RFfd=open_port(ttyport); 
 
+
+   if (xmit){
+       LB_packet_t LB;
+       LB_request_new_t *RQ;
+       int result,size;
+       char buf[200];
+       RQ=(LB_request_new_t *)&LB;
+
+       RQ->addr=2047;
+       RQ->cmd=LBC_REQUEST_NEW;
+	// calculates the correct CRC and adds it to the end of the packet payload
+	// also fills in the length field
+       size = RF_size(RQ->cmd);
+       set_crc8(RQ,3);
+
+       while(1){
+	   usleep(xmit*1000);
+	    // now send it to the RF master
+	   result=write(RFfd,RQ,size);
+	   if (result==size) {
+	       sprintf(buf,"Xmit test  ->RF  [%2d]  ",size);
+	       DCMSG_HEXB(BLUE,buf,RQ,size);
+	   } else {
+	       sprintf(buf,"Xmit test  ->RF  [%d!=%d]  ",size,result);
+	       DCMSG_HEXB(RED,buf,RQ,size);
+	   }
+
+
+       }
+   }
+
+   
 //  now Create socket for the incoming connection */
 
     if ((serversock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
@@ -310,6 +347,8 @@ int main(int argc, char **argv) {
     if (listen(serversock, 2) < 0)
 	DieWithError("listen() failed");
 
+
+    
     for (;;) {
 
 	/* Wait for a client to connect */
