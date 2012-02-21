@@ -251,14 +251,14 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    memset(&s, 0, sizeof(LB_status_resp_ext_t));
    s.hits = min(0,max(fc->hit_hit, 127)); // cap upper/lower bounds
    s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
-   s.speed = min(0,max(fc->f2102_resp.body.speed * 100, 2047)); // cap upper/lower bounds
+   s.speed = min(0,max(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
    s.dir = fc->f2102_resp.body.move & 0x3;
-   s.location = fc->f2102_resp.body.pos & 0x7ff;
+   s.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
    s.hitmode = fc->hit_mode;
    s.react = fc->hit_react;
    s.sensitivity = fc->hit_react;
    s.timehits = fc->hit_burst;
-   s.fault = fc->f2102_resp.body.fault;
+   s.fault = htons(fc->f2102_resp.body.fault);
 
    // determine changes send correct status response
    if (s.fault != fc->last_status.fault ||

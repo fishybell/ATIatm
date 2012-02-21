@@ -285,7 +285,7 @@ int send_2000(fasit_connection_t *fc, int zone) {
    }
 
    // change zone from 0-7 to 1-x
-   bdy.zone = zone+1;
+   bdy.zone = htons(zone+1);
 
    // send
    queueMsg(fc, &hdr, sizeof(FASIT_header));
@@ -388,12 +388,12 @@ int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int t
    memset(&bdy, 0, sizeof(FASIT_2100));
    bdy.cid = CID_Config_Hit_Sensor;
    bdy.on = on;
-   bdy.hit = hit;
+   bdy.hit = htons(hit);
    bdy.react = react;
-   bdy.tokill = tokill;
-   bdy.sens = sens;
+   bdy.tokill = htons(tokill);
+   bdy.sens = htons(sens);
    bdy.mode = mode;
-   bdy.burst = burst;
+   bdy.burst = htons(burst);
 
    // remember for later
    fc->hit_on = on;
@@ -447,12 +447,12 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    }
    // remember hit sensing settings
    fc->hit_on = fc->f2102_resp.body.hit_conf.on;
-   fc->hit_hit = fc->f2102_resp.body.hit;
+   fc->hit_hit = htons(fc->f2102_resp.body.hit);
    fc->hit_react = fc->f2102_resp.body.hit_conf.react;
-   fc->hit_tokill = fc->f2102_resp.body.hit_conf.tokill;
-   fc->hit_sens = fc->f2102_resp.body.hit_conf.sens;
+   fc->hit_tokill = htons(fc->f2102_resp.body.hit_conf.tokill);
+   fc->hit_sens = htons(fc->f2102_resp.body.hit_conf.sens);
    fc->hit_mode = fc->f2102_resp.body.hit_conf.mode;
-   fc->hit_burst = fc->f2102_resp.body.hit_conf.burst;
+   fc->hit_burst = htons(fc->f2102_resp.body.hit_conf.burst);
    return doNothing;
 }
 
@@ -548,7 +548,7 @@ int send_14200(fasit_connection_t *fc, int blank) {
 
    // fill in body
    memset(&bdy, 0, sizeof(FASIT_14200));
-   bdy.blank = blank;
+   bdy.blank = htons(blank);
 
    // send
    queueMsg(fc, &hdr, sizeof(FASIT_header));
@@ -565,7 +565,7 @@ int send_14400(fasit_connection_t *fc, int cid, int length, char *data) {
    // fill in body
    memset(&bdy, 0, sizeof(FASIT_14400));
    bdy.cid = cid;
-   bdy.length = length;
+   bdy.length = htons(length);
    memcpy(bdy.data, data, length);
 
    // send
