@@ -79,6 +79,7 @@ typedef struct fasit_connection {
    LB_status_resp_ext_t last_status; 
 
    // Data for RF handling
+   int waiting_status_resp;
    int groups[MAX_GROUPS]; // a list of group ids to listen for in addition to the main id
    int groups_disabled[MAX_GROUPS]; // a list of group ids that are disabled for me
    

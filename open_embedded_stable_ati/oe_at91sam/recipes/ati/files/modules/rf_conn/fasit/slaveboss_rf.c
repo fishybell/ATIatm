@@ -240,9 +240,9 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
 }
 
 int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
-   // just send back the appropriate status
-   // TODO -- wait a short while so we have more up-to-date information
-   return send_STATUS_RESP(fc);
+   // wait 'til we have the most up-to-date information to send
+   fc->waiting_status_resp = 1;
+   return send_2100_status_req(fc); // gather latest information
 }
 
 int send_STATUS_RESP(fasit_connection_t *fc) {

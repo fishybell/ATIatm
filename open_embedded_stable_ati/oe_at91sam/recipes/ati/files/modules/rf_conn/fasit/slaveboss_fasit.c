@@ -453,7 +453,14 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    fc->hit_sens = htons(fc->f2102_resp.body.hit_conf.sens);
    fc->hit_mode = fc->f2102_resp.body.hit_conf.mode;
    fc->hit_burst = htons(fc->f2102_resp.body.hit_conf.burst);
-   return doNothing;
+
+   // check to see if we're waiting to send the information back
+   if (fc->waiting_status_resp) {
+      fc->waiting_status_resp = 0; // not waiting anymore
+      return send_STATUS_RESP(fc); // return appropriate information
+   } else {
+      return doNothing;
+   }
 }
 
 int send_2110(fasit_connection_t *fc, int on, int mode, int idelay, int rdelay) {
