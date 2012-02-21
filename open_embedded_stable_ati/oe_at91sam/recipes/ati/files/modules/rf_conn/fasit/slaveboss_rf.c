@@ -167,7 +167,11 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_PYRO_FIRE:
          case LBC_DEVICE_REG:
          case LBC_DEVICE_ADDR:
-         case LBC_STATUS:
+         case LBC_STATUS_REQ:
+         case LBC_STATUS_RESP_LIFTER:
+         case LBC_STATUS_RESP_MOVER:
+         case LBC_STATUS_RESP_EXT:
+         case LBC_STATUS_NO_RESP:
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
          case LBC_QEXPOSE:
@@ -213,7 +217,7 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
             DCMSG(RED,"Slept through RF message %d",mnum);
          } else {
             switch (mnum) {
-               HANDLE_RF (STATUS);
+               HANDLE_RF (STATUS_REQ);
                HANDLE_RF (EXPOSE);
                HANDLE_RF (MOVE);
                HANDLE_RF (CONFIGURE_HIT);
@@ -235,10 +239,105 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
    return doNothing;
 }
 
-int handle_STATUS(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
-   // TODO -- fill me in
+int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
+   // just send back the appropriate status
+   // TODO -- wait a short while so we have more up-to-date information
+   return send_STATUS_RESP(fc);
+}
+
+int send_STATUS_RESP(fasit_connection_t *fc) {
+   // build up current response
+   LB_status_resp_ext_t s;
+   memset(&s, 0, sizeof(LB_status_resp_ext_t));
+   s.hits = min(0,max(fc->hit_hit, 127)); // cap upper/lower bounds
+   s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
+   s.speed = min(0,max(fc->f2102_resp.body.speed * 100, 2047)); // cap upper/lower bounds
+   s.dir = fc->f2102_resp.body.move & 0x3;
+   s.location = fc->f2102_resp.body.pos & 0x7ff;
+   s.hitmode = fc->hit_mode;
+   s.react = fc->hit_react;
+   s.sensitivity = fc->hit_react;
+   s.timehits = fc->hit_burst;
+   s.fault = fc->f2102_resp.body.fault;
+
+   // determine changes send correct status response
+   if (s.fault != fc->last_status.fault ||
+       s.timehits != fc->last_status.timehits ||
+       s.sensitivity != fc->last_status.sensitivity ||
+       s.react != fc->last_status.react ||
+       s.tokill != fc->last_status.tokill ||
+       s.hitmode != fc->last_status.hitmode) {
+      // copy current status to last status and send it
+      fc->last_status = s;
+      return send_STATUS_RESP_EXT(fc);
+   } else if (s.location != fc->last_status.location ||
+              s.dir != fc->last_status.dir ||
+              s.speed != fc->last_status.speed ||
+              s.expose != fc->last_status.expose ||
+              s.hits != fc->last_status.hits) {
+      // copy current status to last status and send it
+      fc->last_status = s;
+      // send appropriate mover or lifter message
+      if (fc->target_type == RF_Type_MIT || fc->target_type == RF_Type_MAT) {
+         return send_STATUS_RESP_MOVER(fc);
+      } else {
+         return send_STATUS_RESP_LIFTER(fc);
+      }
+   } else {
+      // nothing changed, send that
+      send_STATUS_NO_RESP(fc);
+   }
    return doNothing;
+}
+
+int send_STATUS_RESP_LIFTER(fasit_connection_t *fc) {
+   // create message from parts of fc->last_status
+   LB_status_resp_mover_t bdy;
+   bdy.cmd = LBC_STATUS_RESP_LIFTER;
+   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
+   bdy.hits = fc->last_status.hits;
+   bdy.expose = fc->last_status.expose;
+
+   // set crc and send
+   set_crc8(&bdy, sizeof(LB_status_resp_mover_t));
+   queueMsg(fc, &bdy, sizeof(LB_status_resp_mover_t));
+   return mark_rfWrite;
+}
+
+int send_STATUS_RESP_MOVER(fasit_connection_t *fc) {
+   // create message from parts of fc->last_status
+   LB_status_resp_mover_t bdy;
+   bdy.cmd = LBC_STATUS_RESP_MOVER;
+   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
+   bdy.hits = fc->last_status.hits;
+   bdy.expose = fc->last_status.expose;
+   bdy.speed = fc->last_status.speed;
+   bdy.dir = fc->last_status.dir;
+   bdy.location = fc->last_status.location;
+
+   // set crc and send
+   set_crc8(&bdy, sizeof(LB_status_resp_mover_t));
+   queueMsg(fc, &bdy, sizeof(LB_status_resp_mover_t));
+   return mark_rfWrite;
+}
+
+int send_STATUS_RESP_EXT(fasit_connection_t *fc) {
+   // finish filling in message and send
+   fc->last_status.cmd = LBC_STATUS_RESP_EXT;
+   fc->last_status.addr = fc->id & 0x7FF; // source address (always to basestation)
+   set_crc8(&fc->last_status, sizeof(LB_status_resp_ext_t));
+   queueMsg(fc, &fc->last_status, sizeof(LB_status_resp_ext_t));
+   return mark_rfWrite;
+}
+
+int send_STATUS_NO_RESP(fasit_connection_t *fc) {
+   // create message and send
+   LB_status_no_resp_t bdy;
+   bdy.cmd = LBC_STATUS_NO_RESP;
+   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
+   set_crc8(&bdy, sizeof(LB_status_no_resp_t));
+   queueMsg(fc, &bdy, sizeof(LB_status_no_resp_t));
+   return mark_rfWrite;
 }
 
 int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
@@ -476,9 +575,8 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    LB_device_reg_t bdy;
    memset(&bdy, 0, sizeof(LB_device_reg_t));
    bdy.cmd = LBC_DEVICE_REG;
-   bdy.addr = 0; // destined for base station
+   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    bdy.dev_type = fc->target_type;
-   bdy.temp_addr = fc->id & 0x7FF;
    if (fc->target_type == RF_Type_BES) {
       bdy.devid = fc->f2111_resp.body.devid & 0xffffff;
    } else {
