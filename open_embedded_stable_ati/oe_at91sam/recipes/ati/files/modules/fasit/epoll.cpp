@@ -391,6 +391,7 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
                fasit_tcp = new FASIT_TCP(client);
             }
             // connect new client and add to epoll
+            memset(&ev, 0, sizeof(ev));
             ev.events = EPOLLIN;
             ev.data.ptr = (void*)fasit_tcp;
             if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, client, &ev) < 0) {
