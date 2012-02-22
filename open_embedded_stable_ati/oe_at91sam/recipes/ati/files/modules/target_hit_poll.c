@@ -187,6 +187,8 @@ static void hit_kyle(void) {
     }
 
     tmp_val = at91_get_gpio_value(sensors[line].gpio);
+// don't look for disconnected hit sensor if we are on an eval board
+#ifndef TESTING_ON_EVAL
    // Line is high see look for disconnected hit sensor
    if (tmp_val) {
       sensors[line].d_count ++;
@@ -211,6 +213,7 @@ static void hit_kyle(void) {
          }
       }
    }
+#endif
 
     // if we're blanking the input or disconnected, ignore everything
     if (sensors[line].blanking || sensors[line].disconnected) {
