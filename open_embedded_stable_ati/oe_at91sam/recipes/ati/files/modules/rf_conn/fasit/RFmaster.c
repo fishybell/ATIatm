@@ -1,8 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 
-int verbose;	// so debugging works right in all modules
-
+int verbose,slottime,slot_count;	// globals
 
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
@@ -45,8 +44,9 @@ void DieWithError(char *errorMessage){
 void HandleRF(int MCPsock,int RFfd){
     struct timespec elapsed_time, start_time, istart_time,delta_time;
     char Mbuf[MbufSize],Rbuf[512], buf[200];        /* Buffer MCP socket */
+    char  *Mptr,*Mstart;
     char  *Rptr,*Rstart;
-    int size,gathered;
+    int size,gathered,delta,remaining_time;
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
     fd_set rf_or_mcp;
     struct timeval timeout;
@@ -62,6 +62,8 @@ void HandleRF(int MCPsock,int RFfd){
     Rstart=Rptr;
 
     memset(Rstart,0,100);
+
+    remaining_time=100;		//  remaining time before we can transmit (in ms)
     
 /**   loop until we lose connection  **/
     clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
@@ -87,15 +89,67 @@ void HandleRF(int MCPsock,int RFfd){
 	 */
 
 //	DCMSG(YELLOW,"RFmaster waiting for select(rf or mcp)");
-
-	timeout.tv_sec=0;
-	timeout.tv_usec=100000;	
-	sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, NULL);
+	
+	timeout.tv_sec=remaining_time/1000;
+	timeout.tv_usec=(remaining_time%1000)*1000;
+	sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
 
 	if (sock_ready<0){
 	    strerror_r(errno,Mbuf,200);
 	    DCMSG(RED,"RFmaster select error: %s", Mbuf);
 	    exit(-1);
+	}
+
+/*******      we timed out
+ *******
+ *******      check if the listening timeslots have expired
+ *******      check if the radio is cold and has room for the next send
+ *******/      
+	//    we timed out.   
+	if (!sock_ready){
+	    // get the actual current time.
+	    timestamp(&elapsed_time,&istart_time,&delta_time);
+	    DDCMSG(D_TIME,CYAN,"RFmaster:  select timed out at %5ld.%09ld timestamp, delta=%5ld.%09ld"
+		   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+	    delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000);
+	    DDCMSG(D_TIME,CYAN,"RFmaster:  delta=%2dms",delta);
+
+	    if (delta>remaining_time) {
+		//   we have waited long enough.
+		//       we can transmit up to 250 bytes of the packet queue
+
+		if (Mptr-Mstart<250){
+		    result=write(RFfd,Mstart,Mptr-Mstart);
+		} else {
+		    result=write(RFfd,Mstart,250);
+		}
+		if (result<0){
+		    strerror_r(errno,buf,200);		    
+		    DCMSG(RED,"RFmaster:  write to RF error %s",buf);
+		} else {
+		    if (!result){
+			DCMSG(RED,"RFmaster:  write to RF returned 0");
+		    }
+
+		    sprintf(buf,"MCP-> RF  [%2d]  ",result);
+		    DCMSG_HEXB(BLUE,buf,Mstart,result);		    
+		    
+		    // update the ptrs - shift the queue down if we could not send it all
+		    if (result<Mptr-Mstart){
+			memmove(Mbuf,Mstart,result);
+			Mptr-=result;
+			Mstart=Mbuf;
+		    } else {
+			// it was all sent, just reset the pointers
+			Mptr=Mstart=Mbuf;
+		    }
+		}
+		
+		rfcount+=MsgSize;
+		timestamp(&elapsed_time,&istart_time,&delta_time);
+		cps=(double) rfcount/(double)elapsed_time.tv_sec;
+		DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
+	    }
 	}
 
 	//  Testing has shown that we generally get 8 character chunks from the serial port
@@ -112,12 +166,9 @@ void HandleRF(int MCPsock,int RFfd){
 		Rptr=gathered+Rstart;
 	    }
 	/* Receive message, or continue to recieve message from RF */
-	    DCMSG(GREEN,"RFmaster: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
+	    DDCMSG(D_VERY,GREEN,"RFmaster: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
 		  gathered,Rptr-Rbuf,Rstart-Rbuf,Rptr-Rstart);
 
-	    sprintf(buf,"Rbuf[0..%d]=  ",gathered+10);
-	    DCMSG_HEXB(RED,buf,Rbuf,gathered+10);
-	    
 	    if (gathered>=3){
 		// we have a chance of a compelete packet
 		LB=(LB_packet_t *)Rstart;	// map the header in
@@ -131,10 +182,10 @@ void HandleRF(int MCPsock,int RFfd){
 			result=write(MCPsock,Rstart,size);
 			if (result==size) {
 			    sprintf(buf,"RF ->MCP  [%2d]  ",size);
-			    DCMSG_HEXB(GREEN,buf,Rstart,size);
+			    DDCMSG_HEXB(D_RF,GREEN,buf,Rstart,size);
 			} else {
 			    sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
-			    DCMSG_HEXB(RED,buf,Rstart,size);
+			    DDCMSG_HEXB(D_RF,RED,buf,Rstart,size);
 			}
 		    } else {
 			DCMSG(RED,"RF packet with BAD CRC ignored");
@@ -161,56 +212,43 @@ void HandleRF(int MCPsock,int RFfd){
 	//    we will have to watch to make sure we don't force down too much for the radio
 	if (FD_ISSET(MCPsock,&rf_or_mcp)){
     /* Receive message from MCP */
-	    if ((MsgSize = recv(MCPsock, Mbuf, MbufSize, 0)) < 0)
-		DieWithError("recv() failed");
-
+	    MsgSize = read(MCPsock, Mptr, MbufSize-(Mptr-Mbuf));
+	    if (MsgSize<0){
+		strerror_r(errno,buf,200);
+		DCMSG(RED,"RFmaster: read from MCP fd=%d failed  %s ",MCPsock,buf);
+		sleep(1);
+	    }
+	    if (!MsgSize){
+		DCMSG(RED,"RFmaster: read from MCP returned 0");
+	    }
+	
 	    if (MsgSize){
 
 		// we need a buffer that we can use to stage output to the radio in
 		// plus, we probably need some kind of handshake back to the MCP so
 		// we can throttle it down
 
-		// we will keep a count of chars, and at the next transmission we will know if it will be
-		// above or below the duty cycle limit.  But we can also transmit up to burst time limit
-		// before we care.  we should keep a moving average of about a minute for CPS, and watch the burst times
-		// IIR average should work.
-		// blindly write it  to the  radio
+		// Mbuf is that buffer.   Mptr is the current insert point,
+		// and Mstart is the beginning of unsent data
 
+		// we will not actually copy it down to the RF at this point in time.
+
+		Mptr+=MsgSize;	// add on the new length
 		
-		result=write(RFfd,Mbuf,MsgSize);
-		if (result==MsgSize) {
-		    sprintf(buf,"MCP-> RF  [%2d]  ",MsgSize);
-		    DCMSG_HEXB(BLUE,buf,Mbuf,MsgSize);
-		} else {
-		    sprintf(buf,"MCP-> RF  [%d!=%d]  ",MsgSize,result);
-		    DCMSG_HEXB(RED,buf,Mbuf,MsgSize);
-		}
-
-		rfcount+=MsgSize;
-		timestamp(&elapsed_time,&istart_time,&delta_time);
-
-		cps=(double) rfcount/(double)elapsed_time.tv_sec;
-		
-		DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
-		
-		memset(Mbuf,0,MsgSize+3);
-	    } else {
-		// the socket to the MCP seems to have closed...
-
 	    }
 	}  // end of MCP_sock
     } // end while 1
     close(MCPsock);    /* Close socket */    
 }
 
-
 void print_help(int exval) {
     printf("RFmaster [-h] [-v num] [-t comm] [-p port] [-x delay] \n\n");
     printf("  -h            print this help and exit\n");
     printf("  -p 4000       set listen port\n");
     printf("  -t /dev/ttyS1 set serial port device\n");
-    printf("  -s 10         max number of slaves to look for\n");
-    printf("  -x 800          xmit test, xmit a request devices every arg milliseconds\n");
+    printf("  -s 4          slot_count - max number of slots\n");
+    printf("  -l 250        slottime in ms\n");
+    printf("  -x 800        xmit test, xmit a request devices every arg milliseconds (default=disabled=0)\n");
     print_verbosity();
     exit(exval);
 }
@@ -240,13 +278,14 @@ int main(int argc, char **argv) {
     char ttyport[32];	/* default to ttyS0  */
     int opt,slave_count,xmit;
 
-    slave_count=10;
+    slot_count=4;	// determined by hashing function
+    slottime=150;	// time of each slot and the hold-off period
     verbose=0;
-    xmit=0;
+    xmit=0;		// used for testing
     RFmasterport = defaultPORT;
     strcpy(ttyport,"/dev/ttyS0");
     
-    while((opt = getopt(argc, argv, "hv:t:p:s:x:")) != -1) {
+    while((opt = getopt(argc, argv, "hv:t:p:s:x:l:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
@@ -265,7 +304,11 @@ int main(int argc, char **argv) {
 		break;
 
 	    case 's':
-		slave_count = atoi(optarg);
+		slot_count = atoi(optarg);
+		break;
+
+	    case 'l':
+		slottime = atoi(optarg);
 		break;
 
 	    case 'x':
@@ -286,13 +329,15 @@ int main(int argc, char **argv) {
     DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);
     DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
     DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
-    DCMSG(YELLOW,"RFmaster: will look for up to %d Slave devices",slave_count);
+    DCMSG(YELLOW,"RFmaster: slottime =%2dms",slottime);
+    DCMSG(YELLOW,"RFmaster: slot_count =%2d",slot_count);
     
 //   Okay,   set up the RF modem link here
 
    RFfd=open_port(ttyport); 
 
 
+//  this section is just used for testing   
    if (xmit){
        LB_packet_t LB;
        LB_request_new_t *RQ;
@@ -318,12 +363,9 @@ int main(int argc, char **argv) {
 	       sprintf(buf,"Xmit test  ->RF  [%d!=%d]  ",size,result);
 	       DCMSG_HEXB(RED,buf,RQ,size);
 	   }
-
-
        }
-   }
+   }  // if xmit testing section over.
 
-   
 //  now Create socket for the incoming connection */
 
     if ((serversock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
@@ -346,8 +388,6 @@ int main(int argc, char **argv) {
 	/* the '1' for MAXPENDINF might need to be a '0')  */
     if (listen(serversock, 2) < 0)
 	DieWithError("listen() failed");
-
-
     
     for (;;) {
 
@@ -364,6 +404,3 @@ int main(int argc, char **argv) {
     }
     /* NOT REACHED */
 }
-
-
-

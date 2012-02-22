@@ -181,9 +181,6 @@ int main(int argc, char **argv) {
 	    // now send it to the RF master
 	    result=write(RF_sock,&LB_buf,RF_size(LB_buf.cmd));
 	    DDCMSG(D_RF,BLUE,"MCP:  Sent %d bytes to RF",result);
-
-	    // SLEEP 9 seconds  - can't have this permanently
-	    sleep(9);
 	    
 	} else { // we have some fd's ready
 	    // check for ready minions or RF

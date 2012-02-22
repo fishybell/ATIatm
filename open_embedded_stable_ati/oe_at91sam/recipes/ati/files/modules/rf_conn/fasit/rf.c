@@ -96,11 +96,18 @@ int gather_rf(int fd, char *pos, char *start,int max){
     ready=read(fd,pos,max);
 
     if (ready<=0) { /* parse the error message   */
+	char buf[100];
 
+	strerror_r(errno,buf,100);
+	DCMSG(RED,"gather_rf:  read returned error %s \n",buf);
+
+	if (errno!=EAGAIN){
+	    DCMSG(RED,"gather_rf:  halting \n");
+	    exit(-1);
+	}
     } else {
 	pos+=ready;	// increment the position pointer
-	DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",
-	      ready,pos-start);
+	DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",ready,pos-start);
 
 	return(pos-start);
 

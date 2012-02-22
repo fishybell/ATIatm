@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
     int serversock;			/* Socket descriptor for server connection */
     int MCPsock;			/* Socket descriptor to use */
     int RFfd;				/* File descriptor for RFmodem serial port */
-    int opt;
+    int opt,xmit;
     struct sockaddr_in ServAddr;	/* Local address */
     struct sockaddr_in ClntAddr;	/* Client address */
 //    unsigned short RFslaveport;	/* Server port */
@@ -41,12 +41,16 @@ int main(int argc, char **argv) {
     char Rbuf[1024],buf[200];        /* Buffer MCP socket */
     char *Rptr, *Rstart;    
     int gathered,i;
+    LB_packet_t LB;
+    LB_request_new_t *RQ;
+    int result,size;
+    RQ=(LB_request_new_t *)&LB;
 
-    
+    xmit=0;
     verbose=0;
     strcpy(ttyport,"/dev/ttyS1");
     
-    while((opt = getopt(argc, argv, "hv:t:")) != -1) {
+    while((opt = getopt(argc, argv, "hv:t:x:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
@@ -54,6 +58,10 @@ int main(int argc, char **argv) {
 
 	    case 'v':
 		verbose = strtoul(optarg,NULL,16);
+		break;
+
+	    case 'x':
+		xmit = strtoul(optarg,NULL,10);
 		break;
 
 	    case 't':
@@ -99,21 +107,40 @@ int main(int argc, char **argv) {
 
    Rptr=Rstart=Rbuf;
 
+
+   RQ->addr=2047;
+   RQ->cmd=LBC_REQUEST_NEW;
+	// calculates the correct CRC and adds it to the end of the packet payload
+	// also fills in the length field
+   size = RF_size(RQ->cmd);
+   set_crc8(RQ,3);
+
     /**   loop until we lose connection  **/
    clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
 
    sprintf(buf,"Segfaults without this line.  Rbuf = ");
-	   DCMSG_HEXB(GREEN,buf,Rstart, 1);   
+   DCMSG_HEXB(GREEN,buf,Rstart, 1);   
+
+   DCMSG(GREEN,"\n\nElapsed Time   bytes  Packet data");
    
-   DCMSG(GREEN,"\n\nElapsed Time   bytes  Packet data");   
-   while(1) {
-       
+   while(1){
+       if(xmit){
+       usleep(xmit*1000);
+       // now send it to the RF master
+       result=write(RFfd,RQ,size);
+
+       timestamp(&elapsed_time,&istart_time,&delta_time);
+       sprintf(buf,"%4ld.%03ld  Xmit-> [%d:%d]   ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,size,result);
+       printf("\x1B[3%d;%dm%s",(BLUE)&7,((BLUE)>>3)&1,buf);
+       for (int i=0; i<2; i++) printf("%02x.", ((uint8 *)RQ)[i]);
+       printf("%02x\n", ((uint8 *)RQ)[3]);
+
+       }
        gathered = gather_rf(RFfd,Rptr,Rstart,300);
 
        if (gathered>0) {
 	   timestamp(&elapsed_time,&istart_time,&delta_time);
 	   sprintf(buf,"%4ld.%03ld  %2d    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,gathered);
-
 
 	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
 	   if(gathered>1){

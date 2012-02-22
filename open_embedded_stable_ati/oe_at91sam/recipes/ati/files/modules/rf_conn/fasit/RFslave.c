@@ -77,7 +77,7 @@ void HandleSlaveRF(int RFfd){
 	}
 	/* Receive message, or continue to recieve message from RF */
 	
-	DCMSG(GREEN,"RFslave: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
+	DDCMSG(D_VERY,GREEN,"RFslave: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
 	      gathered,Rptr-Rbuf,Rstart-Rbuf,Rptr-Rstart);
 
 	if (gathered>=3){
@@ -89,8 +89,8 @@ void HandleSlaveRF(int RFfd){
 		// we could check the CRC and dump it here
 		crc=crc8(LB,size);
 		if (verbose&D_RF){	// don't do the sprintf if we don't need to
-		    sprintf(buf,"LB packet pseq=%4d read from RF. Cmd=%2d size=%2d addr=%4d RF_addr=%4d\n"
-			    ,pcount++,LB->cmd,RF_size(LB->cmd),LB->addr,RF_addr);
+		    sprintf(buf,"RFslave[RFaddr=%2d]: pseq=%4d   %2d byte RFpacket Cmd=%2d addr=%4d \n"
+			    ,RF_addr,pcount++,RF_size(LB->cmd),LB->cmd,LB->addr);
 		    DCMSG_HEXB(GREEN,buf,Rstart,size);
 		}
 	// only respond if our address matches AND the crc was good
@@ -120,9 +120,9 @@ void HandleSlaveRF(int RFfd){
 
 		// now send it to the RF master
 		// after waiting for our timeslot:   which is slottime*(MAC&MASK) for now
-		
+
 			    // argument
-			    holdoff=100000;	// 100ms sec holdoff time
+			    holdoff=slottime;	// 100ms sec holdoff time
 			    usleep(holdoff+slottime*(DevID&0x3));		// just try *4* hard slots now
 			    DDCMSG(D_TIME,CYAN,"usleep for %d",holdoff+slottime*(DevID&0x3));
 			    
@@ -132,6 +132,10 @@ void HandleSlaveRF(int RFfd){
 					,LB_devreg->devid,LB_devreg->addr,LB_devreg->addr,RF_size(LB_devreg->cmd),result);
 				DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
 			    }
+			    
+			    // finish waiting for the slots before proceding
+			    usleep(slottime*(4-(DevID&0x3)));		// just try *4* hard slots now
+			    DDCMSG(D_TIME,CYAN,"usleep for %d",slottime*(4-(DevID&0x3)));
 			    break;
 
 			case LBC_DEVICE_ADDR:
@@ -141,7 +145,6 @@ void HandleSlaveRF(int RFfd){
 			    DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, assigning new address %4d (0x%x)  (0x%x):11"
 				  ,RF_addr,LB_addr->new_addr,LB_addr->new_addr,LB_addr->new_addr);
 			    RF_addr=LB_addr->new_addr;	// set our new address
-
 			    break;
 
 			case LBC_EXPOSE:
@@ -215,7 +218,7 @@ int main(int argc, char **argv) {
     char ttyport[32];	/* default to ttyS0  */
 
     verbose=0;
-    slottime=1000000;	// try 1000ms for default
+    slottime=120000;	// try 120ms for default
     strcpy(ttyport,"/dev/ttyS1");
     
     while((opt = getopt(argc, argv, "hv:t:s:")) != -1) {
@@ -250,6 +253,7 @@ int main(int argc, char **argv) {
     }
 
     printf(" Watching comm port = <%s>\n",ttyport);
+    printf(" slottime = %d ms\n",slottime/1000);
 
 
     // turn power to low for the radio A/B pin
