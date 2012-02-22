@@ -24,6 +24,8 @@ FUNCTION_START("::MIT_Client(int fd, int tnum) : Connection(fd)")
 
    // we have not yet connected to SmartRange/TRACR
    ever_conn = false;
+   skippedFault = 0; // haven't skipped any faults
+
 
    // connect our netlink connection
    nl_conn = NL_Conn::newConn<MIT_Conn>(this);
@@ -91,8 +93,13 @@ FUNCTION_END("::fillStatus2102(FASIT_2102 *msg)")
 void MIT_Client::sendStatus2102() {
 FUNCTION_START("::sendStatus2102()")
 
-   FASIT_header hdr;
-   FASIT_2102 msg;
+   // ignore if we haven't connected yet
+   if (!ever_conn) {
+      FUNCTION_END("::sendStatus2102()");
+      return;
+   }
+
+   FASIT_header hdr; FASIT_2102 msg;
    defHeader(2102, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2102));
 
@@ -219,9 +226,6 @@ FUNCTION_START("::handle_100(int start, int end)")
    // do handling of message
    IMSG("Handling 100 in MIT\n");
 
-   // we were connected at some point in time
-   ever_conn = true;
-
    // map header (no body for 100)
    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
 
@@ -249,6 +253,14 @@ FUNCTION_START("::handle_100(int start, int end)")
    queueMsg(&rhdr, sizeof(FASIT_header));
    queueMsg(&msg, sizeof(FASIT_2111));
    finishMsg();
+
+   // we were connected at some point in time
+   ever_conn = true;
+
+   // get around to skipped faults now
+   if (skippedFault != 0) {
+      didFailure(skippedFault);
+   }
 
 FUNCTION_INT("::handle_100(int start, int end)", 0)
    return 0;
@@ -318,8 +330,16 @@ FUNCTION_INT("::handle_2100(int start, int end)", 0)
 void MIT_Client::didFailure(int type) {
 FUNCTION_START("::didFailure(int type)")
 
+   // ignore if we haven't connected yet
+   if (!ever_conn) {
+      skippedFault = type; // send after connection
+      FUNCTION_END("::didFailure(int type)")
+      return;
+   }
+
    FASIT_header hdr;
    FASIT_2102 msg;
+   DCMSG(BLUE,"Prepared to send 2102 failure packet: %i", type);
    defHeader(2102, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2102));
 

@@ -24,6 +24,11 @@ const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,
  ***********************************************************/
 SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
     FUNCTION_START("::SIT_Client(int fd, int tnum) : Connection(fd)");
+
+    // we have not yet connected to SmartRange/TRACR
+    ever_conn = false;
+    skippedFault = 0; // haven't skipped any faults
+
     // connect our netlink connection
     nl_conn = NL_Conn::newConn<SIT_Conn>(this);
     if (nl_conn == NULL) {
@@ -174,6 +179,12 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
 // create and send a status messsage to the FASIT server
 void SIT_Client::sendStatus2102(int force) {
     FUNCTION_START("::sendStatus2102()");
+
+    // ignore if we haven't connected yet
+    if (!ever_conn) {
+        FUNCTION_END("::sendStatus2102()");
+        return;
+    }
 
     FASIT_header hdr;
     FASIT_2102 msg;
@@ -387,7 +398,8 @@ int SIT_Client::handle_100(int start, int end) {
     DCMSG(BLUE,"Prepared to send 2111 device capabilites message:");
     DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n"\
           "%4d    %d.%d     %5d    %3d     %3d",htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htons(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
-    DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n Device ID (mac address backwards) | flag_bits == GPS=4,Muzzle Flash=2,MILES Shootback=1\n0x%8.8llx           0x%2x",msg.body.devid,msg.body.flags);
+    DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n Device ID (mac address backwards) | flag_bits == GPS=4,Muzzle Flash=2,MILES Shootback=1");
+    DCMSG(BLUE,"0x%8.8llx           0x%2x",msg.body.devid,msg.body.flags);
 
     // send
     queueMsg(&rhdr, sizeof(FASIT_header));
@@ -399,6 +411,14 @@ int SIT_Client::handle_100(int start, int end) {
 
     // if it is a Pyro device it responds with a 2005 device ID and
     // capabilities here (instead of or in addition to a 2111????????)
+
+    // we were connected at some point in time
+    ever_conn = true;
+
+    // get around to skipped faults now
+    if (skippedFault != 0) {
+        didFailure(skippedFault);
+    }
 
     FUNCTION_INT("::handle_100(int start, int end)", 0);
     return 0;
@@ -911,8 +931,16 @@ int SIT_Client::handle_14401(int start, int end) {
 void SIT_Client::didFailure(int type) {
     FUNCTION_START("::didFailure(int type)");
 
+    // ignore if we haven't connected yet
+    if (!ever_conn) {
+        skippedFault = type; // send after connection
+        FUNCTION_END("::didFailure(int type)")
+        return;
+    }
+
     FASIT_header hdr;
     FASIT_2102 msg;
+    DCMSG(BLUE,"Prepared to send 2102 failure packet: %i", type);
     defHeader(2102, &hdr); // sets the sequence number and other data
     hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2102));
 

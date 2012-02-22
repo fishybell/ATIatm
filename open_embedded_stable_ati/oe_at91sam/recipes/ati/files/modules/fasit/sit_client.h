@@ -102,6 +102,10 @@ private:
    int resp_num;
    int resp_seq;
 
+   // remember if we ever connected
+   bool ever_conn;
+   int skippedFault;
+
    // remember the battery value rather than send a response each time we get a change
    int lastBatteryVal;
 
