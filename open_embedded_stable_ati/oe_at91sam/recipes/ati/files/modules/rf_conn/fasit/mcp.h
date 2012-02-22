@@ -1,3 +1,6 @@
+#ifndef __MCP_H__
+#define __MCP_H__
+
 #include <netinet/tcp.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -267,4 +270,4 @@ enum {
 */
 
 
-
+#endif
