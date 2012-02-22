@@ -13,8 +13,12 @@
 #define TARGET_NAME		"hit sensor"
 #define SENSOR_TYPE		"poll"
 
+// for ignoring hit sensor completely
 //#define TESTING_ON_EVAL
-#ifdef TESTING_ON_EVAL
+
+// for testing large amount of fake hits
+//#define TESTING_ON_EVAL_FAKE
+#ifdef TESTING_ON_EVAL_FAKE
     #define FAKE_MS 100
     #undef INPUT_HIT_SENSOR
     #define	INPUT_HIT_SENSOR 					AT91_PIN_PB31
@@ -103,7 +107,7 @@ static hit_sensor_t sensors[] = {{
 static void debug_out(unsigned long data);
 static struct timer_list debug_timer = TIMER_INITIALIZER(debug_out, 0, 0);
 
-#ifdef TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL_FAKE
 //---------------------------------------------------------------------------
 // Timer list for fake hit creation
 //---------------------------------------------------------------------------
@@ -214,7 +218,11 @@ static void hit_kyle(void) {
         return;
     }
 
-    in_val = at91_get_gpio_value(sensors[line].gpio) == sensors[line].active; // do a test so the value of in_val can be 0 for non-hit and 1 for hit
+    // NDB - don't check the value twice in the same loop - in_val = at91_get_gpio_value(sensors[line].gpio) == sensors[line].active; // do a test so the value of in_val can be 0 for non-hit and 1 for hit
+    in_val = tmp_val == sensors[line].active; // do a test so the value of in_val can be 0 for non-hit and 1 for hit
+#ifdef TESTING_ON_EVAL
+    in_val = 0; // ignore hit sensor on eval board
+#endif
 
     // invert if needed
     if (sensors[line].invert) {
@@ -379,7 +387,7 @@ static void debug_out(unsigned long data) {
     delay_printk("\n");
 }
 
-#ifdef TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL_FAKE
 //---------------------------------------------------------------------------
 // Timer function to create fake hit
 //---------------------------------------------------------------------------
@@ -419,7 +427,7 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     atomic_set(&driver_id, d_id);
 
     atomic_set(&full_init, TRUE);
-#ifdef TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL_FAKE
     mod_timer(&fake_timer, jiffies+((FAKE_MS*HZ)/1000)); // create a fake hit every 100 ms
 #endif
     return 0;
@@ -431,7 +439,7 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
 static void __exit target_hit_poll_exit(void) {
     atomic_set(&full_init, FALSE);
     del_timer(&debug_timer);
-#ifdef TESTING_ON_EVAL
+#ifdef TESTING_ON_EVAL_FAKE
     del_timer(&fake_timer);
 #endif
     ati_flush_work(&hit_work); // close any open work queue items
