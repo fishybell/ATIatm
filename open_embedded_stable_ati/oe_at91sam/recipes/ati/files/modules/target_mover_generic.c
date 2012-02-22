@@ -2530,12 +2530,14 @@ static void do_position(struct work_struct * work)
             }
             // See if our position is out of bounds
             // The numbers 100 and -100 are randomly picked 
-            if (atomic_read(&internal_length) != 0){
-               if (atomic_read(&position) > ( atomic_read(&internal_length) + 100) ||
-                        atomic_read(&position) < -100){
+            int dir = atomic_read(&movement_atomic);
+            int len = atomic_read(&internal_length);
+            int pos = atomic_read(&position);
+            if (len != 0 &&
+                  ((dir == MOVER_DIRECTION_FORWARD) && (pos > (len + 100))) ||
+                  ((dir == MOVER_DIRECTION_REVERSE) && (pos < -100))) {
                do_fault(ERR_stop_by_distance);
                hardware_speed_set(0);
-               }
             }
         }
 
