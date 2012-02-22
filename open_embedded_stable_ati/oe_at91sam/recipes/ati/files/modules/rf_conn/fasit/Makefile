@@ -9,11 +9,11 @@ OE =/home/brynn/ActionTarget/oe/oe
 SYSROOT=$(OE)/tmp/staging/armv5te-angstrom-linux-gnueabi
 XGCC = $(OE)/tmp/cross/armv5te/bin/arm-angstrom-linux-gnueabi-gcc
 
-HFILES = mcp.h fasit_c.h
+HFILES = mcp.h fasit_c.h rf.h
 MCFILES = serial.c timestamp.c htonll.c rf.c
 
 
-default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump.arm slaveboss slavetest
+default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump.arm slaveboss.arm slavetest slavetest.arm
 
 mcp : mcp.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c $(MCFILES)
@@ -30,11 +30,14 @@ RFslave : RFslave.c $(HFILES) $(MCFILES)
 RFslave.arm : RFslave.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.arm RFslave.c $(MCFILES)
 
-slaveboss : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c $(HFILES) $(MCFILES)
-	gcc -lrt -std=gnu99 -o slaveboss fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c $(MCFILES)
+#slaveboss : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c rf_debug.c rf_debug.h $(HFILES) $(MCFILES)
+#	gcc -lrt -std=gnu99 -o slaveboss fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c rf_debug.c eeprom.c $(MCFILES)
 
-slavetest : slavetest.c $(HFILES) $(MCFILES)
-	gcc -lrt -std=gnu99 -o slavetest slavetest.c $(MCFILES)
+slavetest : slavetest.c rf_debug.c rf_debug.h $(HFILES) $(MCFILES) slaveboss.h
+	gcc -lrt -std=gnu99 -o slavetest slavetest.c rf_debug.c $(MCFILES)
+
+slaveboss.arm : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c rf_debug.c rf_debug.h $(HFILES) $(MCFILES) slaveboss.h
+	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o slaveboss.arm fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c rf_debug.c $(MCFILES)
 
 RFdump.arm : RFdump.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFdump.arm RFdump.c $(MCFILES)
