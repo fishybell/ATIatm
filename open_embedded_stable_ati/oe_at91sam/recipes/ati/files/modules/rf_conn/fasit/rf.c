@@ -36,7 +36,7 @@ int RF_size(int cmd){
 	    return (8);
 	    
 	case  LBC_STATUS_RESP_EXT:
-	    return (12);
+	    return (11);
 	    
 	case  LBC_STATUS_NO_RESP:
 	    return (3);
@@ -48,7 +48,7 @@ int RF_size(int cmd){
 	    return (5);
 	    
 	case  LBC_CONFIGURE_HIT:
-	    return (7);
+	    return (6);
 	    
 	case  LBC_GROUP_CONTROL:
 	    return (5);
@@ -69,7 +69,7 @@ int RF_size(int cmd){
 	    return (3);
 	    
 	case  LBC_DEVICE_REG:
-	    return (9);
+	    return (8);
 	    
 	case  LBC_REQUEST_NEW:
 	    return (3);
