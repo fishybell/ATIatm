@@ -18,6 +18,7 @@
 #include "target_mover_generic.h"
 #include "target_generic_output.h"
 #include "target_battery.h"
+#include "fasit/faults.h"
 
 //---------------------------------------------------------------------------
 // These variables are parameters given when doing an insmod (insmod blah.ko variable=5)
@@ -173,6 +174,8 @@ delay_printk("Mover: received value: %i\n", value);
 
         // stop mover
         mover_speed_stop();
+// report as emergency stop
+        move_faults(ERR_emergency_stop);
 
         // Stop accessories (will disable them as well)
         generic_output_event(EVENT_ERROR);
@@ -221,6 +224,8 @@ delay_printk("Mover: handling move command\n");
         if (value == VELOCITY_STOP) {
             // stop
             mover_speed_stop(); // -- this is emergency stop
+// report as requested stop
+            move_faults(ERR_stop);
             // mover_speed_set(0); -- this is "coast" stop
         } else if (value == VELOCITY_REQ) {
             // retrieve speed

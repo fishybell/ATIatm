@@ -268,6 +268,9 @@ FUNCTION_START("::handle_2100(int start, int end)")
    // TODO -- handle other commands here
    bool needPass = true;
    switch (msg->cid) {
+      case CID_Stop:
+         doStop();
+         break;
       case CID_Shutdown:
          doShutdown();
          break;

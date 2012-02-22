@@ -59,6 +59,10 @@ static int MOVER_DELAY_MULT[] = {6,2,6,6,0};
 #define MOVER_DIRECTION_REVERSE		2
 #define MOVER_DIRECTION_STOPPED_FAULT	3
 
+#define MOVER_SENSOR_UNKNOWN  0
+#define MOVER_SENSOR_HOME  1
+#define MOVER_SENSOR_END  2
+
 // the maximum allowed speed ticks
 //static int NUMBER_OF_SPEEDS[] = {10,20,10,10,0};
 static int NUMBER_OF_SPEEDS[] = {100,200,200,200,0};
@@ -227,6 +231,15 @@ atomic_t quad_direction = ATOMIC_INIT(0);
 atomic_t doing_pos = ATOMIC_INIT(FALSE);
 atomic_t doing_vel = ATOMIC_INIT(FALSE);
 atomic_t tc_clock = ATOMIC_INIT(2);
+
+// This is used to know which sensor was last set so we can determine
+// invalid direction request. If we are home we do not want to 
+// allow reverse.
+atomic_t last_sensor = ATOMIC_INIT(MOVER_SENSOR_UNKNOWN);
+
+// This is used to determine if we have exceeded the track length as
+// determined by the home and end flags.
+atomic_t internal_length = ATOMIC_INIT(0);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that an operation is in progress,
@@ -439,11 +452,6 @@ void set_move_callback(move_event_callback handler, move_event_callback faulthan
     }
 }
 EXPORT_SYMBOL(set_move_callback);
-
-void set_move_fault_callback(move_event_callback handler) {
-    // only allow setting the callback once
-}
-EXPORT_SYMBOL(set_move_fault_callback);
 
 static void do_event(int etype) {
 #ifndef DEBUG_PID
@@ -820,6 +828,7 @@ static void timeout_fire(unsigned long data)
        do_event(EVENT_STOPPED); // timeout was part of coasting or stopping
     } else {
        do_event(EVENT_ERROR); // timeout wasn't part of coasting
+       do_fault(ERR_no_movement);
     }
 
     hardware_movement_stop(FALSE);
@@ -1061,10 +1070,10 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
         return IRQ_HANDLED;
         }
 
+    atomic_set(&last_sensor, MOVER_SENSOR_HOME); // home sensor
     do_event(EVENT_HOME_LIMIT); // triggered on home limit
     do_fault(ERR_stop_left_limit); // triggered on home limit
     do_event(EVENT_STOP); // started stopping
-    do_fault(ERR_stop); // triggered on home limit
 #ifndef TESTING_MAX
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(FALSE);
@@ -1092,10 +1101,17 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
+   // If we have not set our internal track length, set it now if we can
+   // so we can turn off the motor after we have traveled more that this distance
+   // plus a fudge factor.
+   if (atomic_read(&internal_length) == 0){
+      atomic_set(&internal_length, atomic_read(&position));
+   }
+
+    atomic_set(&last_sensor, MOVER_SENSOR_END); // end sensor
     do_event(EVENT_END_LIMIT); // triggered on end limit
     do_fault(ERR_stop_right_limit); // triggered on home limit
     do_event(EVENT_STOP); // started stopping
-    do_fault(ERR_stop); // triggered on home limit
 #ifndef TESTING_MAX
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(FALSE);
@@ -1750,13 +1766,33 @@ int mover_speed_set(int speed) {
 
    // can we go the requested speed?
    if (abs(speed) > NUMBER_OF_SPEEDS[mover_type]) {
+      do_fault(ERR_invalid_speed_req); // The fasit spec has this message
       return 0; // nope
+   }
+   else if (speed == 0) {
+      do_fault(ERR_speed_zero_req); // The fasit spec has this message
+      // do not return, we will just coast
+   }
+   else if (abs(speed) < MIN_SPEED[mover_type]) {
+      do_fault(ERR_invalid_speed_req); // The fasit spec has this message
+      // do not return, there is logic in the 
+      // hardware_speed_set function to handle this.
    }
 
    // first select desired movement movement
    if (speed < 0) {
+      // if we are home, do not allow reverse
+      if (atomic_read(&last_sensor) == MOVER_SENSOR_HOME) {
+         do_fault(ERR_invalid_direction_req);
+         return 0;
+      }
       hardware_movement_set(MOVER_DIRECTION_REVERSE);
    } else if (speed > 0) {
+      // if we are at the end, do not allow forward
+      if (atomic_read(&last_sensor) == MOVER_SENSOR_END) {
+         do_fault(ERR_invalid_direction_req);
+         return 0;
+      }
       hardware_movement_set(MOVER_DIRECTION_FORWARD);
    } else { 
       // setting 0 will cause the mover to "coast" if it isn't already stopped
@@ -1765,7 +1801,9 @@ int mover_speed_set(int speed) {
 #endif
    }
 
-   // next start ramping to desired speed
+// Since we are moving the last_sensor needs to be unknown
+   atomic_set(&last_sensor, MOVER_SENSOR_UNKNOWN);
+
    hardware_speed_set(abs(speed));
 
    return 1;
@@ -2489,6 +2527,15 @@ static void do_position(struct work_struct * work)
 #endif
 #endif
             target_sysfs_notify(&target_device_mover_generic, "position");
+            }
+            // See if our position is out of bounds
+            // The numbers 100 and -100 are randomly picked 
+            if (atomic_read(&internal_length) != 0){
+               if (atomic_read(&position) > ( atomic_read(&internal_length) + 100) ||
+                        atomic_read(&position) < -100){
+               do_fault(ERR_stop_by_distance);
+               hardware_speed_set(0);
+               }
             }
         }
 
