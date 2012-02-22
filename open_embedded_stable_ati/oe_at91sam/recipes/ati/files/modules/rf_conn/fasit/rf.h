@@ -10,6 +10,7 @@
 #define D_TIME		0x10
 #define D_VERY		0x20
 
+#include "mcp.h"
 
 // definitions of the low-bandwith RF packets
 // they are bit-packed and between 3 and whatever (up to 35) bytes long
@@ -42,8 +43,7 @@
 #define LBC_STATUS_RESP_LIFTER	8
 #define LBC_STATUS_RESP_MOVER		9
 #define LBC_STATUS_RESP_EXT		10
-#define LBC_STATUS_RESP_FAULT		11
-#define LBC_STATUS_NO_RESP			12
+#define LBC_STATUS_NO_RESP			11
 
 #define LBC_QEXPOSE		16
 #define LBC_QCONCEAL		17
@@ -60,7 +60,7 @@ typedef struct LB_packet_tag {
     uint16 cmd:5 __attribute__ ((packed));
     uint16 addr:11 __attribute__ ((packed)); // source or destination address
     uint16 payload[24] __attribute__ ((packed)); // has room for max payload and the CRC byte    
-} LB_packet_t;
+} __attribute__ ((packed))  LB_packet_t;
 
 // LBC_STATUS_REQ packet
 //
@@ -70,7 +70,7 @@ typedef struct LB_status_req_t {
     uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:8 __attribute__ ((packed));
-} LB_status_req_t;
+} __attribute__ ((packed))  LB_status_req_t;
 
 // LBC_STATUS_RESP_LIFTER packet
 //
@@ -81,7 +81,7 @@ typedef struct LB_status_resp_lifter_t {
     uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
     uint32 expose:1 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
-} LB_status_resp_lifter_t;
+} __attribute__ ((packed))  LB_status_resp_lifter_t;
 
 // LBC_STATUS_RESP_MOVER packet
 //
@@ -97,12 +97,12 @@ typedef struct LB_status_resp_mover_t {
     uint32 dir:2 __attribute__ ((packed)); // 0 = stop, 1 = away from home, 2 = towards home
     uint32 location:11 __attribute__ ((packed)); // meters from home
     uint32 crc:8 __attribute__ ((packed));
-} LB_status_resp_mover_t;
+} __attribute__ ((packed))  LB_status_resp_mover_t;
 
 // LBC_STATUS_RESP_EXT packet
 //
 typedef struct LB_status_resp_ext_t {
-    // 3 * 32 bytes = 3 long - padding = 12 bytes
+    // 3 * 32 bytes = 3 long - padding = 11 bytes
     uint32 cmd:5 __attribute__ ((packed));
     uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
     uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
@@ -111,16 +111,17 @@ typedef struct LB_status_resp_ext_t {
 
     uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
     uint32 dir:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
+    uint32 react:3 __attribute__ ((packed));
     uint32 location:11 __attribute__ ((packed)); // meters from home
     uint32 hitmode:1 __attribute__ ((packed));
     uint32 tokill:4 __attribute__ ((packed));
-    uint32 react:3 __attribute__ ((packed));
 
     uint32 sensitivity:4 __attribute__ ((packed));
     uint32 timehits:4 __attribute__ ((packed));
     uint32 fault:8 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
-} LB_status_resp_ext_t;
+    uint32 padding:8 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_status_resp_ext_t;
 
 // LBC_STATUS_NO_RESP packet
 //
@@ -130,7 +131,7 @@ typedef struct LB_status_no_resp_t {
     uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:8 __attribute__ ((packed));
-} LB_status_no_resp_t;
+} __attribute__ ((packed))  LB_status_no_resp_t;
 
 // LBC_REQUEST_NEW packet
 //
@@ -140,7 +141,7 @@ typedef struct LB_request_new_t {
     uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:8 __attribute__ ((packed));
-} LB_request_new_t;
+} __attribute__ ((packed))  LB_request_new_t;
 
 // LBC_DEVICE_REG packet
 //
@@ -155,7 +156,7 @@ typedef struct LB_device_reg_t {
 
     uint32 devid:24 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
-} LB_device_reg_t;
+} __attribute__ ((packed))  LB_device_reg_t;
 
 // LBC_DEVICE_ADDR packet
 //
@@ -189,7 +190,7 @@ typedef struct LB_expose {
 
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:24 __attribute__ ((packed));
-} LB_expose_t;
+} __attribute__ ((packed))  LB_expose_t;
 
 // LBC_MOVE
 //    we still have 4 more bits
@@ -203,12 +204,12 @@ typedef struct LB_move {
 
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:24 __attribute__ ((packed));
-} LB_move_t;
+} __attribute__ ((packed))  LB_move_t;
 
 // LBC_CONFIGURE_HIT
 //    we have 2 too many or 6 short
 typedef struct LB_configure {
-    // 2 * 32 bytes = 2 long - padding = 7 bytes
+    // 2 * 32 bytes = 2 long - padding = 6 bytes
     uint32 cmd:5 __attribute__ ((packed));
     uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 hitmode:1 __attribute__ ((packed));
@@ -220,8 +221,8 @@ typedef struct LB_configure {
     uint32 hitcountset:2 __attribute__ ((packed));
     uint32 pad:6 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
-    uint32 padding:8 __attribute__ ((packed));
-} LB_configure_t;
+    uint32 padding:16 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_configure_t;
 
 // LBC_GROUP_CONTROL
 //    we have 11 short
@@ -235,7 +236,7 @@ typedef struct LB_group_control {
 
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:24 __attribute__ ((packed));
-} LB_group_control_t;
+} __attribute__ ((packed))  LB_group_control_t;
 
 // LBC_AUDIO_CONTROL
 //    we have 5 short
@@ -251,7 +252,7 @@ typedef struct LB_audio_control {
     uint32 track:8 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:16 __attribute__ ((packed));
-} LB_audio_control_t;
+} __attribute__ ((packed))  LB_audio_control_t;
 
 // LBC_POWER_CONTROL
 //    we have 6 short
@@ -262,7 +263,7 @@ typedef struct LB_power_control {
     uint32 pcmd:2 __attribute__ ((packed));
     uint32 pad:6 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
-} LB_power_control_t;
+} __attribute__ ((packed))  LB_power_control_t;
 
 // LBC_PYRO_FIRE
 //    we have 5 short
@@ -273,7 +274,7 @@ typedef struct LB_pyro_fire {
     uint32 zone:2 __attribute__ ((packed));
     uint32 pad:6 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
-} LB_pyro_fire_t;
+} __attribute__ ((packed))  LB_pyro_fire_t;
 
 void set_crc8(void *buf, uint8 length);
 uint8 crc8(void *buf, uint8 length);
