@@ -1,6 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 #include "slaveboss.h"
+#include "rf_debug.h"
 
 int verbose = 0;    // so debugging works right in all modules
 int last_slot = -1; // last slot used starts at no slot used
@@ -53,45 +54,68 @@ void setnonblocking(int sock) {
 int handleRet(int ret, fasit_connection_t *fc, int efd) {
    struct epoll_event ev; // temp event
    int done = 0;
+   DCMSG(RED, "start...%i[%i]: %08X...", ret, fc->index, fc);
    if (ret == doNothing) { return done; }
    if (ret & mark_rfWrite) {
-      memset(&ev, 0, sizeof(ev));
+      DCMSG(RED, "mark_rfWrite: %i", fc->rf);
+      D_memset(&ev, 0, sizeof(ev));
       ev.data.fd = fc->rf;
       ev.events = EPOLLIN | EPOLLOUT;
       epoll_ctl(efd, EPOLL_CTL_MOD, fc->rf, &ev);
    }
    if (ret & mark_fasitWrite) {
-      memset(&ev, 0, sizeof(ev));
+      DCMSG(RED, "mark_fasitWrite: %i", fc->fasit);
+      D_memset(&ev, 0, sizeof(ev));
       ev.data.ptr = fc;
       ev.events = EPOLLIN | EPOLLOUT;
       epoll_ctl(efd, EPOLL_CTL_MOD, fc->fasit, &ev);
    }
    if (ret & mark_rfRead) { // mark_rfRead overwrites mark_rfWrite
-      memset(&ev, 0, sizeof(ev));
+      DCMSG(RED, "mark_rfRead: %i", fc->rf);
+      D_memset(&ev, 0, sizeof(ev));
       ev.data.fd = fc->rf;
       ev.events = EPOLLIN;
       epoll_ctl(efd, EPOLL_CTL_MOD, fc->rf, &ev);
    }
    if (ret & mark_fasitRead) { // mark_fasitRead overwrites mark_fasitWrite
-      memset(&ev, 0, sizeof(ev));
+      DCMSG(RED, "mark_fasitRead, %i", fc->fasit);
+      D_memset(&ev, 0, sizeof(ev));
       ev.data.ptr = fc;
       ev.events = EPOLLIN;
       epoll_ctl(efd, EPOLL_CTL_MOD, fc->fasit, &ev);
    }
    if (ret & rem_rfEpoll) {
+      DCMSG(RED, "rem_rfEpoll: %i", fc->rf);
       epoll_ctl(efd, EPOLL_CTL_DEL, fc->rf, NULL);
+         perror("errno: ");
       close(fc->rf); // nothing to do if errors...ignore return value from close()
+         //exit(1);
       done = 1; // TODO -- don't be done, accept again on rfclient
    }
    if (ret & rem_fasitEpoll) {
+      DCMSG(RED, "rem_fasitEpoll: %i", fc->fasit);
       int index = fc->index;
       epoll_ctl(efd, EPOLL_CTL_DEL, fc->fasit, NULL);
+         perror("errno: ");
       close(fc->fasit); // nothing to do if errors...ignore return value from close()
-      memset(fc, 0, sizeof(fasit_connection_t)); // reset to blank
+         //exit(1);
+      D_memset(fc, 0, sizeof(fasit_connection_t)); // reset to blank
       if (index == last_slot) {
          last_slot--; // move back last slot if we were the last
       }
    }
+   if (ret & add_rfEpoll) {
+      // add RF client connection to epoll now that we're ready
+      D_memset(&ev, 0, sizeof(ev));
+      ev.events = EPOLLIN; // only for reading to start
+      ev.data.fd = fc->rf;
+DCMSG(GREEN,"ADDING %i TO EPOLL(rfclient)", fc->rf);
+      if (epoll_ctl(efd, EPOLL_CTL_ADD, fc->rf, &ev) < 0) {
+         DCMSG(RED, "slaveboss epoll add rfclient failed");
+         done = 1;
+      }
+   }
+   DCMSG(RED, "...end");
    return done;
 }
 
@@ -102,11 +126,11 @@ int main(int argc, char **argv) {
    int fasitsock, rfsock, efd, nfds; // file descriptors for sockets
    int flen = sizeof(faddr);
    // initialize fasit/rf connection array
-   memset(fconns, 0, sizeof(fconns));
+   D_memset(fconns, 0, sizeof(fconns));
 
    // initialize addresses
-   memset(&faddr, 0, sizeof(struct sockaddr_in));
-   memset(&raddr, 0, sizeof(struct sockaddr_in));
+   D_memset(&faddr, 0, sizeof(struct sockaddr_in));
+   D_memset(&raddr, 0, sizeof(struct sockaddr_in));
    faddr.sin_family = AF_INET;
    raddr.sin_family = AF_INET;
    faddr.sin_addr.s_addr = htonl(INADDR_ANY);   // Any incoming interface
@@ -167,117 +191,121 @@ int main(int argc, char **argv) {
 	   DieWithError("setsockopt(SO_REUSEADDR) failed");
    }
 
-   // setup listening for FASIT client
-   if ((fasitsock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-	   DieWithError("socket() failed");
-   }
-   if (bind(fasitsock, (struct sockaddr *)&faddr, sizeof(faddr)) < 0) {
-      DieWithError("bind failed");
-   }
-   if (listen(fasitsock, 2) < 0) {
-	   DieWithError("listen() failed");
-   }
-
    // setup epoll
    efd = epoll_create(MAX_CONNECTIONS);
-   memset(&ev, 0, sizeof(ev));
-   ev.events = EPOLLIN; // only for reading to start
-   // listen to the fasit socket always
-   ev.data.fd = fasitsock; // remember for later
-   if (epoll_ctl(efd, EPOLL_CTL_ADD, fasitsock, &ev) < 0) {
-      DieWithError("epoll listener insertion error");
-   }
-
 
    // main loop
+   int rfclient;
    while (!done) {
       // wait for a single RF client
       struct sockaddr_in caddr; // client address
-      int rfclient = accept(rfsock, (struct sockaddr *) &caddr, &flen);
-      if (rfclient < 0) {
+      DCMSG(MAGENTA, "WAITING FOR RF ACCEPT");
+      rfclient = accept(rfsock, (struct sockaddr *) &caddr, &flen);
+      DCMSG(BLACK,"SLAVEBOSS: client RF address = %s:%d", inet_ntoa(caddr.sin_addr),htons(caddr.sin_port));
+      if (rfclient <= 0) {
          DCMSG(RED, "slaveboss accept() failed");
+         perror("errno: ");
+         exit(1);
          continue;
+      }
+      setnonblocking(rfclient);
+      DCMSG(MAGENTA, "RF ACCEPTED %i", rfclient);
+
+      // setup listening for FASIT client
+      if ((fasitsock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+         DieWithError("socket() failed");
+      }
+      if (bind(fasitsock, (struct sockaddr *)&faddr, sizeof(faddr)) < 0) {
+         DieWithError("bind failed");
+      }
+      if (listen(fasitsock, 2) < 0) {
+         DieWithError("listen() failed");
+      }
+
+      // add fasit listener to epoll
+      D_memset(&ev, 0, sizeof(ev));
+      ev.events = EPOLLIN; // only for reading to start
+      // listen to the fasit socket always
+      ev.data.fd = fasitsock; // remember for later
+      DCMSG(GREEN,"ADDING %i TO EPOLL(fasitsock)", fasitsock);
+      if (epoll_ctl(efd, EPOLL_CTL_ADD, fasitsock, &ev) < 0) {
+         DieWithError("epoll listener insertion error");
       }
 
      
       // after accepting RF client, accept any number of FASIT clients and parse
       //    the messages back and forth
       while (!done) {
+         DCMSG(MAGENTA, "EPOLL WAITING");
          // wait for something to happen
-         nfds = epoll_wait(efd, events, MAX_EVENTS, -1); // infinite timeout
+         nfds = epoll_wait(efd, events, MAX_EVENTS, 10000); // 10 second timeout
          
          // parse all waiting connections
          for (n = 0; !done && n < nfds; n++) {
             if (events[n].data.fd == rfclient) { // Read/Write from rfclient
-               // writing?
-               if (events[n].events & EPOLLOUT) {
-                  // for each connection, write what's available to the RF client
-                  for (i = 0; !done && i < last_slot; i++) {
-                     // rfWrite will decide whether to handle the packet or not
-                     done = handleRet(rfWrite(&fconns[i]),&fconns[i], efd);
-                  }
-               }
-
-               // reading?
-               if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
-                  char tbuf[RF_BUF_SIZE]; // temporary read buffer
-                  int ms; // message size
-                  int ret; // do next
-                  // read message once into temporary buffer
-                  memset(tbuf,0,RF_BUF_SIZE);
-                  ret = rfRead(rfclient, (char**)&tbuf, &ms);
-                  if (ret != doNothing) {
-                     handleRet(ret, &fconns[i], efd);
-                  } else {
-                     // de-mangle and send to all fasit connections
-                     for (i = 0; !done && i < last_slot; i++) {
-                        // rf2fasit will decide whether to handle the packet or not
-                        done = handleRet(rf2fasit(&fconns[i], tbuf, ms), &fconns[i], efd);
-                     }
-                  }
-               }
+               DCMSG(MAGENTA, "events[%i].events: %i rfclient", n, events[n].events);
 
                // closed socket?
                if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
                   // client closed, shutdown -- TODO -- don't shutdown, handle new connection
                   done = 1;
+               // writing?
+               } else if (events[n].events & EPOLLOUT) {
+                  // for each connection, write what's available to the RF client
+                  for (i = 0; !done && i <= last_slot; i++) {
+                     // rfWrite will decide whether to handle the packet or not
+                     done = handleRet(rfWrite(&fconns[i]),&fconns[i], efd);
+                  }
+               // reading?
+               } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
+                  char tbuf[RF_BUF_SIZE]; // temporary read buffer
+                  int ms; // message size
+                  int ret; // do next
+                  // read message once into temporary buffer
+                  D_memset(tbuf,0,RF_BUF_SIZE);
+                  ret = rfRead(rfclient, tbuf, &ms);
+                  if (ret != doNothing) {
+                     handleRet(ret, &fconns[0], efd); // always use first in fconns as rf is the same in all of them
+                  } else {
+                     // de-mangle and send to all fasit connections
+                     for (i = 0; !done && i <= last_slot; i++) {
+                        addToRFBuffer(&fconns[i], tbuf, ms);
+                        // rf2fasit will decide whether to handle the packet or not
+                        while (!done && (ret = rf2fasit(&fconns[i], tbuf, ms)) != doNothing) {
+                           done = handleRet(ret, &fconns[i], efd);
+                        }
+                     }
+                  }
                }
             } else if (events[n].data.fd == fasitsock) { // Accept new connection from fasitsock
                // new FASIT socket connection
                int index = -1;
                int newsock = accept(fasitsock, (struct sockaddr *) &caddr, &flen);
-               if (newsock < 0) {
+               DCMSG(BLACK,"SLAVEBOSS: client FASIT address = %s:%d", inet_ntoa(caddr.sin_addr),htons(caddr.sin_port));
+
+               if (newsock <= 0) {
                   DCMSG(RED, "slaveboss accept() failed");
+                  perror("errno: ");
+                  exit(1);
                   continue;
                }
-
-               // check to see if we got all our FASIT connections yet
-               if (fnum > 0) {
-                  if (--fnum == 0) { // count backwards and re-check
-                     // add RF client connection to epoll now that we're ready
-                     memset(&ev, 0, sizeof(ev));
-                     ev.events = EPOLLIN; // only for reading to start
-                     ev.data.fd = rfclient;
-                     if (epoll_ctl(efd, EPOLL_CTL_ADD, rfclient, &ev) < 0) {
-                        DCMSG(RED, "slaveboss epoll add rfclient failed");
-                        continue;
-                     }
-                  }
-               }
+               setnonblocking(newsock);
+               DCMSG(MAGENTA, "FASIT ACCEPTED");
 
                // find slot to put it in
                for (i = 0; i < MAX_CONNECTIONS && index == -1; i++) {
                   if (fconns[i].rf == 0 && fconns[i].fasit == 0) {
                      // found a slot
                      index = i;
-                     fconns[i].rf = newsock;
-                     fconns[i].fasit = fasitsock;
+                     fconns[i].rf = rfclient;
+                     fconns[i].fasit = newsock;
                      fconns[i].id = 2047; // TODO -- random number
                      fconns[i].index = i; // remember its own index
+   DCMSG(GREEN,"ADDING rf:%i fasit:%i TO fconns[%i]: %08X", fconns[i].rf, fconns[i].fasit, i, &fconns[i]);
                      fconns[i].target_type = RF_Type_Unknown; // unknown target type
 
                      // are we the last slot?
-                     if ((last_slot - 1) == index) {
+                     if ((last_slot + 1) == index) {
                         last_slot++; // we are the last slot
                      }
                   }
@@ -291,56 +319,71 @@ int main(int argc, char **argv) {
                }
 
                // add this connection to the epoll
-               memset(&ev, 0, sizeof(ev));
+               D_memset(&ev, 0, sizeof(ev));
                ev.events = EPOLLIN; // only for reading to start
                ev.data.ptr = &fconns[index];
+   DCMSG(GREEN,"ADDING %i TO EPOLL(newsock)", newsock);
                if (epoll_ctl(efd, EPOLL_CTL_ADD, newsock, &ev) < 0) {
                   DCMSG(RED, "slaveboss epoll add fasit client failed");
                   continue;
                }
 
                // send 100 message
-               handleRet(send_100(&fconns[index]), &fconns[index], efd);
-            } else if (ev.data.ptr != NULL) {
+               done = handleRet(send_100(&fconns[index]), &fconns[index], efd);
+            } else if (events[n].data.ptr != NULL) {
                // mangle and send to to rf connection
-               fasit_connection_t *fc = (fasit_connection_t*) ev.data.ptr;
-               
-               // writing?
-               if (events[n].events & EPOLLOUT) {
-                  // fasitWrite will write what's available to the fasit client
-                  done = handleRet(fasitWrite(fc), fc, efd);
-               }
-
-               // reading?
-               if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
-                  char tbuf[FASIT_BUF_SIZE]; // temporary read buffer
-                  int ms; // message size
-                  int ret; // do next
-                  // read message once into temporary buffer
-                  memset(tbuf,0,FASIT_BUF_SIZE);
-                  ret = fasitRead(fc->fasit, (char**)&tbuf, &ms);
-                  if (ret != doNothing) {
-                     handleRet(ret, fc, efd);
-                  } else {
-                     // de-mangle and send to all fasit connections
-                     for (i = 0; !done && i < last_slot; i++) {
-                        // rf2fasit will decide whether to handle the packet or not
-                        done = handleRet(fasit2rf(fc, tbuf, ms), fc, efd);
-                     }
-                  }
-               }
+               fasit_connection_t *fc = (fasit_connection_t*) events[n].data.ptr;
+               DCMSG(MAGENTA, "events[%i].events: %i %08X", n, events[n].events, fc);
 
                // closed socket?
                if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
                   // close by handling like a rem_fasitEpoll
                   done = handleRet(rem_fasitEpoll, fc, efd);
+               // writing?
+               } else if (events[n].events & EPOLLOUT) {
+                  // fasitWrite will write what's available to the fasit client
+                  done = handleRet(fasitWrite(fc), fc, efd);
+               // reading?
+               } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
+                  char tbuf[FASIT_BUF_SIZE]; // temporary read buffer
+                  int ms; // message size
+                  int ret; // do next
+                  // read message once into temporary buffer
+                  D_memset(tbuf,0,FASIT_BUF_SIZE);
+                  ret = fasitRead(fc->fasit, tbuf, &ms);
+                  addToFASITBuffer(fc, tbuf, ms);
+                  if (ret != doNothing) {
+                     done = handleRet(ret, fc, efd);
+                  } else {
+                     // fasit2rf will decide whether to handle the packet or not
+                     while (!done && (ret = fasit2rf(fc, tbuf, ms)) != doNothing) {
+                        DCMSG(CYAN, "FASIT ret is %i", ret);
+                        done = handleRet(ret, fc, efd);
+                     }
+                     DCMSG(BLUE, "FASIT ret is %i", ret);
+                  }
                }
             }
          }
       }
    }
 
-   // listen for RF clients
+   // close listeners and clients
+   close(fasitsock);
+   close(rfclient);
+   close(rfsock);
+
    return 0;
 }
+
+#ifdef DEBUG_MEM
+void *__D_memcpy(void *dest, const void *src, size_t n, char* f, int l) {
+   DCMSG(black, "memcpy(%08X, %08X, %i) @ %s:%i", dest, src, n, f, l);
+   return memcpy(dest,src,n);
+}
+void *__D_memset(void *s, int c, size_t n, char* f, int l) {
+   DCMSG(black, "memset(%08X, %i, %i) @ %s:%i", s, c, n, f, l);
+   return memset(s,c,n);
+}
+#endif
 

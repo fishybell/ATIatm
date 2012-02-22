@@ -77,6 +77,7 @@ typedef struct fasit_connection {
    FASIT_2112 f2112_resp;
    FASIT_2113 f2113_resp;
    LB_status_resp_ext_t last_status; 
+   int sent_status;
 
    // Data for RF handling
    int waiting_status_resp;
@@ -87,10 +88,11 @@ typedef struct fasit_connection {
 
 extern fasit_connection_t fconns[MAX_CONNECTIONS]; // a slot available for each connection
 extern int last_slot; // the last slot used
+extern int verbose;
 
 // read/write function helpers
-int rfRead(int fd, char **dest, int *dests); // read a single RF message into given buffer, return do next
-int fasitRead(int fd, char **dest, int *dests); // same as above, but for FASIT messages
+int rfRead(int fd, char *dest, int *dests); // read a single RF message into given buffer, return do next
+int fasitRead(int fd, char *dest, int *dests); // same as above, but for FASIT messages
 int rfWrite(fasit_connection_t *fc); // write all RF messages for connection in fconns
 int fasitWrite(fasit_connection_t *fc); // same as above, but for FASIT messages
 
@@ -120,6 +122,8 @@ int handle_14112(fasit_connection_t *fc, int start, int end);
 int send_14200(fasit_connection_t *fc, int blank);
 int send_14400(fasit_connection_t *fc, int cid, int length, char *data);
 int handle_14401(fasit_connection_t *fc, int start, int end);
+void addToFASITBuffer(fasit_connection_t *fc, char *buf, int s);
+
 
 // rf commands
 int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end);
@@ -141,6 +145,7 @@ int handle_QCONCEAL(fasit_connection_t *fc, int start, int end);
 int send_DEVICE_REG(fasit_connection_t *fc);
 int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end);
 int handle_DEVICE_ADDR(fasit_connection_t *fc, int start, int end);
+void addToRFBuffer(fasit_connection_t *fc, char *buf, int s);
 
 
 // mangling/demangling functions
@@ -161,6 +166,7 @@ int fasit2rf(fasit_connection_t *fc, char *buf, int s); // mangle one or more fa
 #define mark_fasitRead (1<<4)
 #define rem_rfEpoll (1<<5)
 #define rem_fasitEpoll (1<<6)
+#define add_rfEpoll (1<<7)
 
 // for some reason we have a ntohs/htons, but no ntohf/htonf
 float ntohf(float f);
@@ -169,5 +175,20 @@ float ntohf(float f);
 
 #define min(a, b) ( a > b ? b : a )
 #define max(a, b) ( a > b ? a : b )
+
+// for debugging memset/memcpy
+//#define DEBUG_MEM
+
+#ifdef DEBUG_MEM
+
+void *__D_memcpy(void *dest, const void *src, size_t n, char* f, int l);
+void *__D_memset(void *s, int c, size_t n, char* f, int l);
+#define D_memcpy(dest,src,n) __D_memcpy(dest,src,n, __FILE__, __LINE__)
+#define D_memset(s,c,n) __D_memset(s,c,n, __FILE__, __LINE__)
+
+#else
+#define D_memcpy(dest,src,n) memcpy(dest,src,n)
+#define D_memset(s,c,n) memset(s,c,n)
+#endif
 
 #endif

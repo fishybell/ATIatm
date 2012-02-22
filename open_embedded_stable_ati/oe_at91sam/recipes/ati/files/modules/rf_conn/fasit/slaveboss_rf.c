@@ -2,6 +2,7 @@
 #include "slaveboss.h"
 #include "rf.h"
 #include "eeprom.h"
+#include "rf_debug.h"
 
 // we don't worry about clearing the data before a valid message, just up to the end
 static void clearBuffer(fasit_connection_t *fc, int end) {
@@ -11,8 +12,8 @@ static void clearBuffer(fasit_connection_t *fc, int end) {
    } else {
       // clear out everything up to and including end
       char tbuf[RF_BUF_SIZE];
-      memcpy(tbuf, fc->rf_ibuf + (sizeof(char) * end), fc->rf_ilen - end);
-      memcpy(fc->rf_ibuf, tbuf, fc->rf_ilen - end);
+      D_memcpy(tbuf, fc->rf_ibuf + (sizeof(char) * end), fc->rf_ilen - end);
+      D_memcpy(fc->rf_ibuf, tbuf, fc->rf_ilen - end);
       fc->rf_ilen -= end;
    }
 }
@@ -30,7 +31,7 @@ static void queueMsg(fasit_connection_t *fc, void *msg, int size) {
    }
 
    // append to existing message
-   memcpy(fc->rf_obuf + (sizeof(char) *fc->rf_olen), msg, size);
+   D_memcpy(fc->rf_obuf + (sizeof(char) *fc->rf_olen), msg, size);
    fc->rf_olen += size;
 }
 
@@ -38,36 +39,49 @@ static void queueMsg(fasit_connection_t *fc, void *msg, int size) {
 static int packetForMe(fasit_connection_t *fc, int start) {
    LB_packet_t *hdr = (LB_packet_t*)(fc->rf_ibuf + start);
    int i, j;
-   if (hdr->addr == fc->id) { return 1; } // directly for me
+   DDCMSG(D_RF,RED,"packetForMe %i",start);
+   DDCMSG_HEXB(D_RF, RED, "RF Message:", fc->rf_ibuf+start, fc->rf_ilen-start);
+   if (hdr->addr == fc->id) {
+DDCMSG(D_RF,RED, "RF Packet for me: %i", hdr->addr);
+      return 1; // directly for me
+   }
 
    for (i = 0; i<MAX_GROUPS; i++) {
       if (hdr->addr == fc->groups[i]) {
          for (j = 0; j<MAX_GROUPS; j++) {
             if (hdr->addr == fc->groups_disabled[j]) {
+DDCMSG(D_RF,RED, "RF Packet for disabled group %i", hdr->addr);
                return 0; // is one of my groups, but it's disabled
             }
          }
+DDCMSG(D_RF,RED, "RF Packet for enabled group %i", hdr->addr);
          return 1; // is one of my groups
       }
    }
 
    // not for me
+DDCMSG(D_RF,RED, "RF Packet for other listener %i", hdr->addr);
    return 0;
 }
 
 // read a single RF message into given buffer, return do next
-int rfRead(int fd, char **dest, int *dests) {
+int rfRead(int fd, char *dest, int *dests) {
+   DDCMSG(D_RF,MAGENTA, "RF READING");
    // read as much as possible
-   *dests = read(fd, *dest, RF_BUF_SIZE);
+   *dests = read(fd, dest, RF_BUF_SIZE);
+   DDCMSG(D_RF,MAGENTA, "RF READ %i BYTES", *dests);
 
    // did we read nothing?
    if (*dests <= 0) {
-      *dests = 0;
-      if (*dests == 0 || errno == EAGAIN) {
+      if (errno == EAGAIN) {
          // try again later
+         *dests = 0;
          return doNothing;
       } else {
          // connection dead, remove it
+         *dests = 0;
+perror("RF Died because ");
+DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
          return rem_rfEpoll;
       }
    }
@@ -79,6 +93,7 @@ int rfRead(int fd, char **dest, int *dests) {
 // write all RF messages for connection in fconns
 int rfWrite(fasit_connection_t *fc) {
    int s;
+   DDCMSG(D_RF,BLUE, "RF WRITE");
 
    // have something to write?
    if (fc->rf_olen <= 0) {
@@ -88,6 +103,7 @@ int rfWrite(fasit_connection_t *fc) {
 
    // write all the data we can
    s = write(fc->rf, fc->rf_obuf, fc->rf_olen);
+   DDCMSG(D_RF,BLUE, "RF WROTE %i BYTES", s);
 
    // did it fail?
    if (s <= 0) {
@@ -96,6 +112,8 @@ int rfWrite(fasit_connection_t *fc) {
          return doNothing;
       } else {
          // connection dead, remove it
+perror("RF Died because ");
+DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
          return rem_rfEpoll;
       }
    } else if (s < fc->rf_olen) {
@@ -105,10 +123,14 @@ int rfWrite(fasit_connection_t *fc) {
       // change to blocking from non-blocking
       opts = fcntl(fc->rf, F_GETFL); // grab existing flags
       if (opts < 0) {
+perror("RF Died because ");
+DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
          return rem_rfEpoll;
       }
       opts = (opts ^ O_NONBLOCK); // remove nonblock from existing flags
       if (fcntl(fc->rf, F_SETFL, opts) < 0) {
+perror("RF Died because ");
+DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
          return rem_rfEpoll;
       }
 
@@ -117,6 +139,8 @@ int rfWrite(fasit_connection_t *fc) {
          int ns = write(fc->rf, fc->rf_obuf + (sizeof(char) * s), fc->rf_olen - s);
          if (ns < 0 && errno != EAGAIN) {
             // connection dead, remove it
+perror("RF Died because ");
+DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
             return rem_rfEpoll;
          }
          s += ns; // increase total written, possibly by zero
@@ -125,6 +149,8 @@ int rfWrite(fasit_connection_t *fc) {
       // change to non-blocking from blocking
       opts = (opts | O_NONBLOCK); // add nonblock back into existing flags
       if (fcntl(fc->rf, F_SETFL, opts) < 0) {
+perror("RF Died because ");
+DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
          return rem_rfEpoll;
       }
 
@@ -140,6 +166,18 @@ int rfWrite(fasit_connection_t *fc) {
 
    // partial success, leave writeable so we try again
    return doNothing;
+}
+
+void addToRFBuffer(fasit_connection_t *fc, char *buf, int s) {
+   // replace buffer?
+   if (fc->rf_ilen <= 0) {
+      D_memcpy(fc->rf_ibuf, buf, s);
+      fc->rf_ilen = s;
+   } else {
+      // add to buffer
+      D_memcpy(fc->rf_ibuf + (sizeof(char) * fc->rf_ilen), buf, s);
+      fc->rf_ilen += s;
+   }
 }
 
 // the start and end values may be set even if no valid message is found
@@ -158,6 +196,8 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
       if (((fc->rf_ibuf + fc->rf_ilen) - (fc->rf_ibuf + *start)) > hl) { *start = *start + 1; continue; } // invalid message length, or more likely, don't have all of the message yet
 
       *end = *start + hl;
+      DDCMSG(D_RF,RED, "RF validMessage for %i", hdr->cmd);
+      debugRF(RED, fc->rf_ibuf);
       switch (hdr->cmd) {
          // they all have a crc, check it
          case LBC_EXPOSE:
@@ -175,11 +215,13 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
          case LBC_QEXPOSE:
-         case LBC_QCONCEAL	:
+         case LBC_QCONCEAL:
          case LBC_REQUEST_NEW:
             if (crc8(hdr, hl) == 0) {
-               mnum = hdr->cmd;
-               break;
+            //   DDCMSG(D_RF,RED, "RF VALID CRC");
+               return hdr->cmd;
+            } else {
+            //   DDCMSG(D_RF,RED, "RF INVALID CRC");
             }
             break;
 
@@ -191,15 +233,18 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
       *start = *start + 1;
    }
 
+//   DDCMSG(D_RF,RED, "RF invalid: %08X %i %i", fc->rf_ibuf, *start, fc->rf_ilen);
+//   DDCMSG(D_RF,HEXB(RED, "RF invalid:", fc->rf_ibuf+*start, fc->rf_ilen-*start);
    return mnum;
 }
 
 // macro used in rf2fasit
-#define HANDLE_RF(RF_NUM) case LBC_ ## RF_NUM : return handle_ ## RF_NUM (fc, start, end) ; break;
+#define HANDLE_RF(RF_NUM) case LBC_ ## RF_NUM : retval = handle_ ## RF_NUM (fc, start, end) ; break;
 
 // mangle an rf message into 1 or more fasit messages, and potentially respond with rf message
 int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
-   int start, end, mnum;
+   int start, end, mnum, retval = doNothing;
+   DDCMSG(D_RF,RED, "RF 2 FASIT");
 
    // check client
    if (!fc->rf) {
@@ -207,14 +252,14 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
    }
   
    // read all available valid messages
-   while ((mnum = validMessage(fc, &start, &end)) != -1) {
+   while (retval == doNothing && (mnum = validMessage(fc, &start, &end)) != -1) {
       if (!packetForMe(fc, start)) {
-         DCMSG(RED,"Ignored RF message %d",mnum);
+         DDCMSG(D_RF,RED,"Ignored RF message %d",mnum);
       } else {
-         DCMSG(RED,"Recieved RF message %d",mnum);
+         DDCMSG(D_RF,RED,"Recieved RF message %d",mnum);
          if (fc->sleeping && mnum != LBC_POWER_CONTROL) {
             // ignore message when sleeping
-            DCMSG(RED,"Slept through RF message %d",mnum);
+            DDCMSG(D_RF,RED,"Slept through RF message %d",mnum);
          } else {
             switch (mnum) {
                HANDLE_RF (STATUS_REQ);
@@ -236,10 +281,11 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
       }
       clearBuffer(fc, end); // clear out last message
    }
-   return doNothing;
+   return retval;
 }
 
 int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
+   DDCMSG(D_RF,RED, "handle_STATUS_REQ(%08X, %i, %i)", fc, start, end);
    // wait 'til we have the most up-to-date information to send
    fc->waiting_status_resp = 1;
    return send_2100_status_req(fc); // gather latest information
@@ -248,7 +294,8 @@ int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
 int send_STATUS_RESP(fasit_connection_t *fc) {
    // build up current response
    LB_status_resp_ext_t s;
-   memset(&s, 0, sizeof(LB_status_resp_ext_t));
+   DDCMSG(D_RF,RED, "send_STATUS_RESP(%08X)", fc);
+   D_memset(&s, 0, sizeof(LB_status_resp_ext_t));
    s.hits = min(0,max(fc->hit_hit, 127)); // cap upper/lower bounds
    s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
    s.speed = min(0,max(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
@@ -259,6 +306,13 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.sensitivity = fc->hit_react;
    s.timehits = fc->hit_burst;
    s.fault = htons(fc->f2102_resp.body.fault);
+
+   // check to see if we've never sent any status before
+   if (!fc->sent_status) {
+      // copy current status to last status and send it
+      fc->last_status = s;
+      return send_STATUS_RESP_EXT(fc);
+   }
 
    // determine changes send correct status response
    if (s.fault != fc->last_status.fault ||
@@ -285,28 +339,31 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
       }
    } else {
       // nothing changed, send that
-      send_STATUS_NO_RESP(fc);
+      return send_STATUS_NO_RESP(fc);
    }
-   return doNothing;
+   return doNothing; // shouldn't get here
 }
 
 int send_STATUS_RESP_LIFTER(fasit_connection_t *fc) {
    // create message from parts of fc->last_status
    LB_status_resp_mover_t bdy;
+   DDCMSG(D_RF,RED, "send_STATUS_RESP_LIFTER(%08X)", fc);
    bdy.cmd = LBC_STATUS_RESP_LIFTER;
    bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    bdy.hits = fc->last_status.hits;
    bdy.expose = fc->last_status.expose;
+   fc->sent_status = 1; // have sent a status message before
 
    // set crc and send
    set_crc8(&bdy, sizeof(LB_status_resp_mover_t));
-   queueMsg(fc, &bdy, sizeof(LB_status_resp_mover_t));
+   queueMsg(fc, &bdy, RF_size(LBC_STATUS_RESP_LIFTER));
    return mark_rfWrite;
 }
 
 int send_STATUS_RESP_MOVER(fasit_connection_t *fc) {
    // create message from parts of fc->last_status
    LB_status_resp_mover_t bdy;
+   DDCMSG(D_RF,RED, "send_STATUS_RESP_MOVER(%08X)", fc);
    bdy.cmd = LBC_STATUS_RESP_MOVER;
    bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    bdy.hits = fc->last_status.hits;
@@ -314,29 +371,33 @@ int send_STATUS_RESP_MOVER(fasit_connection_t *fc) {
    bdy.speed = fc->last_status.speed;
    bdy.dir = fc->last_status.dir;
    bdy.location = fc->last_status.location;
+   fc->sent_status = 1; // have sent a status message before
 
    // set crc and send
    set_crc8(&bdy, sizeof(LB_status_resp_mover_t));
-   queueMsg(fc, &bdy, sizeof(LB_status_resp_mover_t));
+   queueMsg(fc, &bdy, RF_size(LBC_STATUS_RESP_MOVER));
    return mark_rfWrite;
 }
 
 int send_STATUS_RESP_EXT(fasit_connection_t *fc) {
+   DDCMSG(D_RF,RED, "send_STATUS_RESP_EXT(%08X)", fc);
    // finish filling in message and send
    fc->last_status.cmd = LBC_STATUS_RESP_EXT;
    fc->last_status.addr = fc->id & 0x7FF; // source address (always to basestation)
+   fc->sent_status = 1; // have sent a status message before
    set_crc8(&fc->last_status, sizeof(LB_status_resp_ext_t));
-   queueMsg(fc, &fc->last_status, sizeof(LB_status_resp_ext_t));
+   queueMsg(fc, &fc->last_status, RF_size(LBC_STATUS_RESP_EXT));
    return mark_rfWrite;
 }
 
 int send_STATUS_NO_RESP(fasit_connection_t *fc) {
    // create message and send
    LB_status_no_resp_t bdy;
+   DDCMSG(D_RF,RED, "send_STATUS_NO_RESP(%08X)", fc);
    bdy.cmd = LBC_STATUS_NO_RESP;
    bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    set_crc8(&bdy, sizeof(LB_status_no_resp_t));
-   queueMsg(fc, &bdy, sizeof(LB_status_no_resp_t));
+   queueMsg(fc, &bdy, RF_size(LBC_STATUS_NO_RESP));
    return mark_rfWrite;
 }
 
@@ -345,6 +406,7 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
    int retval = doNothing;
    static int mfsSDelay = -1;
    static int mfsRDelay = -1;
+   DDCMSG(D_RF,RED, "handle_EXPOSE(%08X, %i, %i)", fc, start, end);
 
    // read, once, the eeprom values for start and repeat delays
    if (mfsSDelay == -1) {
@@ -357,29 +419,29 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
       switch (pkt->mfs) {
          case 0:
             // off
-            retval &= send_2110(fc, 0, 0, 0, 0);
+            retval |= send_2110(fc, 0, 0, 0, 0);
             break;
          case 1:
             // single
-            retval &= send_2110(fc, 1, 0, mfsSDelay, mfsRDelay);
+            retval |= send_2110(fc, 1, 0, mfsSDelay, mfsRDelay);
             break;
          case 2:
             // burst
-            retval &= send_2110(fc, 1, 1, mfsSDelay, mfsRDelay);
+            retval |= send_2110(fc, 1, 1, mfsSDelay, mfsRDelay);
             break;
          case 3:
             // simulate single or burst randomly
             if (rand() % 2) {
-               retval &= send_2110(fc, 1, 0, mfsSDelay, mfsRDelay);
+               retval |= send_2110(fc, 1, 0, mfsSDelay, mfsRDelay);
             } else {
-               retval &= send_2110(fc, 1, 1, mfsSDelay, mfsRDelay);
+               retval |= send_2110(fc, 1, 1, mfsSDelay, mfsRDelay);
             }
             break;
       }
    }
 
    // send configure hit sensing
-   retval &= send_2100_conf_hit(fc, 4, /* blank on conceal */
+   retval |= send_2100_conf_hit(fc, 4, /* blank on conceal */
                                 0, /* reset hit count */
                                 fc->hit_react, /* remembered hit reaction */
                                 pkt->tokill, /* hits to kill */
@@ -389,7 +451,7 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
 
    
    // send expose command
-   retval &= send_2100_exposure(fc, pkt->expose ? 90 : 0);
+   retval |= send_2100_exposure(fc, pkt->expose ? 90 : 0);
    
    return retval;
 }
@@ -398,6 +460,7 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
    LB_move_t *pkt = (LB_move_t *)(fc->rf_ibuf + start);
    // convert speed
    float speed = pkt->speed / 100.0;
+   DDCMSG(D_RF,RED, "handle_MOVE(%08X, %i, %i)", fc, start, end);
    if (pkt->speed == 2047) {
       // TODO -- add emergency stop handling here
       speed = 0.0; // just normal stop for right now
@@ -411,6 +474,7 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
    LB_configure_t *pkt = (LB_configure_t *)(fc->rf_ibuf + start);
    int retval = doNothing;
+   DDCMSG(D_RF,RED, "handle_CONFIGURE_HIT(%08X, %i, %i)", fc, start, end);
 
    // check for thermal control only
    if (pkt->react == 7) {
@@ -439,11 +503,11 @@ int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
 
    // reaction settings
    if (pkt->react == 6) {
-      retval &= send_14110(fc, 1); // enable PHI
+      retval |= send_14110(fc, 1); // enable PHI
       fc->hit_phi = 1; // remember
       fc->hit_react = 1; // kill
    } else if (fc->hit_phi) {
-      retval &= send_14110(fc, 1); // disable previously enabled PHI
+      retval |= send_14110(fc, 1); // disable previously enabled PHI
       fc->hit_phi = 0; // forget
       fc->hit_react = pkt->react;
    } else {
@@ -457,7 +521,7 @@ int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
    fc->hit_burst = pkt->timehits * 5; // each number is 5 milliseconds
    
    // send configure hit sensing
-   retval &= send_2100_conf_hit(fc, 4, /* blank on conceal */
+   retval |= send_2100_conf_hit(fc, 4, /* blank on conceal */
                                 fc->hit_hit, /* remembered hit reset value */
                                 fc->hit_react, /* remembered hit reaction */
                                 fc->hit_tokill, /* remembered hits to kill */
@@ -472,6 +536,7 @@ int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end) {
    LB_group_control_t *pkt = (LB_group_control_t *)(fc->rf_ibuf + start);
    // which group command?
    int i, j;
+   DDCMSG(D_RF,RED, "handle_GROUP_CONTROL(%08X, %i, %i)", fc, start, end);
    switch (pkt->gcmd) {
       case 0: // disable command
          for (i = 0; i<MAX_GROUPS; i++) {
@@ -531,12 +596,14 @@ int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end) {
 
 int handle_AUDIO_CONTROL(fasit_connection_t *fc, int start, int end) {
    LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_RF,RED, "handle_AUDIO_CONTROL(%08X, %i, %i)", fc, start, end);
    // TODO -- fill me in
    return doNothing;
 }
 
 int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end) {
    LB_power_control_t *pkt = (LB_power_control_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_RF,RED, "handle_POWER_CONTROL(%08X, %i, %i)", fc, start, end);
    // send correct power command to fasit client
    switch (pkt->pcmd) {
       case 0: // ignore command
@@ -555,17 +622,20 @@ int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end) {
 
 int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end) {
    LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_RF,RED, "handle_PYRO_FIRE(%08X, %i, %i)", fc, start, end);
    // send pyro fire request (will handle "set" and "fire" commands to BES)
    send_2000(fc, pkt->zone);
    return doNothing;
 }
 
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
+   DDCMSG(D_RF,RED, "handle_QEXPOSE(%08X, %i, %i)", fc, start, end);
    // send exposure request
    return send_2100_exposure(fc, 90); // 90^ = exposed
 }
 
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
+   DDCMSG(D_RF,RED, "handle_QCONCEAL(%08X, %i, %i)", fc, start, end);
    // send exposure request
    return send_2100_exposure(fc, 0); // 0^ = concealed
 }
@@ -573,25 +643,34 @@ int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
 int send_DEVICE_REG(fasit_connection_t *fc) {
    // create a message packet with most significant bytes of the FASIT device ID
    LB_device_reg_t bdy;
-   memset(&bdy, 0, sizeof(LB_device_reg_t));
+   DDCMSG(D_RF,RED, "send_DEVICE_REG(%08X)", fc);
+   D_memset(&bdy, 0, sizeof(LB_device_reg_t));
    bdy.cmd = LBC_DEVICE_REG;
    bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    bdy.dev_type = fc->target_type;
    if (fc->target_type == RF_Type_BES) {
-      bdy.devid = fc->f2111_resp.body.devid & 0xffffff;
-   } else {
       bdy.devid = fc->f2005_resp.body.devid & 0xffffff;
+   } else {
+//      bdy.devid = (fc->f2111_resp.body.devid & 0xffll << (8*7)) >> (8*7) |
+//                  (fc->f2111_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
+//                  (fc->f2111_resp.body.devid & 0xffll << (8*5)) >> (8*3); // 3 most significant bytes and reversed from original (reversed) order
+      bdy.devid = (fc->f2111_resp.body.devid & 0xffll << (8*7)) >> (8*5) |
+                  (fc->f2111_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
+                  (fc->f2111_resp.body.devid & 0xffll << (8*5)) >> (8*5); // 3 most significant bytes in original (reversed) order
+      DDCMSG(D_RF,BLACK, "Looking at: %08x", bdy.devid);
+      DDCMSG(D_RF,BLACK, "From pieces of 2111: %08llx", fc->f2111_resp.body.devid);
    }
 
    // put in the crc and send
    set_crc8(&bdy, sizeof(LB_device_reg_t));
-   queueMsg(fc, &bdy, sizeof(LB_device_reg_t));
+   queueMsg(fc, &bdy, RF_size(LBC_DEVICE_REG));
    return mark_rfWrite;
 }
 
 // a request for new messages has arrived, send back "DEVICE_REG"
 int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
    LB_request_new_t *pkt = (LB_request_new_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_RF,RED, "handle_REQUEST_NEW(%08X, %i, %i)", fc, start, end);
    // only send a registry if I have a fully connected fasit client
    if (fc->target_type == RF_Type_Unknown) {
       return doNothing;
@@ -601,7 +680,10 @@ int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_DEVICE_ADDR(fasit_connection_t *fc, int start, int end) {
-   LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
+   LB_device_addr_t *pkt = (LB_device_addr_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_RF,RED, "handle_DEVICE_ADDR(%08X, %i, %i)", fc, start, end);
+   // change device ID to new address
+   fc->id = pkt->new_addr;
    return doNothing;
 }
 
