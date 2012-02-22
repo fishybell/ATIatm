@@ -13,7 +13,11 @@ HFILES = mcp.h fasit_c.h rf.h
 MCFILES = serial.c timestamp.c htonll.c rf.c
 
 
+<<<<<<< Makefile
+default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm slaveboss slavetest 
+=======
 default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump.arm slaveboss.arm slavetest slavetest.arm
+>>>>>>> 1.12
 
 mcp : mcp.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c $(MCFILES)
@@ -42,6 +46,9 @@ slaveboss.arm : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c rf_debug.c
 RFdump.arm : RFdump.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFdump.arm RFdump.c $(MCFILES)
 
+RFdump : RFdump.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o RFdump RFdump.c $(MCFILES)
+
 clean:
-	$(RM) mcp *.o RFmaster RFmaster.arm RFslave RFslave.arm RFdump.arm
+	$(RM) mcp *.o RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm
 
