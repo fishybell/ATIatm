@@ -197,10 +197,10 @@ char *do_STATUS_RESP_EXT(int a, int *num) {
    pkt->expose = num[3];
    pkt->speed = num[4];
    pkt->dir = num[5];
-   pkt->location = num[6];
-   pkt->hitmode = num[7];
-   pkt->tokill = num[8];
-   pkt->react = num[9];
+   pkt->react = num[6];
+   pkt->location = num[7];
+   pkt->hitmode = num[8];
+   pkt->tokill = num[9];
    pkt->sensitivity = num[10];
    pkt->timehits = num[11];
    pkt->fault = num[12];
