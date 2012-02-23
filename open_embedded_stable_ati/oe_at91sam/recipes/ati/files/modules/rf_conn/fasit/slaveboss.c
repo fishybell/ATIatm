@@ -1,3 +1,4 @@
+#include <signal.h>
 #include "mcp.h"
 #include "rf.h"
 #include "slaveboss.h"
@@ -9,8 +10,24 @@ fasit_connection_t fconns[MAX_CONNECTIONS];
 
 #define MAX_EVENTS 16
 
-void print_help(int exval) {
-   printf("slaveboss [-h] [-v num] [-f port] [-r port] [-n num]\n\n");
+// kill switch to program
+static int close_nicely = 0;
+static void quitproc(int sig) {
+   switch (sig) {
+      case SIGINT:
+         DCMSG(red,"Caught signal: SIGINT\n");
+         break;
+      case SIGQUIT:
+         DCMSG(red,"Caught signal: SIGQUIT\n");
+         break;
+      default:
+         DCMSG(red,"Caught signal: %i\n", sig);
+         break;
+   }
+   close_nicely = 1;
+}
+
+void print_help(int exval) { printf("slaveboss [-h] [-v num] [-f port] [-r port] [-n num]\n\n");
    printf("  -h            print this help and exit\n");
    printf("  -f 14000      set FASIT listen port\n");
    printf("  -r 14004      set RF listen port\n");
@@ -196,7 +213,7 @@ int main(int argc, char **argv) {
 
    // main loop
    int rfclient;
-   while (!done) {
+   while (!done && !close_nicely) {
       // wait for a single RF client
       struct sockaddr_in caddr; // client address
       DCMSG(MAGENTA, "WAITING FOR RF ACCEPT");
@@ -235,13 +252,13 @@ int main(int argc, char **argv) {
      
       // after accepting RF client, accept any number of FASIT clients and parse
       //    the messages back and forth
-      while (!done) {
+      while (!done && !close_nicely) {
          DCMSG(MAGENTA, "EPOLL WAITING");
          // wait for something to happen
          nfds = epoll_wait(efd, events, MAX_EVENTS, 10000); // 10 second timeout
          
          // parse all waiting connections
-         for (n = 0; !done && n < nfds; n++) {
+         for (n = 0; !done && !close_nicely && n < nfds; n++) {
             if (events[n].data.fd == rfclient) { // Read/Write from rfclient
                DCMSG(MAGENTA, "events[%i].events: %i rfclient", n, events[n].events);
 
@@ -252,7 +269,7 @@ int main(int argc, char **argv) {
                // writing?
                } else if (events[n].events & EPOLLOUT) {
                   // for each connection, write what's available to the RF client
-                  for (i = 0; !done && i <= last_slot; i++) {
+                  for (i = 0; !done && !close_nicely && i <= last_slot; i++) {
                      // rfWrite will decide whether to handle the packet or not
                      done = handleRet(rfWrite(&fconns[i]),&fconns[i], efd);
                   }
@@ -268,10 +285,10 @@ int main(int argc, char **argv) {
                      handleRet(ret, &fconns[0], efd); // always use first in fconns as rf is the same in all of them
                   } else {
                      // de-mangle and send to all fasit connections
-                     for (i = 0; !done && i <= last_slot; i++) {
+                     for (i = 0; !done && !close_nicely && i <= last_slot; i++) {
                         addToRFBuffer(&fconns[i], tbuf, ms);
                         // rf2fasit will decide whether to handle the packet or not
-                        while (!done && (ret = rf2fasit(&fconns[i], tbuf, ms)) != doNothing) {
+                        while (!done && !close_nicely && (ret = rf2fasit(&fconns[i], tbuf, ms)) != doNothing) {
                            done = handleRet(ret, &fconns[i], efd);
                         }
                      }
@@ -356,7 +373,7 @@ int main(int argc, char **argv) {
                      done = handleRet(ret, fc, efd);
                   } else {
                      // fasit2rf will decide whether to handle the packet or not
-                     while (!done && (ret = fasit2rf(fc, tbuf, ms)) != doNothing) {
+                     while (!done && !close_nicely && (ret = fasit2rf(fc, tbuf, ms)) != doNothing) {
                         DCMSG(CYAN, "FASIT ret is %i", ret);
                         done = handleRet(ret, fc, efd);
                      }

@@ -432,6 +432,7 @@ int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int t
 
    // remember for later
    fc->hit_on = on;
+   DDCMSG(D_PACKET,CYAN, "Setting Hits to %i", hit);
    fc->hit_hit = hit;
    fc->hit_react = react;
    fc->hit_tokill = tokill;
@@ -484,6 +485,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    }
    // remember hit sensing settings
    fc->hit_on = fc->f2102_resp.body.hit_conf.on;
+   DDCMSG(D_PACKET,CYAN, "Setting Hits to %i", htons(fc->f2102_resp.body.hit));
    fc->hit_hit = htons(fc->f2102_resp.body.hit);
    fc->hit_react = fc->f2102_resp.body.hit_conf.react;
    fc->hit_tokill = htons(fc->f2102_resp.body.hit_conf.tokill);
@@ -495,8 +497,11 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    if (fc->waiting_status_resp) {
       fc->waiting_status_resp = 0; // not waiting anymore
       return send_STATUS_RESP(fc); // return appropriate information
-   } else {
+   } else if (!fc->added_rf_to_epoll) {
+      fc->added_rf_to_epoll = 1;
       return add_rfEpoll; // the RF is ready to work now that I have a type
+   } else {
+      return doNothing; // just remember the status for later
    }
 }
 

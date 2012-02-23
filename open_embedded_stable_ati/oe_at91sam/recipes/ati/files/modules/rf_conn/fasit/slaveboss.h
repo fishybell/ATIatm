@@ -78,6 +78,7 @@ typedef struct fasit_connection {
    FASIT_2113 f2113_resp;
    LB_status_resp_ext_t last_status; 
    int sent_status;
+   int added_rf_to_epoll;
 
    // Data for RF handling
    int waiting_status_resp;
