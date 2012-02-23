@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <math.h>
+#include <signal.h>
 
 using namespace std;
 
@@ -49,6 +50,23 @@ MIT_Client::~MIT_Client() {
 FUNCTION_START("::~MIT_Client()")
 
 FUNCTION_END("::~MIT_Client()")
+}
+
+void MIT_Client::Reset() {
+FUNCTION_START("::Reset()");
+      int pid;
+      signal(SIGCHLD, SIG_IGN);
+      if (!fork()) {
+        DCMSG(BLUE,"Preparing to REBOOT");
+         nl_conn->~NL_Conn();
+         if (fd >= 0) close(fd);
+         closeListener();
+         execl("/usr/bin/restart", "restart", (char *)0 );
+         exit(0);
+      }
+      pid = getpid();
+      kill(pid, SIGQUIT);
+FUNCTION_END("::Reset()");
 }
 
 // fill out 2102 status message
@@ -292,6 +310,15 @@ FUNCTION_START("::handle_2100(int start, int end)")
 	  case CID_Wake:
 	     doWake();
 		 break;
+     case CID_Reset_Device:
+         // send 2101 ack
+         DCMSG(RED,"CID_Reset_Device  send 'S'uccess ack.   set lastHitCal.* to defaults") ;
+         send_2101_ACK(hdr,'S');
+         // also supposed to reset all values to the 'initial exercise step value'
+         //  which I am not sure if it is different than ordinary inital values 
+         Reset();
+         break;
+
       case CID_Move_Request:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
 	     send_2101_ACK(hdr,'S');

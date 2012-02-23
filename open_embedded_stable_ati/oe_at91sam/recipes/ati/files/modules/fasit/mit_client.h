@@ -37,6 +37,7 @@ public :
    void didFault(int val); // current fault value
    void doStop(); // emergency stop (stops accessories as well)
    void didStop(); // received immediate stop response
+   void Reset(); // received immediate stop response
 
    void handle_2111(FASIT_2111 *msg); // called from attached_SIT_Client object
    void handle_2102(FASIT_2102 *msg); // called from attached_SIT_Client object
