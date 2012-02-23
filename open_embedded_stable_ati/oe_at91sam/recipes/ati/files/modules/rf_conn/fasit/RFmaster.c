@@ -39,12 +39,21 @@ void DieWithError(char *errorMessage){
  *************
  *************/
 
-#define MbufSize 4096
+#define M0size 4096
+#define M1size 512
+#define M2size 4096
+#define M3size 4096
 
 void HandleRF(int MCPsock,int RFfd){
     struct timespec elapsed_time, start_time, istart_time,delta_time;
-    char Mbuf[MbufSize],Rbuf[512], buf[200];        /* Buffer MCP socket */
-    char  *Mptr,*Mstart;
+    char M0buf[M0size+sizeof(queue_t)];
+    char M1buf[M1size+sizeof(queue_t)];
+    char M2buf[M2size+sizeof(queue_t)];
+    char M3buf[M3size+sizeof(queue_t)];
+    queue_t *M0,*M1,*M2,*M3;
+    
+    char Rbuf[512];
+    char buf[200];        /* text Buffer  */
     char  *Rptr,*Rstart;
     int size,gathered,delta,remaining_time;
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
@@ -61,12 +70,18 @@ void HandleRF(int MCPsock,int RFfd){
     Rptr=Rbuf;
     Rstart=Rptr;
 
+    queue_init(M0,M0buf,M0size);
+    queue_init(M1,M1buf,M1size);
+    queue_init(M2,M2buf,M2size);
+    queue_init(M3,M3buf,M3size);
+        
     memset(Rstart,0,100);
 
     remaining_time=100;		//  remaining time before we can transmit (in ms)
     
 /**   loop until we lose connection  **/
     clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
+    timestamp(&elapsed_time,&istart_time,&delta_time);	// make sure the delta_time gets set    
     while(1) {
 
 	timestamp(&elapsed_time,&istart_time,&delta_time);
@@ -88,15 +103,17 @@ void HandleRF(int MCPsock,int RFfd){
 	 *   the RFmaster to just pass data back and forth.
 	 */
 
-//	DCMSG(YELLOW,"RFmaster waiting for select(rf or mcp)");
+
 	
 	timeout.tv_sec=remaining_time/1000;
 	timeout.tv_usec=(remaining_time%1000)*1000;
 	sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
 
+	DCMSG(YELLOW,"RFmaster:  select returned, sock_ready=%d",sock_ready);
+	
 	if (sock_ready<0){
-	    strerror_r(errno,Mbuf,200);
-	    DCMSG(RED,"RFmaster select error: %s", Mbuf);
+	    strerror_r(errno,buf,200);
+	    DCMSG(RED,"RFmaster select error: %s", buf);
 	    exit(-1);
 	}
 
@@ -107,21 +124,49 @@ void HandleRF(int MCPsock,int RFfd){
  *******/      
 	//    we timed out.   
 	if (!sock_ready){
+
 	    // get the actual current time.
 	    timestamp(&elapsed_time,&istart_time,&delta_time);
 	    DDCMSG(D_TIME,CYAN,"RFmaster:  select timed out at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 		   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-	    delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000);
+	    delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000000);
 	    DDCMSG(D_TIME,CYAN,"RFmaster:  delta=%2dms",delta);
+	    
+	    DDCMSG(D_VERY,YELLOW,"RFmaster:  select timed out  delta=%d remaining_time=%d  Mptr-Mstart=%d",delta,remaining_time,M0->ptr-M0->start);
+	    
+	    if ((delta>remaining_time-1)&&(Queue_Depth(M0)>0)) {
 
-	    if (delta>remaining_time) {
-		//   we have waited long enough.
-		//       we can transmit up to 250 bytes of the packet queue
+/***************    there can be three types of MCP packets we need to be concerned with
+ ***************
+ ***************    1)  request new devices
+ ***************        this is expecting responses from all un-assigned RFslaves.
+ ***************        it will have to be sent alone or at the end of a string of no-response packets.
+ ***************
+ ***************    2)  status requests
+ ***************        eventually these need to be set up to expect slotted responses from multiple
+ ***************        devices - as we will want to burst multiple ones
+ ***************
+ ***************    3)  Commands
+ ***************        commands will not recieve responses.
+ ***************        they can be strung together in a burst that preceeds any response expecting requests
+ ***************
+ ***************    type #1 should be relativly seldom and can be sent alone or tacked to the end of a #3
+ ***************            it expects up to slot_count responses ((slottime+1)*slot_count) time to wait
+ ***************            
+ ***************    type #2 eventually needs to be set as a burst that expects responses, can also be
+ ***************            tacked onto the end of a #3
+ ***************            
+ ***************    type #3 can all be strung together now up to less than about 250 bytes
+ ***************            to be sent as a 'burst'
+ ***************
+ ***************    Possibly when they are read from the MCP they should be split into 3 seperate queues
+ ***************    
+ ***************/
 
-		if (Mptr-Mstart<250){
-		    result=write(RFfd,Mstart,Mptr-Mstart);
+		if (Queue_Depth(M0)<250){
+		    result=write(RFfd,M0->start,Queue_Depth(M0));
 		} else {
-		    result=write(RFfd,Mstart,250);
+		    result=write(RFfd,M0->start,250);
 		}
 		if (result<0){
 		    strerror_r(errno,buf,200);		    
@@ -132,16 +177,14 @@ void HandleRF(int MCPsock,int RFfd){
 		    }
 
 		    sprintf(buf,"MCP-> RF  [%2d]  ",result);
-		    DCMSG_HEXB(BLUE,buf,Mstart,result);		    
+		    DCMSG_HEXB(BLUE,buf,M0->start,result);		    
+
+		    if (result<Queue_Depth(M0)){
+			Queue_Up(M0,result );
 		    
-		    // update the ptrs - shift the queue down if we could not send it all
-		    if (result<Mptr-Mstart){
-			memmove(Mbuf,Mstart,result);
-			Mptr-=result;
-			Mstart=Mbuf;
 		    } else {
 			// it was all sent, just reset the pointers
-			Mptr=Mstart=Mbuf;
+			M0->ptr=M0->start=M0->qbuf;
 		    }
 		}
 		
@@ -173,6 +216,11 @@ void HandleRF(int MCPsock,int RFfd){
 		// we have a chance of a compelete packet
 		LB=(LB_packet_t *)Rstart;	// map the header in
 		size=RF_size(LB->cmd);
+
+	/* Receive message, or continue to recieve message from RF */
+		DDCMSG(D_VERY,GREEN,"RFmaster: cmd=%d addr=%d RF_size =%2d  Rptr-Rstart=%2d  ",
+		       LB->cmd,LB->addr,size,Rptr-Rstart);
+		
 		if ((Rptr-Rstart) >= size){
 		    //  we do have a complete packet
 		    // we could check the CRC and dump it here
@@ -212,28 +260,52 @@ void HandleRF(int MCPsock,int RFfd){
 	//    we will have to watch to make sure we don't force down too much for the radio
 	if (FD_ISSET(MCPsock,&rf_or_mcp)){
     /* Receive message from MCP */
-	    MsgSize = read(MCPsock, Mptr, MbufSize-(Mptr-Mbuf));
+	    MsgSize = recv(MCPsock, Mptr, MbufSize-(Mptr-Mbuf),0);
 	    if (MsgSize<0){
 		strerror_r(errno,buf,200);
 		DCMSG(RED,"RFmaster: read from MCP fd=%d failed  %s ",MCPsock,buf);
 		sleep(1);
 	    }
 	    if (!MsgSize){
-		DCMSG(RED,"RFmaster: read from MCP returned 0");
+		DCMSG(RED,"RFmaster: read from MCP returned 0 - MCP closed");
+		close(MCPsock);    /* Close socket */    
+		return;			/* go back to the main loop waiting for MCP connection */
 	    }
 	
 	    if (MsgSize){
 
-		// we need a buffer that we can use to stage output to the radio in
-		// plus, we probably need some kind of handshake back to the MCP so
-		// we can throttle it down
-
-		// Mbuf is that buffer.   Mptr is the current insert point,
-		// and Mstart is the beginning of unsent data
-
-		// we will not actually copy it down to the RF at this point in time.
+/***************    there can be three types of MCP packets we need to be concerned with
+ ***************
+ ***************    1)  request new devices
+ ***************        get put into M1queue
+ ***************
+ ***************    2)  status requests
+ ***************        get put into M2queue
+ ***************
+ ***************    3)  Commands
+ ***************        get put into M3queue
+ ***************
+ ***************    We are going to do a little parsing here and split them into seperate queues
+ ***************
+ ***************    there will also need to be some kind of throttle to slow the MCP if we are full.
+ ***************    
+ ***************    */
 
 		Mptr+=MsgSize;	// add on the new length
+		bytecount=(Mptr-Mstart);
+		  // loop until we are out of complete packets
+		while (bytecount>=3) {  // make sure there is a possibility of a whole packet
+		    LB=(LB_packet_t *)Mstart;
+		    if (RF_size(LB->cmd)>=bytecount){  // sort this packet
+			switch (LB->cmd) {
+			    
+
+			} // end of switch
+		    } // end of this packet
+		    //  decrement bytecount  (or do it in an else)
+
+		    
+		} // if we have at least 3 bytes 
 		
 	    }
 	}  // end of MCP_sock

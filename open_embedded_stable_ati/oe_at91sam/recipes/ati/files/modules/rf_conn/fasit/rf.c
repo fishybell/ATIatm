@@ -9,8 +9,36 @@
 #include <linux/if.h>
 #include <netinet/tcp.h>
 
-
 extern int verbose;
+
+void queue_init(queue_t *M, char *buf, int size){
+
+    M=(queue_t *)buf;
+    M->size=size;
+    M->ptr=M->qbuf;
+    M->start=M->qbuf;
+
+}
+
+// update the ptrs - shift the queue down if we could not send it all
+
+void Queue_Up(queue_t *M,int count){
+    
+
+    memmove(Mbuf,Mstart,result);
+    Mptr-=result;
+    Mstart=Mbuf;
+n} else {
+			// it was all sent, just reset the pointers
+    Mptr=Mstart=Mbuf;
+}
+
+
+//  this is a macro
+//int Queue_Depth(queue_t *M){
+//    M->ptr-M->start;
+//}
+
 
 void print_verbosity(void){
     printf("  -v xx         set verbosity bits.   Examples:\n");

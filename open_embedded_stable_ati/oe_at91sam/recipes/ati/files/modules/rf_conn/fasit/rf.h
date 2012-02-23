@@ -12,6 +12,19 @@
 
 #include "mcp.h"
 
+typedef struct queue_tag {
+    char *ptr,*start;
+    int size;
+    char qbuf[8];	// size here is a dummy
+}  queue_t ;
+
+void queue_init(queue_t *M, char *buf, int size);
+
+#define Queue_Depth(M) ((M)->ptr - (M)->start)
+
+//}
+
+
 // definitions of the low-bandwith RF packets
 // they are bit-packed and between 3 and whatever (up to 35) bytes long
 
@@ -30,27 +43,27 @@
 //     that is probably bit-packed
 
 //  the command ID's
-#define LBC_STATUS_REQ		0
-#define LBC_EXPOSE		1
-#define LBC_MOVE		2
-#define LBC_CONFIGURE_HIT	3
-#define LBC_GROUP_CONTROL	4
-#define LBC_AUDIO_CONTROL	5
-#define LBC_POWER_CONTROL	6
+#define LBC_STATUS_REQ			0
+#define LBC_EXPOSE			1
+#define LBC_MOVE			2
+#define LBC_CONFIGURE_HIT		3
+#define LBC_GROUP_CONTROL		4
+#define LBC_AUDIO_CONTROL		5
+#define LBC_POWER_CONTROL		6
 
-#define LBC_PYRO_FIRE		7
+#define LBC_PYRO_FIRE			7
 
-#define LBC_STATUS_RESP_LIFTER	8
+#define LBC_STATUS_RESP_LIFTER		8
 #define LBC_STATUS_RESP_MOVER		9
 #define LBC_STATUS_RESP_EXT		10
-#define LBC_STATUS_NO_RESP			11
+#define LBC_STATUS_NO_RESP		11
 
-#define LBC_QEXPOSE		16
-#define LBC_QCONCEAL		17
+#define LBC_QEXPOSE			16
+#define LBC_QCONCEAL			17
 
-#define LBC_DEVICE_REG		29
-#define LBC_REQUEST_NEW		30
-#define LBC_DEVICE_ADDR		31
+#define LBC_DEVICE_REG			29
+#define LBC_REQUEST_NEW			30
+#define LBC_DEVICE_ADDR			31
 
 /********************************************/
 /* Low Bandwidth Message Header             */

@@ -14,7 +14,7 @@ MCFILES = serial.c timestamp.c htonll.c rf.c
 
 
 
-default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm slaveboss slavetest 
+default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm 
 
 mcp : mcp.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c $(MCFILES)
@@ -31,8 +31,8 @@ RFslave : RFslave.c $(HFILES) $(MCFILES)
 RFslave.arm : RFslave.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.arm RFslave.c $(MCFILES)
 
-#slaveboss : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c rf_debug.c rf_debug.h $(HFILES) $(MCFILES)
-#	gcc -lrt -std=gnu99 -o slaveboss fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c rf_debug.c eeprom.c $(MCFILES)
+slaveboss : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c rf_debug.c rf_debug.h $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o slaveboss fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c rf_debug.c eeprom.c $(MCFILES)
 
 slavetest : slavetest.c rf_debug.c rf_debug.h $(HFILES) $(MCFILES) slaveboss.h
 	gcc -lrt -std=gnu99 -o slavetest slavetest.c rf_debug.c $(MCFILES)
