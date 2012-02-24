@@ -185,7 +185,7 @@ void HandleRF(int MCPsock,int RFfd){
  ****  add to remaining time based on heat or 480cps and size we sent
  ****
  ****
- ****   simple algorithm:
+ ****   simple algorithm:  CURRENTLY IMPLEMENTED
  ****   
  ****   if there is a #1 packet (should only be 3 bytes)
  ****       send it
@@ -203,6 +203,7 @@ void HandleRF(int MCPsock,int RFfd){
  ****           endif
  ****       endif
  ****   endif
+ ****  add to remaining time based on heat or 480cps and size we sent
  ****/
 
 		//  we will start with the simple algorithm until debugged
@@ -220,11 +221,19 @@ void HandleRF(int MCPsock,int RFfd){
 		    } else {
 			if (Queue_Depth(M3)>2){
 			    int bcnt=0;
-			    while ((Queue_Depth(M3)<240)&&(Queue_Depth(M3)>2)){
+			    while ((Queue_Depth(Tx)<240)&&(Queue_Depth(M3)>2)){
 				LB=(LB_packet_t *)M3->head;
-				size=RF_size(LB->cmd);			    
-				DDCMSG(D_RF,YELLOW,"RFmaster: in M3 - requeueing to Tx:  %d bytes cmd=%d",size,LB->cmd);
+				size=RF_size(LB->cmd);
+//				DCMSG(YELLOW,"RFmaster: in M3[%d:%d]:%d  -- requeueing to Tx: LB  cmd=%d size=%d",M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),LB->cmd,size);
+//				sprintf(buf,"M3[%2d:%2d]  ",M3->head-M3->buf,M3->tail-M3->buf);
+//				DCMSG_HEXB(YELLOW,buf,M3->head,Queue_Depth(M3));
+//				DDCMSG(D_RF,YELLOW,"RFmaster: in M3 - Before requeueing %d bytes to Tx: M3[%2d:%2d]:%d   Tx[%2d:%2d]:%d "
+//				       ,size,M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),Tx->head-Tx->buf,Tx->tail-Tx->buf,Queue_Depth(Tx));
+				
 				ReQueue(Tx,M3,size);	// copy it to the TxBuf and deletes from front of old queue
+				DDCMSG(D_RF,YELLOW,"RFmaster: in M3 -  After requeueing %d bytes to Tx: M3[%2d:%2d]:%d   Tx[%2d:%2d]:%d "
+				       ,size,M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),Tx->head-Tx->buf,Tx->tail-Tx->buf,Queue_Depth(Tx));
+
 				bcnt+=size;
 			    }
 			    // bcnt is how many bytes we are sending.
@@ -262,7 +271,6 @@ void HandleRF(int MCPsock,int RFfd){
 		DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
 	    }
 	}
-
 
 	//  Testing has shown that we generally get 8 character chunks from the serial port
 	//  when set up the way it is right now.
@@ -324,7 +332,6 @@ void HandleRF(int MCPsock,int RFfd){
 		}
 	    }  // if gathered >=3
 	} // if this fd is ready
-
 
 	//  if we have data to read from the MCP, read it then force it down the radio
 	//    we will have to watch to make sure we don't force down too much for the radio
@@ -393,7 +400,9 @@ void HandleRF(int MCPsock,int RFfd){
 
 			    default:		// everything else is assumed to be a command that does not expect a response - put in queue #3
 				ReQueue(M3,M0,size);	// move count from the front of queue M0 to tail of M1				
-				DCMSG(YELLOW,"RFmaster: requeued into M3[%d]:%d   LB  cmd=%d size=%d",M3->head-M3->buf,Queue_Depth(M3),LB->cmd,size);
+				DCMSG(YELLOW,"RFmaster: requeued into M3[%d:%d]:%d   LB  cmd=%d size=%d",M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),LB->cmd,size);
+				sprintf(buf,"M3[%2d:%2d]  ",M3->head-M3->buf,M3->tail-M3->buf);
+				DCMSG_HEXB(YELLOW,buf,M3->head,Queue_Depth(M3));
 
 				break;
 			} // end of switch

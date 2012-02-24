@@ -166,16 +166,14 @@ void HandleSlaveRF(int RFfd){
 		    }  // switch LB cmd
 		}  // if our address matched and the CRC was good
 
-		DDCMSG(D_VERY,BLUE,"clean up Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);		
+		DDCMSG(D_RF,BLUE,"clean up Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);		
 		if ((Rptr-Rstart) > size){
 		    Rstart+=size;	// step ahead to the next packet
 		    //  it is possible here if things are slow that we might never reset to the beginning of the buffer.  that would be bad.
 		} else {
 		    Rptr=Rstart=Rbuf;	// reset to the beginning of the buffer
 		}
-		DDCMSG(D_VERY,BLUE,"Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);		
-		
-
+		DDCMSG(D_RF,BLUE,"Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);
 	    } // if there was a full packet
 	} //  if we gathered 3 or more bytes
     } // while forever
