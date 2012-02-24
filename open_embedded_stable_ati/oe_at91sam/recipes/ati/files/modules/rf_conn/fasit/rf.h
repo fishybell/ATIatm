@@ -9,18 +9,22 @@
 #define D_POLL		8
 #define D_TIME		0x10
 #define D_VERY		0x20
+#define D_MEGA		0x80
 
 #include "mcp.h"
 
 typedef struct queue_tag {
-    char *ptr,*start;
-    int size;
-    char qbuf[8];	// size here is a dummy
+    char *tail;		//  end of queue - insertion point
+    char *head;		// start of queue - we remove fifo usually
+    int size;		// how big the buffer is
+    char buf[8];	// size here is a dummy
 }  queue_t ;
 
-void queue_init(queue_t *M, char *buf, int size);
+queue_t *queue_init( int size);
+void DeQueue(queue_t *M,int count);
+void ReQueue(queue_t *Mdst,queue_t *Msrc,int count);
 
-#define Queue_Depth(M) ((M)->ptr - (M)->start)
+#define Queue_Depth(M) ((M)->tail - (M)->head)
 
 //}
 

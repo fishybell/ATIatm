@@ -11,32 +11,47 @@
 
 extern int verbose;
 
-void queue_init(queue_t *M, char *buf, int size){
 
-    M=(queue_t *)buf;
-    M->size=size;
-    M->ptr=M->qbuf;
-    M->start=M->qbuf;
-
-}
-
-// update the ptrs - shift the queue down if we could not send it all
-
-void Queue_Up(queue_t *M,int count){
+// the RFmaster may eventually benifit if these are circular buffers, but for now
+//  we just assume that they return to 'empty' often which is easily done by just reseting the pointers
+queue_t *queue_init(int size){
+    queue_t *M;
     
+    M=(queue_t *)malloc(size+sizeof(queue_t));
+    M->size=size;
+    M->tail=M->buf;
+    M->head=M->buf;
 
-    memmove(Mbuf,Mstart,result);
-    Mptr-=result;
-    Mstart=Mbuf;
-n} else {
-			// it was all sent, just reset the pointers
-    Mptr=Mstart=Mbuf;
+    return M;
 }
 
+// remove count bytes from the head of the queue and normalize the queue
+
+void DeQueue(queue_t *M,int count){
+
+    if (count<Queue_Depth(M)){    
+	memmove(M->buf,M->head,Queue_Depth(M));
+	M->tail-=count;
+	M->head=M->buf;
+    } else {	// it was all removed, queue is empty so just reset the pointers
+	M->tail=M->head=M->buf;
+    }
+
+}
+
+// move count from the front of queue Msrc to tail of Mdst
+//   and shift up the old queue for now
+// having bounds checking and stuff might be nice during debugging
+void ReQueue(queue_t *Mdst,queue_t *Msrc,int count){
+    memcpy(Mdst->tail,Msrc->head,count);	// copy count bytes
+    Mdst->tail+=count;				// increment the tail
+    Msrc->head+=count;				// and head
+    DeQueue(Msrc,count);	// and remove from src queue
+}
 
 //  this is a macro
 //int Queue_Depth(queue_t *M){
-//    M->ptr-M->start;
+//    M->tail-M->head;
 //}
 
 
