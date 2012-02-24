@@ -589,6 +589,9 @@ FUNCTION_START("::handle_2102(int start, int end)")
 
    // send via client
    if (hasPair()) {
+      if (msg->body.fault != ERR_normal) {
+         mit_client->didFault(msg->body.fault);
+      }
       mit_client->handle_2102(msg);
    }
 
