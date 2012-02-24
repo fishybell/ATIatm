@@ -91,6 +91,15 @@ signed int delay_printk(const char *pFormat, ...)
     signed int result=1;
     struct printk_buffer *msg = NULL;
 
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return result;
+    }
+     // check valid format first
+    if (pFormat == NULL) {
+       return result;
+    }
+
     // allocate message buffer
     // use GFP_ATOMIC as it's quicker than GFP_KERNEL
     msg = kmalloc(sizeof(struct printk_buffer), GFP_ATOMIC);
@@ -136,7 +145,9 @@ EXPORT_SYMBOL(delay_printk);
 //---------------------------------------------------------------------------
 void ati_flush_work(struct work_struct *work) {
     printk("flushing...");
-    flush_work(work);
+    if (work != NULL) {
+       flush_work(work);
+    }
     printk("flushed\n");
 }
 
