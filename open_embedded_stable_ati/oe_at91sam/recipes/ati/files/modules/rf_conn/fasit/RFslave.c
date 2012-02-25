@@ -31,6 +31,8 @@ void DieWithError(char *errorMessage){
  *************
  *************/
 
+#define Rxsize 1024
+
 void HandleSlaveRF(int RFfd){
 #define MbufSize 4096
     struct timespec elapsed_time, start_time, istart_time,delta_time;
@@ -38,6 +40,7 @@ void HandleSlaveRF(int RFfd){
     char Mbuf[MbufSize], Rbuf[1024],buf[200], hbuf[200];        /* Buffer MCP socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
     char *Mptr, Mstart, Mend;
+    queue_t *Rx;    
     char *Rptr, *Rstart;    
     int gathered;
     uint8 crc;
@@ -51,6 +54,8 @@ void HandleSlaveRF(int RFfd){
     LB_device_reg_t *LB_devreg;
     LB_device_addr_t *LB_addr;
     LB_expose_t *LB_exp;
+
+
     
     RF_addr=2047;	//  only respond to address 2047 for the request new device packet
 
@@ -58,40 +63,42 @@ void HandleSlaveRF(int RFfd){
     DCMSG(BLUE,"RFslave: DevID = 0x%06X",DevID);
 
     // initialize our gathering buffer
-    Rptr=Rbuf;
-    Rstart=Rptr;
-    
+    Rx=queue_init(Rxsize);	// incoming Rx buffer
+   
     /**   loop until we lose connection  **/
     clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
+
+    holdoff=slottime;	// set the holdoff equal to the slottime
     
     while(1) {
 	timestamp(&elapsed_time,&istart_time,&delta_time);
 	DDCMSG(D_TIME,CYAN,"RFslave top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 	       ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 
-//    MAKE SURE THE RFfd is non-blocking!!!	
-	gathered = gather_rf(RFfd,Rptr,Rstart,300);
+//    MAKE SURE THE RFfd is non-blocking!!!
 
-	if (gathered>0){  // increment our current pointer
-	    Rptr+=gathered;
+	gathered = gather_rf(RFfd,Rx->tail,Rx->head,300);	// gathered actually returns Queue_Depth
+
+	if (gathered>0){  // increment the tail - later gather may take a queue as the argument
+	    Rx->tail+=gathered;
 	}
 	/* Receive message, or continue to recieve message from RF */
-	
-	DDCMSG(D_VERY,GREEN,"RFslave: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
-	      gathered,Rptr-Rbuf,Rstart-Rbuf,Rptr-Rstart);
 
-	if (gathered>=3){
-	    LB=(LB_packet_t *)Rstart;	// map the header in
+	DDCMSG(D_VERY,GREEN,"RFslave: gathered %d  into Rx[%d:%d]:%d"
+	      ,gathered,Rx->head-Rx->buf,Rx->tail-Rx->buf,Queue_Depth(Rx));
+
+	while (gathered>=3){
+	    LB=(LB_packet_t *)Rx->head;	// map the header in
 	    // we have a chance of a compelete packet
 	    size=RF_size(LB->cmd);
-	    if ((Rptr-Rstart) >= size){
+	    if (Queue_Depth(Rx) >= size){
 		//  we do have a complete packet
 		// we could check the CRC and dump it here
 		crc=crc8(LB,size);
 		if (verbose&D_RF){	// don't do the sprintf if we don't need to
-		    sprintf(buf,"RFslave[RFaddr=%2d]: pseq=%4d   %2d byte RFpacket Cmd=%2d addr=%4d \n"
-			    ,RF_addr,pcount++,RF_size(LB->cmd),LB->cmd,LB->addr);
-		    DCMSG_HEXB(GREEN,buf,Rstart,size);
+		    sprintf(buf,"RFslave[RFaddr=%2d]: pseq=%4d   %2d byte RFpacket Cmd=%2d addr=%4d crc=%d\n"
+			    ,RF_addr,pcount++,RF_size(LB->cmd),LB->cmd,LB->addr,crc);
+		    DCMSG_HEXB(GREEN,buf,Rx->head,size);
 		}
 	// only respond if our address matches AND the crc was good
 		if (!crc && ((RF_addr==LB->addr)||((RF_addr>1709)&&(LB->addr==2047)))){
@@ -106,11 +113,9 @@ void HandleSlaveRF(int RFfd){
 			    DCMSG(BLUE,"Recieved 'request new devices' packet.");
 		// create a RESPONSE packet
 			    rLB.cmd=LBC_DEVICE_REG;
-
 			    LB_devreg =(LB_device_reg_t *)(&rLB);	// map our bitfields in
 			    LB_devreg->dev_type=1;			// SIT with MFS
 			    LB_devreg->devid=DevID;		// Actual 3 significant bytes of MAC address
-
 			    RF_addr=1710+(DevID&0x7);	//  use the fancy hash algorithm to come up with the real temp address
 			    LB_devreg->addr=RF_addr;
 
@@ -121,8 +126,6 @@ void HandleSlaveRF(int RFfd){
 		// now send it to the RF master
 		// after waiting for our timeslot:   which is slottime*(MAC&MASK) for now
 
-			    // argument
-			    holdoff=slottime;	// 100ms sec holdoff time
 			    usleep(holdoff+slottime*(DevID&0x3));		// just try *4* hard slots now
 			    DDCMSG(D_TIME,CYAN,"usleep for %d",holdoff+slottime*(DevID&0x3));
 			    
@@ -164,18 +167,22 @@ void HandleSlaveRF(int RFfd){
 			    }		    
 			    break;
 		    }  // switch LB cmd
-		}  // if our address matched and the CRC was good
-
-		DDCMSG(D_RF,BLUE,"clean up Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);		
-		if ((Rptr-Rstart) > size){
-		    Rstart+=size;	// step ahead to the next packet
-		    //  it is possible here if things are slow that we might never reset to the beginning of the buffer.  that would be bad.
-		} else {
-		    Rptr=Rstart=Rbuf;	// reset to the beginning of the buffer
+		    DeQueue(Rx,size);	// delete just the packet we used
+		    gathered-=size;
+		    
+		} else { // if our address matched and the CRC was good
+		    if (crc) {// actually if the crc is bad we need to dequeue just 1 byte
+			DDCMSG(D_RF,BLUE,"CRC bad.  DeQueueing 1 byte.");
+			DeQueue(Rx,1);	// delete just one byte
+			gathered--;
+		    } else { // the packet was not for us, skip it
+			DDCMSG(D_RF,BLUE,"NOT for us.  DeQueueing %d bytes.",size);
+			DeQueue(Rx,size);	// delete just the packet we used
+			gathered-=size;					
+		    }
 		}
-		DDCMSG(D_RF,BLUE,"Rptr=%d and Rstart=%d",Rptr-Rbuf,Rstart-Rbuf);
 	    } // if there was a full packet
-	} //  if we gathered 3 or more bytes
+	}//  while we have gathered at least enough for a packet
     } // while forever
 }// end of handleSlaveRF
 

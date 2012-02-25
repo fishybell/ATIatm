@@ -123,18 +123,14 @@ case  LBC_STATUS_RESP_LIFTER:
     }
 }
 
-//	this is how the RFmaster gathers the packet
-//    since the RFslave needs to do pretty much the same, it should do the same thing.
-// actually I should have one function that works in both places - because it is critical that it
-// works right all the time
 //   and in fact, there needs to be more error checking, and throwing away of bad checksum packets
-//   not sure how to re-sync after a garbage packet - probably have to zero it out.
+//   not sure how to re-sync after a garbage packet - probably have to zero it out one byte at a time.
 
-int gather_rf(int fd, char *pos, char *start,int max){
+int gather_rf(int fd, char *tail, char *head,int max){
     int ready;
 
-    /* Receive as much as we can from the non-blocking fd. */
-    ready=read(fd,pos,max);
+    /* read as much as we can or max from the non-blocking fd. */
+    ready=read(fd,tail,max);
 
     if (ready<=0) { /* parse the error message   */
 	char buf[100];
@@ -147,14 +143,11 @@ int gather_rf(int fd, char *pos, char *start,int max){
 	    exit(-1);
 	}
     } else {
-	pos+=ready;	// increment the position pointer
-	DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",ready,pos-start);
-
-	return(pos-start);
-
+	tail+=ready;	// increment the position pointer
+	DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",ready,tail-head);
+	return(tail-head);
     }
 }
-
 
 #define false 0
 #define true ~false
