@@ -28,13 +28,9 @@ queue_t *queue_init(int size){
 // remove count bytes from the head of the queue and normalize the queue
 
 void DeQueue(queue_t *M,int count){
-    if (count<Queue_Depth(M)){
-	memmove(M->buf,M->head,Queue_Depth(M));
-	M->tail-=count;
-	M->head=M->buf;
-    } else {	// it was all removed, queue is empty so just reset the pointers
-	M->tail=M->head=M->buf;
-    }
+    memmove(M->buf,M->head+count,Queue_Depth(M));
+    M->tail-=count;
+    M->head=M->buf;
 }
 
 // move count from the front of queue Msrc to tail of Mdst

@@ -88,6 +88,9 @@ void HandleSlaveRF(int RFfd){
 	      ,gathered,Rx->head-Rx->buf,Rx->tail-Rx->buf,Queue_Depth(Rx));
 
 	while (gathered>=3){
+	    DDCMSG(D_VERY,GREEN,"RFslave: while(gathered[%d]>=3)  into Rx[%d:%d]:%d"
+		   ,gathered,Rx->head-Rx->buf,Rx->tail-Rx->buf,Queue_Depth(Rx));
+	    
 	    LB=(LB_packet_t *)Rx->head;	// map the header in
 	    // we have a chance of a compelete packet
 	    size=RF_size(LB->cmd);
