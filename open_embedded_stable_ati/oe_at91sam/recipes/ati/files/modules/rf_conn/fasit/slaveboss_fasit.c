@@ -129,11 +129,11 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
 
 // read a single FASIT message into given buffer, return do next
 int fasitRead(int fd, char *dest, int *dests) {
-   DDCMSG(D_PACKET,MAGENTA, "FASIT READING");
+   DDCMSG(D_PACKET,YELLOW, "FASIT READING");
    // read as much as possible
    *dests = read(fd, dest, RF_BUF_SIZE);
 
-   DDCMSG(D_PACKET,MAGENTA, "FASIT READ %i BYTES", *dests);
+   DDCMSG(D_PACKET,YELLOW, "FASIT READ %i BYTES", *dests);
 
    // did we read nothing?
    if (*dests <= 0) {
