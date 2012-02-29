@@ -3,8 +3,8 @@
 #   the root of the oe directory will probably have to change if your not me
 #
 
-OE =/home/brynn/ActionTarget/oe/oe
-#OE = /usr/local/var/oe
+#OE =/home/brynn/ActionTarget/oe/oe
+OE = /usr/local/var/oe
 
 SYSROOT=$(OE)/tmp/staging/armv5te-angstrom-linux-gnueabi
 XGCC = $(OE)/tmp/cross/armv5te/bin/arm-angstrom-linux-gnueabi-gcc
@@ -15,7 +15,6 @@ MCFILES = serial.c timestamp.c htonll.c rf.c
 
 
 default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm 
-slave: slavetest slavetest.arm slaveboss slaveboss.arm
 
 mcp : mcp.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c $(MCFILES)
@@ -48,5 +47,5 @@ RFdump : RFdump.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o RFdump RFdump.c $(MCFILES)
 
 clean:
-	$(RM) mcp *.o RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm slavetest slavetest.arm slaveboss slaveboss.arm
+	$(RM) mcp *.o RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm
 

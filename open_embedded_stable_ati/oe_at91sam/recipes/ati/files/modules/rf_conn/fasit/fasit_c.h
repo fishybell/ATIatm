@@ -40,8 +40,8 @@ typedef struct FASIT_header {
 
 // Most FASIT responses start with these
 typedef struct FASIT_RESPONSE {
-   __uint16_t rnum PCKD;
-   __uint32_t rseq PCKD;
+   __uint16_t resp_num PCKD;
+   __uint32_t resp_seq PCKD;
 } FASIT_RESPONSE;
 
 /********************************************/

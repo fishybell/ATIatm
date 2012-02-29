@@ -236,8 +236,13 @@ int main(int argc, char **argv) {
 			    minions[mID].status=S_open;
 			}
 
+			/****
+			 ****    Initialize the minion thread data -
+			 ****/
+
 			minions[mID].mID=mID;	// make sure we pass the minion ID down
 			minions[mID].devid=LB_devreg->devid;	// use the actual device id (MAC address)
+			minions[mID].seq=0;	// the seq number for this minions transmissions to RCC
 
 			if (LB_devreg->dev_type==1)
 			    minions[mID].S.cap|=PD_NES;	// add the NES capability

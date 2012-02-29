@@ -66,10 +66,10 @@ DDCMSG(D_RF,RED, "RF Packet for other listener %i", hdr->addr);
 
 // read a single RF message into given buffer, return do next
 int rfRead(int fd, char *dest, int *dests) {
-   DDCMSG(D_RF,YELLOW, "RF READING");
+   DDCMSG(D_RF,MAGENTA, "RF READING");
    // read as much as possible
    *dests = read(fd, dest, RF_BUF_SIZE);
-   DDCMSG(D_RF,YELLOW, "RF READ %i BYTES", *dests);
+   DDCMSG(D_RF,MAGENTA, "RF READ %i BYTES", *dests);
 
    // did we read nothing?
    if (*dests <= 0) {

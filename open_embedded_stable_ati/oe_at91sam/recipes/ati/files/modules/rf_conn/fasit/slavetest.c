@@ -383,16 +383,16 @@ int main(int argc, char **argv) {
 
 
    // connect to given address
-   DCMSG(YELLOW, "CREATING SOCKET");
+   DCMSG(MAGENTA, "CREATING SOCKET");
    if ((sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
       DieWithError("Failed to open socket");
    }
-   DCMSG(YELLOW, "CONNECTING");
+   DCMSG(MAGENTA, "CONNECTING");
    if (connect(sock, (struct sockaddr *)&raddr, sizeof(raddr)) < 0) {
       DieWithError("Failed to connect");
    }
    setnonblocking(sock, 1); // set keep alive
-   DCMSG(YELLOW, "CONNECTED");
+   DCMSG(MAGENTA, "CONNECTED");
 
    // setup epoll
    efd = epoll_create(MAX_CONNECTIONS);
@@ -503,8 +503,8 @@ int main(int argc, char **argv) {
                            extra_buf_c = RF_size(tpkt->cmd) - c;
                         }
                         // output what we did read
-                        debugRF(YELLOW, buf);
-                        DCMSG_HEXB(YELLOW, "READ DATA:", buf, RF_size(tpkt->cmd));
+                        debugRF(MAGENTA, buf);
+                        DCMSG_HEXB(MAGENTA, "READ DATA:", buf, RF_size(tpkt->cmd));
                      }
                   }
                }

@@ -3,7 +3,6 @@
 #include "fasit_c.h"
 
 #define BufSize 1024
-#define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
 
 #define S_set(ITEM,D,ND,F,T) \
     { \
@@ -12,6 +11,10 @@
 	S->ITEM.flags = F; \
 	S->ITEM.timer = T; \
     }
+
+
+
+#define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
 
 int resp_num,resp_seq;		// global for now.  not happy
 struct timespec istart_time;
@@ -54,19 +57,20 @@ void initialize_state(minion_state_t *S){
 }
 
 // fill out default header information
-void defHeader(int mnum, FASIT_header *fhdr,int seq) {
-    fhdr->num = htons(mnum);
-    fhdr->icd1 = htons(1);
-    fhdr->icd2 = htons(1);
-    fhdr->rsrvd = htonl(0);
-    fhdr->seq = htonl(seq);
+void defHeader(FASIT_header *rhdr,int mnum,int seq,int length){
+    rhdr->num = htons(mnum);
+    rhdr->icd1 = htons(1);
+    rhdr->icd2 = htons(1);
+    rhdr->rsrvd = htonl(0);
+    rhdr->seq = htonl(seq);
+    rhdr->length = htons(sizeof(FASIT_header) + length);
     switch (mnum) {
 	case 100:
 	case 2000:
 	case 2004:
 	case 2005:
 	case 2006:
-	    fhdr->icd1 = htons(2);
+	    rhdr->icd1 = htons(2);
 	    break;
     }
 }
@@ -89,8 +93,8 @@ int read_FASIT_msg(thread_data_t *minion,char *buf, int bufsize){
 	}
 
 	header=(FASIT_header *)buf; 
-	minion->seq=htonl(header->seq);
-	DDCMSG(D_PACKET,BLUE,"minion %d: FASIT packet, cmd=%d ICD=%d.%d seq=%d len=%d", minion->mID,htons(header->num),htons(header->icd1),htons(header->icd2),minion->seq,htons(header->length));
+	DDCMSG(D_PACKET,BLUE,"minion %d: FASIT packet, cmd=%d ICD=%d.%d seq=%d len=%d",
+	       minion->mID,htons(header->num),htons(header->icd1),htons(header->icd2),htonl(header->seq),htons(header->length));
 
 	// we will return to the caller with the msglen, and they can look at the buffer and parse the message and respond to it
     } else if (msglen<0) {
@@ -131,28 +135,32 @@ int write_FASIT_msg(thread_data_t *minion,void *hdr,int hlen,void *msg,int mlen)
 // create and send a status messsage to the FASIT server
 void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
     struct iovec iov[2];
+    FASIT_header rhdr;
     FASIT_2102 msg;
     int result;
 
-    defHeader(2102, hdr,minion->seq); // sets the sequence number and other data
-    hdr->length = htons(sizeof(FASIT_header) + sizeof(FASIT_2102));
-
+    // sets the sequence number and other data    
+    defHeader(&rhdr,2102,minion->seq++, sizeof(FASIT_2102));
+    
     // fill message
     // start with zeroes
     memset(&msg, 0, sizeof(FASIT_2102));
 
     // fill out as response
+    DDCMSG(D_PACKET,YELLOW,"fillingout a 2102 status response hdr->num=%d, hdr->seq=%d",
+	   htons(hdr->num),htonl(hdr->seq));
+
     if (force==1) {
-//	msg.response.rnum = htons(hdr->num);	//  pulls the message number from the header  (htons was wrong here)
-	msg.response.rnum = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
-	msg.response.rseq = hdr->seq;
-    } else if (force==2) {
-	msg.response.rnum = resp_num;	//  pulls the message number from the header  (htons was wrong here)
-	msg.response.rseq = resp_seq;
+	msg.response.resp_num = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
+	msg.response.resp_seq = hdr->seq;
+//	msg.response.resp_num = rhdr.num;	//  pulls the message number from the header  (htons was wrong here)
+//	msg.response.resp_seq = htonl(minion->seq-1);
     } else if (force==0) {
-	msg.response.rnum = 0;	// unsolicited
-	msg.response.rseq = 0;
+	    msg.response.resp_num = 0;	// unsolicited
+	    msg.response.resp_seq = 0;
     }
+    DDCMSG(D_PACKET,RED,"2102 status response hdr->num=%d, hdr->seq=%d",
+	   htons(msg.response.resp_num),htonl(msg.response.resp_num));
     // exposure
     // instead of obfuscating the 0,45,and 90 values, just use them.
 
@@ -182,25 +190,26 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
 
     DDCMSG(D_PACKET,BLUE,"sending a 2102 status response");
     DDCMSG(D_PACKET,BLUE,"M-Num | ICD-v | seq-# | rsrvd | length  R-num  R-seq          <--- Header\n %6d  %d.%d  %6d  %6d %7d %6d %7d "
-	  ,htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htonl(hdr->seq),htonl(hdr->rsrvd),htons(hdr->length),htons(msg.response.rnum),htonl(msg.response.rseq));
+	  ,htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htonl(rhdr.seq),htonl(rhdr.rsrvd),htons(rhdr.length),htons(msg.response.resp_num),htonl(msg.response.resp_seq));
     DDCMSG(D_PACKET,BLUE,\
 	  "PSTAT | Fault | Expos | Aspct |  Dir | Move |  Speed  | POS | Type | Hits | On/Off | React | ToKill | Sens | Mode | Burst\n"\
 	  "  %3d    %3d     %3d     %3d     %3d    %3d    %6.2f    %3d   %3d    %3d      %3d     %3d      %3d     %3d    %3d    %3d ",
 	  msg.body.pstatus,msg.body.fault,msg.body.exp,msg.body.asp,msg.body.dir,msg.body.move,msg.body.speed,msg.body.pos,msg.body.type,htons(msg.body.hit),
 	  msg.body.hit_conf.on,msg.body.hit_conf.react,htons(msg.body.hit_conf.tokill),htons(msg.body.hit_conf.sens),msg.body.hit_conf.mode,htons(msg.body.hit_conf.burst));
 
-    write_FASIT_msg(minion,hdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2102));
+    write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2102));
 
 }
 
 // create and send a status messsage to the FASIT server
 void sendStatus2112(int force, FASIT_header *hdr,thread_data_t *minion) {
     struct iovec iov[2];
+    FASIT_header rhdr;
     FASIT_2112 msg;
     int result;
 
-    defHeader(2112, hdr,minion->seq); // sets the sequence number and other data
-    hdr->length = htons(sizeof(FASIT_header) + sizeof(FASIT_2112));
+    // sets the sequence number and other data    
+    defHeader(&rhdr,2112,minion->seq++, sizeof(FASIT_2112));
 
     // fill message
     // start with zeroes
@@ -208,18 +217,15 @@ void sendStatus2112(int force, FASIT_header *hdr,thread_data_t *minion) {
 
     // fill out as response
     if (force==1) {
-//	msg.response.rnum = htons(hdr->num);	//  pulls the message number from the header  (htons was wrong here)
-	msg.response.rnum = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
-	msg.response.rseq = hdr->seq;
-    } else if (force==2) {
-	msg.response.rnum = resp_num;	//  pulls the message number from the header  (htons was wrong here)
-	msg.response.rseq = resp_seq;
+	msg.response.resp_num = hdr->num;	//  pulls the message number from the header that we are responding to
+	msg.response.resp_seq = hdr->seq;
     } else if (force==0) {
-	msg.response.rnum = 0;	// unsolicited
-	msg.response.rseq = 0;
+	msg.response.resp_num = 0;	// unsolicited
+	msg.response.resp_seq = 0;
     }
 
-    msg.response.rnum = htons(2110);	// we are responding to 2110
+    // not sure if this line is right, though
+//    msg.response.resp_num = htons(2110);	    // the old code had this and seemed to work better
     
     msg.body.on = minion->S.mfs_on.newdata;
     msg.body.mode = minion->S.mfs_mode.newdata;
@@ -228,13 +234,13 @@ void sendStatus2112(int force, FASIT_header *hdr,thread_data_t *minion) {
 
     DDCMSG(D_PACKET,BLUE,"sending a 2112 status response");
     DDCMSG(D_PACKET,BLUE,"M-Num | ICD-v | seq-# | rsrvd | length  R-num  R-seq          <--- Header\n %6d  %d.%d  %6d  %6d %7d %6d %7d "
-	  ,htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htonl(hdr->seq),htonl(hdr->rsrvd),htons(hdr->length),htons(msg.response.rnum),htonl(msg.response.rseq));
+	   ,htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htonl(rhdr.seq),htonl(rhdr.rsrvd),htons(rhdr.length),htons(msg.response.resp_num),htonl(msg.response.resp_seq));
     DDCMSG(D_PACKET,BLUE,\
 	  "   ON | Mode  | idelay| rdelay\n"\
 	  "  %3d    %3d     %3d     %3d   ",
 	  msg.body.on,msg.body.mode,msg.body.idelay,msg.body.rdelay)
     
-    write_FASIT_msg(minion,hdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2112));
+    write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2112));
 
 }
 
@@ -255,17 +261,18 @@ int send_2101_ACK(FASIT_header *hdr,int response,thread_data_t *minion) {
     // and 'F' for Received and Cannot comply
     // other Command ID's send other messages
 
-    defHeader(2101, &rhdr,minion->seq); // sets the sequence number and other data
-    rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2101));
-
+    // sets the sequence number and other data    
+    defHeader(&rhdr,2102,minion->seq++, sizeof(FASIT_2102));
+    
     // set response
-    rmsg.response.rnum = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
-    rmsg.response.rseq = hdr->seq;		
+    rmsg.response.resp_num = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
+    rmsg.response.resp_seq = htonl(hdr->seq);		
 
     rmsg.body.resp = response;	// The actual response code 'S'=can do, 'F'=Can't do
-    //    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htons(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
+    //    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd |
+    //    length\n%6d  %d.%d  %6d  %6d  %7d",htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htonl(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
     //    DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nR-NUM | R-Seq | Response\n%5d  %6d  '%c'",
-    //	  htons(rmsg.response.rnum),htons(rmsg.response.rseq),rmsg.body.resp);
+    //	  htons(rmsg.response.resp_num),htons(rmsg.response.resp_seq),rmsg.body.resp);
 
     write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&rmsg,sizeof(FASIT_2101));
     return 0;
@@ -302,27 +309,28 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
     
     // map header and body for both message and response
     header = (FASIT_header*)(buf);
-    DDCMSG(D_PACKET,BLUE,"MINION %d: Handle_FASIT_msg recieved fasit packet num=%d length=%d packetlen=%d",minion->mID,htons(header->num),htons(header->length),packetlen);
+    DDCMSG(D_PACKET,BLUE,"MINION %d: Handle_FASIT_msg recieved fasit packet num=%d seq=%d length=%d packetlen=%d",
+	   minion->mID,htons(header->num),htonl(header->seq),htons(header->length),packetlen);
 
     // now we need to parse and respond to the message we just recieved
     // we have received a message from the mcp, process it
     // it is either a command, or it is an RF response from our slave
 
+    
     switch (htons(header->num)) {
 	case 100:
 
 	    // message 100 is responded with a 2111 as in sit_client.cpp
 	    // build a response here
-	    defHeader(2111,&rhdr,minion->seq++);	// fills in the default values for the response header 
-	    rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2111));
-
-	    // set response
-	    msg.response.rnum = htons(100);
-	    msg.response.rseq = rhdr.seq;
+	    // sets the sequence number and other data    
+	    defHeader(&rhdr,2111,minion->seq++, sizeof(FASIT_2111));
+	    
+	    // set response message and sequence numbers
+	    msg.response.resp_num = header->num;
+	    msg.response.resp_seq = header->seq;
 
 	    // fill message
 	    msg.body.devid = htonll(0x705eaa000000L+ minion->devid); // MAC address  70:5E:AA:xx.xx.xx  devid is the last 3 bytes
-
 
 	    // get the capability flags from the cap field
 
@@ -341,8 +349,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 	    DDCMSG(D_PACKET,RED,"Prepared to send 2111 device capabilites message response to a 100:");
 	    DDCMSG(D_PACKET,BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n"\
 		   "%4d    %d.%d     %5d    %3d     %3d"
-		   ,htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htons(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
-	    DDCMSG(D_PACKET,BLUE,"\t\t\t\t\t\t\tmessage body\n Device ID (mac address backwards) | flag_bits == GPS=4,Muzzle Flash=2,MILES Shootback=1\n0x%8.8llx           0x%2x"
+		   ,htons(rhdr.num),htons(rhdr.icd1),htons(rhdr.icd2),htonl(rhdr.seq),htons(rhdr.rsrvd),htons(rhdr.length));
+	    DDCMSG(D_PACKET,BLUE,"\t\t\t2111 message body\n Device ID (mac address backwards)   flag_bits == GPS=4,Muzzle Flash=2,MILES Shootback=1\n0x%8.8llx                    0x%2x"
 		   ,msg.body.devid,msg.body.flags);
 	    write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2111));
 	    break;
@@ -352,9 +360,6 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 	    DDCMSG(D_PACKET,BLUE,"MINION %d: fasit packet 2100, CID=%d", minion->mID,message_2100->cid);
 
-	    // save response numbers
-	    resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
-	    resp_seq = header->seq;
 
 	    // Just parse out the command for now and print a pretty message
 	    switch (message_2100->cid) {
@@ -397,7 +402,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 	    DDCMSG(D_PACKET,CYAN,"Full message decomposition....");
 	    DDCMSG(D_PACKET,CYAN,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d"
-		  ,htons(header->num),htons(header->icd1),htons(header->icd2),htons(header->seq),htons(header->rsrvd),htons(header->length));
+		  ,htons(header->num),htons(header->icd1),htons(header->icd2),htonl(header->seq),htons(header->rsrvd),htons(header->length));
 
 	    DDCMSG(D_PACKET,CYAN,"\t\t\t\t\t\t\tmessage body\n"\
 		  "C-ID | Expos | Aspct |  Dir | Move |  Speed | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n"\
@@ -422,11 +427,9 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 		case CID_Status_Request:
 		    // send 2102 status
-		    DDCMSG(D_PACKET,BLUE,"CID_Status_Request   send 2102 status") ;
-		    // save response numbers
-		    resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
-		    resp_seq = header->seq;
-
+			DDCMSG(D_PACKET,BLUE,"CID_Status_Request   send 2102 status  hdr->num=%d, hdr->seq=%d",
+			       htons(header->num),htonl(header->seq));
+			
 		    sendStatus2102(1,header,minion); // forces sending of a 2102
 		    // AND/OR? send 2115 MILES shootback status if supported
 		    //			    if (acc_conf.acc_type == ACC_NES_MFS){
@@ -435,7 +438,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    if (minion->S.cap&PD_NES){
 			DDCMSG(D_PACKET,BLUE,"we also seem to have a MFS Muzzle Flash Simulator - send 2112 status") ; 
 			// AND/OR? send 2112 Muzzle Flash status if supported   
-			sendStatus2112(2,header,minion); // forces sending of a 2112, 2 means use saved resp and seq numbers
+//			sendStatus2112(1,header,minion); // forces sending of a 2112, 2 means use saved resp and seq numbers
+			sendStatus2112(0,header,minion); // forces sending of a 2112, 2 means use saved resp and seq numbers
 		    }
 		    break;
 
@@ -533,7 +537,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    DDCMSG(D_PACKET,BLUE,"CID_Config_Hit_Sensor  send a 2102 in response") ;
 		    DDCMSG(D_PACKET,BLUE,"Full message decomposition....");
 		    DDCMSG(D_PACKET,BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d"
-			  ,htons(header->num),htons(header->icd1),htons(header->icd2),htons(header->seq),htons(header->rsrvd),htons(header->length));
+			  ,htons(header->num),htons(header->icd1),htons(header->icd2),htonl(header->seq),htons(header->rsrvd),htons(header->length));
 
 		    DDCMSG(D_PACKET,BLUE,"\t\t\t\t\t\t\tmessage body\n"\
 			  "C-ID | Expos | Aspct |  Dir | Move |  Speed | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n"\
@@ -590,7 +594,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 		    // send 2102 status or change the hit count (which will send the 2102 later)
 		    if (1 /*hits == htons(message_2100->hit)*/) {
-			sendStatus2102(2,header,minion);  // sends a 2102 as we won't if we didn't change the the hit count
+			sendStatus2102(1,header,minion);  // sends a 2102 as we won't if we didn't change the the hit count
 			DDCMSG(D_PACKET,BLUE,"We will send 2102 status in response to the config hit sensor command");
 			
 		    } else {
@@ -625,15 +629,9 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 	case 2110:
 	    message_2110 = (FASIT_2110*)(buf + sizeof(FASIT_header));
-	    resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
-	    resp_seq = header->seq;
 
 	    DDCMSG(D_PACKET,BLUE,"MINION %d: fasit packet 2110 Configure_Muzzle_Flash, seq=%d  on=%d  mode=%d  idelay=%d  rdelay=%d"
 		  , minion->mID,htonl(header->seq),message_2110->on,message_2110->mode,message_2110->idelay,message_2110->rdelay);
-
-	    // save response numbers
-	    resp_num = header->num; //  pulls the message number from the header  (htons was wrong here)
-	    resp_seq = header->seq;
 
 	    // check to see if we have muzzle flash capability -  or just pretend
 	    if (minion->S.cap&PD_NES){
@@ -649,7 +647,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 		//doMFS(msg->on,msg->mode,msg->idelay,msg->rdelay);
 		// when the didMFS happens fill in the 2112, force a 2112 message to be sent
-		sendStatus2112(2,header,minion); // forces sending of a 2112
+		sendStatus2112(1,header,minion); // forces sending of a 2112
 		//			    sendStatus2102(0,header,minion); // forces sending of a 2102
 		//sendMFSStatus = 1; // force
 	    } else {
@@ -895,9 +893,11 @@ void *minion_thread(thread_data_t *minion){
 		header = (FASIT_header*)(buf);	// find out how long of message we have
 		length=htons(header->length);	// set the length for the handle function
 		if (result>length){
-		    DDCMSG(D_PACKET,BLUE,"MINION %d: Multiple Packet  num=%d  result=%d seq=%d header->length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
+			DDCMSG(D_PACKET,BLUE,"MINION %d: Multiple Packet  num=%d  result=%d seq=%d header->length=%d",
+			       minion->mID,htons(header->num),result,htonl(header->seq),length);
 		} else {
-		    DDCMSG(D_PACKET,BLUE,"MINION %d:  num=%d  result=%d seq=%d header->length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
+			DDCMSG(D_PACKET,BLUE,"MINION %d: num=%d  result=%d seq=%d header->length=%d",
+			       minion->mID,htons(header->num),result,htonl(header->seq),length);
 		}
 		tbuf=buf;			// use our temp pointer so we can step ahead
 		// loop until result reaches 0
@@ -911,7 +911,7 @@ void *minion_thread(thread_data_t *minion){
 		    header = (FASIT_header*)(tbuf);	// find out how long of message we have
 		    length=htons(header->length);	// set the length for the handle function
 		    if (result){
-			DDCMSG(D_PACKET,BLUE,"MINION %d: Continue processing the rest of the BIG fasit packet num=%d  result=%d seq=%d  length=%d",minion->mID,htons(header->num),result,htons(header->seq),length);
+			DDCMSG(D_PACKET,BLUE,"MINION %d: Continue processing the rest of the BIG fasit packet num=%d  result=%d seq=%d  length=%d",minion->mID,htons(header->num),result,htonl(header->seq),length);
 		    }
 		}
 	    } else {
