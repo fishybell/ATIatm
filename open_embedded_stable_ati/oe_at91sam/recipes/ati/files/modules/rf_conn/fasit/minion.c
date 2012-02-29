@@ -12,8 +12,6 @@
 	S->ITEM.timer = T; \
     }
 
-
-
 #define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
 
 int resp_num,resp_seq;		// global for now.  not happy
@@ -146,10 +144,7 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
     // start with zeroes
     memset(&msg, 0, sizeof(FASIT_2102));
 
-    // fill out as response
-    DDCMSG(D_PACKET,YELLOW,"fillingout a 2102 status response hdr->num=%d, hdr->seq=%d",
-	   htons(hdr->num),htonl(hdr->seq));
-
+    // fill out response
     if (force==1) {
 	msg.response.resp_num = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
 	msg.response.resp_seq = hdr->seq;
@@ -262,11 +257,11 @@ int send_2101_ACK(FASIT_header *hdr,int response,thread_data_t *minion) {
     // other Command ID's send other messages
 
     // sets the sequence number and other data    
-    defHeader(&rhdr,2102,minion->seq++, sizeof(FASIT_2102));
+    defHeader(&rhdr,2101,minion->seq++, sizeof(FASIT_2101));
     
     // set response
     rmsg.response.resp_num = hdr->num;	//  pulls the message number from the header  (htons was wrong here)
-    rmsg.response.resp_seq = htonl(hdr->seq);		
+    rmsg.response.resp_seq = hdr->seq;		
 
     rmsg.body.resp = response;	// The actual response code 'S'=can do, 'F'=Can't do
     //    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd |
