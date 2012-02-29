@@ -17,7 +17,8 @@
 #define LIFTER_TYPE  	"infantry"
 
 #define TIMEOUT_IN_SECONDS		3
-#define SENSOR_TIMEOUT_IN_MILLISECONDS		150
+#define SENSOR_TIMEOUT_LEAVE_IN_MILLISECONDS		150
+#define SENSOR_TIMEOUT_ARRIVE_IN_MILLISECONDS	750
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -102,8 +103,10 @@ static struct timer_list timeout_timer_list = TIMER_INITIALIZER(timeout_fire, 0,
 //---------------------------------------------------------------------------
 // Declaration of the function that gets called when the sensor timeout fires.
 //---------------------------------------------------------------------------
-static void sensor_timeout_fire(unsigned long data);
-static struct timer_list sensor_timeout_list = TIMER_INITIALIZER(sensor_timeout_fire, 0, 0);
+static void sensor_timeout_leave_fire(unsigned long data);
+static struct timer_list sensor_timeout_leave_list = TIMER_INITIALIZER(sensor_timeout_leave_fire, 0, 0);
+static void sensor_timeout_arrive_fire(unsigned long data);
+static struct timer_list sensor_timeout_arrive_list = TIMER_INITIALIZER(sensor_timeout_arrive_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Maps the position to position name.
@@ -149,47 +152,93 @@ static void do_fault(int etype) {
 //---------------------------------------------------------------------------
 // Starts the timeout timer.
 //---------------------------------------------------------------------------
-static int sensorTimerDirection;
-static void sensor_timeout_start(int direction)
+static int sensorTimerLeaveDirection;
+static void sensor_timeout_leave_start(int direction)
 	{
-   sensorTimerDirection = direction;
-	mod_timer(&sensor_timeout_list, jiffies+(SENSOR_TIMEOUT_IN_MILLISECONDS*HZ/1000));
+   sensorTimerLeaveDirection = direction;
+	mod_timer(&sensor_timeout_leave_list, jiffies+(SENSOR_TIMEOUT_LEAVE_IN_MILLISECONDS*HZ/1000));
 	}
 
 //---------------------------------------------------------------------------
 // Stops the timeout timer.
 //---------------------------------------------------------------------------
-static void sensor_timeout_stop(void)
+static void sensor_timeout_leave_stop(void)
 	{
-	del_timer(&sensor_timeout_list);
+	del_timer(&sensor_timeout_leave_list);
 	}
 
 //---------------------------------------------------------------------------
 // The function that gets called when the timeout fires.
 //---------------------------------------------------------------------------
-static void sensor_timeout_fire(unsigned long data)
+static void sensor_timeout_leave_fire(unsigned long data)
     {
     int readLimit;
+    sensor_timeout_leave_stop();
     if (!atomic_read(&full_init))
         {
         return;
         }
 
-	if (sensorTimerDirection == LIFTER_POSITION_DOWN)
+	if (sensorTimerLeaveDirection == LIFTER_POSITION_DOWN)
 		{
          readLimit = at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT);
          if (readLimit == INPUT_LIFTER_POS_ACTIVE_STATE) {
             do_fault(ERR_not_leave_expose); // Did not leave expose switch
          }
 		}
-	else if (sensorTimerDirection == LIFTER_POSITION_UP)
+	else if (sensorTimerLeaveDirection == LIFTER_POSITION_UP)
 		{
          readLimit = at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT);
          if (readLimit == INPUT_LIFTER_POS_ACTIVE_STATE) {
             do_fault(ERR_not_leave_conceal); // Did not leave conceal switch
          }
 		}
-      sensor_timeout_stop();
+    }
+
+//---------------------------------------------------------------------------
+// Starts the timeout timer.
+//---------------------------------------------------------------------------
+static int sensorTimerArriveDirection;
+static void sensor_timeout_arrive_start(int direction)
+	{
+   sensorTimerArriveDirection = direction;
+	mod_timer(&sensor_timeout_arrive_list, jiffies+(SENSOR_TIMEOUT_ARRIVE_IN_MILLISECONDS*HZ/1000));
+	}
+
+//---------------------------------------------------------------------------
+// Stops the timeout timer.
+//---------------------------------------------------------------------------
+static void sensor_timeout_arrive_stop(void)
+	{
+	del_timer(&sensor_timeout_arrive_list);
+	}
+
+//---------------------------------------------------------------------------
+// The function that gets called when the timeout fires.
+//---------------------------------------------------------------------------
+static void sensor_timeout_arrive_fire(unsigned long data)
+    {
+    int readLimit;
+    sensor_timeout_arrive_stop();
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+
+	if (sensorTimerArriveDirection == LIFTER_POSITION_DOWN)
+		{
+         readLimit = at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT);
+         if (readLimit != INPUT_LIFTER_POS_ACTIVE_STATE) {
+            do_fault(ERR_not_reach_conceal); // Did not reach conceal switch
+         }
+		}
+	else if (sensorTimerArriveDirection == LIFTER_POSITION_UP)
+		{
+         readLimit = at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT);
+         if (readLimit != INPUT_LIFTER_POS_ACTIVE_STATE) {
+            do_fault(ERR_not_reach_expose); // Did not reach expose switch
+         }
+		}
     }
 
 //---------------------------------------------------------------------------
@@ -238,7 +287,8 @@ delay_printk("%s - %s()\n",TARGET_NAME, __func__);
         at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// Turn brake off
     	at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// Turn motor on
     	spin_unlock_irqrestore(&motor_lock, flags);
-      sensor_timeout_start(direction);
+      sensor_timeout_leave_start(direction);
+      sensor_timeout_arrive_start(direction);
     }
 
     // when not locking, signal an event
@@ -320,6 +370,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 	   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     	timeout_timer_stop();
+      sensor_timeout_arrive_stop();
 
         // Turn the motor off
         hardware_motor_off();
@@ -375,6 +426,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 	delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     	timeout_timer_stop();
+      sensor_timeout_arrive_stop();
 
         // Turn the motor off
         hardware_motor_off();
