@@ -57,6 +57,7 @@ FUNCTION_START("::Reset()");
       int pid;
       signal(SIGCHLD, SIG_IGN);
       if (!fork()) {
+        sleep(2);
         DCMSG(BLUE,"Preparing to REBOOT");
          nl_conn->~NL_Conn();
          if (fd >= 0) close(fd);
