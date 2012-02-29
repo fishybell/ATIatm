@@ -3,6 +3,7 @@
 #include "fasit_c.h"
 
 #define BufSize 1024
+#define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
 
 #define S_set(ITEM,D,ND,F,T) \
     { \
