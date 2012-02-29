@@ -949,10 +949,18 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
                 // wheel going backwards, but reversed, so we're going forward
                 atomic_inc(&position);
                 atomic_set(&quad_direction, 1);
+               if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE) {
+                  do_fault(ERR_wrong_direction);
+                  hardware_speed_set(0);
+               }
             } else {
                 // wheel going forwards, but reversed, so we're going backwards
                 atomic_dec(&position);
                 atomic_set(&quad_direction, -1);
+               if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD) {
+                  do_fault(ERR_wrong_direction);
+                  hardware_speed_set(0);
+               }
             }
         } else {
             // reverse flag not set
@@ -960,10 +968,18 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
                 // wheel going backwards, so we're going reversed
                 atomic_dec(&position);
                 atomic_set(&quad_direction, -1);
+               if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD) {
+                  do_fault(ERR_wrong_direction);
+                  hardware_speed_set(0);
+               }
             } else {
                 // wheel going forward, so we're going forward
                 atomic_inc(&position);
                 atomic_set(&quad_direction, 1);
+               if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE) {
+                  do_fault(ERR_wrong_direction);
+                  hardware_speed_set(0);
+               }
             }
         }
         atomic_set(&delta_t, this_t + atomic_read(&o_count));
@@ -2512,6 +2528,9 @@ struct target_device target_device_mover_generic =
 //---------------------------------------------------------------------------
 static void do_position(struct work_struct * work)
         {
+         int dir;
+         int len;
+         int pos;
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
@@ -2530,9 +2549,9 @@ static void do_position(struct work_struct * work)
             }
             // See if our position is out of bounds
             // The numbers 100 and -100 are randomly picked 
-            int dir = atomic_read(&movement_atomic);
-            int len = atomic_read(&internal_length);
-            int pos = atomic_read(&position);
+            dir = atomic_read(&movement_atomic);
+            len = atomic_read(&internal_length);
+            pos = atomic_read(&position);
             if (len != 0 &&
                   ((dir == MOVER_DIRECTION_FORWARD) && (pos > (len + 100))) ||
                   ((dir == MOVER_DIRECTION_REVERSE) && (pos < -100))) {
