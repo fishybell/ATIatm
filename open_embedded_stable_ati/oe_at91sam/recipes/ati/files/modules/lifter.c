@@ -606,11 +606,67 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
     return rc;
 }
 
+/* Kill if we need to */
+void do_kill_internal(void) {
+	int stay_up = 1;
+	u8 kdata;
+	if (atomic_read(&hits_to_kill) > 0) {
+		stay_up = !atomic_dec_and_test(&kill_counter);
+        // If fasit bob then bob after each hit until killed
+        if (atomic_read(&bob_type) == 1 && stay_up) {
+           enable_battery_check(0); // disable battery checking while motor is on
+           set_target_conceal();
+           lifter_position_set(LIFTER_POSITION_DOWN); // conceal now 
+        }
+	}
+	if (!stay_up) {
+		atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+
+		// create events for outputs
+		generic_output_event(EVENT_KILL);
+
+		// send kill upstream (always, no matter what the upload value is)
+		kdata = EVENT_KILL; // cast to 8-bits
+		queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
+
+		// bob if we need to bob
+		switch (atomic_read(&after_kill)) {
+			case 0: /* fall */
+			case 1: /* kill -- TODO -- find out difference between fall and kill */
+				// put down
+                enable_battery_check(0); // disable battery checking while motor is on
+				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+				break;
+			case 2: /* stop */
+				// TODO -- send stop movement message to mover
+				break;
+			case 3: /* fall/stop */
+				// put down
+                enable_battery_check(0); // disable battery checking while motor is on
+				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+				// TODO -- send stop movement message to mover
+				break;
+			case 4: 
+                if (atomic_read(&bob_type) != 1) { /* ats bob */
+				   // put down
+                   enable_battery_check(0); // disable battery checking while motor is on
+                   set_target_conceal();
+				   lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+                } else if (atomic_read(&bob_type) == 1) { /* fasit bob */
+                   enable_battery_check(0); // disable battery checking while motor is on
+				   lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+                }
+				break;
+		}
+	}
+}
+
 //---------------------------------------------------------------------------
 // netlink command handler for accessory commands
 //---------------------------------------------------------------------------
 int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
+    int htk = -1;
     int rc = HANDLE_SUCCESS_NO_REPLY; // by default this is a command with no response
     struct hit_calibration *hit_c;
     delay_printk("Lifter: handling hit-calibration command\n");
@@ -639,6 +695,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     break;
                 case HIT_OVERWRITE_ALL:   /* overwrites every value */
                     set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
+                    htk = atomic_read(&hits_to_kill);
                     atomic_set(&hits_to_kill, hit_c->hits_to_kill);
                     atomic_set(&after_kill, hit_c->after_kill);
                     atomic_set(&bob_type, hit_c->bob_type);
@@ -658,6 +715,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     schedule_work(&hit_enable_work); // fix the hit sensor enabling soon
                     break;
                 case HIT_OVERWRITE_OTHER: /* overwrites non-calibration values (type, etc.) */
+                    htk = atomic_read(&hits_to_kill);
                     atomic_set(&hits_to_kill, hit_c->hits_to_kill);
                     atomic_set(&after_kill, hit_c->after_kill);
                     atomic_set(&hit_type, hit_c->type);
@@ -669,10 +727,15 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     set_hit_invert(hit_c->invert);
                     break;
                 case HIT_OVERWRITE_KILL:  /* overwrites hits_to_kill value only */
+                    htk = atomic_read(&hits_to_kill);
                     atomic_set(&hits_to_kill, hit_c->hits_to_kill);
                     atomic_set(&after_kill, hit_c->after_kill);
                     atomic_set(&kill_counter, hit_c->hits_to_kill); // reset kill counter
                     break;
+            }
+            /* if we changed hits to kill see if we need to do kill */
+            if (htk > 0 && htk != atomic_read(&hits_to_kill)){
+               do_kill_internal();
             }
         }
     }
@@ -920,9 +983,7 @@ void hit_event(int line) {
 
 void hit_event_internal(int line, bool upload) {
 	struct hit_item *new_hit;
-    struct hit_calibration *hit_c;
-	int stay_up = 1;
-	u8 hits = 0, kdata;
+	u8 hits = 0;
 	u8 data = EVENT_HIT; // cast to 8-bits
 	delay_printk("hit_event_internal(line=%i, upload=%d)\n", line,upload);
 
@@ -964,56 +1025,7 @@ void hit_event_internal(int line, bool upload) {
    }
 
 	// go down if we need to go down
-	if (atomic_read(&hits_to_kill) > 0) {
-		stay_up = !atomic_dec_and_test(&kill_counter);
-        // If fasit bob then bob after each hit until killed
-        if (atomic_read(&bob_type) == 1 && stay_up) {
-           enable_battery_check(0); // disable battery checking while motor is on
-           set_target_conceal();
-           lifter_position_set(LIFTER_POSITION_DOWN); // conceal now 
-        }
-	}
-	if (!stay_up) {
-		atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
-
-		// create events for outputs
-		generic_output_event(EVENT_KILL);
-
-		// send kill upstream (always, no matter what the upload value is)
-		kdata = EVENT_KILL; // cast to 8-bits
-		queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
-
-		// bob if we need to bob
-		switch (atomic_read(&after_kill)) {
-			case 0: /* fall */
-			case 1: /* kill -- TODO -- find out difference between fall and kill */
-				// put down
-                enable_battery_check(0); // disable battery checking while motor is on
-				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-				break;
-			case 2: /* stop */
-				// TODO -- send stop movement message to mover
-				break;
-			case 3: /* fall/stop */
-				// put down
-                enable_battery_check(0); // disable battery checking while motor is on
-				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-				// TODO -- send stop movement message to mover
-				break;
-			case 4: 
-                if (atomic_read(&bob_type) != 1) { /* ats bob */
-				   // put down
-                   enable_battery_check(0); // disable battery checking while motor is on
-                   set_target_conceal();
-				   lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-                } else if (atomic_read(&bob_type) == 1) { /* fasit bob */
-                   enable_battery_check(0); // disable battery checking while motor is on
-				   lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-                }
-				break;
-		}
-	}
-
+   do_kill_internal();
 }
 
 void disconnected_hit_sensor_event(int disconnected) {
