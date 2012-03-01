@@ -1,9 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 
-int verbose;
-int slottime;
-int low_dev,high_dev;
+int verbose,devtype;
 
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
@@ -47,15 +45,18 @@ void HandleSlaveRF(int RFfd){
     int gathered;
     uint8 crc;
     
+    int slottime,my_slot,total_slots;
+    int low_dev,high_dev;
+    
     fd_set rf_or_mcp;
     struct timeval timeout;
     LB_packet_t *LB,rLB;
-    int len,addr,cmd,RF_addr,size,my_slot;
+    int len,addr,cmd,RF_addr,size;
 
     uint32 DevID;
     LB_request_new_t *LB_new;
     LB_device_reg_t *LB_devreg;
-    LB_device_addr_t *LB_addr;
+    LB_assign_addr_t *LB_addr;
     LB_expose_t *LB_exp;
     
     RF_addr=2047;	//  means it is unassigned.  we will always respond to the request_new in our temp slot
@@ -102,8 +103,8 @@ void HandleSlaveRF(int RFfd){
 			    ,RF_addr,pcount++,RF_size(LB->cmd),LB->cmd,LB->addr,crc);
 		    DCMSG_HEXB(GREEN,buf,Rx->head,size);
 		}
-	// only respond if our address matches AND the crc was good
-		if (!crc && ((RF_addr==LB->addr)||((RF_addr>1709)&&(LB->cmd==LBC_REQUEST_NEW)))){
+	// only parse  if crc is good, we got one of the right commands, or our address matches
+		if (!crc && ((LB->cmd==LBC_REQUEST_NEW)||(LB->cmd==LBC_REQUEST_NEW)||(RF_addr==LB->addr))){
 		    timestamp(&elapsed_time,&istart_time,&delta_time);
 		    DDCMSG(D_TIME,CYAN,"RFslave top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 			   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
@@ -112,51 +113,69 @@ void HandleSlaveRF(int RFfd){
 	//  if good CRC, parse and respond or whatever
 		    switch (LB->cmd){
 			case LBC_REQUEST_NEW:
-			    DCMSG(BLUE,"Recieved 'request new devices' packet.");
 			    LB_new =(LB_request_new_t *) LB;
-			    slottime=LB_new->slottime*5;
+
+			    /****      we have a request_new
+			     ****
+			     ****      We respond
+			     ****      if our devid is in range
+			     ****      AND
+			     ****      our RF_addr=2047 OR reregister=1
+			     ****
+			     ****      */
 			    low_dev=LB_new->low_dev;
 			    high_dev=LB_new->high_dev;
-			    
+
+			    if (((DevID>=low_dev)&&(DevID<=high_dev)) &&
+				  ((RF_addr==2047)||LB_new->reregister)){   // passed the test
+								
+				slottime=LB_new->slottime*5;
+				total_slots=high_dev-low_dev+2;	// total number of slots with end padding
+
 		// create a RESPONSE packet
-			    rLB.cmd=LBC_DEVICE_REG;
-			    LB_devreg =(LB_device_reg_t *)(&rLB);	// map our bitfields in
-			    LB_devreg->dev_type=1;			// SIT with MFS
-			    LB_devreg->devid=DevID;		// Actual 3 significant bytes of MAC address
+				rLB.cmd=LBC_DEVICE_REG;
+				LB_devreg =(LB_device_reg_t *)(&rLB);	// map our bitfields in
+				LB_devreg->dev_type=devtype;		// use the option we were invoked with
+				LB_devreg->devid=DevID;			// Actual 3 significant bytes of MAC address
 			    // respond in a slot that is DevID-low_dev, at an address 1710 more than that
-			    my_slot=DevID-low_dev;
-			    RF_addr=1710+my_slot;	//  use the fancy hash algorithm to come up with the real temp address
-			    LB_devreg->addr=RF_addr;
+				my_slot=DevID-low_dev;
+				total_slots=high_dev-low_dev;
+				my_slot++;		// add the holdoff in, so we never use slot zero
+
+				DDCMSG(D_RF,BLUE,"Recieved 'request new devices' set slottime=%dms total_slots=%d my_slot=%d RF_addr=%d",
+				   slottime,total_slots,my_slot,RF_addr);			    			    
 
 		// calculates the correct CRC and adds it to the end of the packet payload
-			    set_crc8(&rLB);
-			    DDCMSG(D_RF,BLUE,"setting temp addr to %4d (0x%x) after CRC calc  RF_addr= %4d (0x%x)",RF_addr,RF_addr,LB_devreg->addr,LB_devreg->addr);
+				set_crc8(&rLB);
 
 		// now send it to the RF master
 		// after waiting for our timeslot:   which is slottime*(MAC&MASK) for now
 
-			    usleep(slottime*(my_slot+1)*1000);
-			    DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
+				usleep(slottime*(my_slot)*1000);	// plus 1 is the holdoff
+				DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
 			    
-			    result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
-			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-				sprintf(hbuf,"new device response to RFmaster devid=0x%06X address=%4d (0x%4x) len=%2d wrote %d\n"
-					,LB_devreg->devid,LB_devreg->addr,LB_devreg->addr,RF_size(LB_devreg->cmd),result);
-				DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
+				result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
+				if (verbose&D_RF){	// don't do the sprintf if we don't need to
+				    sprintf(hbuf,"new device response to RFmaster devid=0x%06X len=%2d wrote %d\n"
+					    ,LB_devreg->devid,RF_size(LB_devreg->cmd),result);
+				    DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
+				}
+			    
+				// finish waiting for the slots before proceding
+				usleep(slottime*(total_slots-my_slot)*1000);
+				DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
+
 			    }
-			    
-			    // finish waiting for the slots before proceding
-			    usleep(slottime*(high_dev-low_dev+2)*1000);
-			    DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
 			    break;
 
-			case LBC_DEVICE_ADDR:
-			    DDCMSG(D_RF,BLUE,"Recieved 'device address' packet.");
-			    LB_addr =(LB_device_addr_t *)(LB);	// map our bitfields in
-
-			    DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, assigning new address %4d (0x%x)  (0x%x):11"
-				  ,RF_addr,LB_addr->new_addr,LB_addr->new_addr,LB_addr->new_addr);
-			    RF_addr=LB_addr->new_addr;	// set our new address
+			case LBC_ASSIGN_ADDR:
+			    DDCMSG(D_RF,BLUE,"Recieved 'assign address' packet.");
+			    LB_addr =(LB_assign_addr_t *)(LB);	// map our bitfields in
+			    
+			    if ((DevID==LB_addr->devid)&& ((RF_addr==2047)||LB_addr->reregister)){   // passed the test
+				RF_addr=LB_addr->new_addr;	// set our new address
+				DDCMSG(D_RF,BLUE,"Assign address matches criteria, assigning new address %4d",RF_addr);
+			    }
 			    break;
 
 			case LBC_EXPOSE:
@@ -199,7 +218,6 @@ void HandleSlaveRF(int RFfd){
 void print_help(int exval) {
     printf("RFslave [-h] [-v verbosity] [-t serial_device] \n\n");
     printf("  -h            print this help and exit\n");
-    printf("  -s            slottime in ms\n");
     printf("  -t /dev/ttyS1 set serial port device\n");
     print_verbosity();    
     exit(exval);
@@ -232,10 +250,10 @@ int main(int argc, char **argv) {
     char ttyport[32];	/* default to ttyS0  */
 
     verbose=0;
-    slottime=120000;	// try 120ms for default
+    devtype=1;	// default to SIT with MFS
     strcpy(ttyport,"/dev/ttyS1");
     
-    while((opt = getopt(argc, argv, "hv:t:s:")) != -1) {
+    while((opt = getopt(argc, argv, "hv:t:d:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
@@ -245,14 +263,14 @@ int main(int argc, char **argv) {
 		verbose = strtoul(optarg,NULL,16);
 		break;
 
-	    case 's':
-		slottime = 1000*strtoul(optarg,NULL,10);
-		break;
-
 	    case 't':
 		strcpy(ttyport,optarg);
 		break;
 		
+	    case 'd':
+		devtype=atoi(optarg);
+		break;
+
 	    case ':':
 		fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
 		print_help(1);
@@ -267,7 +285,6 @@ int main(int argc, char **argv) {
     }
 
     printf(" Watching comm port = <%s>\n",ttyport);
-    printf(" slottime = %d ms\n",slottime/1000);
 
 
     // turn power to low for the radio A/B pin

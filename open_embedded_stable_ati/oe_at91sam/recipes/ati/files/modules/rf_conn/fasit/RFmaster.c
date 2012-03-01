@@ -2,8 +2,6 @@
 #include "rf.h"
 
 int verbose;	// globals
-uint8 slottime;
-int low_dev,high_dev;
 
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
@@ -61,9 +59,13 @@ void HandleRF(int MCPsock,int RFfd){
     int maxcps=500,rfcount=0;		/*  characters per second that we can transmit without melting - 1000 is about 100% */
     double cps;
     uint8 crc;
+    int slottime,total_slots;
+    int low_dev,high_dev;
+
 
     // packet header so we can determine the length from the command in the header
     LB_packet_t *LB;
+    LB_request_new_t *LB_new;
 
     // initialize our gathering buffer
     Rptr=Rbuf;
@@ -213,13 +215,13 @@ void HandleRF(int MCPsock,int RFfd){
 		    LB=(LB_packet_t *)M1->head;
 		    size=RF_size(LB->cmd);
 		    ReQueue(Tx,M1,size);	// copy it to the TxBuf and deletes from front of old queue
-		    remaining_time =(high_dev-low_dev+1)*slottime;
+		    remaining_time =(total_slots)*slottime;
 		} else {
 		    if (Queue_Depth(M2)>2){
 			LB=(LB_packet_t *)M2->head;
 			size=RF_size(LB->cmd);
 			ReQueue(Tx,M2,size);	// copy it to the TxBuf and deletes from front of old queue
-			remaining_time =2*slottime;
+			remaining_time =3*slottime;
 		    } else {
 			if (Queue_Depth(M3)>2){
 			    int bcnt=0;
@@ -384,13 +386,21 @@ void HandleRF(int MCPsock,int RFfd){
 		while (bytecount>=3) {  // make sure there is a possibility of a whole packet
 		    LB=(LB_packet_t *)M0->head;
 		    size=RF_size(LB->cmd);
-		    DCMSG(YELLOW,"RFmaster: bytecount = %2d LB  cmd=%d size=%d",bytecount,LB->cmd,size);
+		    DDCMSG(D_VERY,YELLOW,"RFmaster: bytecount = %2d LB  cmd=%d size=%d",bytecount,LB->cmd,size);
 
 		    if (size>=bytecount){  // sort this packet which is complete although there could be more
 			switch (LB->cmd) {
 			    case LBC_REQUEST_NEW:	// put in queue #1
+				
+				LB_new =(LB_request_new_t *) LB;	// we need to parse out the slottime, high_dev and low_dev from this packet.
+				slottime=LB_new->slottime*5;		// convert passed slottime back to milliseconds
+				low_dev=LB_new->low_dev;
+				high_dev=LB_new->high_dev;
+				total_slots=high_dev-low_dev+2;		// total number of slots with end padding
+
 				ReQueue(M1,M0,size);	// move count from the front of queue M0 to tail of M1
-				DCMSG(YELLOW,"RFmaster: requeued into M1   LB  cmd=%d size=%d",LB->cmd,size);
+				DCMSG(YELLOW,"RFmaster: requeued into M1   LB  cmd=%d size=%d slottime=%d low_dev=%d high_dev=%d total_slots=%d",
+				      LB->cmd,size,slottime,low_dev,high_dev,total_slots);
 
 				break;
 
@@ -455,9 +465,10 @@ int main(int argc, char **argv) {
     unsigned short RFmasterport;	/* Server port */
     unsigned int clntLen;               /* Length of client address data structure */
     char ttyport[32];	/* default to ttyS0  */
-    int opt,slave_count,xmit;
+    int opt,xmit;
+    int slottime,total_slots;
+    int low_dev,high_dev;
 
-    slottime=150;	// time of each slot and the hold-off period
     verbose=0;
     xmit=0;		// used for testing
     RFmasterport = defaultPORT;
@@ -483,7 +494,7 @@ int main(int argc, char **argv) {
 		break;
 
 	    case 's':
-		slottime = atoi(optarg)/5;	// adjust to 1 byte
+		slottime = atoi(optarg);
 		break;
 
 	    case 'd':
@@ -516,6 +527,8 @@ int main(int argc, char **argv) {
     DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);
     DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
     DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
+
+    
     DCMSG(YELLOW,"RFmaster: slottime =%2dms",slottime);
 
     //   Okay,   set up the RF modem link here
@@ -524,24 +537,40 @@ int main(int argc, char **argv) {
 
 
     //  this section is just used for testing   
-    if (xmit){
+    if (xmit){	
 	LB_packet_t LB;
 	LB_request_new_t *RQ;
 	int result,size;
 	char buf[200];
+
+	total_slots=high_dev-low_dev+2;
+	if (!slottime || (high_dev<low_dev)){
+	    DCMSG(RED,"\nRFmaster: xmit test: slottime=%d must be set and high_dev=%d cannot be less than low_dev=%d",slottime,high_dev,low_dev);
+	    exit(-1);
+	} else {
+
+	    DCMSG(GREEN,"RFmaster: xmit test: slottime=%d  high_dev=%d low_dev=%d  total_slots=%d",slottime,high_dev,low_dev,total_slots);
+	}
+
+	if (slottime>1275){
+	    DCMSG(RED,"\nRFmaster: xmit test: slottime=%d must be set between 50? and 1275 milliseconds",slottime);
+	    exit(-1);
+	}
+
+	
 	RQ=(LB_request_new_t *)&LB;
 
 	RQ->cmd=LBC_REQUEST_NEW;
 	RQ->low_dev=low_dev;
 	RQ->high_dev=high_dev;
-	RQ->slottime=slottime;
+	RQ->slottime=slottime/5;
 	// calculates the correct CRC and adds it to the end of the packet payload
 	// also fills in the length field
 	size = RF_size(RQ->cmd);
 	set_crc8(RQ);
 
 	while(1){
-	    usleep(xmit*1000);
+	    usleep(total_slots*slottime*1000);
 	    // now send it to the RF master
 	    result=write(RFfd,RQ,size);
 	    if (result==size) {
@@ -591,4 +620,4 @@ int main(int argc, char **argv) {
 
     }
     /* NOT REACHED */
-}
+    }

@@ -727,7 +727,7 @@ void *minion_thread(thread_data_t *minion){
 
     LB_packet_t *LB;
     LB_device_reg_t *LB_devreg;
-    LB_device_addr_t *LB_addr;
+    LB_assign_addr_t *LB_addr;
     LB_expose_t *LB_exp;
 
 
@@ -842,8 +842,8 @@ void *minion_thread(thread_data_t *minion){
 
 			break;
 
-		    case LBC_DEVICE_ADDR:
-			LB_addr =(LB_device_addr_t *)(LB);	// map our bitfields in
+		    case LBC_ASSIGN_ADDR:
+			LB_addr =(LB_assign_addr_t *)(LB);	// map our bitfields in
 
 			minion->RF_addr=LB_addr->new_addr;	// set our new address
 			DCMSG(YELLOW,"Minion %d: parsed 'device address' packet.  new minion->RF_addr=%d",minion->mID,minion->RF_addr);

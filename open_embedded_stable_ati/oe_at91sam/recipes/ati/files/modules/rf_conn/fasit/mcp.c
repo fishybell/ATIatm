@@ -5,7 +5,7 @@
 thread_data_t minions[MAX_NUM_Minions];
 struct sockaddr_in fasit_addr;
 int verbose;
-uint8 slottime;
+int slottime,total_slots;
 int low_dev,high_dev;
 
 void print_help(int exval) {
@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
 
     LB_request_new_t *LB_new;
     LB_device_reg_t *LB_devreg;
-    LB_device_addr_t *LB_addr;
+    LB_assign_addr_t *LB_addr;
     
 
     // process the arguments
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
 		break;
 
 	    case 's':
-		slottime = atoi(optarg)/5;	// adjust to 1 byte
+		slottime = atoi(optarg);	// leave it in ms until it gets sent in a packet
 		break;
 
 	    case 'd':
@@ -118,9 +118,18 @@ int main(int argc, char **argv) {
 		break;
 	}
     }
-    DCMSG(YELLOW,"MCP: verbosity is set to 0x%x", verbose);
-    DCMSG(BLACK,"MCP: FASIT SERVER address = %s:%d", inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port));
-    DCMSG(YELLOW,"MCP: RFmaster SERVER address = %s:%d", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port));
+    DCMSG(BLUE,"MCP: verbosity is set to 0x%x", verbose);
+    DCMSG(BLUE,"MCP: FASIT SERVER address = %s:%d", inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port));
+    DCMSG(BLUE,"MCP: RFmaster SERVER address = %s:%d", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port));
+
+    total_slots=high_dev-low_dev+2;
+    if (!slottime || (high_dev<low_dev)){
+	DCMSG(RED,"\nMCP: slottime=%d must be set and high_dev=%d cannot be less than low_dev=%d",slottime,high_dev,low_dev);
+	exit(-1);
+    } else {
+	
+	DCMSG(RED,"MCP: slottime=%d  high_dev=%d low_dev=%d  total_slots=%d",slottime,high_dev,low_dev,total_slots);
+    }
 
     /****************************************************************
      ******
@@ -235,85 +244,100 @@ int main(int argc, char **argv) {
 			LB_devreg =(LB_device_reg_t *)(LB);	// change our pointer to the correct packet type
 			//LB_devreg->length=RF_size(LB_devreg->cmd);	
 
-			DDCMSG(D_RF,YELLOW,"MCP: RFslave sent LB DEVICE_REG packet.   devtype=%d devid=%06x addr=%d"
-			       ,LB_devreg->dev_type,LB_devreg->devid,LB_devreg->addr);
-
-			/***  we have a newly registered slave,
+			DDCMSG(D_RF,YELLOW,"MCP: RFslave sent LB_DEVICE_REG packet.   devtype=%d devid=0x%06x"
+			       ,LB_devreg->dev_type,LB_devreg->devid);
+			
+			/***
+			 ***   AFTER CHECKING if we already have a minion for this devid slave
+			 ***     and ignoring? this packet if we do
+			 ***
+			 ***  we have a newly registered slave,
 			 ***  create a minion for it
-			 ***    add it to the list of temp addresses - they need to get asssigned
-			 ***  real addresses
-			 ***  It currently has a temporary address in the range 1705-1799
-			 ***  the devid should is the last 3 bytes of the actual slave MAC address
-			 ***  
 			 ***   create a new minion - mID = slave registration address
 			 ***                       devid = MAC address
 			 ****************************************************************************/
-			mID+=1;	// increment our minion count
+		    
+/////////   CHECK if we already have a minion with this devID
+			taddr_cnt=1;		//  step through to check if we already had this one
+			while ((taddr_cnt<=mID)&&(minions[taddr_cnt].devid!=LB_devreg->devid)) taddr_cnt++;
 
-			/* open a bidirectional pipe for communication with the minion  */
-			if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &minions[mID].mcp_sock))){
-			    perror("opening stream socket pair");
-			    minions[mID].status=S_closed;
-			} else {
-			    minions[mID].status=S_open;
-			}
+			if (taddr_cnt>mID){  // we don't have this one yet.
 
-			/****
-			 ****    Initialize the minion thread data -
-			 ****/
+			    mID+=1;	// increment our minion count
 
-			minions[mID].mID=mID;	// make sure we pass the minion ID down
-			minions[mID].devid=LB_devreg->devid;	// use the actual device id (MAC address)
-			minions[mID].seq=0;	// the seq number for this minions transmissions to RCC
+			    /* open a bidirectional pipe for communication with the minion  */
+			    if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &minions[mID].mcp_sock))){
+				perror("opening stream socket pair");
+				minions[mID].status=S_closed;
+			    } else {
+				minions[mID].status=S_open;
+			    }
 
-			if (LB_devreg->dev_type==1)
-			    minions[mID].S.cap|=PD_NES;	// add the NES capability
+			    /****
+			     ****    Initialize the minion thread data -
+			     ****/
 
-			/*   fork a minion */    
-			if ((child = fork()) == -1) perror("fork");
+			    minions[mID].mID=mID;	// make sure we pass the minion ID down
+			    minions[mID].devid=LB_devreg->devid;	// use the actual device id (MAC address)
+			    minions[mID].seq=0;	// the seq number for this minions transmissions to RCC
 
-			if (child) {
-			    /* This is the parent. */
-			    DCMSG(RED,"MCP forked minion %d", mID);
-			    close(minions[mID].mcp_sock);
+			    if (LB_devreg->dev_type==1)
+				minions[mID].S.cap|=PD_NES;	// add the NES capability
 
-			} else {
-			    /* This is the child. */
-			    close(minions[mID].minion);
-			    minion_thread(&minions[mID]);
-			    DCMSG(RED,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
+			    /*   fork a minion */    
+			    if ((child = fork()) == -1) perror("fork");
 
-			    break;	// if we come back , bail to another level or something more fatal
-			}
+			    if (child) {
+				/* This is the parent. */
+				DCMSG(RED,"MCP forked minion %d", mID);
+				close(minions[mID].mcp_sock);
 
-			// add the minion to the set of file descriptors
-			// that are monitored by epoll
-			ev.events = EPOLLIN;
-			ev.data.fd = minions[mID].minion;
-			ev.data.ptr = (void *) &minions[mID]; 
+			    } else {
+				/* This is the child. */
+				close(minions[mID].minion);
+				minion_thread(&minions[mID]);
+				DCMSG(RED,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
 
-			if (epoll_ctl(fds, EPOLL_CTL_ADD, minions[mID].minion, &ev) < 0) {
-			    perror("MCP: epoll set insertion error: \n");
-			    return 1;
-			}
+				break;	// if we come back , bail to another level or something more fatal
+			    }
 
-			taddr_cnt=1;	// look for an unused address slot
-			while(taddr_cnt<1700&&(taddr[taddr_cnt].inuse)) taddr_cnt++;			    
-			taddr[taddr_cnt].addr=LB_devreg->addr;
-			taddr[taddr_cnt].devid=LB_devreg->devid;
-			taddr[taddr_cnt].fd=minions[mID].minion;
-			taddr[taddr_cnt].mID=mID;
-			taddr[taddr_cnt].inuse=1;
+			    // add the minion to the set of file descriptors
+			    // that are monitored by epoll
+			    ev.events = EPOLLIN;
+			    ev.data.fd = minions[mID].minion;
+			    ev.data.ptr = (void *) &minions[mID]; 
 
-			DDCMSG(D_RF,RED,"MCP: assigning an address slot #%d temp=%d fd=%d mID=%d inuse=%d "
-			       ,taddr_cnt,taddr[taddr_cnt].addr,taddr[taddr_cnt].fd,taddr[taddr_cnt].mID,taddr[taddr_cnt].inuse);
+			    if (epoll_ctl(fds, EPOLL_CTL_ADD, minions[mID].minion, &ev) < 0) {
+				perror("MCP: epoll set insertion error: \n");
+				return 1;
+			    }
 
-			// building a new LB packet for the RF
-			LB_buf.addr=LB_devreg->addr;
-			LB_buf.cmd=LBC_DEVICE_ADDR;
-			LB_addr =(LB_device_addr_t *)(&LB_buf);	// map our bitfields in
+			    taddr_cnt=1;	// look for an unused address slot
+			    while(taddr_cnt<2046&&(taddr[taddr_cnt].inuse)) taddr_cnt++;			    
+//			    taddr[taddr_cnt].addr=LB_devreg->addr;
+			    taddr[taddr_cnt].devid=LB_devreg->devid;
+			    taddr[taddr_cnt].fd=minions[mID].minion;
+			    taddr[taddr_cnt].mID=mID;
+			    taddr[taddr_cnt].inuse=1;
 
-			LB_addr->new_addr=taddr_cnt;	// the actual slot is the perm address
+			    DDCMSG(D_RF,RED,"MCP: assigning an address slot #%d temp=%d fd=%d mID=%d inuse=%d "
+				   ,taddr_cnt,taddr[taddr_cnt].addr,taddr[taddr_cnt].fd,taddr[taddr_cnt].mID,taddr[taddr_cnt].inuse);
+
+
+			    /***   end of create a new minion 
+			     ****************************************************************************/
+			}  //  end of check to see if we already had a minion this devID
+
+		    
+			// we send this even if we already had this devid - the slave might have rebooted
+			// taddr_cnt  should be the RF_addr slot  it already had
+
+			LB_addr =(LB_assign_addr_t *)(&LB_buf);	// map our bitfields in
+
+			LB_addr->cmd=LBC_ASSIGN_ADDR;
+			LB_addr->reregister=0;			
+			LB_addr->devid=taddr[taddr_cnt].devid;	// get what might have been given out earlier
+			LB_addr->new_addr=taddr_cnt;		// the actual slot is the perm address
 
 			DDCMSG(D_RF,RED,"MCP: Build a LB device addr packet to assign the address slot %4d (0x%x)  %4d (0x%x)"
 			       ,taddr_cnt,taddr_cnt,LB_addr->new_addr,LB_addr->new_addr);
@@ -322,7 +346,8 @@ int main(int argc, char **argv) {
 			// also fills in the length field
 			set_crc8(LB_addr);
 			if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			    sprintf(hbuf,"MCP: LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",LB_addr->addr,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
+			    sprintf(hbuf,"MCP: LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",
+				    taddr_cnt,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
 			    DDCMSG_HEXB(D_RF,BLUE,hbuf,LB_addr,7);
 			}
 			// this packet must also get sent to the minion
@@ -333,8 +358,6 @@ int main(int argc, char **argv) {
 			result=write(RF_sock,LB_addr,RF_size(LB_addr->cmd));
 			DDCMSG(D_RF,RED,"MCP: 1 Sent %d bytes to RF fd=%d",result,RF_sock);
 
-			/***   end of create a new minion 
-			 ****************************************************************************/
 
 		    } else {	// it is any other command than dev regx
 			// which means we just copy it on to the minion so it can process it
@@ -351,8 +374,9 @@ int main(int argc, char **argv) {
 			result=write(ev.data.fd,LB,RF_size(LB->cmd));
 			DDCMSG(D_RF,BLUE,"MCP: 3 Sent %d bytes to minion %d at fd=%d\n",result,mID,ev.data.fd);
 
-		    }  // all the commands from RF should have been handled
-		} // it is from the rf
+		    }
+
+		}
 		else { // it is from a minion
 
 		    //   we have to do some processing, mainly just pass on to the RF_sock
@@ -389,5 +413,5 @@ int main(int argc, char **argv) {
 	    } //  for all the ready fd's
 	}  // else we did not time out
     } //while forever loop
-
 } // end of main
+
