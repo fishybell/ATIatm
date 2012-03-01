@@ -675,8 +675,16 @@ int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
    if (fc->target_type == RF_Type_Unknown) {
       return doNothing;
    }
-   // register -- TODO -- what about if I'm already registered?
-   return send_DEVICE_REG(fc);
+
+   // register if I'm in the dev range
+   if (fc->f2111_resp.body.devid >= pkt->low_dev &&
+       fc->f2111_resp.body.devid <= pkt->high_dev) {
+      return send_DEVICE_REG(fc); // register
+   } else if (pkt->reregister) {
+      return send_DEVICE_REG(fc); // re-register
+   } else {
+      return doNothing; // already registered
+   }
 }
 
 int handle_DEVICE_ADDR(fasit_connection_t *fc, int start, int end) {
