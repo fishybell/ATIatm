@@ -570,10 +570,37 @@ int sock2tty(rf_connection_t *rc) {
       clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&rc->time_start);
    }
 
-   // TODO -- find which timeslot I'm in
+   // find which timeslot I'm in (the mcp should always leave us with exactly one of these tests as true)
+   if (rc->id_index >= 0) {
+      // timeslot is decided by which address I am in the chain
+      int i;
+      // find the lowest matching address
+      for (ts = 0; ts < min(rc->id_lasttime_index, MAX_IDS); ts++) {
+         for (i = 0; i < min(rc->id_index, MAX_IDS); i++) {
+            if (rc->ids_lasttime[ts] == rc->ids[i]) {
+               goto found_ts; // just jump down, my ts variable is now correct
+            }
+         }
+      }
+   } else if (rc->devid_last_high >= 0) {
+      int i;
+      ts = 0xffff; // start off as a really big number
+      // timeslot is decided by which devid I am in the range, find lowest devid
+      for (i = 0; i < min(rc->devid_index, MAX_IDS); i++) {
+         if ((rc->devids[i] - rc->devid_last_low) < ts) {
+            ts = rc->devids[i] - rc->devid_last_low; // exact match would be 0 slot, then 1, etc.
+         }
+      }
+      if (ts == 0xffff || ts < 0) {
+         ts = 0; // should never get here, but just in case be a sane value
+      }
+   }
+
+   // label to jump to when I found my timeslot
+   found_ts:
 
    // change timeout
-   doTimeAfter(rc, rc->timeslot_length * ts); // timeslot length * timeslot I'm in
+   doTimeAfter(rc, rc->timeslot_length * (ts + 1)); // timeslot length * timeslot I'm in, minimum of timeslot_length
 
    return (retval | doNothing); // the timeout will determine when we can write, right now do nothing or whatever retval was
 }
