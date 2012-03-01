@@ -73,7 +73,7 @@ void debug_QCONCEAL(int color, LB_packet_t *pkt) {
 
 void debug_DEVICE_REG(int color, LB_packet_t *pkt) {
    LB_device_reg_t *p = (LB_device_reg_t*)pkt;
-   DCMSG(color, "LBC_DEVICE_REG: cmd: %i, addr: %i, dev_type: %i, devid: %02X:%02X:%02X:%02X, crc: %02X", p->cmd, p->addr, p->dev_type, (p->devid & 0xff000000) >> 24, (p->devid & 0xff0000) >> 16, (p->devid & 0xff00) >> 8, p->devid & 0xff, p->crc);
+   DCMSG(color, "LBC_DEVICE_REG: cmd: %i, dev_type: %i, devid: %02X:%02X:%02X:%02X, crc: %02X", p->cmd, p->dev_type, (p->devid & 0xff000000) >> 24, (p->devid & 0xff0000) >> 16, (p->devid & 0xff00) >> 8, p->devid & 0xff, p->crc);
 }
 
 void debug_REQUEST_NEW(int color, LB_packet_t *pkt) {
@@ -81,9 +81,9 @@ void debug_REQUEST_NEW(int color, LB_packet_t *pkt) {
    DCMSG(color, "LBC_REQUEST_NEW: cmd: %i, reregister: %i, low_dev: %02X:%02X:%02X:%02X, high_dev: %02X:%02X:%02X:%02X, slottime: %i", p->cmd, p->reregister, (p->low_dev & 0xff000000) >> 24, (p->low_dev & 0xff0000) >> 16, (p->low_dev & 0xff00) >> 8, p->low_dev & 0xff, (p->high_dev & 0xff000000) >> 24, (p->high_dev & 0xff0000) >> 16, (p->high_dev & 0xff00) >> 8, p->high_dev & 0xff, p->slottime);
 }
 
-void debug_DEVICE_ADDR(int color, LB_packet_t *pkt) {
-   LB_device_addr_t *p = (LB_device_addr_t*)pkt;
-   DCMSG(color, "LBC_DEVICE_ADDR: cmd: %i, addr: %i, new_addr: %i, crc: %02X", p->cmd, p->addr, p->new_addr, p->crc);
+void debug_ASSIGN_ADDR(int color, LB_packet_t *pkt) {
+   LB_assign_addr_t *p = (LB_assign_addr_t*)pkt;
+   DCMSG(color, "LBC_ASSIGN_ADDR: cmd: %i, reregister=%i, devid =0x%06X, new_addr: %i, crc: %02X", p->cmd, p->reregister, p->devid, p->devid, p->new_addr, p->crc);
 }
 
 // debug an RF packet
@@ -122,8 +122,8 @@ void debugRF(int color, char *packet) {
          debug_DEVICE_REG(color,pkt); break;
       case LBC_REQUEST_NEW:
          debug_REQUEST_NEW(color,pkt); break;
-      case LBC_DEVICE_ADDR:
-         debug_DEVICE_ADDR(color,pkt); break;
+      case LBC_ASSIGN_ADDR:
+         debug_ASSIGN_ADDR(color,pkt); break;
    }
 }
 

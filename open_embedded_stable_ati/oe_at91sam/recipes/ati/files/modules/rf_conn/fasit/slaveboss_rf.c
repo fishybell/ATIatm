@@ -206,7 +206,7 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_AUDIO_CONTROL:
          case LBC_PYRO_FIRE:
          case LBC_DEVICE_REG:
-         case LBC_DEVICE_ADDR:
+         case LBC_ASSIGN_ADDR:
          case LBC_STATUS_REQ:
          case LBC_STATUS_RESP_LIFTER:
          case LBC_STATUS_RESP_MOVER:
@@ -273,7 +273,7 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
                HANDLE_RF (QEXPOSE);
                HANDLE_RF (QCONCEAL);
                HANDLE_RF (REQUEST_NEW);
-               HANDLE_RF (DEVICE_ADDR);
+               HANDLE_RF (ASSIGN_ADDR);
                default:
                   break;
             }
@@ -646,7 +646,6 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    DDCMSG(D_RF,RED, "send_DEVICE_REG(%08X)", fc);
    D_memset(&bdy, 0, sizeof(LB_device_reg_t));
    bdy.cmd = LBC_DEVICE_REG;
-   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    bdy.dev_type = fc->target_type;
    if (fc->target_type == RF_Type_BES) {
 //      bdy.devid = (fc->f2005_resp.body.devid & 0xffll << (8*7)) >> (8*7) |
@@ -697,9 +696,9 @@ int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
    }
 }
 
-int handle_DEVICE_ADDR(fasit_connection_t *fc, int start, int end) {
-   LB_device_addr_t *pkt = (LB_device_addr_t *)(fc->rf_ibuf + start);
-   DDCMSG(D_RF,RED, "handle_DEVICE_ADDR(%08X, %i, %i)", fc, start, end);
+int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end) {
+   LB_assign_addr_t *pkt = (LB_assign_addr_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_RF,RED, "handle_ASSIGN_ADDR(%08X, %i, %i)", fc, start, end);
    // change device ID to new address
    fc->id = pkt->new_addr;
    return doNothing;

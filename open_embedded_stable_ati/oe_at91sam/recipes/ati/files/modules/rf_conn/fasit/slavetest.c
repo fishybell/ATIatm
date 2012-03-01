@@ -240,7 +240,7 @@ char *do_QCONCEAL(int a, int *num) {
 char *do_DEVICE_REG(int a, int *num) {
    LB_device_reg_t *pkt = malloc(sizeof(LB_device_reg_t));
    pkt->cmd = num[0];
-   pkt->addr = num[1];
+//   pkt->addr = num[1];
    pkt->dev_type = num[2];
    pkt->devid = num[3];
    set_crc8(pkt);
@@ -260,10 +260,10 @@ char *do_REQUEST_NEW(int a, int *num) {
 }
 
 
-char *do_DEVICE_ADDR(int a, int *num) {
-   LB_device_addr_t *pkt = malloc(sizeof(LB_device_addr_t));
+char *do_ASSIGN_ADDR(int a, int *num) {
+   LB_assign_addr_t *pkt = malloc(sizeof(LB_assign_addr_t));
    pkt->cmd = num[0];
-   pkt->addr = num[1];
+//   pkt->addr = num[1];
    pkt->new_addr = num[2];
    set_crc8(pkt);
    return (char*)pkt;
@@ -332,8 +332,8 @@ char *rfFromLine(char *readline, const ssize_t r, int *mnum) {
                return do_DEVICE_REG(a, num);
             case LBC_REQUEST_NEW:
                return do_REQUEST_NEW(a, num);
-            case LBC_DEVICE_ADDR:
-               return do_DEVICE_ADDR(a, num);
+            case LBC_ASSIGN_ADDR:
+               return do_ASSIGN_ADDR(a, num);
             default:
                return NULL;
          }

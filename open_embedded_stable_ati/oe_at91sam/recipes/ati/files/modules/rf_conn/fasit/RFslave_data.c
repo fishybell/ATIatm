@@ -36,7 +36,7 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          case LBC_AUDIO_CONTROL:
          case LBC_PYRO_FIRE:
          case LBC_DEVICE_REG:
-         case LBC_DEVICE_ADDR:
+         case LBC_ASSIGN_ADDR:
          case LBC_STATUS_REQ:
          case LBC_STATUS_RESP_LIFTER:
          case LBC_STATUS_RESP_MOVER:
@@ -423,11 +423,11 @@ int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
    return doNothing;
 } 
 
-int t2s_handle_DEVICE_ADDR(rf_connection_t *rc, int start, int end) {
+int t2s_handle_ASSIGN_ADDR(rf_connection_t *rc, int start, int end) {
    int i;
-   LB_device_addr_t *pkt = (LB_device_addr_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_DEVICE_ADDR(%08X, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   LB_assign_addr_t *pkt = (LB_assign_addr_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_ASSIGN_ADDR(%08X, %i, %i)", rc, start, end);
+//  FIXME   addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
 
@@ -453,7 +453,7 @@ int tty2sock(rf_connection_t *rc) {
          t2s_HANDLE_RF (QEXPOSE); // keep track of ids
          t2s_HANDLE_RF (QCONCEAL); // keep track of ids
          t2s_HANDLE_RF (REQUEST_NEW); // keep track of devids
-         t2s_HANDLE_RF (DEVICE_ADDR); // keep track of ids
+         t2s_HANDLE_RF (ASSIGN_ADDR); // keep track of ids
          default:
             break;
       }

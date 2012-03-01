@@ -145,7 +145,7 @@ int handle_QEXPOSE(fasit_connection_t *fc, int start, int end);
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end);
 int send_DEVICE_REG(fasit_connection_t *fc);
 int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end);
-int handle_DEVICE_ADDR(fasit_connection_t *fc, int start, int end);
+int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end);
 void addToRFBuffer(fasit_connection_t *fc, char *buf, int s);
 
 
