@@ -53,5 +53,5 @@ RFdump : RFdump.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o RFdump RFdump.c $(MCFILES)
 
 clean:
-	$(RM) mcp *.o RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm
+	$(RM) mcp *.o RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm RFslave.new RFslave.new.arm slavetest slavetest.arm slaveboss slaveboss.arm
 
