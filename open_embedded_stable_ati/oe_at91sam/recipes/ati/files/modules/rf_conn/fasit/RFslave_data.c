@@ -1,5 +1,77 @@
 #include "mcp.h"
+#include "rf_debug.h"
 #include "RFslave.h"
+
+// the start and end values may be set even if no valid message is found
+static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
+   LB_packet_t *hdr;
+   int hl = -1;
+   int mnum = -1;
+   *start = 0;
+   // loop through entire buffer, parsing starting at each character
+   while (*start < (tty ? rc->tty_ilen : rc->sock_ilen) && mnum == -1) {
+      // map the memory, we don't need to manipulate it
+      if (tty) {
+         hdr = (LB_packet_t*)(rc->tty_ibuf + *start);
+      } else {
+         hdr = (LB_packet_t*)(rc->sock_ibuf + *start);
+      }
+      
+      // check for valid message first
+      hl = RF_size(hdr->cmd);
+      if (tty && ((rc->tty_ibuf + rc->tty_ilen) - (rc->tty_ibuf + *start)) > hl) {
+         *start = *start + 1; continue; // invalid message length, or more likely, don't have all of the message yet
+      } else if (((rc->sock_ibuf + rc->sock_ilen) - (rc->sock_ibuf + *start)) > hl) {
+         *start = *start + 1; continue; // invalid message length, or more likely, don't have all of the message yet
+      }
+
+      *end = *start + hl;
+      DDCMSG(D_RF, tty ? cyan : blue, "%s validMessage for %i", tty ? "TTY" : "SOCKET", hdr->cmd);
+      debugRF(tty ? cyan : blue, tty ? rc->tty_ibuf : rc->sock_ibuf);
+      switch (hdr->cmd) {
+         // they all have a crc, check it
+         case LBC_EXPOSE:
+         case LBC_MOVE:
+         case LBC_CONFIGURE_HIT:
+         case LBC_AUDIO_CONTROL:
+         case LBC_PYRO_FIRE:
+         case LBC_DEVICE_REG:
+         case LBC_DEVICE_ADDR:
+         case LBC_STATUS_REQ:
+         case LBC_STATUS_RESP_LIFTER:
+         case LBC_STATUS_RESP_MOVER:
+         case LBC_STATUS_RESP_EXT:
+         case LBC_STATUS_NO_RESP:
+         case LBC_GROUP_CONTROL:
+         case LBC_POWER_CONTROL:
+         case LBC_QEXPOSE:
+         case LBC_QCONCEAL:
+         case LBC_REQUEST_NEW:
+            if (crc8(hdr) == 0) {
+               DDCMSG(D_RF, tty ? cyan : blue, "%s VALID CRC", tty ? "TTY" : "SOCKET");
+               return hdr->cmd;
+            } else {
+               DDCMSG(D_RF, tty ? cyan : blue, "%s INVALID CRC", tty ? "TTY" : "SOCKET");
+            }
+            break;
+
+         // not a valid number, not a valid header
+         default:
+            break;
+      }
+
+      *start = *start + 1;
+   }
+
+//   if (tty) {
+//      DDCMSG(D_RF, cyan, "TTY invalid: %08X %i %i", rc->tty_ibuf, *start, rc->tty_ilen);
+//      DDCMSG(D_RF, HEXB(cyan, "TTY invalid:", rc->tty_ibuf+*start, rc->tty_ilen-*start);
+//   } else {
+//      DDCMSG(D_RF, cyan, "SOCKET invalid: %08X %i %i", rc->sock_ibuf, *start, rc->sock_ilen);
+//      DDCMSG(D_RF, HEXB(cyan, "SOCKET invalid:", rc->sock_ibuf+*start, rc->sock_ilen-*start);
+//   }
+   return mnum;
+}
 
 // returns the timeout value to pass to epoll
 int getTimeout(rf_connection_t *rc) {
@@ -130,7 +202,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
       } else {
          // connection dead, remove it
          perror("Died because ");
-         DDCMSG(D_RF,RED, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
+         DDCMSG(D_RF, tty ? cyan : blue, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
          return tty ? rem_ttyEpoll : rem_sockEpoll;
       }
    } else if (s < (tty ? rc->tty_olen : rc->sock_olen)) {
@@ -148,7 +220,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
          if (ns < 0 && errno != EAGAIN) {
             // connection dead, remove it
             perror("Died because ");
-            DDCMSG(D_RF,RED, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
+            DDCMSG(D_RF, tty ? cyan : blue, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
             return tty ? rem_ttyEpoll : rem_sockEpoll;
          }
          s += ns; // increase total written, possibly by zero
@@ -241,43 +313,83 @@ void addToBuffer_sock_in(rf_connection_t *rc, char *buf, int s) {
 }
 
 
+// macro used in tty2sock
+#define t2s_HANDLE_RF(RF_NUM) case LBC_ ## RF_NUM : retval = t2s_handle_ ## RF_NUM (rc, start, end) ; break;
+
 // transfer tty data to the socket
 int tty2sock(rf_connection_t *rc) {
-   // copy the "in" tty buffer to the "out" socket buffer (for now, I don't care if it's a whole packet or not)
-   addToBuffer_sock_out(rc, rc->tty_ibuf, rc->tty_ilen);
+   int start, end, mnum, retval = doNothing; // start doing nothing
 
-   // TODO -- parse the message buffer and...
-   //                                     ...wait until I have a full packet
-   //                                     ...keep track of ids that I'm listening on
-   //                                     ...see if there is a change to the timeslot length
-   //                                     ...see what timeslot to use
+   // read all available valid messages up until I have to do something on return
+   while (retval == doNothing && (mnum = validMessage(rc, &start, &end, 1)) != -1) { // 1 for tty
+      switch (mnum) {
+         t2s_HANDLE_RF (STATUS_REQ); // keep track of ids
+         t2s_HANDLE_RF (EXPOSE); // keep track of ids
+         t2s_HANDLE_RF (MOVE); // keep track of ids
+         t2s_HANDLE_RF (CONFIGURE_HIT); // keep track of ids
+         t2s_HANDLE_RF (GROUP_CONTROL); // keep track of ids
+         t2s_HANDLE_RF (AUDIO_CONTROL); // keep track of ids
+         t2s_HANDLE_RF (POWER_CONTROL); // keep track of ids
+         t2s_HANDLE_RF (PYRO_FIRE); // keep track of ids
+         t2s_HANDLE_RF (QEXPOSE); // keep track of ids
+         t2s_HANDLE_RF (QCONCEAL); // keep track of ids
+         t2s_HANDLE_RF (REQUEST_NEW); // keep track of devids
+         t2s_HANDLE_RF (DEVICE_ADDR); // keep track of ids
+         default:
+            break;
+      }
+      // copy the found message to the socket "out" buffer
+      addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
+
+      // clear out the found message
+      clearBuffer(rc, end, 1); // 1 for tty
+
+      // change the start time to now
+      clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&rc->time_start);
+   }
+   // parse the message buffer and...
+   //                             ...keep track of ids that I'm listening on
+   //                             ...see if there is a change to the timeslot length
+   //                             ...see what timeslot to use
    
    
-   // change the start time to now
-   clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&rc->time_start);
-
-   // clear the tty "in" buffer
-   clearBuffer(rc, rc->tty_ilen, 1); // 1 for tty
-
-   return mark_sockWrite; // the socket needs to write it out now
+   return (retval | mark_sockWrite); // the socket needs to write it out now and whatever the t2s_* handler said to do
 }
+
+// macro used in sock2tty
+#define s2t_HANDLE_RF(RF_NUM) case LBC_ ## RF_NUM : retval = s2t_handle_ ## RF_NUM (rc, start, end) ; break;
 
 // transfer socket data to the tty and set up delay times
 int sock2tty(rf_connection_t *rc) {
-   // copy the "in" tty buffer to the "out" socket buffer (for now, I don't care if it's a whole packet or not)
-   addToBuffer_tty_out(rc, rc->sock_ibuf, rc->sock_ilen);
+   int start, end, mnum, retval = doNothing; // start doing nothing
 
-   // TODO -- parse the message buffer and...
-   //                                     ...wait for full message
-   //                                     ...keep track of ids that I'm listening on
+   // read all available valid messages up until I have to do something on return
+   while (retval == doNothing && (mnum = validMessage(rc, &start, &end, 0)) != -1) { // 0 for socket
+      switch (mnum) {
+         s2t_HANDLE_RF (STATUS_RESP_LIFTER); // keep track of ids
+         s2t_HANDLE_RF (STATUS_RESP_MOVER); // keep track of ids
+         s2t_HANDLE_RF (STATUS_RESP_EXT); // keep track of ids
+         s2t_HANDLE_RF (STATUS_NO_RESP); // keep track of ids
+         s2t_HANDLE_RF (DEVICE_REG); // keep track of devids
+         default:
+            break;
+      }
+      // copy the found message to the tty "out" buffer
+      addToBuffer_tty_out(rc, rc->sock_ibuf + start, end - start);
 
-   // clear the socket "in" buffer
-   clearBuffer(rc, rc->sock_ilen, 0); // 0 for socket
+      // clear out the found message
+      clearBuffer(rc, end, 1); // 1 for socket
+
+      // change the start time to now
+      clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&rc->time_start);
+   }
+   // parse the message buffer and...
+   //                             ...keep track of ids that I'm sending on
 
    // TODO -- find which timeslot I'm in
    doTimeAfter(rc, rc->timeslot_length);
 
-   return doNothing; // the timeout will determine when we can write, right now do nothing
+   return (retval | doNothing); // the timeout will determine when we can write, right now do nothing or whatever retval was
 }
 
 
