@@ -249,8 +249,8 @@ void set_crc8(void *buf) {
 
     size=RF_size(LB->cmd)-1;
     
-//    sprintf(hbuf,"set_crc8: length=%d - displaying len+1\n",length);
-//    DCMSG_HEXB(YELLOW,hbuf,buf,length+1);
+//    sprintf(hbuf,"crc8: cmd=%d  length=%d\n",LB->cmd,size+1);
+//    DCMSG_HEXB(YELLOW,hbuf,buf,size+1);
     
     while (size--) {
 	crc = crc8_table[(__uint8_t)(crc ^ *data)];
@@ -276,8 +276,12 @@ uint8 crc8(void *buf) {
     int size;		// was size = length-1;
     unsigned char crc = 0; // initial value of 0
 
-    size=RF_size(LB->cmd)-1;
+    size=RF_size(LB->cmd);
 
+//    sprintf(hbuf,"crc8: cmd=%d  length=%d\n",LB->cmd,size);
+//    DCMSG_HEXB(YELLOW,hbuf,buf,size);
+
+    
     while (size--) {
 	crc = crc8_table[(__uint8_t)(crc ^ *data)];
 	data++;

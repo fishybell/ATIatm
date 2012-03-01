@@ -1,7 +1,9 @@
 #include "mcp.h"
 #include "rf.h"
 
-int verbose,slottime;
+int verbose;
+int slottime;
+int low_dev,high_dev;
 
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
@@ -48,16 +50,15 @@ void HandleSlaveRF(int RFfd){
     fd_set rf_or_mcp;
     struct timeval timeout;
     LB_packet_t *LB,rLB;
-    int len,addr,cmd,RF_addr,size;
+    int len,addr,cmd,RF_addr,size,my_slot;
 
     uint32 DevID;
+    LB_request_new_t *LB_new;
     LB_device_reg_t *LB_devreg;
     LB_device_addr_t *LB_addr;
     LB_expose_t *LB_exp;
-
-
     
-    RF_addr=2047;	//  only respond to address 2047 for the request new device packet
+    RF_addr=2047;	//  means it is unassigned.  we will always respond to the request_new in our temp slot
 
     DevID=getDevID();
     DCMSG(BLUE,"RFslave: DevID = 0x%06X",DevID);
@@ -67,8 +68,6 @@ void HandleSlaveRF(int RFfd){
    
     /**   loop until we lose connection  **/
     clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
-
-    holdoff=slottime;	// set the holdoff equal to the slottime
     
     while(1) {
 	timestamp(&elapsed_time,&istart_time,&delta_time);
@@ -104,7 +103,7 @@ void HandleSlaveRF(int RFfd){
 		    DCMSG_HEXB(GREEN,buf,Rx->head,size);
 		}
 	// only respond if our address matches AND the crc was good
-		if (!crc && ((RF_addr==LB->addr)||((RF_addr>1709)&&(LB->addr==2047)))){
+		if (!crc && ((RF_addr==LB->addr)||((RF_addr>1709)&&(LB->cmd==LBC_REQUEST_NEW)))){
 		    timestamp(&elapsed_time,&istart_time,&delta_time);
 		    DDCMSG(D_TIME,CYAN,"RFslave top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 			   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
@@ -114,12 +113,19 @@ void HandleSlaveRF(int RFfd){
 		    switch (LB->cmd){
 			case LBC_REQUEST_NEW:
 			    DCMSG(BLUE,"Recieved 'request new devices' packet.");
+			    LB_new =(LB_request_new_t *) LB;
+			    slottime=LB_new->slottime*5;
+			    low_dev=LB_new->low_dev;
+			    high_dev=LB_new->high_dev;
+			    
 		// create a RESPONSE packet
 			    rLB.cmd=LBC_DEVICE_REG;
 			    LB_devreg =(LB_device_reg_t *)(&rLB);	// map our bitfields in
 			    LB_devreg->dev_type=1;			// SIT with MFS
 			    LB_devreg->devid=DevID;		// Actual 3 significant bytes of MAC address
-			    RF_addr=1710+(DevID&0x7);	//  use the fancy hash algorithm to come up with the real temp address
+			    // respond in a slot that is DevID-low_dev, at an address 1710 more than that
+			    my_slot=DevID-low_dev;
+			    RF_addr=1710+my_slot;	//  use the fancy hash algorithm to come up with the real temp address
 			    LB_devreg->addr=RF_addr;
 
 		// calculates the correct CRC and adds it to the end of the packet payload
@@ -129,8 +135,8 @@ void HandleSlaveRF(int RFfd){
 		// now send it to the RF master
 		// after waiting for our timeslot:   which is slottime*(MAC&MASK) for now
 
-			    usleep(holdoff+slottime*(DevID&0x3));		// just try *4* hard slots now
-			    DDCMSG(D_TIME,CYAN,"usleep for %d",holdoff+slottime*(DevID&0x3));
+			    usleep(slottime*(my_slot+1));
+			    DDCMSG(D_TIME,CYAN,"usleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
 			    
 			    result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
