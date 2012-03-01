@@ -105,13 +105,13 @@ int RF_size(int cmd){
 	    return (3);
 	    
 	case  LBC_DEVICE_REG:
-	    return (8);
+	    return (6);
 	    
 	case  LBC_REQUEST_NEW:
 	    return (9);
 	    
-	case  LBC_DEVICE_ADDR:
-	    return (5);
+	case  LBC_ASSIGN_ADDR:
+	    return (7);
 
 	default:
 	    return (2);
