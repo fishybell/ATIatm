@@ -242,7 +242,9 @@ static void shutdown_soon(bool lowbat) {
     // look for first few shutdown messages
     if (atomic_inc_return(&shutdown_msg) < 3) {
         // let attached devices know that we're shutting down
-        queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
+        if (lowbat == 1) {
+           queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
+        }
 
         // build shutdown scenario
         scen = "\
