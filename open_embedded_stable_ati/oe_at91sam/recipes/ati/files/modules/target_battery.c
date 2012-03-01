@@ -18,15 +18,15 @@
 // and use of more than one ADC channel at a time.
 
 // various timer timeouts
-#define TIMEOUT_IN_SECONDS		10
-#define ADC_READ_DELAY_IN_MSECONDS	20
-#define LED_BLINK_ON_IN_MSECONDS	100
-#define LED_BLINK_COUNT			3
-#define LED_BLINK_OFF_IN_MSECONDS	1500
-#define LED_CHARGING_ON_IN_MSECONDS	500
+#define TIMEOUT_IN_SECONDS				1200	// 20 minutes
+#define ADC_READ_DELAY_IN_MSECONDS		20
+#define LED_BLINK_ON_IN_MSECONDS		100
+#define LED_BLINK_COUNT					3
+#define LED_BLINK_OFF_IN_MSECONDS		1500
+#define LED_CHARGING_ON_IN_MSECONDS		500
 #define LED_CHARGING_OFF_IN_MSECONDS	500
-#define SHUTDOWN_IN_MSECONDS		250
-#define REENABLE_IN_SECONDS 20
+#define SHUTDOWN_IN_MSECONDS			250
+#define REENABLE_IN_SECONDS 			20
 
 #define BATTERY_CHARGING_NO   		0
 #define BATTERY_CHARGING_YES    	1
@@ -208,13 +208,20 @@ static struct work_struct level_work;
 // enables/disables battery sensing (so we don't sense while running a moter)
 //---------------------------------------------------------------------------
 void enable_battery_check(int enable) {
-   atomic_set(&check_atomic, enable);
+   /* Commenting out the details of this function for now because there are 
+      problems when the device loses connectivity and this never being called,
+      or not being called correctly.  Still want the stub because this function
+      is called multiple places and if we want to return things back to the way
+      they were.
+      Shelly 3-1-2012 */
+   /*atomic_set(&check_atomic, enable);
    // automatically reenable the battery check if the calling ko doesn't
    if (enable == 0) {
       mod_timer(&reenable_timer_list, jiffies+(REENABLE_IN_SECONDS*HZ));
    } else {
       del_timer(&reenable_timer_list);
-   }
+   }*/
+   return;
 }
 EXPORT_SYMBOL(enable_battery_check);
 
