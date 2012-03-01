@@ -135,8 +135,8 @@ void HandleSlaveRF(int RFfd){
 		// now send it to the RF master
 		// after waiting for our timeslot:   which is slottime*(MAC&MASK) for now
 
-			    usleep(slottime*(my_slot+1));
-			    DDCMSG(D_TIME,CYAN,"usleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
+			    usleep(slottime*(my_slot+1)*1000);
+			    DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
 			    
 			    result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
@@ -146,8 +146,8 @@ void HandleSlaveRF(int RFfd){
 			    }
 			    
 			    // finish waiting for the slots before proceding
-			    usleep(slottime*(4-(DevID&0x3)));		// just try *4* hard slots now
-			    DDCMSG(D_TIME,CYAN,"usleep for %d",slottime*(4-(DevID&0x3)));
+			    usleep(slottime*(high_dev-low_dev+2)*1000);
+			    DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
 			    break;
 
 			case LBC_DEVICE_ADDR:
