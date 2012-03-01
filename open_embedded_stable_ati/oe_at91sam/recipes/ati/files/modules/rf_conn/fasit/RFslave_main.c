@@ -146,6 +146,11 @@ int main(int argc, char **argv) {
 
    // initialize connection structure
    D_memset(&rc, 0, sizeof(rc));
+   rc.timeslot_length = 100; // start with 100 millisecond timeslots
+   rc.id_index = -1;
+   rc.devid_index = -1;
+   rc.devid_last_low = -1;
+   rc.devid_last_high = -1;
 
    // initialize addresses
    D_memset(&raddr, 0, sizeof(struct sockaddr_in));
@@ -243,7 +248,6 @@ int main(int argc, char **argv) {
    // finish initialization of connection structure
    clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&rc.time_start);
    doTimeAfter(&rc, INFINITE);
-   rc.timeslot_length = 100; // start with 100 millisecond timeslots
 
    // main loop
    while (!done && !close_nicely) {

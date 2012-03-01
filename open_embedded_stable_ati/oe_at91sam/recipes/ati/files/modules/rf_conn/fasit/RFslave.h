@@ -14,7 +14,6 @@ typedef struct rf_connection {
    // file descriptors and buffers
    int tty; // the file descriptor to talk to the tty port on
    int sock; // the file descriptor to talk to slaveboss on
-   int ids[MAX_IDS]; // the ids we're using (temp, standard, and group)
    char tty_obuf[RF_BUF_SIZE]; // outgoing buffer for rf tty messages
    char sock_obuf[RF_BUF_SIZE]; // outgoing buffer for rf sock messages
    char tty_ibuf[RF_BUF_SIZE]; // incoming buffer for rf tty messages
@@ -30,6 +29,13 @@ typedef struct rf_connection {
 
    // timeslot stuff
    int timeslot_length; // the amount of time each timeslot is, as determined by the RFmaster
+   int ids[MAX_IDS]; // the ids we're sending from this time (standard, and group)
+   int id_index; // the last id in the ids list we used
+   int devids[MAX_IDS]; // the devids we're sending from this time
+   int devid_index; // the last devid in the devids list we used
+   int ids_lasttime[MAX_IDS]; // the ids from the last burst message (even a burst of 1)
+   int devid_last_low; // the low_dev from the last LBC_REQUEST_NEW packet
+   int devid_last_high; // the high_dev from the last LBC_REQUEST_NEW packet
 
 //   // cached last message
 //   char last_msg[RF_BUF_SIZE];
