@@ -243,10 +243,18 @@ void addToBuffer_sock_in(rf_connection_t *rc, char *buf, int s) {
 
 // transfer tty data to the socket
 int tty2sock(rf_connection_t *rc) {
-   // TODO -- parse the message buffer and keep track of ids that I'm listening on, if there is a change to the timeslot length, and what timeslot to use
-   
    // copy the "in" tty buffer to the "out" socket buffer (for now, I don't care if it's a whole packet or not)
    addToBuffer_sock_out(rc, rc->tty_ibuf, rc->tty_ilen);
+
+   // TODO -- parse the message buffer and...
+   //                                     ...wait until I have a full packet
+   //                                     ...keep track of ids that I'm listening on
+   //                                     ...see if there is a change to the timeslot length
+   //                                     ...see what timeslot to use
+   
+   
+   // change the start time to now
+   clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&rc->time_start);
 
    // clear the tty "in" buffer
    clearBuffer(rc, rc->tty_ilen, 1); // 1 for tty
@@ -256,12 +264,12 @@ int tty2sock(rf_connection_t *rc) {
 
 // transfer socket data to the tty and set up delay times
 int sock2tty(rf_connection_t *rc) {
-   // TODO -- parse the message buffer and keep track of ids that I'm listening on
-   
-   // TODO -- wait for full message
-
    // copy the "in" tty buffer to the "out" socket buffer (for now, I don't care if it's a whole packet or not)
    addToBuffer_tty_out(rc, rc->sock_ibuf, rc->sock_ilen);
+
+   // TODO -- parse the message buffer and...
+   //                                     ...wait for full message
+   //                                     ...keep track of ids that I'm listening on
 
    // clear the socket "in" buffer
    clearBuffer(rc, rc->sock_ilen, 0); // 0 for socket
