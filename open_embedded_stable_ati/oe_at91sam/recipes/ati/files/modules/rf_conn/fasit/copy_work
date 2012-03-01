@@ -1,0 +1,35 @@
+#!/usr/bin/tclsh
+package require Expect
+package require Tclx
+fconfigure stdin -blocking 1            ;#expect bug?
+
+if  {$argc == 1} {
+    set num [lindex $argv 0]
+} else {
+    puts -nonewline "which one (1-9, a-f)? "
+    flush stdout
+    gets stdin num
+}
+
+# increase delays for wireless devices
+set delay 5
+if {[string match -nocase *w* $num]} {
+    set delay 10
+}
+
+system sed -i -e "s/^sam$num.*//" ~/.ssh/known_hosts
+eval spawn scp [glob *.arm] root@sam$num:/home/root
+set timeout $delay
+while 1 {
+    expect {
+        -re {.*word:.*} {
+            send "shoot\r"
+        }
+        -re {.*yes/no.*} {
+            send "yes\r"
+        }
+        eof {
+            break
+        }
+    }
+}
