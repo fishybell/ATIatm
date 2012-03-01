@@ -25,6 +25,12 @@ RFmaster : RFmaster.c $(HFILES) $(MCFILES)
 RFmaster.arm : RFmaster.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFmaster.arm RFmaster.c $(MCFILES)
 
+RFslave.new : RFslave_main.c RFslave_data.c RFslave.h $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o RFslave.new RFslave_main.c RFslave_data.c $(MCFILES)
+
+RFslave.new.arm : RFslave_main.c RFslave_data.c RFslave.h $(HFILES) $(MCFILES)
+	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.new.arm RFslave_main.c RFslave_data.c $(MCFILES)
+
 RFslave : RFslave.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o RFslave RFslave.c $(MCFILES)
 
