@@ -67,7 +67,7 @@ void ReQueue(queue_t *Mdst,queue_t *Msrc,int count);
 
 #define LBC_DEVICE_REG			29
 #define LBC_REQUEST_NEW			30
-#define LBC_DEVICE_ADDR			31
+#define LBC_ASSIGN_ADDR			31
 
 /********************************************/
 /* Low Bandwidth Message Header             */
@@ -151,15 +151,16 @@ typedef struct LB_status_no_resp_t {
 } __attribute__ ((packed))  LB_status_no_resp_t;
 
 // LBC_REQUEST_NEW packet
-//  9 bytes
 typedef struct LB_request_new_t {
-    // 1 * 32 bytes = 1 long - padding = 3 bytes
+//  9 bytes
     uint32 cmd:5 __attribute__ ((packed));
     uint32 reregister:1 __attribute__ ((packed));
     uint32 padding0:2 __attribute__ ((packed));
     uint32 low_dev:24 __attribute__ ((packed));		// lowest devID
+
     uint32 high_dev:24 __attribute__ ((packed));	// highest devID
     uint32 slottime:8 __attribute__ ((packed));		// slottime (multiply by 5ms)
+
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:24 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_request_new_t;
@@ -169,31 +170,33 @@ typedef struct LB_request_new_t {
 // since this packet happens so seldom I see no good reason to try and
 // bit pack smaller than this
 typedef struct LB_device_reg_t {
-    // 3 * 32 bytes = 3 long - padding = 8 bytes
+    //  6 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed));   // source address (always to basestation) 
-    uint32 dev_type:8 __attribute__ ((packed));
-    uint32 pad:8 __attribute__ ((packed));
-
+    uint32 pad:3 __attribute__ ((packed));
     uint32 devid:24 __attribute__ ((packed));
+    
+    uint32 dev_type:8 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
+    uint32 padding:16 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_device_reg_t;
 
-// LBC_DEVICE_ADDR packet
-//
+// LBC_ASSIGN_ADDR packet
+//   
 // this packet assigns the Slave at the responding address (temp or
 // not)  a new address.   it is two bytes long and can range from 1-1700
 
-typedef struct LB_device_addr_t {
-    // 2 * 32 bytes = 1 long - padding = 5 bytes
+typedef struct LB_assign_addr_t {
+    // 2 * 32 bytes = 1 long - padding = 7 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+    uint32 reregister:1 __attribute__ ((packed));
+    uint32 padding0:2 __attribute__ ((packed));
+    uint32 devid:24 __attribute__ ((packed));	    
+
     uint32 new_addr:11 __attribute__ ((packed));
     uint32 pad:5 __attribute__ ((packed));
-    
     uint32 crc:8 __attribute__ ((packed));
-    uint32 padding:24 __attribute__ ((packed));
-} __attribute__ ((packed)) LB_device_addr_t;
+    uint32 padding:8 __attribute__ ((packed));
+} __attribute__ ((packed)) LB_assign_addr_t;
 
 // LBC_EXPOSE
 //    we still have 4 more bits
