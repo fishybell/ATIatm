@@ -107,13 +107,11 @@ int main(int argc, char **argv) {
 
    Rptr=Rstart=Rbuf;
 
-
-   RQ->addr=2047;
    RQ->cmd=LBC_REQUEST_NEW;
 	// calculates the correct CRC and adds it to the end of the packet payload
 	// also fills in the length field
    size = RF_size(RQ->cmd);
-   set_crc8(RQ,3);
+   set_crc8(RQ);
 
     /**   loop until we lose connection  **/
    clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time

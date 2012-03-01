@@ -295,6 +295,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
     uint8 LB_buf[48];
     LB_device_reg_t	*LB_devreg;
+    LB_status_req_t	*LB_status_req;
     LB_expose_t		*LB_exp;
     LB_move_t		*LB_move;
     LB_configure_t	*LB_configure;
@@ -432,14 +433,36 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    //			    }
 		    if (minion->S.cap&PD_NES){
 			DDCMSG(D_PACKET,BLUE,"we also seem to have a MFS Muzzle Flash Simulator - send 2112 status") ; 
-			// AND/OR? send 2112 Muzzle Flash status if supported   
-//			sendStatus2112(1,header,minion); // forces sending of a 2112, 2 means use saved resp and seq numbers
-			sendStatus2112(0,header,minion); // forces sending of a 2112, 2 means use saved resp and seq numbers
+			// AND send 2112 Muzzle Flash status if supported   
+			sendStatus2112(0,header,minion); // send of a 2112 (0 means unsolicited, 1 copys mnum and seq to resp_mnum and resp_seq)
 		    }
+
+//		    also build an LB packet  to send
+		    LB_status_req  =(LB_status_req_t *)LB_buf;	// make a pointer to our buffer so we can use the bits right
+		    LB_status_req->cmd=LBC_STATUS_REQ;
+		    LB_status_req->addr=minion->RF_addr;
+
+
+		    // should probably be a minion->S (state) timer for status
+		    // minion->S.exp.timer=5;
+
+		    // calculates the correct CRC and adds it to the end of the packet payload
+		    // also fills in the length field
+		    set_crc8(LB_status_req);
+		    
+		    // now send it to the MCP master
+		    result=write(minion->mcp_sock,LB_status_req,RF_size(LB_status_req->cmd));
+		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
+			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d\n",
+				minion->mID,minion->RF_addr,LB_status_req->cmd,RF_size(LB_status_req->cmd));
+			DDCMSG_HEXB(D_RF,YELLOW,hbuf,LB_status_req,RF_size(LB_status_req->cmd));
+			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_status_req->cmd),minion->mcp_sock);
+		    }
+//  sent LB
 		    break;
 
 		case CID_Expose_Request:
-		    DDCMSG(D_PACKET,BLUE,"CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",message_2100->exp) ;       
+		    DDCMSG(D_PACKET,BLUE,"CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",message_2100->exp);
 //		    also build an LB packet  to send
 		    LB_exp =(LB_expose_t *)LB_buf;	// make a pointer to our buffer so we can use the bits right
 		    LB_exp->cmd=LBC_EXPOSE;
@@ -464,7 +487,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    LB_exp->thermal=0;
 	    // calculates the correct CRC and adds it to the end of the packet payload
 	    // also fills in the length field
-		    set_crc8(LB_exp,RF_size(LB_exp->cmd));
+		    set_crc8(LB_exp);
 	    // now send it to the MCP master
 		    result=write(minion->mcp_sock,LB_exp,RF_size(LB_exp->cmd));
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
@@ -526,6 +549,12 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    // send 2101 ack  (2102's will be generated at start and stop of actuator)
 		    DDCMSG(D_PACKET,BLUE,"CID_Move_Request  send 'S'uccess ack.   TODO send the move to the kernel?") ;        
 		    send_2101_ACK(header,'S',minion);
+
+
+
+
+
+		    
 		    break;
 
 		case CID_Config_Hit_Sensor:
@@ -728,28 +757,6 @@ void *minion_thread(thread_data_t *minion){
 
     i=0;
 
-    // the mcp is expecting a response
-#if 0
-    i++;
-    sprintf(mbuf,"msg %d I am minion %d with devid 0x%06X", i,minion->mID,minion->devid);
-
-    result=write(minion->mcp_sock, mbuf, strlen(mbuf));
-    if (result >= 0){
-	DCMSG(BLUE,"minion %d: sent %d chars to MCP   --%s--",minion->mID,strlen(mbuf),mbuf);
-    } else {
-	perror("writing stream message");
-    }
-
-    msglen=read(minion->mcp_sock, buf, 1023);
-    if (msglen > 0) {
-	buf[msglen]=0;
-	DCMSG(BLUE,"minion %d: received from MCP %d chars-->%s<--", minion->mID,msglen,buf);
-    } else if (!msglen) {
-	perror("reading stream message");
-    } else {
-	DCMSG(BLUE,"minion %d: socket to MCP closed, we are FREEEEEeeee!!!", minion->mID);
-    }
-#endif
 
     // now we must get a connection to the range control
     // computer (RCC) using fasit.
@@ -768,21 +775,6 @@ void *minion_thread(thread_data_t *minion){
 
     // we now have a socket.
     DCMSG(BLUE,"minion %d: has a socket to a RCC", minion->mID);
-
-    //   this is a handshake message sent back to the MCP informing it that we have a FASIT connection
-#if 0
-    sprintf(mbuf,"minion %d: msg %d I am connected to an RCC",minion->mID,i);
-    result=write(minion->mcp_sock, mbuf, strlen(mbuf));
-    error=errno;
-    if (result >= 0){
-	DCMSG(BLUE,"minion %d: sent %d chars to MCP   --%s--",minion->mID,strlen(mbuf),mbuf);
-    } else {
-	strerror_r(errno,buf,BufSize);
-	DCMSG(BLUE,"minion %d:   Error writing message to MCP : %s  ", minion->mID,buf);
-	exit(-1);
-    }
-
-#endif
 
     // main loop 
     //   respond to the mcp commands
@@ -841,7 +833,7 @@ void *minion_thread(thread_data_t *minion){
 		//		process_MCP_cmds(&state,buf,msglen);
 
 		LB=(LB_packet_t *)buf;	// map the header in
-		crc= crc8(LB,RF_size(LB->cmd));
+		crc= crc8(LB);
 		DCMSG(YELLOW,"MINION %d: LB packet (cmd=%2d addr=%d crc=%d)", minion->mID,LB->cmd,LB->addr,crc);
 		switch (LB->cmd){
 		    case LBC_REQUEST_NEW:

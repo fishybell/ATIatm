@@ -1,7 +1,9 @@
 #include "mcp.h"
 #include "rf.h"
 
-int verbose,slottime,slot_count;	// globals
+int verbose;	// globals
+uint8 slottime;
+int low_dev,high_dev;
 
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
@@ -148,7 +150,7 @@ void HandleRF(int MCPsock,int RFfd){
  ***************        they can be strung together in a burst that preceeds any response expecting requests
  ***************
  ***************    type #1 should be relativly seldom and can be sent alone or tacked to the end of a #3
- ***************            it expects up to slot_count responses ((slottime+1)*slot_count) time to wait
+ ***************            it expects up to  ((slottime+1)*(high_dev-low_dev)) responses time to wait
  ***************            
  ***************    type #2 eventually needs to be set as a burst that expects responses, can also be
  ***************            tacked onto the end of a #3
@@ -190,7 +192,7 @@ void HandleRF(int MCPsock,int RFfd){
  ****   if there is a #1 packet (should only be 3 bytes)
  ****       send it
  ****       do a timestamp to reset our clock
- ****       set remaining time to   (slot_count+1)*slottime 
+ ****       set remaining time to   (slot_count+1)*slottime    slot_count = high_dev-low_dev
  ****   else
  ****       if there is an M2 packet
  ****           send just 1 packet and set up the time to wait
@@ -211,7 +213,7 @@ void HandleRF(int MCPsock,int RFfd){
 		    LB=(LB_packet_t *)M1->head;
 		    size=RF_size(LB->cmd);
 		    ReQueue(Tx,M1,size);	// copy it to the TxBuf and deletes from front of old queue
-		    remaining_time =(slot_count+1)*slottime;
+		    remaining_time =(high_dev-low_dev+1)*slottime;
 		} else {
 		    if (Queue_Depth(M2)>2){
 			LB=(LB_packet_t *)M2->head;
@@ -302,7 +304,7 @@ void HandleRF(int MCPsock,int RFfd){
 		    //  we do have a complete packet
 		    // we could check the CRC and dump it here
 
-		    crc=crc8(LB,size);
+		    crc=crc8(LB);
 		    if (!crc) {
 			result=write(MCPsock,Rstart,size);
 			if (result==size) {
@@ -422,9 +424,10 @@ void print_help(int exval) {
     printf("  -h            print this help and exit\n");
     printf("  -p 4000       set listen port\n");
     printf("  -t /dev/ttyS1 set serial port device\n");
-    printf("  -s 4          slot_count - max number of slots\n");
-    printf("  -l 250        slottime in ms\n");
     printf("  -x 800        xmit test, xmit a request devices every arg milliseconds (default=disabled=0)\n");
+    printf("  -s 150        slottime in ms (5ms granules, 1275 ms max  ONLY WITH -x\n");
+    printf("  -d 0x20       Lowest devID to find  ONLY WITH -x\n");
+    printf("  -D 0x30       Highest devID to find  ONLY WITH -x\n");
     print_verbosity();
     exit(exval);
 }
@@ -454,14 +457,14 @@ int main(int argc, char **argv) {
     char ttyport[32];	/* default to ttyS0  */
     int opt,slave_count,xmit;
 
-    slot_count=4;	// determined by hashing function
     slottime=150;	// time of each slot and the hold-off period
     verbose=0;
     xmit=0;		// used for testing
     RFmasterport = defaultPORT;
     strcpy(ttyport,"/dev/ttyS0");
 
-    while((opt = getopt(argc, argv, "hv:t:p:s:x:l:")) != -1) {
+
+    while((opt = getopt(argc, argv, "hv:t:p:s:x:l:d:D:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
@@ -480,7 +483,15 @@ int main(int argc, char **argv) {
 		break;
 
 	    case 's':
-		slot_count = atoi(optarg);
+		slottime = atoi(optarg)/5;	// adjust to 1 byte
+		break;
+
+	    case 'd':
+		low_dev = strtoul(optarg,NULL,16);
+		break;
+
+	    case 'D':
+		high_dev = strtoul(optarg,NULL,16);
 		break;
 
 	    case 'l':
@@ -506,7 +517,6 @@ int main(int argc, char **argv) {
     DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
     DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
     DCMSG(YELLOW,"RFmaster: slottime =%2dms",slottime);
-    DCMSG(YELLOW,"RFmaster: slot_count =%2d",slot_count);
 
     //   Okay,   set up the RF modem link here
 
@@ -521,12 +531,14 @@ int main(int argc, char **argv) {
 	char buf[200];
 	RQ=(LB_request_new_t *)&LB;
 
-	RQ->addr=2047;
 	RQ->cmd=LBC_REQUEST_NEW;
+	RQ->low_dev=low_dev;
+	RQ->high_dev=high_dev;
+	RQ->slottime=slottime;
 	// calculates the correct CRC and adds it to the end of the packet payload
 	// also fills in the length field
 	size = RF_size(RQ->cmd);
-	set_crc8(RQ,3);
+	set_crc8(RQ);
 
 	while(1){
 	    usleep(xmit*1000);

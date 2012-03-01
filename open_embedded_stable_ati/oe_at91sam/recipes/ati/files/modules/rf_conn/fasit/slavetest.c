@@ -74,7 +74,7 @@ char *do_STATUS_REQ(int a, int *num) {
    LB_status_req_t *pkt = malloc(sizeof(LB_status_req_t));
    pkt->cmd = num[0];
    pkt->addr = num[1];
-   set_crc8(pkt, RF_size(LBC_STATUS_REQ));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -89,7 +89,7 @@ char *do_EXPOSE(int a, int *num) {
    pkt->react = num[5];
    pkt->mfs = num[6];
    pkt->thermal = num[7];
-   set_crc8(pkt, RF_size(LBC_EXPOSE));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -100,7 +100,7 @@ char *do_MOVE(int a, int *num) {
    pkt->addr = num[1];
    pkt->direction = num[2];
    pkt->speed = num[3];
-   set_crc8(pkt, RF_size(LBC_MOVE));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -115,7 +115,7 @@ char *do_CONFIGURE_HIT(int a, int *num) {
    pkt->sensitivity = num[5];
    pkt->timehits = num[6];
    pkt->hitcountset = num[7];
-   set_crc8(pkt, RF_size(LBC_CONFIGURE_HIT));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -126,7 +126,7 @@ char *do_GROUP_CONTROL(int a, int *num) {
    pkt->addr = num[1];
    pkt->gcmd = num[2];
    pkt->gaddr = num[3];
-   set_crc8(pkt, RF_size(LBC_GROUP_CONTROL));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -139,7 +139,7 @@ char *do_AUDIO_CONTROL(int a, int *num) {
    pkt->volume = num[3];
    pkt->playmode = num[4];
    pkt->track = num[5];
-   set_crc8(pkt, RF_size(LBC_AUDIO_CONTROL));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -149,7 +149,7 @@ char *do_POWER_CONTROL(int a, int *num) {
    pkt->cmd = num[0];
    pkt->addr = num[1];
    pkt->pcmd = num[2];
-   set_crc8(pkt, RF_size(LBC_POWER_CONTROL));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -159,7 +159,7 @@ char *do_PYRO_FIRE(int a, int *num) {
    pkt->cmd = num[0];
    pkt->addr = num[1];
    pkt->zone = num[2];
-   set_crc8(pkt, RF_size(LBC_PYRO_FIRE));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -170,7 +170,7 @@ char *do_STATUS_RESP_LIFTER(int a, int *num) {
    pkt->addr = num[1];
    pkt->hits = num[2];
    pkt->expose = num[3];
-   set_crc8(pkt, RF_size(LBC_STATUS_RESP_LIFTER));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -184,7 +184,7 @@ char *do_STATUS_RESP_MOVER(int a, int *num) {
    pkt->speed = num[4];
    pkt->dir = num[5];
    pkt->location = num[6];
-   set_crc8(pkt, RF_size(LBC_STATUS_RESP_MOVER));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -204,7 +204,7 @@ char *do_STATUS_RESP_EXT(int a, int *num) {
    pkt->sensitivity = num[10];
    pkt->timehits = num[11];
    pkt->fault = num[12];
-   set_crc8(pkt, RF_size(LBC_STATUS_RESP_EXT));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -214,7 +214,7 @@ char *do_STATUS_NO_RESP(int a, int *num) {
    LB_packet_t *pkt = malloc(sizeof(LB_packet_t));
    pkt->cmd = num[0];
    pkt->addr = num[1];
-   set_crc8(pkt, RF_size(LBC_STATUS_NO_RESP));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -223,7 +223,7 @@ char *do_QEXPOSE(int a, int *num) {
    LB_packet_t *pkt = malloc(sizeof(LB_packet_t));
    pkt->cmd = num[0];
    pkt->addr = num[1];
-   set_crc8(pkt, RF_size(LBC_QEXPOSE));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -232,7 +232,7 @@ char *do_QCONCEAL(int a, int *num) {
    LB_packet_t *pkt = malloc(sizeof(LB_packet_t));
    pkt->cmd = num[0];
    pkt->addr = num[1];
-   set_crc8(pkt, RF_size(LBC_QCONCEAL));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -243,7 +243,7 @@ char *do_DEVICE_REG(int a, int *num) {
    pkt->addr = num[1];
    pkt->dev_type = num[2];
    pkt->devid = num[3];
-   set_crc8(pkt, RF_size(LBC_STATUS_REQ));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -252,7 +252,7 @@ char *do_REQUEST_NEW(int a, int *num) {
    LB_request_new_t *pkt = malloc(sizeof(LB_request_new_t));
    pkt->cmd = num[0];
    pkt->addr = num[1];
-   set_crc8(pkt, RF_size(LBC_REQUEST_NEW));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 
@@ -262,7 +262,7 @@ char *do_DEVICE_ADDR(int a, int *num) {
    pkt->cmd = num[0];
    pkt->addr = num[1];
    pkt->new_addr = num[2];
-   set_crc8(pkt, RF_size(LBC_DEVICE_ADDR));
+   set_crc8(pkt);
    return (char*)pkt;
 }
 

@@ -76,7 +76,7 @@ typedef struct LB_packet_tag {
     // 26 * 16 bytes = 13 longs
     uint16 cmd:5 __attribute__ ((packed));
     uint16 addr:11 __attribute__ ((packed)); // source or destination address
-    uint16 payload[24] __attribute__ ((packed)); // has room for max payload and the CRC byte    
+    uint16 payload[24] __attribute__ ((packed)); // has room for some max payload (48 bytes now) and the CRC byte    
 } __attribute__ ((packed))  LB_packet_t;
 
 // LBC_STATUS_REQ packet
@@ -151,13 +151,16 @@ typedef struct LB_status_no_resp_t {
 } __attribute__ ((packed))  LB_status_no_resp_t;
 
 // LBC_REQUEST_NEW packet
-//
+//  9 bytes
 typedef struct LB_request_new_t {
     // 1 * 32 bytes = 1 long - padding = 3 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+    uint32 padding0:3 __attribute__ ((packed));
+    uint32 low_dev:24 __attribute__ ((packed));		// lowest devID
+    uint32 high_dev:24 __attribute__ ((packed));	// highest devID
+    uint32 slottime:8 __attribute__ ((packed));		// slottime (multiply by 5ms)
     uint32 crc:8 __attribute__ ((packed));
-    uint32 padding:8 __attribute__ ((packed));
+    uint32 padding:24 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_request_new_t;
 
 // LBC_DEVICE_REG packet
@@ -293,8 +296,10 @@ typedef struct LB_pyro_fire {
     uint32 crc:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_pyro_fire_t;
 
-void set_crc8(void *buf, uint8 length);
-uint8 crc8(void *buf, uint8 length);
+
+
+void set_crc8(void *buf);
+uint8 crc8(void *buf);
 int RF_size(int cmd);
 uint32 getDevID (void);
 int gather_rf(int fd, char *pos, char *start,int max);

@@ -65,8 +65,7 @@ int RF_size(int cmd){
 	case  LBC_STATUS_REQ:
 	    return (3);
 	    
-
-case  LBC_STATUS_RESP_LIFTER:
+	case  LBC_STATUS_RESP_LIFTER:
 	    return (4);
 	    
 	case  LBC_STATUS_RESP_MOVER:
@@ -109,7 +108,7 @@ case  LBC_STATUS_RESP_LIFTER:
 	    return (8);
 	    
 	case  LBC_REQUEST_NEW:
-	    return (3);
+	    return (9);
 	    
 	case  LBC_DEVICE_ADDR:
 	    return (5);
@@ -241,12 +240,15 @@ static __uint8_t crc8_table[256] = {
 
 
 // calculates the crc, adds it and the length to the end of the packet
-void set_crc8(void *buf, uint8 length) {
+void set_crc8(void *buf) {
     static char hbuf[100];
     char *data = (char*)buf;
-    int size = length-1;
+    LB_packet_t *LB=(LB_packet_t *)buf;
+    int size;		// was size = length-1;
     unsigned char crc = 0; // initial value of 0
 
+    size=RF_size(LB->cmd)-1;
+    
 //    sprintf(hbuf,"set_crc8: length=%d - displaying len+1\n",length);
 //    DCMSG_HEXB(YELLOW,hbuf,buf,length+1);
     
@@ -261,17 +263,20 @@ void set_crc8(void *buf, uint8 length) {
 //    *data=0;		// tack a zero after that
 
     if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
-	sprintf(hbuf,"set_crc8: LB len=%d set crc=0x%x  ",length,crc);
-	DCMSG_HEXB(YELLOW,hbuf,buf,length);
+	sprintf(hbuf,"set_crc8: LB len=%d set crc=0x%x  ",size+1,crc);
+	DCMSG_HEXB(YELLOW,hbuf,buf,size+1);
     }
 }
 
 // just calculates the crc
-uint8 crc8(void *buf, uint8 length) {
+uint8 crc8(void *buf) {
     static char hbuf[100];
     char *data = (char*)buf;
-    int size = length;
+    LB_packet_t *LB=(LB_packet_t *)buf;
+    int size;		// was size = length-1;
     unsigned char crc = 0; // initial value of 0
+
+    size=RF_size(LB->cmd)-1;
 
     while (size--) {
 	crc = crc8_table[(__uint8_t)(crc ^ *data)];
@@ -280,11 +285,11 @@ uint8 crc8(void *buf, uint8 length) {
 
     if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
 	if (crc) {
-	    sprintf(hbuf,"crc8: LB len=%d  BAD CRC=0x%x  ",length,crc);
-	    DCMSG_HEXB(RED,hbuf,buf,length);
+	    sprintf(hbuf,"crc8: LB len=%d  BAD CRC=0x%x  ",size+1,crc);
+	    DCMSG_HEXB(RED,hbuf,buf,size+1);
 	} else {
-	    sprintf(hbuf,"crc8: LB len=%d  GOOD CRC=0x%x  ",length,crc);
-	    DCMSG_HEXB(YELLOW,hbuf,buf,length);
+	    sprintf(hbuf,"crc8: LB len=%d  GOOD CRC=0x%x  ",size+1,crc);
+	    DCMSG_HEXB(YELLOW,hbuf,buf,size+1);
 	}
     }
     return crc;

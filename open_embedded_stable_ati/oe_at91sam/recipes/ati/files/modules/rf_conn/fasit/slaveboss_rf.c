@@ -217,7 +217,7 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_QEXPOSE:
          case LBC_QCONCEAL:
          case LBC_REQUEST_NEW:
-            if (crc8(hdr, hl) == 0) {
+            if (crc8(hdr) == 0) {
             //   DDCMSG(D_RF,RED, "RF VALID CRC");
                return hdr->cmd;
             } else {
@@ -355,7 +355,7 @@ int send_STATUS_RESP_LIFTER(fasit_connection_t *fc) {
    fc->sent_status = 1; // have sent a status message before
 
    // set crc and send
-   set_crc8(&bdy, sizeof(LB_status_resp_mover_t));
+   set_crc8(&bdy);
    queueMsg(fc, &bdy, RF_size(LBC_STATUS_RESP_LIFTER));
    return mark_rfWrite;
 }
@@ -374,7 +374,7 @@ int send_STATUS_RESP_MOVER(fasit_connection_t *fc) {
    fc->sent_status = 1; // have sent a status message before
 
    // set crc and send
-   set_crc8(&bdy, sizeof(LB_status_resp_mover_t));
+   set_crc8(&bdy);
    queueMsg(fc, &bdy, RF_size(LBC_STATUS_RESP_MOVER));
    return mark_rfWrite;
 }
@@ -385,7 +385,7 @@ int send_STATUS_RESP_EXT(fasit_connection_t *fc) {
    fc->last_status.cmd = LBC_STATUS_RESP_EXT;
    fc->last_status.addr = fc->id & 0x7FF; // source address (always to basestation)
    fc->sent_status = 1; // have sent a status message before
-   set_crc8(&fc->last_status, sizeof(LB_status_resp_ext_t));
+   set_crc8(&fc->last_status);
    queueMsg(fc, &fc->last_status, RF_size(LBC_STATUS_RESP_EXT));
    return mark_rfWrite;
 }
@@ -396,7 +396,7 @@ int send_STATUS_NO_RESP(fasit_connection_t *fc) {
    DDCMSG(D_RF,RED, "send_STATUS_NO_RESP(%08X)", fc);
    bdy.cmd = LBC_STATUS_NO_RESP;
    bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
-   set_crc8(&bdy, sizeof(LB_status_no_resp_t));
+   set_crc8(&bdy);
    queueMsg(fc, &bdy, RF_size(LBC_STATUS_NO_RESP));
    return mark_rfWrite;
 }
@@ -662,7 +662,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    }
 
    // put in the crc and send
-   set_crc8(&bdy, sizeof(LB_device_reg_t));
+   set_crc8(&bdy);
    queueMsg(fc, &bdy, RF_size(LBC_DEVICE_REG));
    return mark_rfWrite;
 }

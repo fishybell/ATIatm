@@ -5,6 +5,8 @@
 thread_data_t minions[MAX_NUM_Minions];
 struct sockaddr_in fasit_addr;
 int verbose;
+uint8 slottime;
+int low_dev,high_dev;
 
 void print_help(int exval) {
     printf("mcp [-h] [-v num] [-f ip] [-p port] [-r ip] [-m port] [-n minioncount]\n\n");
@@ -13,6 +15,9 @@ void print_help(int exval) {
     printf("  -p 4000       set FASIT server port address\n");
     printf("  -r 127.0.0.1  set RFmaster server IP address\n");
     printf("  -m 4004       set RFmaster server port address\n");
+    printf("  -s 150        slottime in ms (5ms granules, 1275 ms max\n");
+    printf("  -d 0x20       Lowest devID to find\n");
+    printf("  -D 0x30       Highest devID to find\n");
     print_verbosity();
     exit(exval);
 }
@@ -37,6 +42,7 @@ int main(int argc, char **argv) {
 
     LB_packet_t *LB,LB_buf;
 
+    LB_request_new_t *LB_new;
     LB_device_reg_t *LB_devreg;
     LB_device_addr_t *LB_addr;
     
@@ -62,7 +68,7 @@ int main(int argc, char **argv) {
     RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");		// RFmaster server the MCP connects to
     RF_addr.sin_port = htons(4004);				// RFmaster server port number
 
-    while((opt = getopt(argc, argv, "hv:m:r:p:f:")) != -1) {
+    while((opt = getopt(argc, argv, "hv:m:r:p:f:s:d:D:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
@@ -70,6 +76,18 @@ int main(int argc, char **argv) {
 
 	    case 'v':
 		verbose = strtoul(optarg,NULL,16);
+		break;
+
+	    case 's':
+		slottime = atoi(optarg)/5;	// adjust to 1 byte
+		break;
+
+	    case 'd':
+		low_dev = strtoul(optarg,NULL,16);
+		break;
+
+	    case 'D':
+		high_dev = strtoul(optarg,NULL,16);
 		break;
 
 	    case 'f':
@@ -172,14 +190,18 @@ int main(int argc, char **argv) {
 	//
 	if (!ready_fd_count /* || idle long enough */  ){
 	    DDCMSG(D_RF,RED,"MCP:  Build a LB request new devices messages");
-	    //   for now the request new devices will just use payload len=0	    
-	    LB_buf.addr=2047;
-	    LB_buf.cmd=LBC_REQUEST_NEW;
+	    //   for now the request new devices will just use payload len=0
+	    LB_new=(LB_request_new_t *) &LB_buf;
+	    LB_new->cmd=LBC_REQUEST_NEW;
+	    LB_new->low_dev=low_dev;
+	    LB_new->high_dev=high_dev;
+	    LB_new->slottime=slottime;
+	    
 	    // calculates the correct CRC and adds it to the end of the packet payload
 	    // also fills in the length field
-	    set_crc8(&LB_buf,3);	    
+	    set_crc8(LB_new);
 	    // now send it to the RF master
-	    result=write(RF_sock,&LB_buf,RF_size(LB_buf.cmd));
+	    result=write(RF_sock,LB_new,RF_size(LB_new->cmd));
 	    DDCMSG(D_RF,BLUE,"MCP:  Sent %d bytes to RF",result);
 	    
 	} else { // we have some fd's ready
@@ -298,7 +320,7 @@ int main(int argc, char **argv) {
 
 			// calculates the correct CRC and adds it to the end of the packet payload
 			// also fills in the length field
-			set_crc8(LB_addr,RF_size(LB_addr->cmd));
+			set_crc8(LB_addr);
 			if (verbose&D_RF){	// don't do the sprintf if we don't need to
 			    sprintf(hbuf,"MCP: LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",LB_addr->addr,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
 			    DDCMSG_HEXB(D_RF,BLUE,hbuf,LB_addr,7);

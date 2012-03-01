@@ -97,7 +97,7 @@ void HandleSlaveRF(int RFfd){
 	    if (Queue_Depth(Rx) >= size){
 		//  we do have a complete packet
 		// we could check the CRC and dump it here
-		crc=crc8(LB,size);
+		crc=crc8(LB);
 		if (verbose&D_RF){	// don't do the sprintf if we don't need to
 		    sprintf(buf,"RFslave[RFaddr=%2d]: pseq=%4d   %2d byte RFpacket Cmd=%2d addr=%4d crc=%d\n"
 			    ,RF_addr,pcount++,RF_size(LB->cmd),LB->cmd,LB->addr,crc);
@@ -123,7 +123,7 @@ void HandleSlaveRF(int RFfd){
 			    LB_devreg->addr=RF_addr;
 
 		// calculates the correct CRC and adds it to the end of the packet payload
-			    set_crc8(&rLB,RF_size(LB_devreg->cmd));
+			    set_crc8(&rLB);
 			    DDCMSG(D_RF,BLUE,"setting temp addr to %4d (0x%x) after CRC calc  RF_addr= %4d (0x%x)",RF_addr,RF_addr,LB_devreg->addr,LB_devreg->addr);
 
 		// now send it to the RF master
