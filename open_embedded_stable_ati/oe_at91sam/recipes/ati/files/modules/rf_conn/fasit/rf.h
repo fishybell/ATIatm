@@ -155,7 +155,8 @@ typedef struct LB_status_no_resp_t {
 typedef struct LB_request_new_t {
     // 1 * 32 bytes = 1 long - padding = 3 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 padding0:3 __attribute__ ((packed));
+    uint32 reregister:1 __attribute__ ((packed));
+    uint32 padding0:2 __attribute__ ((packed));
     uint32 low_dev:24 __attribute__ ((packed));		// lowest devID
     uint32 high_dev:24 __attribute__ ((packed));	// highest devID
     uint32 slottime:8 __attribute__ ((packed));		// slottime (multiply by 5ms)
