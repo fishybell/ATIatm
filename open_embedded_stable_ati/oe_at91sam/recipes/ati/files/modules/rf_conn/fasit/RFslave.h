@@ -3,8 +3,11 @@
 
 #include "rf.h"
 
+// should really only ever have one connection to a socket and one to a tty
 #define MAX_CONNECTIONS 4
-#define MAX_IDS 64
+
+// due to protocol considerations, could have as many as 256 IDs, though not likely more than a few
+#define MAX_IDS 256
 
 #define RF_BUF_SIZE 1024
 
