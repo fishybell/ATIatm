@@ -649,7 +649,12 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    bdy.dev_type = fc->target_type;
    if (fc->target_type == RF_Type_BES) {
-      bdy.devid = fc->f2005_resp.body.devid & 0xffffff;
+//      bdy.devid = (fc->f2005_resp.body.devid & 0xffll << (8*7)) >> (8*7) |
+//                  (fc->f2005_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
+//                  (fc->f2005_resp.body.devid & 0xffll << (8*5)) >> (8*3); // 3 most significant bytes and reversed from original (reversed) order
+      bdy.devid = (fc->f2005_resp.body.devid & 0xffll << (8*7)) >> (8*5) |
+                  (fc->f2005_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
+                  (fc->f2005_resp.body.devid & 0xffll << (8*5)) >> (8*5); // 3 most significant bytes in original (reversed) order
    } else {
 //      bdy.devid = (fc->f2111_resp.body.devid & 0xffll << (8*7)) >> (8*7) |
 //                  (fc->f2111_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
@@ -679,11 +684,16 @@ int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
    // register if I'm in the dev range
    if (fc->f2111_resp.body.devid >= pkt->low_dev &&
        fc->f2111_resp.body.devid <= pkt->high_dev) {
-      return send_DEVICE_REG(fc); // register
+      // check if I'm already registered
+      if (fc->id == 2047) {
+         return send_DEVICE_REG(fc); // register now
+      } else {
+         return doNothing; // already registered
+      }
    } else if (pkt->reregister) {
       return send_DEVICE_REG(fc); // re-register
    } else {
-      return doNothing; // already registered
+      return doNothing; // don't register now
    }
 }
 
