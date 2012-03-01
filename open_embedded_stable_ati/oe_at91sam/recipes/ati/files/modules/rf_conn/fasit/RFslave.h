@@ -34,12 +34,9 @@ typedef struct rf_connection {
    int devids[MAX_IDS]; // the devids we're sending from this time
    int devid_index; // the last devid in the devids list we used
    int ids_lasttime[MAX_IDS]; // the ids from the last burst message (even a burst of 1)
+   int id_lasttime_index; // the last id in the ids_lasttime list we used
    int devid_last_low; // the low_dev from the last LBC_REQUEST_NEW packet
    int devid_last_high; // the high_dev from the last LBC_REQUEST_NEW packet
-
-//   // cached last message
-//   char last_msg[RF_BUF_SIZE];
-//   int last_len;
 } rf_connection_t;
 
 extern int verbose;

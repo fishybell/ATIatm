@@ -312,6 +312,125 @@ void addToBuffer_sock_in(rf_connection_t *rc, char *buf, int s) {
    addToBuffer_generic(rc->sock_ibuf, &rc->sock_ilen, buf, s);
 }
 
+// find address from tty to socket message for finding timeslot on way back to tty
+void addAddrToLastIDs(rf_connection_t *rc, int addr) {
+   int i;
+   // check to see if we already of this one in the list
+   for (i = 0; i < min(MAX_IDS, rc->id_lasttime_index); i++) {
+      if (rc->ids_lasttime[i] == addr) {
+         return;
+      }
+   }
+
+   // add address to id list
+   if (++rc->id_lasttime_index < MAX_IDS) {
+      rc->ids_lasttime[rc->id_lasttime_index] = addr;
+   }
+}
+
+int t2s_handle_STATUS_REQ(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_status_req_t *pkt = (LB_status_req_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_EXPOSE(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_expose_t *pkt = (LB_expose_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_EXPOSE(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_MOVE(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_move_t *pkt = (LB_move_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_MOVE(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_CONFIGURE_HIT(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_configure_t *pkt = (LB_configure_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_CONFIGURE_HIT(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_GROUP_CONTROL(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_group_control_t *pkt = (LB_group_control_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_GROUP_CONTROL(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_AUDIO_CONTROL(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_audio_control_t *pkt = (LB_audio_control_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_AUDIO_CONTROL(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_POWER_CONTROL(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_power_control_t *pkt = (LB_power_control_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_POWER_CONTROL(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_PYRO_FIRE(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_PYRO_FIRE(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_QEXPOSE(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_QEXPOSE(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_QCONCEAL(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_QCONCEAL(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_request_new_t *pkt = (LB_request_new_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_REQUEST_NEW(%08X, %i, %i)", rc, start, end);
+
+   // remember last low/high devid
+   rc->devid_last_low = pkt->low_dev;
+   rc->devid_last_high = pkt->high_dev;
+
+   // remember timeslot length
+   rc->timeslot_length = pkt->slottime * 5; // convert to milliseconds
+
+   return doNothing;
+} 
+
+int t2s_handle_DEVICE_ADDR(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_device_addr_t *pkt = (LB_device_addr_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_DEVICE_ADDR(%08X, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
 
 // macro used in tty2sock
 #define t2s_HANDLE_RF(RF_NUM) case LBC_ ## RF_NUM : retval = t2s_handle_ ## RF_NUM (rc, start, end) ; break;
@@ -347,21 +466,88 @@ int tty2sock(rf_connection_t *rc) {
       // change the start time to now
       clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&rc->time_start);
    }
-   // parse the message buffer and...
-   //                             ...keep track of ids that I'm listening on
-   //                             ...see if there is a change to the timeslot length
-   //                             ...see what timeslot to use
-   
    
    return (retval | mark_sockWrite); // the socket needs to write it out now and whatever the t2s_* handler said to do
 }
+
+// find address from socket to tty message for finding timeslot on way back to tty
+void addAddrToNowIDs(rf_connection_t *rc, int addr) {
+   int i;
+   // check to see if we already of this one in the list
+   for (i = 0; i < min(MAX_IDS, rc->id_index); i++) {
+      if (rc->ids[i] == addr) {
+         return;
+      }
+   }
+
+   // add address to id list
+   if (++rc->id_index < MAX_IDS) {
+      rc->ids[rc->id_index] = addr;
+   }
+}
+
+// find devid from socket to tty message for finding timeslot on way back to tty
+void addDevidToNowDevIDs(rf_connection_t *rc, int addr) {
+   int i;
+   // check to see if we already of this one in the list
+   for (i = 0; i < min(MAX_IDS, rc->devid_index); i++) {
+      if (rc->devids[i] == addr) {
+         return;
+      }
+   }
+
+   // add address to devid list
+   if (++rc->devid_index < MAX_IDS) {
+      rc->devids[rc->devid_index] = addr;
+   }
+}
+
+int s2t_handle_STATUS_RESP_LIFTER(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_status_resp_lifter_t *pkt = (LB_status_resp_lifter_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   addAddrToNowIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int s2t_handle_STATUS_RESP_MOVER(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_status_resp_mover_t *pkt = (LB_status_resp_mover_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   addAddrToNowIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int s2t_handle_STATUS_RESP_EXT(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_status_resp_ext_t *pkt = (LB_status_resp_ext_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   addAddrToNowIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int s2t_handle_STATUS_NO_RESP(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_status_no_resp_t *pkt = (LB_status_no_resp_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   addAddrToNowIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
+int s2t_handle_DEVICE_REG(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_device_reg_t *pkt = (LB_device_reg_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   addDevidToNowDevIDs(rc, pkt->devid);
+   return doNothing;
+} 
 
 // macro used in sock2tty
 #define s2t_HANDLE_RF(RF_NUM) case LBC_ ## RF_NUM : retval = s2t_handle_ ## RF_NUM (rc, start, end) ; break;
 
 // transfer socket data to the tty and set up delay times
 int sock2tty(rf_connection_t *rc) {
-   int start, end, mnum, retval = doNothing; // start doing nothing
+   int start, end, mnum, ts = 0, retval = doNothing; // start doing nothing
 
    // read all available valid messages up until I have to do something on return
    while (retval == doNothing && (mnum = validMessage(rc, &start, &end, 0)) != -1) { // 0 for socket
@@ -383,11 +569,11 @@ int sock2tty(rf_connection_t *rc) {
       // change the start time to now
       clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&rc->time_start);
    }
-   // parse the message buffer and...
-   //                             ...keep track of ids that I'm sending on
 
    // TODO -- find which timeslot I'm in
-   doTimeAfter(rc, rc->timeslot_length);
+
+   // change timeout
+   doTimeAfter(rc, rc->timeslot_length * ts); // timeslot length * timeslot I'm in
 
    return (retval | doNothing); // the timeout will determine when we can write, right now do nothing or whatever retval was
 }
