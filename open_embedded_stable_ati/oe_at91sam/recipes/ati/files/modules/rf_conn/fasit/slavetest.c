@@ -251,7 +251,10 @@ char *do_DEVICE_REG(int a, int *num) {
 char *do_REQUEST_NEW(int a, int *num) {
    LB_request_new_t *pkt = malloc(sizeof(LB_request_new_t));
    pkt->cmd = num[0];
-   pkt->addr = num[1];
+   pkt->reregister = num[1];
+   pkt->low_dev = num[2];
+   pkt->high_dev = num[3];
+   pkt->slottime = num[4];
    set_crc8(pkt);
    return (char*)pkt;
 }
