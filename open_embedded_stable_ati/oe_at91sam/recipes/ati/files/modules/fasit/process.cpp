@@ -39,19 +39,20 @@ FUNCTION_START("Process::handleRead(const epoll_event *ev)");
    char buf[BUF_SIZE+1];
    int rsize=0;
    rsize = fread(buf, sizeof(char), BUF_SIZE, pipe);
+   int err = errno; // save errno
 
 DCMSG(BLUE,"pipe 0x%08x read %i bytes:\n", pipe, rsize);
 DCMSG(BLUE, "<<<<<<<\n%s\n>>>>>>>\n", buf);
 
    DCOLOR(black) ;
    if (rsize == -1) {
-      IERROR("Read error: %s\n", strerror(errno))
+      IERROR("Read error: %s\n", strerror(err))
    }
    if (rsize > 0) {
       int ret = parseData(rsize, buf);
 FUNCTION_INT("Process::handleRead(const epoll_event *ev)", ret);
       return ret;
-   } else if (rsize != -1 || (rsize == -1 && errno != EAGAIN)) {
+   } else if (rsize != -1 || (rsize == -1 && err != EAGAIN)) {
       // the process has closed, schedule the deletion by returning -1
 FUNCTION_INT("Process::handleRead(const epoll_event *ev)", -1);
       return -1;
@@ -80,6 +81,7 @@ FUNCTION_START("Process::handleWrite(const epoll_event *ev)");
 
    // write all the data we can
    int s = fwrite(fwbuf, sizeof(char), fwsize, pipe);
+   int err = errno; // save errno
 
    // did it fail?
    if (s <= 0) {
@@ -87,7 +89,7 @@ FUNCTION_START("Process::handleWrite(const epoll_event *ev)");
       wbuf.push_back(fwbuf);
       wsize.push_back(fwsize);
       newMsg = true; // set this message as a discrete message
-      if (s == 0 || errno == EAGAIN) {
+      if (s == 0 || err == EAGAIN) {
          FUNCTION_INT("Process::handleWrite(const epoll_event *ev)", 0);
          return 0;
       } else {

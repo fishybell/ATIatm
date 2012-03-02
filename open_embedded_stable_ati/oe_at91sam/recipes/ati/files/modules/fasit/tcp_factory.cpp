@@ -84,6 +84,7 @@ FUNCTION_INT("::newClientSock()", -1)
       char buf[BUF_SIZE+1];
       int rsize=0;
       rsize = fread(buf, sizeof(char), BUF_SIZE, pipe);
+      int err = errno; // save errno
 
       // check that we read an IP
       if (rsize > 0) {
@@ -93,7 +94,7 @@ FUNCTION_INT("::newClientSock()", -1)
          }
          DCMSG(BLUE, "Auto-IP found address %s\n", inet_ntoa(server.sin_addr));
       } else {
-         IERROR("Read error: %s\n", strerror(errno))
+         IERROR("Read error: %s\n", strerror(err))
 FUNCTION_INT("::newClientSock()", -1)
          return -1;
       }
@@ -110,7 +111,8 @@ FUNCTION_INT("::newClientSock()", -1)
    // connect TCP socket to given IP and port
    DMSG("server: %s : %i\n", inet_ntoa(server.sin_addr), ntohs(server.sin_port));
    if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
-      switch (errno) {
+      int err = errno; // save errno
+      switch (err) {
          case EACCES : IERROR("errno: EACCES\n") break;
          case EPERM : IERROR("errno: EPERM\n") break;
          case EADDRINUSE : IERROR("errno: EADDRINUSE\n") break;

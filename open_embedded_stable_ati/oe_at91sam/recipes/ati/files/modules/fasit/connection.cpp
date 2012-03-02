@@ -203,18 +203,19 @@ FUNCTION_START("Connection::handleRead(const epoll_event *ev)");
    char buf[BUF_SIZE+1];
    int rsize=0;
    rsize = read(fd, buf, BUF_SIZE);
+   int err = errno; // save errno
 
    DCMSG(BLUE,"fd %i read %i bytes:\n", fd, rsize);
    CPRINT_HEXB(BLUE,buf, rsize);
    DCOLOR(black) ;
    if (rsize == -1) {
-      IERROR("Read error: %s\n", strerror(errno))
+      IERROR("Read error: %s\n", strerror(err))
    }
    if (rsize > 0) {
       int ret = parseData(rsize, buf);
 FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", ret);
       return ret;
-   } else if (rsize != -1 || (rsize == -1 && errno != EAGAIN)) {
+   } else if (rsize != -1 || (rsize == -1 && err != EAGAIN)) {
       // the client has closed this connection, schedule the deletion by returning -1
 FUNCTION_INT("Connection::handleRead(const epoll_event *ev)", -1);
       return -1;
@@ -277,6 +278,7 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
 
    // write all the data we can
    int s = write(fd, fwbuf, fwsize);
+   int err = errno; // save errno
 
    // did it fail?
    if (s <= 0) {
@@ -284,7 +286,7 @@ FUNCTION_START("Connection::handleWrite(const epoll_event *ev)");
       wbuf.push_back(fwbuf);
       wsize.push_back(fwsize);
       newMsg = true; // set this message as a discrete message
-      if (s == 0 || errno == EAGAIN) {
+      if (s == 0 || err == EAGAIN) {
          FUNCTION_INT("Connection::handleWrite(const epoll_event *ev)", 0);
          return 0;
       } else {
@@ -377,9 +379,10 @@ FUNCTION_START("::makeWritable(bool writable)");
    ev.data.ptr = (void*)this;
    ev.events = writable ? EPOLLIN | EPOLLOUT : EPOLLIN; // EPOLLOUT if writable set
    int ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
+   int err = errno; // save errno
 //DMSG("epoll_ctl(%i, EPOLL_CTL_MOD, %i, &ev) returned: %i\n", efd, fd, ret);
    if (ret == -1) {
-      switch (errno) {
+      switch (err) {
          case EBADF : IERROR("EBADF\n") ; break;
          case EEXIST : IERROR("EEXIST\n") ; break;
          case EINVAL : IERROR("EINVAL\n") ; break;
