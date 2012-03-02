@@ -67,6 +67,38 @@ void ReQueue(queue_t *Mdst,queue_t *Msrc,int count){
     DeQueue(Msrc,count);	// and remove from src queue 
 }
 
+// move count from the front of queue Msrc to tail of Mdst
+//   and shift up the old queue for now
+// having bounds checking and stuff might be nice during debugging
+void ReQueue_seqstrip(queue_t *Mdst,queue_t *Msrc,int count){
+    char buf[200];
+#if 1
+    DCMSG(MAGENTA,"ReQueue_seqstrip: src[%d:%d]:%d s%d  count=%d",
+	  Msrc->head-Msrc->buf,Msrc->tail-Msrc->buf,Queue_Depth(Msrc),QueueSeq_peek(Msrc),count);
+    sprintf(buf,"Msrc[%2d:%2d]  ",Msrc->head-Msrc->buf,Msrc->tail-Msrc->buf);
+    DCMSG_HEXB(YELLOW,buf,Msrc->head,Queue_Depth(Msrc));
+    
+    DCMSG(MAGENTA,"ReQueue_seqstrip: dst[%d:%d]:%d   count=%d",
+	  Mdst->head-Mdst->buf,Mdst->tail-Mdst->buf,Queue_Depth(Mdst),count);
+    sprintf(buf,"Mdst[%2d:%2d]  ",Mdst->head-Mdst->buf,Mdst->tail-Mdst->buf);
+    DCMSG_HEXB(YELLOW,buf,Mdst->head,Queue_Depth(Mdst));
+#endif
+    memcpy(Mdst->tail,Msrc->head+4,count);	// copy count bytes
+    Mdst->tail+=count;				// increment the tail
+    DeQueue(Msrc,count+4);	// and remove from src queue
+#if 1
+    DCMSG(MAGENTA,"ReQueue_seqstrip: src[%d:%d]:%d s%d  count=%d",
+	  Msrc->head-Msrc->buf,Msrc->tail-Msrc->buf,Queue_Depth(Msrc),QueueSeq_peek(Msrc),count);
+    sprintf(buf,"Msrc[%2d:%2d]  ",Msrc->head-Msrc->buf,Msrc->tail-Msrc->buf);
+    DCMSG_HEXB(YELLOW,buf,Msrc->head,Queue_Depth(Msrc));
+    
+    DCMSG(MAGENTA,"ReQueue_seqstrip: dst[%d:%d]:%d   count=%d",
+	  Mdst->head-Mdst->buf,Mdst->tail-Mdst->buf,Queue_Depth(Mdst),count);
+    sprintf(buf,"Mdst[%2d:%2d]  ",Mdst->head-Mdst->buf,Mdst->tail-Mdst->buf);
+    DCMSG_HEXB(YELLOW,buf,Mdst->head,Queue_Depth(Mdst));
+#endif
+}
+
 //  this is a macro
 //int Queue_Depth(queue_t *M){
 //    M->tail-M->head;

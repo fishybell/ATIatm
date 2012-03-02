@@ -48,7 +48,7 @@ void DieWithError(char *errorMessage){
 void HandleRF(int MCPsock,int RFfd){
     struct timespec elapsed_time, start_time, istart_time,delta_time;
     queue_t *Rx,*M1,*M2,*M3,*Tx;
-    int seq=0;		// the packet sequence numbers
+    int seq=1;		// the packet sequence numbers
 
     char Rbuf[512];
     char buf[200];        /* text Buffer  */
@@ -62,6 +62,7 @@ void HandleRF(int MCPsock,int RFfd){
     uint8 crc;
     int slottime,total_slots;
     int low_dev,high_dev;
+    int seq_M2,seq_M3,burst;
 
 
     // packet header so we can determine the length from the command in the header
@@ -210,48 +211,71 @@ void HandleRF(int MCPsock,int RFfd){
  ****   endif
  ****  add to remaining time based on heat or 480cps and size we sent
  ****/
+//
+		DDCMSG(D_MEGA,CYAN,"RFmaster:  seq_M1[%2d]=%2d  seq_M2[%2d]=%2d  seq_M3[%2d]=%2d"
+		       ,Queue_Depth(M1),QueueSeq_peek(M1),Queue_Depth(M2),QueueSeq_peek(M2),Queue_Depth(M3),QueueSeq_peek(M3));
 
 		//  we will start with the simple algorithm until debugged
-		if (Queue_Depth(M1)>2){
-		    LB=(LB_packet_t *)M1->head;
-		    size=RF_size(LB->cmd);
-		    ReQueue(Tx,M1,size);	// copy it to the TxBuf and deletes from front of old queue
+		if (QueueSeq_peek(M1)){		// returns the sequence number of the queue, 0 if empty
+		    LB=(LB_packet_t *)(M1->head+4);	// move past the sequence number
+		    size=RF_size(LB->cmd);		    
+		    ReQueue_seqstrip(Tx,M1,size);	// strips sequence number, copys to the TxBuf and deletes from front of old queue
 		    remaining_time =(total_slots)*slottime;
 		} else {
 
-		    //  we are having M2 packets budding in front of M3 packets.  we cannot have that.
-		    //  
-		    if (Queue_Depth(M2)>2){
-			LB=(LB_packet_t *)M2->head;
-			size=RF_size(LB->cmd);
-			ReQueue(Tx,M2,size);	// copy it to the TxBuf and deletes from front of old queue
-			remaining_time =3*slottime;
-		    } else {
-			if (Queue_Depth(M3)>2){
-			    int bcnt=0;
-			    while ((Queue_Depth(Tx)<240)&&(Queue_Depth(M3)>2)){
-				LB=(LB_packet_t *)M3->head;
-				size=RF_size(LB->cmd);
-//				DCMSG(YELLOW,"RFmaster: in M3[%d:%d]:%d  -- requeueing to Tx: LB  cmd=%d size=%d",M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),LB->cmd,size);
-//				sprintf(buf,"M3[%2d:%2d]  ",M3->head-M3->buf,M3->tail-M3->buf);
-//				DCMSG_HEXB(YELLOW,buf,M3->head,Queue_Depth(M3));
-//				DDCMSG(D_RF,YELLOW,"RFmaster: in M3 - Before requeueing %d bytes to Tx: M3[%2d:%2d]:%d   Tx[%2d:%2d]:%d "
-//				       ,size,M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),Tx->head-Tx->buf,Tx->tail-Tx->buf,Queue_Depth(Tx));
-				
-				ReQueue(Tx,M3,size);	// copy it to the TxBuf and deletes from front of old queue
-				DDCMSG(D_RF,YELLOW,"RFmaster: in M3 -  After requeueing %d bytes to Tx: M3[%2d:%2d]:%d   Tx[%2d:%2d]:%d "
-				       ,size,M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),Tx->head-Tx->buf,Tx->tail-Tx->buf,Queue_Depth(Tx));
+		    burst=3;
+		    seq_M2=QueueSeq_peek(M2);
+		    seq_M3=QueueSeq_peek(M3);
+		    
+		    while((seq_M2||seq_M3)&&(Queue_Depth(Tx)<240)&&burst){ // while we have room and something more to send
 
-				bcnt+=size;
-			    }
-			    // bcnt is how many bytes we are sending.
-			    //    time = (bcnt*1000) /240    (time in ms to send the chars are 2400 baud)
-			    remaining_time =(bcnt*1000)/240;
+			DDCMSG(D_MEGA,CYAN,"RFmaster:  while bursting   seq_M1[%2d]:s%2d  seq_M2[%2d]:s%2d  seq_M3[%2d]:s%2d   Tx[%d]   burst=%d"
+			       ,Queue_Depth(M1),QueueSeq_peek(M1),Queue_Depth(M2),QueueSeq_peek(M2),Queue_Depth(M3),QueueSeq_peek(M3),Queue_Depth(Tx),burst);
+
+			usleep(100000);
+			
+			// do the M2 burst
+			if (seq_M2&&((seq_M2<seq_M3)||!seq_M3)){
+			    LB=(LB_packet_t *)(M2->head+4);
+			    size=RF_size(LB->cmd);
+			    ReQueue_seqstrip(Tx,M2,size);	// copy it to the TxBuf and deletes from front of old queue
+			    remaining_time +=slottime;	// add time for a response to this one
+			    burst=2;
 			} else {
-			    remaining_time =500;	// blindly wait a max of 500ms
+			    // do the M3 burst
+			    if (seq_M3&&((seq_M3<seq_M2)||!seq_M2)){
+				if (burst==3){
+
+				    sprintf(buf,"M3[%2d:%2d]  ",M3->head-M3->buf,M3->tail-M3->buf);
+				    DCMSG_HEXB(YELLOW,buf,M3->head,Queue_Depth(M3));
+				    
+				    LB=(LB_packet_t *)(M3->head+4);
+				    size=RF_size(LB->cmd);
+				    
+				    DDCMSG(D_MEGA,YELLOW,"RFmaster: in M3 -  before requeueing %d bytes to Tx: M3[%2d:%2d]:%d(seq=%d/seq_M3=%d)   Tx[%2d:%2d]:%d "
+					   ,size,M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),QueueSeq_peek(M3),seq_M3,Tx->head-Tx->buf,Tx->tail-Tx->buf,Queue_Depth(Tx));	
+				    ReQueue_seqstrip(Tx,M3,size);	// copy it to the TxBuf and deletes from front of old queue
+				    DDCMSG(D_RF  ,YELLOW,"RFmaster: in M3 -  after requeueing %d bytes to Tx: M3[%2d:%2d]:%d(seq=%d/seq_M3=%d)   Tx[%2d:%2d]:%d "
+					   ,size,M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),QueueSeq_peek(M3),seq_M3,Tx->head-Tx->buf,Tx->tail-Tx->buf,Queue_Depth(Tx));	
+				} else {
+				    burst=0;	// bursting is done!  force the packet to send
+				}
+			    } else {
+				burst=0;	// bursting is done!  force the packet to send
+
+			    }
 			}
-		    }
-		}
+
+			//   update the seq for the next loop through
+			seq_M2=QueueSeq_peek(M2);
+			seq_M3=QueueSeq_peek(M3);
+		    }// end of while bursting
+
+		    remaining_time +=500;	// blindly wait an extra 500 ms
+		}  // else it is not M1
+
+
+		DDCMSG(D_MEGA,CYAN,"RFmaster:  before Tx to RF.  Tx[%d]",Queue_Depth(Tx));
 
 		if (Queue_Depth(Tx)){  // if we have something to Tx, Tx it.
 		    sprintf(buf,"MCP-> RF  [Que=%2d]  ",Queue_Depth(Tx));
@@ -280,6 +304,8 @@ void HandleRF(int MCPsock,int RFfd){
 	    }
 	}
 
+
+	
 	//  Testing has shown that we generally get 8 character chunks from the serial port
 	//  when set up the way it is right now.
 	// we must splice them back together
@@ -418,22 +444,27 @@ void HandleRF(int MCPsock,int RFfd){
 
 				EnQueueSeq(M1,seq++);	// prefixes the sequence number into the queue
 				ReQueue(M1,Rx,size);	// move count from the front of queue Rx to tail of M1
-				DCMSG(YELLOW,"RFmaster: requeued into M1   LB  cmd=%d size=%d slottime=%d low_dev=%d high_dev=%d total_slots=%d",
-				      LB->cmd,size,slottime,low_dev,high_dev,total_slots);
-
+				DCMSG(YELLOW,"RFmaster: requeued into M1[%d:%d]:%d s%d  size=%d",
+				      M1->head-M1->buf,M1->tail-M1->buf,Queue_Depth(M1),QueueSeq_peek(M1),size);
+				sprintf(buf,"M1[%2d:%2d]  ",M1->head-M1->buf,M1->tail-M1->buf);
+				DCMSG_HEXB(YELLOW,buf,M1->head,Queue_Depth(M1));
 				break;
 
 			    case LBC_STATUS_REQ:	// put in queue #2
 				EnQueueSeq(M2,seq++);	// prefixes the sequence number into the queue
 				ReQueue(M2,Rx,size);	// move count from the front of queue Rx to tail of M1
-				DCMSG(YELLOW,"RFmaster: requeued into M2   LB  cmd=%d size=%d",LB->cmd,size);
+				DCMSG(YELLOW,"RFmaster: requeued into M2[%d:%d]:%d s%d  size=%d",
+				      M2->head-M2->buf,M2->tail-M2->buf,Queue_Depth(M2),QueueSeq_peek(M2),size);
+				sprintf(buf,"M2[%2d:%2d]  ",M2->head-M2->buf,M2->tail-M2->buf);
+				DCMSG_HEXB(YELLOW,buf,M2->head,Queue_Depth(M2));
 
 				break;
 
 			    default:		// everything else is assumed to be a command that does not expect a response - put in queue #3
 				EnQueueSeq(M3,seq++);	// prefixes the sequence number into the queue
 				ReQueue(M3,Rx,size);	// move count from the front of queue Rx to tail of M1				
-				DCMSG(YELLOW,"RFmaster: requeued into M3[%d:%d]:%d   LB  cmd=%d size=%d",M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),LB->cmd,size);
+				DCMSG(YELLOW,"RFmaster: requeued into M3[%d:%d]:%d s%d  size=%d",
+				      M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),QueueSeq_peek(M3),size);
 				sprintf(buf,"M3[%2d:%2d]  ",M3->head-M3->buf,M3->tail-M3->buf);
 				DCMSG_HEXB(YELLOW,buf,M3->head,Queue_Depth(M3));
 

@@ -25,6 +25,9 @@ void DeQueue(queue_t *M,int count);
 void ReQueue(queue_t *Mdst,queue_t *Msrc,int count);
 void EnQueue(queue_t *M, void *ptr,int count);
 void EnQueueSeq(queue_t *M, int seq);
+int QueueSeq_peek(queue_t *M);
+void ReQueue_seqstrip(queue_t *Mdst,queue_t *Msrc,int count);
+
 #define Queue_Depth(M) ((M)->tail - (M)->head)
 
 

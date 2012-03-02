@@ -116,8 +116,9 @@ int main(int argc, char **argv) {
     /**   loop until we lose connection  **/
    clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
 
-   sprintf(buf,"Segfaults without this line.  Rbuf = ");
-   DCMSG_HEXB(GREEN,buf,Rstart, 1);   
+   memset(buf,0,100);
+//   sprintf(buf,"Segfaults without this line.  Rbuf = ");
+//   DCMSG_HEXB(GREEN,buf,Rstart, 1);   
 
    DCMSG(GREEN,"\n\nElapsed Time   bytes  Packet data");
    
