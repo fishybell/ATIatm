@@ -25,8 +25,33 @@ queue_t *queue_init(int size){
     return M;
 }
 
-// remove count bytes from the head of the queue and normalize the queue
+// add count bytes to the tail of the queue
+void EnQueue(queue_t *M, void *ptr,int count){
+    char *data=ptr;
+    while(count--) *M->tail++=*data++ ;
+}
 
+// add the 4 bytes of the sequence number to the tail of the queue
+void EnQueueSeq(queue_t *M, int seq){
+    int count=4;
+    char *data=(char *)&seq;
+    while(count--) *M->tail++=*data++ ;
+}
+
+// peek at the sequence number at the head of the queue.
+// return a 0 if the queue is empty
+int QueueSeq_peek(queue_t *M){
+    int count=4;
+    int seq;
+
+    if (M->tail==M->head) return(0);
+
+    seq=*((int *)M->head);
+    return(seq);
+
+}
+
+// remove count bytes from the head of the queue and normalize the queue
 void DeQueue(queue_t *M,int count){
     memmove(M->buf,M->head+count,Queue_Depth(M));
     M->tail-=count;

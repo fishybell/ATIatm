@@ -39,15 +39,16 @@ void DieWithError(char *errorMessage){
  *************
  *************/
 
-#define M0size 4096
+#define Rxsize 4096
 #define M1size 512
-#define M2size 4096
-#define M3size 4096
+#define M2size 16384
+#define M3size 16384
 #define Txsize 256
 
 void HandleRF(int MCPsock,int RFfd){
     struct timespec elapsed_time, start_time, istart_time,delta_time;
-    queue_t *M0,*M1,*M2,*M3,*Tx;
+    queue_t *Rx,*M1,*M2,*M3,*Tx;
+    int seq=0;		// the packet sequence numbers
 
     char Rbuf[512];
     char buf[200];        /* text Buffer  */
@@ -71,7 +72,7 @@ void HandleRF(int MCPsock,int RFfd){
     Rptr=Rbuf;
     Rstart=Rptr;
 
-    M0=queue_init(M0size);	// incoming packet buffer
+    Rx=queue_init(Rxsize);	// incoming packet buffer
     M1=queue_init(M1size);	// sorting buffers
     M2=queue_init(M2size);
     M3=queue_init(M3size);
@@ -340,11 +341,19 @@ void HandleRF(int MCPsock,int RFfd){
 	    }  // if gathered >=3
 	} // if this fd is ready
 
-	//  if we have data to read from the MCP, read it then force it down the radio
-	//    we will have to watch to make sure we don't force down too much for the radio
+
+
+/***************    if we have data to read from the MCP, read it then sort it into the three packet-type queues.
+ ***************    prefixing a sequence number so we don't send any data out-of-order when we do our sorting and bandwidth optimizing
+ ***************    
+ ***************   If the socket to MCP closed, we free the dynamically allocated queues and then we return to main
+ ***************   which waits for another MCP to connect
+ ***************
+ ***************/
+
 	if (FD_ISSET(MCPsock,&rf_or_mcp)){
 	    /* Receive message from MCP */
-	    MsgSize = recv(MCPsock, M0->tail, M0size-(M0->tail-M0->buf),0);	    
+	    MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);	    
 	    DCMSG(YELLOW,"RFmaster: read %d from MCP.  now to sort",MsgSize);
 
 	    if (MsgSize<0){
@@ -354,7 +363,7 @@ void HandleRF(int MCPsock,int RFfd){
 	    }
 	    if (!MsgSize){
 		DCMSG(RED,"RFmaster: read from MCP returned 0 - MCP closed");
-		free(M0);
+		free(Rx);
 		free(M1);
 		free(M2);
 		free(M3);
@@ -376,18 +385,24 @@ void HandleRF(int MCPsock,int RFfd){
  ***************    3)  Commands
  ***************        get put into M3queue
  ***************
+ ***************    we are going to prefix anything we put in the M[123] queues with a sequence number.
+ ***************    this enables us to keep chronological order
+ ***************
+ ***************    we could also make a little 'info' structure that has sequence numbers, time stamps, or who knows what
+ ***************    in it and that could be prefixed onto each packet.     but for now we will just use a seq num
+ ***************    
  ***************    We are going to do a little parsing here and split them into seperate queues
  ***************
  ***************    there will also need to be some kind of throttle to slow the MCP if we are full.
  ***************    
  ***************    */
 
-		M0->tail+=MsgSize;	// add on the new length
-		bytecount=Queue_Depth(M0);
+		Rx->tail+=MsgSize;	// add on the new length
+		bytecount=Queue_Depth(Rx);
 
 		// loop until we are out of complete packets
 		while (bytecount>=3) {  // make sure there is a possibility of a whole packet
-		    LB=(LB_packet_t *)M0->head;
+		    LB=(LB_packet_t *)Rx->head;
 		    size=RF_size(LB->cmd);
 		    DDCMSG(D_VERY,YELLOW,"RFmaster: bytecount = %2d LB  cmd=%d size=%d",bytecount,LB->cmd,size);
 
@@ -401,20 +416,23 @@ void HandleRF(int MCPsock,int RFfd){
 				high_dev=LB_new->high_dev;
 				total_slots=high_dev-low_dev+2;		// total number of slots with end padding
 
-				ReQueue(M1,M0,size);	// move count from the front of queue M0 to tail of M1
+				EnQueueSeq(M1,seq++);	// prefixes the sequence number into the queue
+				ReQueue(M1,Rx,size);	// move count from the front of queue Rx to tail of M1
 				DCMSG(YELLOW,"RFmaster: requeued into M1   LB  cmd=%d size=%d slottime=%d low_dev=%d high_dev=%d total_slots=%d",
 				      LB->cmd,size,slottime,low_dev,high_dev,total_slots);
 
 				break;
 
 			    case LBC_STATUS_REQ:	// put in queue #2
-				ReQueue(M2,M0,size);	// move count from the front of queue M0 to tail of M1
+				EnQueueSeq(M2,seq++);	// prefixes the sequence number into the queue
+				ReQueue(M2,Rx,size);	// move count from the front of queue Rx to tail of M1
 				DCMSG(YELLOW,"RFmaster: requeued into M2   LB  cmd=%d size=%d",LB->cmd,size);
 
 				break;
 
 			    default:		// everything else is assumed to be a command that does not expect a response - put in queue #3
-				ReQueue(M3,M0,size);	// move count from the front of queue M0 to tail of M1				
+				EnQueueSeq(M3,seq++);	// prefixes the sequence number into the queue
+				ReQueue(M3,Rx,size);	// move count from the front of queue Rx to tail of M1				
 				DCMSG(YELLOW,"RFmaster: requeued into M3[%d:%d]:%d   LB  cmd=%d size=%d",M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),LB->cmd,size);
 				sprintf(buf,"M3[%2d:%2d]  ",M3->head-M3->buf,M3->tail-M3->buf);
 				DCMSG_HEXB(YELLOW,buf,M3->head,Queue_Depth(M3));

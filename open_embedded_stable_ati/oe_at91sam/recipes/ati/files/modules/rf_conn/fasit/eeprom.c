@@ -3,6 +3,9 @@
 
 #include "eeprom.h"
 
+size_t strnlen(const char *s, size_t maxlen);	// make the compiler happier
+
+
 /*************************************************************
 /* Reads data from the specified address at the specified size.
 /* If the memory location is blank then return the default_int.
