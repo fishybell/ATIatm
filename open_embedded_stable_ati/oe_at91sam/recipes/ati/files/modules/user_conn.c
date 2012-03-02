@@ -699,23 +699,23 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      break;
                   case 'B': case 'b':     // Reads the board type
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "I B %s\n", writeEeprom(0x00, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "I B %s\n", writeEeprom(BOARD_LOC, arg3, BOARD_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "I B %s\n", readEeprom(0x00, 0x40)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "I B %s\n", readEeprom(BOARD_LOC, BOARD_SIZE)); // reads and prints out what it read
                      }
                      break;
                   case 'C': case 'c':     // Sets and Reads the connect port number
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "I C %s\n", writeEeprom(0x240, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "I C %s\n", writeEeprom(CONNECT_PORT_LOC, arg3, CONNECT_PORT_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "I C %s\n", readEeprom(0x240, 0x40)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "I C %s\n", readEeprom(CONNECT_PORT_LOC, CONNECT_PORT_SIZE)); // reads and prints out what it read
                      }
                      break;
                   case 'D': case 'd':      // Reads communication type
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "I D %s\n", writeEeprom(0x80, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "I D %s\n", writeEeprom(COMMUNICATION_LOC, arg3, COMMUNICATION_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "I D %s\n", readEeprom(0x80, 0x40)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "I D %s\n", readEeprom(COMMUNICATION_LOC, COMMUNICATION_SIZE)); // reads and prints out what it read
                      }
                      break;
                   case 'E': case 'e':	   // Sets and reads battery defaults
@@ -1012,9 +1012,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      break;
                   case 'I': case 'i':      // Sets and Reads the IP address
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "I I %s\n", writeEeprom(0xC0, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "I I %s\n", writeEeprom(IP_ADDRESS_LOC, arg3, IP_ADDRESS_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "I I %s\n", readEeprom(0xC0, 0x40)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "I I %s\n", readEeprom(IP_ADDRESS_LOC, IP_ADDRESS_SIZE)); // reads and prints out what it read
                      }
                      break;
                   case 'J': case 'j':      // Sets and reads SES defaults
@@ -1165,20 +1165,20 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      break;
                   case 'L': case 'l':      // Sets and Reads the listen port number
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "I L %s\n", writeEeprom(0x200, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "I L %s\n", writeEeprom(LISTEN_PORT_LOC, arg3, LISTEN_PORT_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "I L %s\n", readEeprom(0x200, 0x40)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "I L %s\n", readEeprom(LISTEN_PORT_LOC, LISTEN_PORT_SIZE)); // reads and prints out what it read
                      }
                      break;
                   case 'M': case 'm':      // Sets and Reads the MAC address
                      if (arg3 > 1) { // are they passing in information?
 						if (isMac(cmd+arg2)) {
-                           snprintf(wbuf, 1024, "I M %s\n", writeEeprom(0x40, arg3, 0x40, cmd+arg2)); // writes and prints out what it wrote
+                           snprintf(wbuf, 1024, "I M %s\n", writeEeprom(MAC_ADDRESS_LOC, arg3, MAC_ADDRESS_SIZE, cmd+arg2)); // writes and prints out what it wrote
                         } else {
                            snprintf(wbuf, 1024, "I M Invalid MAC address");
                         }
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "I M %s\n", readEeprom(0x40, 0x40)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "I M %s\n", readEeprom(MAC_ADDRESS_LOC, MAC_ADDRESS_SIZE)); // reads and prints out what it read
                      }
                      break;
                   case 'N': case 'n':	   // MFS defaults
