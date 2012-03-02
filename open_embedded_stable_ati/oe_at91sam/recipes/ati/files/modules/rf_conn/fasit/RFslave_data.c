@@ -331,7 +331,7 @@ void addAddrToLastIDs(rf_connection_t *rc, int addr) {
 int t2s_handle_STATUS_REQ(rf_connection_t *rc, int start, int end) {
    int i;
    LB_status_req_t *pkt = (LB_status_req_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -339,7 +339,7 @@ int t2s_handle_STATUS_REQ(rf_connection_t *rc, int start, int end) {
 int t2s_handle_EXPOSE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_expose_t *pkt = (LB_expose_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_EXPOSE(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_EXPOSE(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -347,7 +347,7 @@ int t2s_handle_EXPOSE(rf_connection_t *rc, int start, int end) {
 int t2s_handle_MOVE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_move_t *pkt = (LB_move_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_MOVE(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_MOVE(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -355,7 +355,7 @@ int t2s_handle_MOVE(rf_connection_t *rc, int start, int end) {
 int t2s_handle_CONFIGURE_HIT(rf_connection_t *rc, int start, int end) {
    int i;
    LB_configure_t *pkt = (LB_configure_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_CONFIGURE_HIT(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_CONFIGURE_HIT(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -363,7 +363,7 @@ int t2s_handle_CONFIGURE_HIT(rf_connection_t *rc, int start, int end) {
 int t2s_handle_GROUP_CONTROL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_group_control_t *pkt = (LB_group_control_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_GROUP_CONTROL(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_GROUP_CONTROL(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -371,7 +371,7 @@ int t2s_handle_GROUP_CONTROL(rf_connection_t *rc, int start, int end) {
 int t2s_handle_AUDIO_CONTROL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_audio_control_t *pkt = (LB_audio_control_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_AUDIO_CONTROL(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_AUDIO_CONTROL(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -379,7 +379,7 @@ int t2s_handle_AUDIO_CONTROL(rf_connection_t *rc, int start, int end) {
 int t2s_handle_POWER_CONTROL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_power_control_t *pkt = (LB_power_control_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_POWER_CONTROL(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_POWER_CONTROL(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -387,7 +387,7 @@ int t2s_handle_POWER_CONTROL(rf_connection_t *rc, int start, int end) {
 int t2s_handle_PYRO_FIRE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_PYRO_FIRE(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_PYRO_FIRE(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -395,7 +395,7 @@ int t2s_handle_PYRO_FIRE(rf_connection_t *rc, int start, int end) {
 int t2s_handle_QEXPOSE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_QEXPOSE(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_QEXPOSE(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -403,7 +403,7 @@ int t2s_handle_QEXPOSE(rf_connection_t *rc, int start, int end) {
 int t2s_handle_QCONCEAL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_QCONCEAL(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_QCONCEAL(%8p, %i, %i)", rc, start, end);
    addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -411,7 +411,7 @@ int t2s_handle_QCONCEAL(rf_connection_t *rc, int start, int end) {
 int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
    int i;
    LB_request_new_t *pkt = (LB_request_new_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_REQUEST_NEW(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_REQUEST_NEW(%8p, %i, %i)", rc, start, end);
 
    // remember last low/high devid
    rc->devid_last_low = pkt->low_dev;
@@ -426,7 +426,7 @@ int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
 int t2s_handle_ASSIGN_ADDR(rf_connection_t *rc, int start, int end) {
    int i;
    LB_assign_addr_t *pkt = (LB_assign_addr_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_ASSIGN_ADDR(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_ASSIGN_ADDR(%8p, %i, %i)", rc, start, end);
 //  FIXME   addAddrToLastIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -505,7 +505,7 @@ void addDevidToNowDevIDs(rf_connection_t *rc, int addr) {
 int s2t_handle_STATUS_RESP_LIFTER(rf_connection_t *rc, int start, int end) {
    int i;
    LB_status_resp_lifter_t *pkt = (LB_status_resp_lifter_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%8p, %i, %i)", rc, start, end);
    addAddrToNowIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -513,7 +513,7 @@ int s2t_handle_STATUS_RESP_LIFTER(rf_connection_t *rc, int start, int end) {
 int s2t_handle_STATUS_RESP_MOVER(rf_connection_t *rc, int start, int end) {
    int i;
    LB_status_resp_mover_t *pkt = (LB_status_resp_mover_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%8p, %i, %i)", rc, start, end);
    addAddrToNowIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -521,7 +521,7 @@ int s2t_handle_STATUS_RESP_MOVER(rf_connection_t *rc, int start, int end) {
 int s2t_handle_STATUS_RESP_EXT(rf_connection_t *rc, int start, int end) {
    int i;
    LB_status_resp_ext_t *pkt = (LB_status_resp_ext_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%8p, %i, %i)", rc, start, end);
    addAddrToNowIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -529,7 +529,7 @@ int s2t_handle_STATUS_RESP_EXT(rf_connection_t *rc, int start, int end) {
 int s2t_handle_STATUS_NO_RESP(rf_connection_t *rc, int start, int end) {
    int i;
    LB_status_no_resp_t *pkt = (LB_status_no_resp_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%8p, %i, %i)", rc, start, end);
    addAddrToNowIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -537,7 +537,7 @@ int s2t_handle_STATUS_NO_RESP(rf_connection_t *rc, int start, int end) {
 int s2t_handle_DEVICE_REG(rf_connection_t *rc, int start, int end) {
    int i;
    LB_device_reg_t *pkt = (LB_device_reg_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%08X, %i, %i)", rc, start, end);
+   DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%8p, %i, %i)", rc, start, end);
    addDevidToNowDevIDs(rc, pkt->devid);
    return doNothing;
 } 

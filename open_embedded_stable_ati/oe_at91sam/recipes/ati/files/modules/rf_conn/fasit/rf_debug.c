@@ -23,7 +23,7 @@ void debug_CONFIGURE_HIT(int color, LB_packet_t *pkt) {
 
 void debug_GROUP_CONTROL(int color, LB_packet_t *pkt) {
    LB_group_control_t *p = (LB_group_control_t*)pkt;
-   DCMSG(color, "LBC_GROUP_CONTROL: cmd: %i, addr: %i, gcmd: %i, gaddr: %i, crc: %02X", p->cmd, p->addr, p->crc);
+   DCMSG(color, "LBC_GROUP_CONTROL: cmd: %i, addr: %i, gcmd: %i, gaddr: %i, crc: %02p", p->cmd, p->addr, p->crc);
 }
 
 void debug_AUDIO_CONTROL(int color, LB_packet_t *pkt) {

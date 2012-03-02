@@ -56,6 +56,7 @@ void print_verbosity(void){
     printf("  -v 8	    sets D_POLL  \n");
     printf("  -v 10	    sets D_TIME  \n");
     printf("  -v 20	    sets D_VERY  \n");
+    printf("  -v 80	    sets D_MEGA  \n");
     printf("  -v 3F	    sets all of the above  \n");
 }
 
@@ -114,7 +115,7 @@ int RF_size(int cmd){
 	    return (7);
 
 	default:
-	    return (2);
+	    return (1);
     }
 }
 
@@ -263,7 +264,7 @@ void set_crc8(void *buf) {
 //    *data=0;		// tack a zero after that
 
     if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
-	sprintf(hbuf,"set_crc8: LB len=%d set crc=0x%x  ",size+1,crc);
+	sprintf(hbuf,"set_crc8: LB len=%d set crc=0x%x  ",RF_size(LB->cmd),crc);
 	DCMSG_HEXB(YELLOW,hbuf,buf,size+1);
     }
 }
@@ -289,10 +290,10 @@ uint8 crc8(void *buf) {
 
     if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
 	if (crc) {
-	    sprintf(hbuf,"crc8: LB len=%d  BAD CRC=0x%x  ",size+1,crc);
+	    sprintf(hbuf,"crc8: LB len=%d  BAD CRC=0x%x  ",RF_size(LB->cmd),crc);
 	    DCMSG_HEXB(RED,hbuf,buf,size+1);
 	} else {
-	    sprintf(hbuf,"crc8: LB len=%d  GOOD CRC=0x%x  ",size+1,crc);
+	    sprintf(hbuf,"crc8: LB len=%d  GOOD CRC=0x%x  ",RF_size(LB->cmd),crc);
 	    DCMSG_HEXB(YELLOW,hbuf,buf,size+1);
 	}
     }

@@ -99,14 +99,15 @@ void HandleSlaveRF(int RFfd){
 		// we could check the CRC and dump it here
 		crc=crc8(LB);
 		if (verbose&D_RF){	// don't do the sprintf if we don't need to
-		    sprintf(buf,"RFslave[RFaddr=%2d]: pseq=%4d   %2d byte RFpacket Cmd=%2d addr=%4d crc=%d\n"
-			    ,RF_addr,pcount++,RF_size(LB->cmd),LB->cmd,LB->addr,crc);
+		    sprintf(buf,"RFslave[RFaddr=%2d]: pseq=%4d   %2d byte RFpacket Cmd=%2d crc=%d\n"
+			    ,RF_addr,pcount++,RF_size(LB->cmd),LB->cmd,crc);
 		    DCMSG_HEXB(GREEN,buf,Rx->head,size);
 		}
+		
 	// only parse  if crc is good, we got one of the right commands, or our address matches
-		if (!crc && ((LB->cmd==LBC_REQUEST_NEW)||(LB->cmd==LBC_REQUEST_NEW)||(RF_addr==LB->addr))){
+		if (!crc && ((LB->cmd==LBC_REQUEST_NEW)||(LB->cmd==LBC_ASSIGN_ADDR)||(RF_addr==LB->addr))){
 		    timestamp(&elapsed_time,&istart_time,&delta_time);
-		    DDCMSG(D_TIME,CYAN,"RFslave top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
+		    DDCMSG(D_TIME,CYAN,"RFslave inside good packet at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 			   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 		    
 	// check the CRC

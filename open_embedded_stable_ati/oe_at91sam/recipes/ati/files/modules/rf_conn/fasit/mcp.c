@@ -204,14 +204,17 @@ int main(int argc, char **argv) {
 	    LB_new->cmd=LBC_REQUEST_NEW;
 	    LB_new->low_dev=low_dev;
 	    LB_new->high_dev=high_dev;
-	    LB_new->slottime=slottime;
+	    LB_new->slottime=slottime/5;	// adjust to 5ms granularity
 	    
 	    // calculates the correct CRC and adds it to the end of the packet payload
 	    // also fills in the length field
 	    set_crc8(LB_new);
 	    // now send it to the RF master
 	    result=write(RF_sock,LB_new,RF_size(LB_new->cmd));
-	    DDCMSG(D_RF,BLUE,"MCP:  Sent %d bytes to RF",result);
+	    if (verbose&D_RF){	// don't do the sprintf if we don't need to
+		sprintf(hbuf,"MCP: sent %d (%d) bytes  LB request_newdev  ",result,RF_size(LB_new->cmd));
+		DCMSG_HEXB(YELLOW,hbuf,LB_new, RF_size(LB_new->cmd));
+	    }
 	    
 	} else { // we have some fd's ready
 	    // check for ready minions or RF

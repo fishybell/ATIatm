@@ -217,6 +217,9 @@ void HandleRF(int MCPsock,int RFfd){
 		    ReQueue(Tx,M1,size);	// copy it to the TxBuf and deletes from front of old queue
 		    remaining_time =(total_slots)*slottime;
 		} else {
+
+		    //  we are having M2 packets budding in front of M3 packets.  we cannot have that.
+		    //  
 		    if (Queue_Depth(M2)>2){
 			LB=(LB_packet_t *)M2->head;
 			size=RF_size(LB->cmd);

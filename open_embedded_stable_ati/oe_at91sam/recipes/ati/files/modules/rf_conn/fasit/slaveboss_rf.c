@@ -285,7 +285,7 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
 }
 
 int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_RF,RED, "handle_STATUS_REQ(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_STATUS_REQ(%8p, %i, %i)", fc, start, end);
    // wait 'til we have the most up-to-date information to send
    fc->waiting_status_resp = 1;
    return send_2100_status_req(fc); // gather latest information
@@ -406,7 +406,7 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
    int retval = doNothing;
    static int mfsSDelay = -1;
    static int mfsRDelay = -1;
-   DDCMSG(D_RF,RED, "handle_EXPOSE(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_EXPOSE(%8p, %i, %i)", fc, start, end);
 
    // read, once, the eeprom values for start and repeat delays
    if (mfsSDelay == -1) {
@@ -460,7 +460,7 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
    LB_move_t *pkt = (LB_move_t *)(fc->rf_ibuf + start);
    // convert speed
    float speed = pkt->speed / 100.0;
-   DDCMSG(D_RF,RED, "handle_MOVE(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_MOVE(%8p, %i, %i)", fc, start, end);
    if (pkt->speed == 2047) {
       // TODO -- add emergency stop handling here
       speed = 0.0; // just normal stop for right now
@@ -474,7 +474,7 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
    LB_configure_t *pkt = (LB_configure_t *)(fc->rf_ibuf + start);
    int retval = doNothing;
-   DDCMSG(D_RF,RED, "handle_CONFIGURE_HIT(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_CONFIGURE_HIT(%8p, %i, %i)", fc, start, end);
 
    // check for thermal control only
    if (pkt->react == 7) {
@@ -536,7 +536,7 @@ int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end) {
    LB_group_control_t *pkt = (LB_group_control_t *)(fc->rf_ibuf + start);
    // which group command?
    int i, j;
-   DDCMSG(D_RF,RED, "handle_GROUP_CONTROL(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_GROUP_CONTROL(%8p, %i, %i)", fc, start, end);
    switch (pkt->gcmd) {
       case 0: // disable command
          for (i = 0; i<MAX_GROUPS; i++) {
@@ -596,14 +596,14 @@ int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end) {
 
 int handle_AUDIO_CONTROL(fasit_connection_t *fc, int start, int end) {
    LB_packet_t *pkt = (LB_packet_t *)(fc->rf_ibuf + start);
-   DDCMSG(D_RF,RED, "handle_AUDIO_CONTROL(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_AUDIO_CONTROL(%8p, %i, %i)", fc, start, end);
    // TODO -- fill me in
    return doNothing;
 }
 
 int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end) {
    LB_power_control_t *pkt = (LB_power_control_t *)(fc->rf_ibuf + start);
-   DDCMSG(D_RF,RED, "handle_POWER_CONTROL(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_POWER_CONTROL(%8p, %i, %i)", fc, start, end);
    // send correct power command to fasit client
    switch (pkt->pcmd) {
       case 0: // ignore command
@@ -622,20 +622,20 @@ int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end) {
 
 int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end) {
    LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(fc->rf_ibuf + start);
-   DDCMSG(D_RF,RED, "handle_PYRO_FIRE(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_PYRO_FIRE(%8p, %i, %i)", fc, start, end);
    // send pyro fire request (will handle "set" and "fire" commands to BES)
    send_2000(fc, pkt->zone);
    return doNothing;
 }
 
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_RF,RED, "handle_QEXPOSE(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_QEXPOSE(%8p, %i, %i)", fc, start, end);
    // send exposure request
    return send_2100_exposure(fc, 90); // 90^ = exposed
 }
 
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_RF,RED, "handle_QCONCEAL(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_QCONCEAL(%8p, %i, %i)", fc, start, end);
    // send exposure request
    return send_2100_exposure(fc, 0); // 0^ = concealed
 }
@@ -674,7 +674,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
 // a request for new messages has arrived, send back "DEVICE_REG"
 int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
    LB_request_new_t *pkt = (LB_request_new_t *)(fc->rf_ibuf + start);
-   DDCMSG(D_RF,RED, "handle_REQUEST_NEW(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_REQUEST_NEW(%8p, %i, %i)", fc, start, end);
    // only send a registry if I have a fully connected fasit client
    if (fc->target_type == RF_Type_Unknown) {
       return doNothing;
@@ -698,7 +698,7 @@ int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
 
 int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end) {
    LB_assign_addr_t *pkt = (LB_assign_addr_t *)(fc->rf_ibuf + start);
-   DDCMSG(D_RF,RED, "handle_ASSIGN_ADDR(%08X, %i, %i)", fc, start, end);
+   DDCMSG(D_RF,RED, "handle_ASSIGN_ADDR(%8p, %i, %i)", fc, start, end);
    // change device ID to new address
    fc->id = pkt->new_addr;
    return doNothing;

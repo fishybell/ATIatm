@@ -395,11 +395,11 @@ int main(int argc, char **argv) {
 
 #ifdef DEBUG_MEM
 void *__D_memcpy(void *dest, const void *src, size_t n, char* f, int l) {
-   DCMSG(black, "memcpy(%08X, %08X, %i) @ %s:%i", dest, src, n, f, l);
+   DCMSG(black, "memcpy(%8p, %8p, %i) @ %s:%i", dest, src, n, f, l);
    return memcpy(dest,src,n);
 }
 void *__D_memset(void *s, int c, size_t n, char* f, int l) {
-   DCMSG(black, "memset(%08X, %i, %i) @ %s:%i", s, c, n, f, l);
+   DCMSG(black, "memset(%8p, %i, %i) @ %s:%i", s, c, n, f, l);
    return memset(s,c,n);
 }
 #endif
