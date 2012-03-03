@@ -25,11 +25,11 @@ RFmaster : RFmaster.c $(HFILES) $(MCFILES)
 RFmaster.arm : RFmaster.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFmaster.arm RFmaster.c $(MCFILES)
 
-RFslave.new : RFslave_main.c RFslave_data.c RFslave.h rf_debug.c rf_debug.h $(HFILES) $(MCFILES)
-	gcc -lrt -std=gnu99 -o RFslave.new RFslave_main.c RFslave_data.c rf_debug.c $(MCFILES)
+RFslave.new : RFslave_main.c RFslave_data.c RFslave.h fasit_debug.c rf_debug.c fasit_debug.h rf_debug.h $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o RFslave.new RFslave_main.c RFslave_data.c fasit_debug.c rf_debug.c $(MCFILES)
 
-RFslave.new.arm : RFslave_main.c RFslave_data.c RFslave.h rf_debug.c rf_debug.h $(HFILES) $(MCFILES)
-	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.new.arm RFslave_main.c RFslave_data.c rf_debug.c $(MCFILES)
+RFslave.new.arm : RFslave_main.c RFslave_data.c RFslave.h fasit_debug.c rf_debug.c fasit_debug.h rf_debug.h $(HFILES) $(MCFILES)
+	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.new.arm RFslave_main.c RFslave_data.c fasit_debug.c rf_debug.c $(MCFILES)
 
 RFslave : RFslave.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o RFslave RFslave.c $(MCFILES)
@@ -37,14 +37,14 @@ RFslave : RFslave.c $(HFILES) $(MCFILES)
 RFslave.arm : RFslave.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFslave.arm RFslave.c $(MCFILES)
 
-slaveboss : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c rf_debug.c rf_debug.h $(HFILES) $(MCFILES)
-	gcc -lrt -std=gnu99 -o slaveboss fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c rf_debug.c eeprom.c $(MCFILES)
+slaveboss : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c fasit_debug.c rf_debug.c fasit_debug.h rf_debug.h $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o slaveboss fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c fasit_debug.c rf_debug.c eeprom.c $(MCFILES)
 
-slavetest : slavetest.c rf_debug.c rf_debug.h $(HFILES) $(MCFILES) slaveboss.h
-	gcc -lrt -std=gnu99 -o slavetest slavetest.c rf_debug.c $(MCFILES)
+slavetest : slavetest.c fasit_debug.c rf_debug.c fasit_debug.h rf_debug.h $(HFILES) $(MCFILES) slaveboss.h
+	gcc -lrt -std=gnu99 -o slavetest slavetest.c fasit_debug.c rf_debug.c $(MCFILES)
 
-slaveboss.arm : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c rf_debug.c rf_debug.h $(HFILES) $(MCFILES) slaveboss.h
-	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o slaveboss.arm fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c rf_debug.c $(MCFILES)
+slaveboss.arm : slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c fasit_debug.c rf_debug.c fasit_debug.h rf_debug.h $(HFILES) $(MCFILES) slaveboss.h
+	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o slaveboss.arm fasit.c slaveboss.c slaveboss_fasit.c slaveboss_rf.c eeprom.c fasit_debug.c rf_debug.c $(MCFILES)
 
 RFdump.arm : RFdump.c $(HFILES) $(MCFILES)
 	$(XGCC) --sysroot=$(SYSROOT) -lrt -std=gnu99 -o RFdump.arm RFdump.c $(MCFILES)
