@@ -166,7 +166,7 @@ int main(int argc, char **argv) {
             print_help(0);
             break;
          case 'v':
-            verbose = atoi(optarg);
+            verbose = strtoul(optarg,NULL,16);
             break;
          case 'n':
             fnum = atoi(optarg);
@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
    while (!done && !close_nicely) {
       // wait for a single RF client
       struct sockaddr_in caddr; // client address
-      DCMSG(MAGENTA, "WAITING FOR RF ACCEPT");
+      DCMSG(YELLOW, "WAITING FOR RF ACCEPT");
       rfclient = accept(rfsock, (struct sockaddr *) &caddr, &flen);
       DCMSG(BLACK,"SLAVEBOSS: client RF address = %s:%d", inet_ntoa(caddr.sin_addr),htons(caddr.sin_port));
       if (rfclient <= 0) {
@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
          continue;
       }
       setnonblocking(rfclient);
-      DCMSG(MAGENTA, "RF ACCEPTED %i", rfclient);
+      DCMSG(YELLOW, "RF ACCEPTED %i", rfclient);
 
       // setup listening for FASIT client
       if ((fasitsock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -253,14 +253,14 @@ int main(int argc, char **argv) {
       // after accepting RF client, accept any number of FASIT clients and parse
       //    the messages back and forth
       while (!done && !close_nicely) {
-         DCMSG(MAGENTA, "EPOLL WAITING");
+         DCMSG(YELLOW, "SLAVEBOSS EPOLL WAITING");
          // wait for something to happen
-         nfds = epoll_wait(efd, events, MAX_EVENTS, 10000); // 10 second timeout
+         nfds = epoll_wait(efd, events, MAX_EVENTS, -1); // infinite timeout
          
          // parse all waiting connections
          for (n = 0; !done && !close_nicely && n < nfds; n++) {
             if (events[n].data.fd == rfclient) { // Read/Write from rfclient
-               DCMSG(MAGENTA, "events[%i].events: %i rfclient", n, events[n].events);
+               DCMSG(YELLOW, "events[%i].events: %i rfclient", n, events[n].events);
 
                // closed socket?
                if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
@@ -307,7 +307,7 @@ int main(int argc, char **argv) {
                   continue;
                }
                setnonblocking(newsock);
-               DCMSG(MAGENTA, "FASIT ACCEPTED");
+               DCMSG(YELLOW, "FASIT ACCEPTED");
 
                // find slot to put it in
                for (i = 0; i < MAX_CONNECTIONS && index == -1; i++) {
@@ -350,7 +350,7 @@ int main(int argc, char **argv) {
             } else if (events[n].data.ptr != NULL) {
                // mangle and send to to rf connection
                fasit_connection_t *fc = (fasit_connection_t*) events[n].data.ptr;
-               DCMSG(MAGENTA, "events[%i].events: %i %08X", n, events[n].events, fc);
+               DCMSG(YELLOW, "events[%i].events: %i %08X", n, events[n].events, fc);
 
                // closed socket?
                if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
