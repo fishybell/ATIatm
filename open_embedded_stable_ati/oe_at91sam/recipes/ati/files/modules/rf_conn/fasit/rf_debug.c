@@ -83,12 +83,13 @@ void debug_REQUEST_NEW(int color, LB_packet_t *pkt) {
 
 void debug_ASSIGN_ADDR(int color, LB_packet_t *pkt) {
    LB_assign_addr_t *p = (LB_assign_addr_t*)pkt;
-   DCMSG(color, "LBC_ASSIGN_ADDR: cmd: %i, reregister=%i, devid =0x%06X, new_addr: %i, crc: %02X", p->cmd, p->reregister, p->devid, p->devid, p->new_addr, p->crc);
+   DCMSG(color, "LBC_ASSIGN_ADDR: cmd: %i, reregister=%i, devid =0x%06X, new_addr: %i, crc: %02X", p->cmd, p->reregister, p->devid, p->new_addr, p->crc);
 }
 
 // debug an RF packet
 void debugRF(int color, char *packet) {
    LB_packet_t *pkt = (LB_packet_t*)packet;
+   DCMSG_HEXB(color, "Raw RF msg: ", packet, RF_size(pkt->cmd));
    switch (pkt->cmd) {
       case LBC_STATUS_REQ:
          debug_STATUS_REQ(color,pkt); break;
