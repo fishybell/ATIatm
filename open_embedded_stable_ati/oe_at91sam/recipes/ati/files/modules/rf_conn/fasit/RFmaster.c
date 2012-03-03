@@ -39,15 +39,12 @@ void DieWithError(char *errorMessage){
  *************
  *************/
 
-#define Rxsize 4096
-#define M1size 512
-#define M2size 16384
-#define M3size 16384
+#define Rxsize 16384
 #define Txsize 256
 
 void HandleRF(int MCPsock,int RFfd){
     struct timespec elapsed_time, start_time, istart_time,delta_time;
-    queue_t *Rx,*M1,*M2,*M3,*Tx;
+    queue_t *Rx,*Tx;
     int seq=1;		// the packet sequence numbers
 
     char Rbuf[512];
@@ -60,9 +57,9 @@ void HandleRF(int MCPsock,int RFfd){
     int maxcps=500,rfcount=0;		/*  characters per second that we can transmit without melting - 1000 is about 100% */
     double cps;
     uint8 crc;
-    int slottime,total_slots;
+    int slottime=0,total_slots;
     int low_dev,high_dev;
-    int seq_M2,seq_M3,burst;
+    int burst,ptype;
 
 
     // packet header so we can determine the length from the command in the header
@@ -74,9 +71,6 @@ void HandleRF(int MCPsock,int RFfd){
     Rstart=Rptr;
 
     Rx=queue_init(Rxsize);	// incoming packet buffer
-    M1=queue_init(M1size);	// sorting buffers
-    M2=queue_init(M2size);
-    M3=queue_init(M3size);
     Tx=queue_init(Txsize);	// outgoing Tx buffer
 
     memset(Rstart,0,100);
@@ -134,146 +128,97 @@ void HandleRF(int MCPsock,int RFfd){
 	    delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000000);
 	    DDCMSG(D_MEGA,CYAN,"RFmaster:  delta=%2dms",delta);
 
-	    DDCMSG(D_MEGA,YELLOW,"RFmaster:  select timed out  delta=%d remaining_time=%d  M1=%d M2=%d M3=%d"
-		   ,delta,remaining_time,Queue_Depth(M1),Queue_Depth(M2),Queue_Depth(M3));
+	    DDCMSG(D_MEGA,YELLOW,"RFmaster:  select timed out  delta=%d remaining_time=%d  Rx[%d] Tx[%d]"
+		   ,delta,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
 
 	    if (delta>remaining_time-1) {
 
-/***************    there can be three types of MCP packets we need to be concerned with
- ***************
- ***************    1)  request new devices
- ***************        this is expecting responses from all un-assigned RFslaves.
- ***************        it will have to be sent alone or at the end of a string of no-response packets.
- ***************
- ***************    2)  status requests
- ***************        eventually these need to be set up to expect slotted responses from multiple
- ***************        devices - as we will want to burst multiple ones
- ***************
- ***************    3)  Commands
- ***************        commands will not recieve responses.
- ***************        they can be strung together in a burst that preceeds any response expecting requests
- ***************
- ***************    type #1 should be relativly seldom and can be sent alone or tacked to the end of a #3
+		
+/***************     TIME to send on the radio
+ ***************     
+ ***************    more simple more better algorithm
+ ***************    
+ ***************    
+ ***************      everything else in chonological order
+ ***************    type #1 should be relativly seldom and can be sent alone or tacked to the end of a string of commands
  ***************            it expects up to  ((slottime+1)*(high_dev-low_dev)) responses time to wait
  ***************            
- ***************    type #2 eventually needs to be set as a burst that expects responses, can also be
- ***************            tacked onto the end of a #3
- ***************            
- ***************    type #3 can all be strung together now up to less than about 250 bytes
+ ***************    type #2 and 3 can all be strung together now up to less than about 250 bytes
  ***************            to be sent as a 'burst'
  ***************
- ***************    Possibly when they are read from the MCP they should be split into 3 seperate queues
- ***************    
+ ***************    when they are read from the MCP they should be  2 seperate queues
+ ***************     or, we could even do it with one queue we are able to send-flush anything previous expecting a response
+ ***************    then we follow it up with just the request new devices packet which expects a big string of responses
+ ***************
+ ***************
+ ***************
+ ******
+ ******    we used to have multiple queues and sorting and sequence numbers, but that was a bad idea.
+ ******
+ ******    all we have to do is have our recieve queue, and put just what we want in the transmit queue.
+ ******
+ ******    Algorithm:  for up to 240 bytes, as long as the packets are not type #1 (request new devices) we
+ ******                put them in the Tx queue.
+ ******                If we do have a #1 then we:
+ ******                a) if there are any #2's in the current Tx queue, then we must send the current queue.
+ ******                b) if there are not any #2's, we tack the #1 on the end and send it.
+ ******
+ ******                much simpler, much better, more goodness
+ ******                we only have to keep track if there are any type #2's in the queue or not.
+ ******  
+ ******		  
  ***************/
 
-/****   advanced algortihm:
- ****
- ****   if there is a #1 packet
- ****       send up to 240 bytes of M3 and tack on the M1
- ****       do a timestamp to reset our clock
- ****       set remaining time to   (slot_count+1)*slottime 
- ****   else
- ****       if there is an M2 packet
- ****           figure out how big M2 is,
- ****               if M2 >240  then send a chunk of it
- ****           send up to 240-(M2 size chunk)  bytes of M3 - if any
- ****           tack on the M2 size chunk
- ****           set remaining time to   (M2slots)*slottime 
- ****       else
- ****           if there is an M3 packet
- ****               send up to 240  bytes of M3
- ****           else
- ****               think about polling using LBC_status_requests
- ****           endif
- ****       endif
- ****   endif
- ****
- ****  add to remaining time based on heat or 480cps and size we sent
- ****
- ****
- ****   simple algorithm:  CURRENTLY IMPLEMENTED
- ****   
- ****   if there is a #1 packet (should only be 3 bytes)
- ****       send it
- ****       do a timestamp to reset our clock
- ****       set remaining time to   (slot_count+1)*slottime    slot_count = high_dev-low_dev
- ****   else
- ****       if there is an M2 packet
- ****           send just 1 packet and set up the time to wait
- ****           set remaining time to   2*slottime 
- ****       else
- ****           if there is an M3 packet
- ****               send up to 240  bytes of M3
- ****           else
- ****               think about polling using LBC_status_requests
- ****           endif
- ****       endif
- ****   endif
- ****  add to remaining time based on heat or 480cps and size we sent
- ****/
-//
-		DDCMSG(D_MEGA,CYAN,"RFmaster:  seq_M1[%2d]=%2d  seq_M2[%2d]=%2d  seq_M3[%2d]=%2d"
-		       ,Queue_Depth(M1),QueueSeq_peek(M1),Queue_Depth(M2),QueueSeq_peek(M2),Queue_Depth(M3),QueueSeq_peek(M3));
 
-		//  we will start with the simple algorithm until debugged
-		if (QueueSeq_peek(M1)){		// returns the sequence number of the queue, 0 if empty
-		    LB=(LB_packet_t *)(M1->head+4);	// move past the sequence number
-		    size=RF_size(LB->cmd);		    
-		    ReQueue_seqstrip(Tx,M1,size);	// strips sequence number, copys to the TxBuf and deletes from front of old queue
-		    remaining_time =(total_slots)*slottime;
-		} else {
+/******		 do enough parsing at this point to decide if the packet is type 1,2, or 3.
+ ******		 we also have fully parse and record the settings in LBC_REQUEST_NEW that are
+ ******		  meant for us
+ ******/
 
-		    burst=3;
-		    seq_M2=QueueSeq_peek(M2);
-		    seq_M3=QueueSeq_peek(M3);
-		    
-		    while((seq_M2||seq_M3)&&(Queue_Depth(Tx)<240)&&burst){ // while we have room and something more to send
+		DDCMSG(D_MEGA,YELLOW,"RFmaster:  ptype rx=%d before Rx to Tx.  Rx[%d] Tx[%d]",QueuePtype(Rx),Queue_Depth(Rx),Queue_Depth(Tx));
+		
+		// loop until we are out of complete packets, and place them into the Tx queue
+		burst=3;		// remembers if we upt a type2 into the burst
+		remaining_time =100;	// reset our remaining_time before we are allowed to Tx again
+		
+		while((ptype=QueuePtype(Rx))&&		/* we have a complete packet */
+		      burst &&				/* and burst is not 0 (0 forces us to send) */
+		      (Queue_Depth(Tx)<240)&&		/*  room for more */
+		      !((ptype==1)&&(burst==2))		/* and if we are NOT a REQUEST_NEW AND haven't got a type 2  yet */
+		     ){	
 
-			DDCMSG(D_MEGA,CYAN,"RFmaster:  while bursting   seq_M1[%2d]:s%2d  seq_M2[%2d]:s%2d  seq_M3[%2d]:s%2d   Tx[%d]   burst=%d"
-			       ,Queue_Depth(M1),QueueSeq_peek(M1),Queue_Depth(M2),QueueSeq_peek(M2),Queue_Depth(M3),QueueSeq_peek(M3),Queue_Depth(Tx),burst);
 
-			usleep(100000);
+		    DDCMSG(D_MEGA,CYAN,"RFmaster:  in loop.  Rx[%d] Tx[%d]",Queue_Depth(Rx),Queue_Depth(Tx));
+		    if (ptype==1){	/*  parse it to get the slottime and devid range, and set burst to 0 */
+			LB_new =(LB_request_new_t *) Rx->head;	// we need to parse out the slottime, high_dev and low_dev from this packet.
+			slottime=LB_new->slottime*5;		// convert passed slottime back to milliseconds
+			low_dev=LB_new->low_dev;
+			high_dev=LB_new->high_dev;
+			total_slots=high_dev-low_dev+2;		// total number of slots with end padding
+			burst=0;
+			remaining_time =(total_slots)*slottime;	// set up the timer
+
+			ReQueue(Tx,Rx,RF_size(LB_new->cmd));	// move it to the Tx queue
 			
-			// do the M2 burst
-			if (seq_M2&&((seq_M2<seq_M3)||!seq_M3)){
-			    LB=(LB_packet_t *)(M2->head+4);
-			    size=RF_size(LB->cmd);
-			    ReQueue_seqstrip(Tx,M2,size);	// copy it to the TxBuf and deletes from front of old queue
-			    remaining_time +=slottime;	// add time for a response to this one
+//			DCMSG(YELLOW,"RFmaster: requeued into M1[%d:%d]:%d s%d  size=%d",
+//			      M1->head-M1->buf,M1->tail-M1->buf,Queue_Depth(M1),QueueSeq_peek(M1),size);
+//			sprintf(buf,"M1[%2d:%2d]  ",M1->head-M1->buf,M1->tail-M1->buf);
+//			DCMSG_HEXB(YELLOW,buf,M1->head,Queue_Depth(M1));
+		    } else {
+			LB=(LB_packet_t *)Rx->head;			
+			ReQueue(Tx,Rx,RF_size(LB->cmd));	// move it to the Tx queue
+			if (ptype==2) {
 			    burst=2;
-			} else {
-			    // do the M3 burst
-			    if (seq_M3&&((seq_M3<seq_M2)||!seq_M2)){
-				if (burst==3){
+			    remaining_time +=slottime;	// add time for a response to this one
+			}			    
+		    }
+		}  // end of while loop to build the Tx packet
 
-				    sprintf(buf,"M3[%2d:%2d]  ",M3->head-M3->buf,M3->tail-M3->buf);
-				    DCMSG_HEXB(YELLOW,buf,M3->head,Queue_Depth(M3));
-				    
-				    LB=(LB_packet_t *)(M3->head+4);
-				    size=RF_size(LB->cmd);
-				    
-				    DDCMSG(D_MEGA,YELLOW,"RFmaster: in M3 -  before requeueing %d bytes to Tx: M3[%2d:%2d]:%d(seq=%d/seq_M3=%d)   Tx[%2d:%2d]:%d "
-					   ,size,M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),QueueSeq_peek(M3),seq_M3,Tx->head-Tx->buf,Tx->tail-Tx->buf,Queue_Depth(Tx));	
-				    ReQueue_seqstrip(Tx,M3,size);	// copy it to the TxBuf and deletes from front of old queue
-				    DDCMSG(D_RF  ,YELLOW,"RFmaster: in M3 -  after requeueing %d bytes to Tx: M3[%2d:%2d]:%d(seq=%d/seq_M3=%d)   Tx[%2d:%2d]:%d "
-					   ,size,M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),QueueSeq_peek(M3),seq_M3,Tx->head-Tx->buf,Tx->tail-Tx->buf,Queue_Depth(Tx));	
-				} else {
-				    burst=0;	// bursting is done!  force the packet to send
-				}
-			    } else {
-				burst=0;	// bursting is done!  force the packet to send
+	    
 
-			    }
-			}
-
-			//   update the seq for the next loop through
-			seq_M2=QueueSeq_peek(M2);
-			seq_M3=QueueSeq_peek(M3);
-		    }// end of while bursting
-
-		    remaining_time +=500;	// blindly wait an extra 500 ms
-		}  // else it is not M1
-
+/***********    Send the RF burst
+ ***********
+ ***********/
 
 		DDCMSG(D_MEGA,CYAN,"RFmaster:  before Tx to RF.  Tx[%d]",Queue_Depth(Tx));
 
@@ -378,9 +323,9 @@ void HandleRF(int MCPsock,int RFfd){
  ***************/
 
 	if (FD_ISSET(MCPsock,&rf_or_mcp)){
-	    /* Receive message from MCP */
+	    /* Receive message from MCP and read it directly into the Rx buffer */
 	    MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);	    
-	    DCMSG(YELLOW,"RFmaster: read %d from MCP.  now to sort",MsgSize);
+	    DCMSG(YELLOW,"RFmaster: read %d from MCP.",MsgSize);
 
 	    if (MsgSize<0){
 		strerror_r(errno,buf,200);
@@ -390,9 +335,6 @@ void HandleRF(int MCPsock,int RFfd){
 	    if (!MsgSize){
 		DCMSG(RED,"RFmaster: read from MCP returned 0 - MCP closed");
 		free(Rx);
-		free(M1);
-		free(M2);
-		free(M3);
 		free(Tx);
 		close(MCPsock);    /* Close socket */    
 		return;			/* go back to the main loop waiting for MCP connection */
@@ -400,86 +342,26 @@ void HandleRF(int MCPsock,int RFfd){
 
 	    if (MsgSize){
 
-/***************    there can be three types of MCP packets we need to be concerned with
+/***************    Sorting is needlessly complicated.
+ ***************       Just queue it up in our Rx queue .
  ***************
- ***************    1)  request new devices
- ***************        get put into M1queue
+ ***************       I suppose it should check for fullness
  ***************
- ***************    2)  status requests
- ***************        get put into M2queue
- ***************
- ***************    3)  Commands
- ***************        get put into M3queue
- ***************
- ***************    we are going to prefix anything we put in the M[123] queues with a sequence number.
- ***************    this enables us to keep chronological order
- ***************
- ***************    we could also make a little 'info' structure that has sequence numbers, time stamps, or who knows what
- ***************    in it and that could be prefixed onto each packet.     but for now we will just use a seq num
- ***************    
- ***************    We are going to do a little parsing here and split them into seperate queues
- ***************
- ***************    there will also need to be some kind of throttle to slow the MCP if we are full.
+ ***************    there might also need to be some kind of throttle to slow the MCP if we are full.
  ***************    
  ***************    */
 
 		Rx->tail+=MsgSize;	// add on the new length
 		bytecount=Queue_Depth(Rx);
 
-		// loop until we are out of complete packets
-		while (bytecount>=3) {  // make sure there is a possibility of a whole packet
-		    LB=(LB_packet_t *)Rx->head;
-		    size=RF_size(LB->cmd);
-		    DDCMSG(D_VERY,YELLOW,"RFmaster: bytecount = %2d LB  cmd=%d size=%d",bytecount,LB->cmd,size);
+// we don't need to parse or anything....
 
-		    if (size>=bytecount){  // sort this packet which is complete although there could be more
-			switch (LB->cmd) {
-			    case LBC_REQUEST_NEW:	// put in queue #1
-				
-				LB_new =(LB_request_new_t *) LB;	// we need to parse out the slottime, high_dev and low_dev from this packet.
-				slottime=LB_new->slottime*5;		// convert passed slottime back to milliseconds
-				low_dev=LB_new->low_dev;
-				high_dev=LB_new->high_dev;
-				total_slots=high_dev-low_dev+2;		// total number of slots with end padding
+	    }  // if msgsize was positive
 
-				EnQueueSeq(M1,seq++);	// prefixes the sequence number into the queue
-				ReQueue(M1,Rx,size);	// move count from the front of queue Rx to tail of M1
-				DCMSG(YELLOW,"RFmaster: requeued into M1[%d:%d]:%d s%d  size=%d",
-				      M1->head-M1->buf,M1->tail-M1->buf,Queue_Depth(M1),QueueSeq_peek(M1),size);
-				sprintf(buf,"M1[%2d:%2d]  ",M1->head-M1->buf,M1->tail-M1->buf);
-				DCMSG_HEXB(YELLOW,buf,M1->head,Queue_Depth(M1));
-				break;
-
-			    case LBC_STATUS_REQ:	// put in queue #2
-				EnQueueSeq(M2,seq++);	// prefixes the sequence number into the queue
-				ReQueue(M2,Rx,size);	// move count from the front of queue Rx to tail of M1
-				DCMSG(YELLOW,"RFmaster: requeued into M2[%d:%d]:%d s%d  size=%d",
-				      M2->head-M2->buf,M2->tail-M2->buf,Queue_Depth(M2),QueueSeq_peek(M2),size);
-				sprintf(buf,"M2[%2d:%2d]  ",M2->head-M2->buf,M2->tail-M2->buf);
-				DCMSG_HEXB(YELLOW,buf,M2->head,Queue_Depth(M2));
-
-				break;
-
-			    default:		// everything else is assumed to be a command that does not expect a response - put in queue #3
-				EnQueueSeq(M3,seq++);	// prefixes the sequence number into the queue
-				ReQueue(M3,Rx,size);	// move count from the front of queue Rx to tail of M1				
-				DCMSG(YELLOW,"RFmaster: requeued into M3[%d:%d]:%d s%d  size=%d",
-				      M3->head-M3->buf,M3->tail-M3->buf,Queue_Depth(M3),QueueSeq_peek(M3),size);
-				sprintf(buf,"M3[%2d:%2d]  ",M3->head-M3->buf,M3->tail-M3->buf);
-				DCMSG_HEXB(YELLOW,buf,M3->head,Queue_Depth(M3));
-
-				break;
-			} // end of switch
-			bytecount-=size;
-
-		    } else { //  size check was not a whole packet
-			bytecount=0;	// we need to bail out
-		    }
-		} // if we have at least 3 bytes 
-	    }
 	}  // end of MCP_sock
     } // end while 1
-}
+}  // end of handle_RF
+
 
 void print_help(int exval) {
     printf("RFmaster [-h] [-v num] [-t comm] [-p port] [-x delay] \n\n");

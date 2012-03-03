@@ -31,24 +31,32 @@ void EnQueue(queue_t *M, void *ptr,int count){
     while(count--) *M->tail++=*data++ ;
 }
 
-// add the 4 bytes of the sequence number to the tail of the queue
-void EnQueueSeq(queue_t *M, int seq){
-    int count=4;
-    char *data=(char *)&seq;
-    while(count--) *M->tail++=*data++ ;
-}
 
-// peek at the sequence number at the head of the queue.
-// return a 0 if the queue is empty
-int QueueSeq_peek(queue_t *M){
-    int count=4;
-    int seq;
+/*** peek at the queue and return a
+ ***   0 if there is not a complete packet at the head
+ ***   1 if there is a request_new_devices packet
+ ***   2 if there is a status_req (or other packet that is expecting a response)
+ ***   3 if there is a command that expects no response
+ ***
+ ***   I suppose it could check the CRC or something too, and return something different in that case,
+ ***   but it was first written to look at commands from the MCP which should always be without crc errors
+ ***/
 
-    if (M->tail==M->head) return(0);
+int QueuePtype(queue_t *M){
+    int depth;
+    LB_packet_t *LB;
 
-    seq=*((int *)M->head);
-    return(seq);
-
+    depth=Queue_Depth(M);
+    
+    if (depth>=3) { // there are enough bytes for a command
+	LB=(LB_packet_t *)M->head;
+	if (RF_size(LB->cmd)<=depth){ // there are enough bytes for this command
+	    if (LB->cmd==LBC_REQUEST_NEW) return(1);
+	    if (LB->cmd==LBC_STATUS_REQ) return(2);
+	    return(3);
+	}
+    }
+    return(0);
 }
 
 // remove count bytes from the head of the queue and normalize the queue
@@ -65,43 +73,6 @@ void ReQueue(queue_t *Mdst,queue_t *Msrc,int count){
     memcpy(Mdst->tail,Msrc->head,count);	// copy count bytes
     Mdst->tail+=count;				// increment the tail
     DeQueue(Msrc,count);	// and remove from src queue 
-}
-
-// move count from the front of queue Msrc to tail of Mdst
-//   and shift up the old queue for now
-// having bounds checking and stuff might be nice during debugging
-void ReQueue_seqstrip(queue_t *Mdst,queue_t *Msrc,int count){
-    char buf[200];
-
-    if (verbose==D_MEGA){
-    DCMSG(MAGENTA,"ReQueue_seqstrip: src[%d:%d]:%d s%d  count=%d",
-	  Msrc->head-Msrc->buf,Msrc->tail-Msrc->buf,Queue_Depth(Msrc),QueueSeq_peek(Msrc),count);
-    sprintf(buf,"Msrc[%2d:%2d]  ",Msrc->head-Msrc->buf,Msrc->tail-Msrc->buf);
-    DCMSG_HEXB(YELLOW,buf,Msrc->head,Queue_Depth(Msrc));
-    
-    DCMSG(MAGENTA,"ReQueue_seqstrip: dst[%d:%d]:%d   count=%d",
-	  Mdst->head-Mdst->buf,Mdst->tail-Mdst->buf,Queue_Depth(Mdst),count);
-    sprintf(buf,"Mdst[%2d:%2d]  ",Mdst->head-Mdst->buf,Mdst->tail-Mdst->buf);
-    DCMSG_HEXB(YELLOW,buf,Mdst->head,Queue_Depth(Mdst));
-    }
-
-    
-    memcpy(Mdst->tail,Msrc->head+4,count);	// copy count bytes
-    Mdst->tail+=count;				// increment the tail
-    DeQueue(Msrc,count+4);	// and remove from src queue
-
-
-    if (verbose==D_MEGA){
-    DCMSG(MAGENTA,"ReQueue_seqstrip: src[%d:%d]:%d s%d  count=%d",
-	  Msrc->head-Msrc->buf,Msrc->tail-Msrc->buf,Queue_Depth(Msrc),QueueSeq_peek(Msrc),count);
-    sprintf(buf,"Msrc[%2d:%2d]  ",Msrc->head-Msrc->buf,Msrc->tail-Msrc->buf);
-    DCMSG_HEXB(YELLOW,buf,Msrc->head,Queue_Depth(Msrc));
-    
-    DCMSG(MAGENTA,"ReQueue_seqstrip: dst[%d:%d]:%d   count=%d",
-	  Mdst->head-Mdst->buf,Mdst->tail-Mdst->buf,Queue_Depth(Mdst),count);
-    sprintf(buf,"Mdst[%2d:%2d]  ",Mdst->head-Mdst->buf,Mdst->tail-Mdst->buf);
-    DCMSG_HEXB(YELLOW,buf,Mdst->head,Queue_Depth(Mdst));
-    }
 }
 
 //  this is a macro
