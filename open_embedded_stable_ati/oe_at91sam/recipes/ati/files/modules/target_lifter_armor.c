@@ -527,7 +527,7 @@ int lifter_position_set(int position) {
     liftPosition = lifter_position_get();
     if (liftPosition == LIFTER_POSITION_ERROR_BOTH) {
       do_fault(ERR_lifter_stuck_at_limit);
-      return 0;
+      //return 0; just because we have an error, don't not go, you can't remove the target without it going down.
     }
     if (liftPosition != position) {
         // signal that an operation is in progress
