@@ -100,7 +100,7 @@ int handleRet(int ret, rf_connection_t *rc, int efd) {
    if (ret & mark_sockWrite) {
       DCMSG(RED, "mark_sockWrite: %i", rc->sock);
       D_memset(&ev, 0, sizeof(ev));
-      ev.data.ptr = rc;
+      ev.data.fd = rc->sock;
       ev.events = EPOLLIN | EPOLLOUT;
       epoll_ctl(efd, EPOLL_CTL_MOD, rc->sock, &ev);
    }
@@ -114,7 +114,7 @@ int handleRet(int ret, rf_connection_t *rc, int efd) {
    if (ret & mark_sockRead) { // mark_sockRead overwrites mark_sockWrite
       DCMSG(RED, "mark_sockRead, %i", rc->sock);
       D_memset(&ev, 0, sizeof(ev));
-      ev.data.ptr = rc;
+      ev.data.fd = rc->sock;
       ev.events = EPOLLIN;
       epoll_ctl(efd, EPOLL_CTL_MOD, rc->sock, &ev);
    }
@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
             print_help(0);
             break;
          case 'v':
-            verbose = atoi(optarg);
+            verbose = strtoul(optarg,NULL,16);
             break;
          case 'i':
             inet_aton(optarg, &raddr.sin_addr);
@@ -205,6 +205,7 @@ int main(int argc, char **argv) {
       DieWithError("connect");
    }
    setnonblocking(rc.sock, 1); // socket first time
+   DCMSG(BLACK,"RFSLAVE: RF socket fd: %i", rc.sock);
 
    // open tty and setup the serial device (copy the old settings to oldtio)
    rc.tty = open(ttyport, O_RDWR | O_NOCTTY);
@@ -223,6 +224,7 @@ int main(int argc, char **argv) {
    tcflush(rc.tty, TCIFLUSH);
    tcsetattr(rc.tty, TCSANOW, &newtio);
    setnonblocking(rc.tty, 0); // not a socket
+   DCMSG(BLACK,"RFSLAVE: RF tty fd: %i", rc.tty);
 
    // setup epoll
    efd = epoll_create(MAX_CONNECTIONS);
@@ -246,23 +248,38 @@ int main(int argc, char **argv) {
    }
 
    // finish initialization of connection structure
-   clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&rc.time_start);
+   clock_gettime(CLOCK_MONOTONIC,&rc.time_start);
    doTimeAfter(&rc, INFINITE);
 
    // main loop
    while (!done && !close_nicely) {
-      DCMSG(YELLOW, "EPOLL WAITING");
+      int timeout = getTimeout(&rc); // find out timeout...
+      DCMSG(YELLOW, "RFSLAVE EPOLL WAITING %i msecs", timeout);
       // wait for something to happen
-      nfds = epoll_wait(efd, events, MAX_EVENTS, getTimeout(&rc)); // find out timeout and pass it directly in
+      nfds = epoll_wait(efd, events, MAX_EVENTS, timeout); // ...and pass it directly in
 
       // timeout?
       if (nfds == 0) {
          handleRet(mark_ttyWrite, &rc, efd); // we want the tty to be available for writing...
-         continue; // ...so come back and wait the rest of the time right before tty writing
+         // timed out, either wait for a while, or do everything now
+         if (getTimeout(&rc) >= 10) { // long timeout (10 milliseconds) still exists
+            DCMSG(YELLOW, "Epoll timed out, going back...");
+         
+            continue; // ...so come back and wait the rest of the time right before tty writing
+         } else if (timeout == 0) { // no timeout exists
+            // reset timer now
+            rc.time_start = rc.timeout_end; // reset to latest time
+            rc.timeout_start = rc.timeout_end; // reset to latest time
+            continue; // ...so come back and wait the rest of the time right before tty writing
+         } else { // short timeout, so wait rest now
+            waitRest(&rc);
+            continue; // timeout will now be 0
+         }
       }
       
       // parse all waiting connections
       for (n = 0; !done && !close_nicely && n < nfds; n++) {
+         DCMSG(YELLOW, "Looking at %i in events...", n);
          if (events[n].data.fd == rc.tty) { // Read/Write from tty
             DCMSG(YELLOW, "events[%i].events: %i tty", n, events[n].events);
 
@@ -272,9 +289,6 @@ int main(int argc, char **argv) {
                done = 1;
             // writing?
             } else if (events[n].events & EPOLLOUT) {
-               // wait the rest of the timeout time
-               waitRest(&rc);
-
                // rcWrite will push the data as quickly as possible
                done = handleRet(rcWrite(&rc, 1),&rc, efd); // 1 for tty
             // reading?
@@ -300,7 +314,7 @@ int main(int argc, char **argv) {
                done = handleRet(rcWrite(&rc, 0), &rc, efd); // 0 for socket
             // reading?
             } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
-               int ret = rcRead(&rc, 1); // 1 for tty
+               int ret = rcRead(&rc, 0); // 0 for socket
                if (ret != doNothing) {
                   done = handleRet(ret, &rc, efd); // this 
                } else {
@@ -308,6 +322,9 @@ int main(int argc, char **argv) {
                   done = handleRet(sock2tty(&rc), &rc, efd);
                }
             }
+         } else {
+            DCMSG(YELLOW, "events[%i].events: %i unknown: %i", n, events[n].events, events[n].data.fd);
+            done = 1; // exit
          }
       }
    }
