@@ -41,6 +41,38 @@ static int packetForMe(fasit_connection_t *fc, int start) {
    int i, j;
    DDCMSG(D_RF,RED,"packetForMe %i",start);
    DDCMSG_HEXB(D_RF, RED, "RF Message:", fc->rf_ibuf+start, fc->rf_ilen-start);
+   if (hdr->cmd == LBC_REQUEST_NEW) {
+      // special case check: check reregister or devid range
+      LB_request_new_t *msg = (LB_request_new_t*)hdr;
+      if (msg->reregister) {
+DDCMSG(D_RF,RED, "RF Packet for everyone: %i", hdr->addr);
+         return 1; // for everyone, which includes me
+      } else if (fc->target_type == RF_Type_Unknown) {
+DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %i:%i", msg->low_dev, msg->high_dev);
+         return 0; // doesn't matter if I'm in the range or not, I've haven't finished connecting
+      } else if (fc->id != 2047) {
+DDCMSG(D_RF,RED, "RF Packet ignored based on already having registered: %i:%i", msg->low_dev, msg->high_dev);
+         return 0; // have already registered
+      } else if (msg->low_dev <= fc->devid && msg->high_dev >= fc->devid) {
+DDCMSG(D_RF,RED, "RF Packet for my devid range: %i:%i", msg->low_dev, msg->high_dev);
+         return 1;
+      }
+DDCMSG(D_RF,RED, "RF Packet outside my devid range: %i:%i", msg->low_dev, msg->high_dev);
+      return 0;
+   } else if (hdr->cmd == LBC_ASSIGN_ADDR) {
+      // special case: check devid match (ignore reregister bit if it still exists in packet)
+      LB_assign_addr_t *msg = (LB_assign_addr_t*)hdr;
+      if (msg->devid == fc->devid) {
+DDCMSG(D_RF,RED, "RF Packet for my devid: %i:%i", msg->devid, fc->devid);
+         return 1;
+      } else if (fc->target_type == RF_Type_Unknown) {
+DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %i", msg->devid);
+         return 0;
+      } else {
+DDCMSG(D_RF,RED, "RF Packet for someone else's devid: %i:%i", msg->devid, fc->devid);
+         return 0;
+      }
+   }
    if (hdr->addr == fc->id) {
 DDCMSG(D_RF,RED, "RF Packet for me: %i", hdr->addr);
       return 1; // directly for me
@@ -66,14 +98,16 @@ DDCMSG(D_RF,RED, "RF Packet for other listener %i", hdr->addr);
 
 // read a single RF message into given buffer, return do next
 int rfRead(int fd, char *dest, int *dests) {
-   DDCMSG(D_RF,MAGENTA, "RF READING");
+   int err;
+   DDCMSG(D_RF,YELLOW, "RF READING");
    // read as much as possible
    *dests = read(fd, dest, RF_BUF_SIZE);
-   DDCMSG(D_RF,MAGENTA, "RF READ %i BYTES", *dests);
+   err = errno; // save errno
+   DDCMSG(D_RF,YELLOW, "RF READ %i BYTES", *dests);
 
    // did we read nothing?
    if (*dests <= 0) {
-      if (errno == EAGAIN) {
+      if (err == EAGAIN) {
          // try again later
          *dests = 0;
          return doNothing;
@@ -92,7 +126,7 @@ DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
 
 // write all RF messages for connection in fconns
 int rfWrite(fasit_connection_t *fc) {
-   int s;
+   int s, err;
    DDCMSG(D_RF,BLUE, "RF WRITE");
 
    // have something to write?
@@ -103,11 +137,13 @@ int rfWrite(fasit_connection_t *fc) {
 
    // write all the data we can
    s = write(fc->rf, fc->rf_obuf, fc->rf_olen);
+   err = errno; // save errno
    DDCMSG(D_RF,BLUE, "RF WROTE %i BYTES", s);
+   debugRF(blue, fc->rf_obuf);
 
    // did it fail?
    if (s <= 0) {
-      if (s == 0 || errno == EAGAIN) {
+      if (s == 0 || err == EAGAIN) {
          // try again later
          return doNothing;
       } else {
@@ -136,8 +172,9 @@ DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
 
       // loop until written (since we're blocking, it won't loop forever, just until timeout)
       while (s >= 0) {
-         int ns = write(fc->rf, fc->rf_obuf + (sizeof(char) * s), fc->rf_olen - s);
-         if (ns < 0 && errno != EAGAIN) {
+         int err, ns = write(fc->rf, fc->rf_obuf + (sizeof(char) * s), fc->rf_olen - s);
+         err = errno; // save errno
+         if (ns < 0 && err != EAGAIN) {
             // connection dead, remove it
 perror("RF Died because ");
 DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
@@ -235,7 +272,7 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
 
 //   DDCMSG(D_RF,RED, "RF invalid: %08X %i %i", fc->rf_ibuf, *start, fc->rf_ilen);
 //   DDCMSG(D_RF,HEXB(RED, "RF invalid:", fc->rf_ibuf+*start, fc->rf_ilen-*start);
-   return mnum;
+   return -1;
 }
 
 // macro used in rf2fasit
@@ -257,6 +294,7 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
          DDCMSG(D_RF,RED,"Ignored RF message %d",mnum);
       } else {
          DDCMSG(D_RF,RED,"Recieved RF message %d",mnum);
+         debugRF(RED, fc->rf_ibuf + start);
          if (fc->sleeping && mnum != LBC_POWER_CONTROL) {
             // ignore message when sleeping
             DDCMSG(D_RF,RED,"Slept through RF message %d",mnum);
@@ -647,23 +685,8 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    D_memset(&bdy, 0, sizeof(LB_device_reg_t));
    bdy.cmd = LBC_DEVICE_REG;
    bdy.dev_type = fc->target_type;
-   if (fc->target_type == RF_Type_BES) {
-//      bdy.devid = (fc->f2005_resp.body.devid & 0xffll << (8*7)) >> (8*7) |
-//                  (fc->f2005_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
-//                  (fc->f2005_resp.body.devid & 0xffll << (8*5)) >> (8*3); // 3 most significant bytes and reversed from original (reversed) order
-      bdy.devid = (fc->f2005_resp.body.devid & 0xffll << (8*7)) >> (8*5) |
-                  (fc->f2005_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
-                  (fc->f2005_resp.body.devid & 0xffll << (8*5)) >> (8*5); // 3 most significant bytes in original (reversed) order
-   } else {
-//      bdy.devid = (fc->f2111_resp.body.devid & 0xffll << (8*7)) >> (8*7) |
-//                  (fc->f2111_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
-//                  (fc->f2111_resp.body.devid & 0xffll << (8*5)) >> (8*3); // 3 most significant bytes and reversed from original (reversed) order
-      bdy.devid = (fc->f2111_resp.body.devid & 0xffll << (8*7)) >> (8*5) |
-                  (fc->f2111_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
-                  (fc->f2111_resp.body.devid & 0xffll << (8*5)) >> (8*5); // 3 most significant bytes in original (reversed) order
-      DDCMSG(D_RF,BLACK, "Looking at: %08x", bdy.devid);
-      DDCMSG(D_RF,BLACK, "From pieces of 2111: %08llx", fc->f2111_resp.body.devid);
-   }
+   bdy.devid = fc->devid;
+   DCMSG(BLACK, "Going to pass devid: %02X:%02X:%02X:%02X", (bdy.devid & 0xff000000) >> 24, (bdy.devid & 0xff0000) >> 16, (bdy.devid & 0xff00) >> 8, bdy.devid & 0xff);
 
    // put in the crc and send
    set_crc8(&bdy);
@@ -677,21 +700,24 @@ int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
    DDCMSG(D_RF,RED, "handle_REQUEST_NEW(%8p, %i, %i)", fc, start, end);
    // only send a registry if I have a fully connected fasit client
    if (fc->target_type == RF_Type_Unknown) {
+      DDCMSG(D_RF, RED, "haven't finished connecting yet, can't register");
       return doNothing;
    }
 
    // register if I'm in the dev range
-   if (fc->f2111_resp.body.devid >= pkt->low_dev &&
-       fc->f2111_resp.body.devid <= pkt->high_dev) {
+   if (fc->devid >= pkt->low_dev &&
+       fc->devid <= pkt->high_dev) {
       // check if I'm already registered
       if (fc->id == 2047) {
          return send_DEVICE_REG(fc); // register now
       } else {
+         DDCMSG(D_RF, RED, "Already registered");
          return doNothing; // already registered
       }
    } else if (pkt->reregister) {
       return send_DEVICE_REG(fc); // re-register
    } else {
+      DDCMSG(D_RF, RED, "Don't register now");
       return doNothing; // don't register now
    }
 }
