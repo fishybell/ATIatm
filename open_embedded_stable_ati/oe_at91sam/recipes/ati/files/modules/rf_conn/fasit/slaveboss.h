@@ -79,6 +79,7 @@ typedef struct fasit_connection {
    LB_status_resp_ext_t last_status; 
    int sent_status;
    int added_rf_to_epoll;
+   int devid;
 
    // Data for RF handling
    int waiting_status_resp;
