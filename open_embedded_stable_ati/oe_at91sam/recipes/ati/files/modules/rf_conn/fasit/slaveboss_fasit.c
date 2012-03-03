@@ -2,6 +2,7 @@
 
 #include "mcp.h"
 #include "slaveboss.h"
+#include "fasit_debug.h"
 
 // for some reason we have a ntohs/htons, but no ntohf/htonf
 float ntohf(float f) {
@@ -129,17 +130,19 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
 
 // read a single FASIT message into given buffer, return do next
 int fasitRead(int fd, char *dest, int *dests) {
-   DDCMSG(D_PACKET,MAGENTA, "FASIT READING");
+   int err;
+   DDCMSG(D_PACKET,YELLOW, "FASIT READING");
    // read as much as possible
    *dests = read(fd, dest, RF_BUF_SIZE);
+   err = errno; // save errno
 
-   DDCMSG(D_PACKET,MAGENTA, "FASIT READ %i BYTES", *dests);
+   DDCMSG(D_PACKET,YELLOW, "FASIT READ %i BYTES", *dests);
 
    // did we read nothing?
    if (*dests <= 0) {
-      DDCMSG(D_PACKET,CYAN, "FASIT ERROR: %i", errno);
+      DDCMSG(D_PACKET,CYAN, "FASIT ERROR: %i", err);
       perror("Error: ");
-      if (errno == EAGAIN) {
+      if (err == EAGAIN) {
          // try again later
          *dests = 0;
          return doNothing;
@@ -158,7 +161,7 @@ DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
 
 // write all FASIT messages for connection in fconns
 int fasitWrite(fasit_connection_t *fc) {
-   int s;
+   int s, err;
    DDCMSG(D_PACKET,BLUE, "FASIT WRITE");
 
    // have something to write?
@@ -169,11 +172,13 @@ int fasitWrite(fasit_connection_t *fc) {
 
    // write all the data we can
    s = write(fc->fasit, fc->fasit_obuf, fc->fasit_olen);
+   err = errno; // save errno
    DDCMSG(D_PACKET,BLUE, "FASIT WROTE %i BYTES", s);
+   debugFASIT(blue, fc->fasit_obuf);
 
    // did it fail?
    if (s <= 0) {
-      if (s == 0 || errno == EAGAIN) {
+      if (s == 0 || err == EAGAIN) {
          // try again later
          return doNothing;
       } else {
@@ -203,7 +208,7 @@ DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
       // loop until written (since we're blocking, it won't loop forever, just until timeout)
       while (s >= 0) {
          int ns = write(fc->fasit, fc->fasit_obuf + (sizeof(char) * s), fc->fasit_olen - s);
-         if (ns < 0 && errno != EAGAIN) {
+         if (ns < 0 && err != EAGAIN) {
             // connection dead, remove it
 perror("FASIT Died because ");
 DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
@@ -263,6 +268,7 @@ int fasit2rf(fasit_connection_t *fc, char *buf, int s) {
    // read all available valid messages
    while (retval == doNothing && (mnum = validMessage(fc, &start, &end)) != 0) {
       DDCMSG(D_PACKET,CYAN,"Recieved FASIT message %d",mnum);
+      debugFASIT(YELLOW, fc->fasit_ibuf + start);
       switch (mnum) {
          HANDLE_FASIT (2004);
          HANDLE_FASIT (2005);
@@ -332,6 +338,14 @@ int handle_2005(fasit_connection_t *fc, int start, int end) {
    D_memcpy(&fc->f2005_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2005));
    // remember target type
    fc->target_type = RF_Type_BES;
+   fc->devid = (fc->f2005_resp.body.devid & 0xffll << (8*7)) >> (8*7) |
+               (fc->f2005_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
+               (fc->f2005_resp.body.devid & 0xffll << (8*5)) >> (8*3); // 3 most significant bytes and reversed from original (reversed) order
+//   fc->devid = (fc->f2005_resp.body.devid & 0xffll << (8*7)) >> (8*5) |
+//               (fc->f2005_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
+//               (fc->f2005_resp.body.devid & 0xffll << (8*5)) >> (8*5); // 3 most significant bytes in original (reversed) order
+   DDCMSG(D_RF,BLACK, "Looking at: %08x", fc->devid);
+   DDCMSG(D_RF,BLACK, "From pieces of 2005: %08llx", fc->f2005_resp.body.devid);
    return add_rfEpoll; // the RF is ready to work now that I have a type
 }
 
@@ -533,6 +547,14 @@ int handle_2111(fasit_connection_t *fc, int start, int end) {
    if (fc->f2111_resp.body.flags & PD_NES) {
       fc->has_MFS = 1;
    }
+   fc->devid = (fc->f2111_resp.body.devid & 0xffll << (8*7)) >> (8*7) |
+               (fc->f2111_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
+               (fc->f2111_resp.body.devid & 0xffll << (8*5)) >> (8*3); // 3 most significant bytes and reversed from original (reversed) order
+//   fc->devid = (fc->f2111_resp.body.devid & 0xffll << (8*7)) >> (8*5) |
+//               (fc->f2111_resp.body.devid & 0xffll << (8*6)) >> (8*5) |
+//               (fc->f2111_resp.body.devid & 0xffll << (8*5)) >> (8*5); // 3 most significant bytes in original (reversed) order
+   DDCMSG(D_RF,BLACK, "Looking at: %08x", fc->devid);
+   DDCMSG(D_RF,BLACK, "From pieces of 2111: %08llx", fc->f2111_resp.body.devid);
    // send out a status request to get target type
    return send_2100_status_req(fc);
 }
