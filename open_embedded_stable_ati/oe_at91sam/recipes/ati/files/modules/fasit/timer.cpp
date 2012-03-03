@@ -45,7 +45,11 @@ DMSG("finding timeout of type %i for (%i,%i) from (%i,%i)\n", type, endTime.tv_s
    if (endTime.tv_usec < timeout.tv_usec) {
       // we need to carry
       timeout.tv_usec -= 1000000;
-      timeout.tv_sec--;
+      if (timeout.tv_usec >= 0) {
+         timeout.tv_sec--;
+      } else {
+         timeout.tv_sec++;
+      }
    }
 
    // subtract the miscroseconds
