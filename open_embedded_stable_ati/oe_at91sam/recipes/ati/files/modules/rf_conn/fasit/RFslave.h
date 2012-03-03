@@ -28,7 +28,8 @@ typedef struct rf_connection {
 
    // delay
    struct timespec time_start; // the time when we last received a message
-   struct timespec timeout_when; // the time when we must send the message
+   struct timespec timeout_start; // the beginning of the timeslot when we must send the message
+   struct timespec timeout_end; // the ending of the timeslot when we must send the message
 
    // timeslot stuff
    int timeslot_length; // the amount of time each timeslot is, as determined by the RFmaster
