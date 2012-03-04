@@ -87,8 +87,13 @@ foreach host $hosts {
     eval spawn scp [glob *.ko] root@$host:/home/root
     eval $dossh
 
+    # copy rf_conn
+    cd rf_conn/fasit
+    eval spawn scp [glob *.arm] root@sam$num:/home/root
+    eval $doshh
+
     # copy ati2
-    cd ../../../ati2
+    cd ../../../../../ati2
     eval spawn scp [glob files/be_* ] [glob files/is_* ] [glob files/has_* ] files/TTMT files/BASE files/EIM files/HHC [glob files/load_*] files/unload files/SES files/SIT files/SAT files/MIT files/MAT files/start files/stop files/restart root@$host:/usr/bin
     eval $dossh
 
