@@ -174,7 +174,7 @@ int fasitWrite(fasit_connection_t *fc) {
    s = write(fc->fasit, fc->fasit_obuf, fc->fasit_olen);
    err = errno; // save errno
    DDCMSG(D_PACKET,BLUE, "FASIT WROTE %i BYTES", s);
-   debugFASIT(blue, fc->fasit_obuf);
+   debugFASIT(blue, fc->fasit_obuf, fc->fasit_olen);
 
    // did it fail?
    if (s <= 0) {
@@ -268,7 +268,7 @@ int fasit2rf(fasit_connection_t *fc, char *buf, int s) {
    // read all available valid messages
    while (retval == doNothing && (mnum = validMessage(fc, &start, &end)) != 0) {
       DDCMSG(D_PACKET,CYAN,"Recieved FASIT message %d",mnum);
-      debugFASIT(YELLOW, fc->fasit_ibuf + start);
+      debugFASIT(YELLOW, fc->fasit_ibuf + start, end-start);
       switch (mnum) {
          HANDLE_FASIT (2004);
          HANDLE_FASIT (2005);
@@ -292,7 +292,7 @@ int fasit2rf(fasit_connection_t *fc, char *buf, int s) {
 
 int send_100(fasit_connection_t *fc) {
    FASIT_header hdr;
-   DDCMSG(D_PACKET,CYAN, "send_100(%08X)", fc);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_100(%08X)", fc);
    defHeader(fc, 100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header));
    queueMsg(fc, &hdr, sizeof(FASIT_header));
@@ -301,7 +301,7 @@ int send_100(fasit_connection_t *fc) {
 
 int send_2000(fasit_connection_t *fc, int zone) {
    FASIT_header hdr;
-   DDCMSG(D_PACKET,CYAN, "send_2000(%08X)", fc);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2000(%08X)", fc);
    defHeader(fc, 2000, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2000));
    FASIT_2000 bdy;
@@ -327,13 +327,13 @@ int send_2000(fasit_connection_t *fc, int zone) {
 }
 
 int handle_2004(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_2004(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2004(%8p, %i, %i)", fc, start, end);
    // do nothing with this information
    return doNothing;
 }
 
 int handle_2005(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_2005(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2005(%8p, %i, %i)", fc, start, end);
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2005_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2005));
    // remember target type
@@ -350,7 +350,7 @@ int handle_2005(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_2006(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_2006(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2006(%8p, %i, %i)", fc, start, end);
    // do nothing with this information
    return doNothing;
 }
@@ -358,7 +358,7 @@ int handle_2006(fasit_connection_t *fc, int start, int end) {
 int send_2100_status_req(fasit_connection_t *fc) {
    FASIT_header hdr;
    FASIT_2100 bdy;
-   DDCMSG(D_PACKET,CYAN, "send_2100_status_req(%08X)", fc);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_status_req(%08X)", fc);
    defHeader(fc, 2100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
 
@@ -375,7 +375,7 @@ int send_2100_status_req(fasit_connection_t *fc) {
 int send_2100_power(fasit_connection_t *fc, int cmd) {
    FASIT_header hdr;
    FASIT_2100 bdy;
-   DDCMSG(D_PACKET,CYAN, "send_2100_power(%8p, %i)", fc, cmd);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_power(%8p, %i)", fc, cmd);
    defHeader(fc, 2100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
 
@@ -392,7 +392,7 @@ int send_2100_power(fasit_connection_t *fc, int cmd) {
 int send_2100_exposure(fasit_connection_t *fc, int exp) {
    FASIT_header hdr;
    FASIT_2100 bdy;
-   DDCMSG(D_PACKET,CYAN, "send_2100_exposure(%8p, %i)", fc, exp);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_exposure(%8p, %i)", fc, exp);
    defHeader(fc, 2100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
 
@@ -410,7 +410,7 @@ int send_2100_exposure(fasit_connection_t *fc, int exp) {
 int send_2100_movement(fasit_connection_t *fc, int move, float speed) {
    FASIT_header hdr;
    FASIT_2100 bdy;
-   DDCMSG(D_PACKET,CYAN, "send_2100_exposure(%8p, %i, %f)", fc, move, speed);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_exposure(%8p, %i, %f)", fc, move, speed);
    defHeader(fc, 2100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
 
@@ -429,7 +429,7 @@ int send_2100_movement(fasit_connection_t *fc, int move, float speed) {
 int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int tokill, int sens, int mode, int burst) {
    FASIT_header hdr;
    FASIT_2100 bdy;
-   DDCMSG(D_PACKET,CYAN, "send_2100_conf_hit(%8p, %i, %i, %i, %i, %i, %i, %i)", fc, on, hit, react, tokill, sens, mode, burst);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_conf_hit(%8p, %i, %i, %i, %i, %i, %i, %i)", fc, on, hit, react, tokill, sens, mode, burst);
    defHeader(fc, 2100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
 
@@ -462,14 +462,14 @@ int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int t
 }
 
 int handle_2101(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_2101(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2101(%8p, %i, %i)", fc, start, end);
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2101_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2101));
    return doNothing;
 }
 
 int handle_2102(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_2102(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2102(%8p, %i, %i)", fc, start, end);
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2102_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2102));
    // remember target type
@@ -522,7 +522,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
 int send_2110(fasit_connection_t *fc, int on, int mode, int idelay, int rdelay) {
    FASIT_header hdr;
    FASIT_2110 bdy;
-   DDCMSG(D_PACKET,CYAN, "send_2100_conf_hit(%8p, %i, %i, %i, %i)", fc, on, mode, idelay, rdelay);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_conf_hit(%8p, %i, %i, %i, %i)", fc, on, mode, idelay, rdelay);
    defHeader(fc, 2110, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2110));
 
@@ -540,7 +540,7 @@ int send_2110(fasit_connection_t *fc, int on, int mode, int idelay, int rdelay) 
 }
 
 int handle_2111(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_2111(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2111(%8p, %i, %i)", fc, start, end);
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2111_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2111));
    // remember if I have an MFS or not
@@ -560,14 +560,14 @@ int handle_2111(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_2112(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_2112(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2112(%8p, %i, %i)", fc, start, end);
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2112_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2112));
    return doNothing;
 }
 
 int handle_2113(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_2113(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2113(%8p, %i, %i)", fc, start, end);
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2113_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2113));
    return doNothing;
@@ -579,7 +579,7 @@ int send_2114(fasit_connection_t *fc) {
 }
 
 int handle_2115(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_2115(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2115(%8p, %i, %i)", fc, start, end);
    // do nothing with this information
    return doNothing;
 }
@@ -590,7 +590,7 @@ int send_13110(fasit_connection_t *fc) {
 }
 
 int handle_13112(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_13112(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_13112(%8p, %i, %i)", fc, start, end);
    // do nothing with this information
    return doNothing;
 }
@@ -598,7 +598,7 @@ int handle_13112(fasit_connection_t *fc, int start, int end) {
 int send_14110(fasit_connection_t *fc, int on) {
    FASIT_header hdr;
    FASIT_14110 bdy;
-   DDCMSG(D_PACKET,CYAN, "send_14110(%8p, %i)", fc, on);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_14110(%8p, %i)", fc, on);
    defHeader(fc, 14110, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_14110));
 
@@ -613,7 +613,7 @@ int send_14110(fasit_connection_t *fc, int on) {
 }
 
 int handle_14112(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_14112(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_14112(%8p, %i, %i)", fc, start, end);
    // do nothing with this information
    return doNothing;
 }
@@ -621,7 +621,7 @@ int handle_14112(fasit_connection_t *fc, int start, int end) {
 int send_14200(fasit_connection_t *fc, int blank) {
    FASIT_header hdr;
    FASIT_14200 bdy;
-   DDCMSG(D_PACKET,CYAN, "send_14200(%8p, %i)", fc, blank);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_14200(%8p, %i)", fc, blank);
    defHeader(fc, 14200, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_14200));
 
@@ -638,7 +638,7 @@ int send_14200(fasit_connection_t *fc, int blank) {
 int send_14400(fasit_connection_t *fc, int cid, int length, char *data) {
    FASIT_header hdr;
    FASIT_14400 bdy;
-   DDCMSG(D_PACKET,CYAN, "send_14200(%8p, %i, %i, %08X)", fc, cid, length, data);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_14200(%8p, %i, %i, %08X)", fc, cid, length, data);
    defHeader(fc, 14400, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_14400));
 
@@ -655,7 +655,7 @@ int send_14400(fasit_connection_t *fc, int cid, int length, char *data) {
 }
 
 int handle_14401(fasit_connection_t *fc, int start, int end) {
-   DDCMSG(D_PACKET,CYAN, "handle_14401(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "handle_14401(%8p, %i, %i)", fc, start, end);
    // do nothing with this information
    return doNothing;
 }

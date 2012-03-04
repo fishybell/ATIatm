@@ -23,7 +23,7 @@ void debug_REQUEST_NEW(int color, LB_packet_t *pkt);
 void debug_ASSIGN_ADDR(int color, LB_packet_t *pkt);
 
 // debug generic RF packet
-void debugRF(int color, char *packet);
+void debugRF(int color, char *packet, int len);
 
 #endif
 

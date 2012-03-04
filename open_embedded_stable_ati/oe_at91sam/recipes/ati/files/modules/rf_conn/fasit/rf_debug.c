@@ -87,44 +87,48 @@ void debug_ASSIGN_ADDR(int color, LB_packet_t *pkt) {
 }
 
 // debug an RF packet
-void debugRF(int color, char *packet) {
-   LB_packet_t *pkt = (LB_packet_t*)packet;
-   DCMSG_HEXB(color, "Raw RF msg: ", packet, RF_size(pkt->cmd));
-   switch (pkt->cmd) {
-      case LBC_STATUS_REQ:
-         debug_STATUS_REQ(color,pkt); break;
-      case LBC_EXPOSE:
-         debug_EXPOSE(color,pkt); break;
-      case LBC_MOVE:
-         debug_MOVE(color,pkt); break;
-      case LBC_CONFIGURE_HIT:
-         debug_CONFIGURE_HIT(color,pkt); break;
-      case LBC_GROUP_CONTROL:
-         debug_GROUP_CONTROL(color,pkt); break;
-      case LBC_AUDIO_CONTROL:
-         debug_AUDIO_CONTROL(color,pkt); break;
-      case LBC_POWER_CONTROL:
-         debug_POWER_CONTROL(color,pkt); break;
-      case LBC_PYRO_FIRE:
-         debug_PYRO_FIRE(color,pkt); break;
-      case LBC_STATUS_RESP_LIFTER:
-         debug_STATUS_RESP_LIFTER(color,pkt); break;
-      case LBC_STATUS_RESP_MOVER:
-         debug_STATUS_RESP_MOVER(color,pkt); break;
-      case LBC_STATUS_RESP_EXT:
-         debug_STATUS_RESP_EXT(color,pkt); break;
-      case LBC_STATUS_NO_RESP:
-         debug_STATUS_NO_RESP(color,pkt); break;
-      case LBC_QEXPOSE:
-         debug_QEXPOSE(color,pkt); break;
-      case LBC_QCONCEAL:
-         debug_QCONCEAL(color,pkt); break;
-      case LBC_DEVICE_REG:
-         debug_DEVICE_REG(color,pkt); break;
-      case LBC_REQUEST_NEW:
-         debug_REQUEST_NEW(color,pkt); break;
-      case LBC_ASSIGN_ADDR:
-         debug_ASSIGN_ADDR(color,pkt); break;
+void debugRF(int color, char *packet, int len) {
+   int start = 0;
+   while (start < len) {
+      LB_packet_t *pkt = (LB_packet_t*)(packet+start);
+      DCMSG_HEXB(color, "Raw RF msg: ", packet+start, RF_size(pkt->cmd));
+      switch (pkt->cmd) {
+         case LBC_STATUS_REQ:
+            debug_STATUS_REQ(color,pkt); break;
+         case LBC_EXPOSE:
+            debug_EXPOSE(color,pkt); break;
+         case LBC_MOVE:
+            debug_MOVE(color,pkt); break;
+         case LBC_CONFIGURE_HIT:
+            debug_CONFIGURE_HIT(color,pkt); break;
+         case LBC_GROUP_CONTROL:
+            debug_GROUP_CONTROL(color,pkt); break;
+         case LBC_AUDIO_CONTROL:
+            debug_AUDIO_CONTROL(color,pkt); break;
+         case LBC_POWER_CONTROL:
+            debug_POWER_CONTROL(color,pkt); break;
+         case LBC_PYRO_FIRE:
+            debug_PYRO_FIRE(color,pkt); break;
+         case LBC_STATUS_RESP_LIFTER:
+            debug_STATUS_RESP_LIFTER(color,pkt); break;
+         case LBC_STATUS_RESP_MOVER:
+            debug_STATUS_RESP_MOVER(color,pkt); break;
+         case LBC_STATUS_RESP_EXT:
+            debug_STATUS_RESP_EXT(color,pkt); break;
+         case LBC_STATUS_NO_RESP:
+            debug_STATUS_NO_RESP(color,pkt); break;
+         case LBC_QEXPOSE:
+            debug_QEXPOSE(color,pkt); break;
+         case LBC_QCONCEAL:
+            debug_QCONCEAL(color,pkt); break;
+         case LBC_DEVICE_REG:
+            debug_DEVICE_REG(color,pkt); break;
+         case LBC_REQUEST_NEW:
+            debug_REQUEST_NEW(color,pkt); break;
+         case LBC_ASSIGN_ADDR:
+            debug_ASSIGN_ADDR(color,pkt); break;
+      }
+      start += RF_size(pkt->cmd);
    }
 }
 

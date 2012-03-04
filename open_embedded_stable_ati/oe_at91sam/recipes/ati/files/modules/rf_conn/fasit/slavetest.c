@@ -431,7 +431,7 @@ int main(int argc, char **argv) {
             char extra_buf[256];
             int extra_buf_c=0;
             // debug the outgoing line
-            debugRF(BLUE, packet);
+            debugRF(BLUE, packet, RF_size(num));
 
             // set epoll to watch for write
             memset(&ev, 0, sizeof(ev));
@@ -506,7 +506,7 @@ int main(int argc, char **argv) {
                            extra_buf_c = RF_size(tpkt->cmd) - c;
                         }
                         // output what we did read
-                        debugRF(YELLOW, buf);
+                        debugRF(YELLOW, buf, RF_size(tpkt->cmd));
                         DCMSG_HEXB(YELLOW, "READ DATA:", buf, RF_size(tpkt->cmd));
                      }
                   }
