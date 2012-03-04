@@ -19,15 +19,17 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
       
       // check for valid message first
       hl = RF_size(hdr->cmd);
-      if (tty && ((rc->tty_ibuf + rc->tty_ilen) - (rc->tty_ibuf + *start)) > hl) {
+      if (tty && ((rc->tty_ilen - (*start)) < hl)) {
+         DDCMSG(D_RF, cyan, "Invalid tty message length %i - %i < %i", rc->tty_ilen, *start, hl);
          *start = *start + 1; continue; // invalid message length, or more likely, don't have all of the message yet
-      } else if (((rc->sock_ibuf + rc->sock_ilen) - (rc->sock_ibuf + *start)) > hl) {
+      } else if (!tty && ((rc->sock_ilen - (*start)) < hl)) {
+         DDCMSG(D_RF, blue, "Invalid socket message length %i - %i < %i", rc->sock_ilen, *start, hl);
          *start = *start + 1; continue; // invalid message length, or more likely, don't have all of the message yet
       }
 
       *end = *start + hl;
       DDCMSG(D_RF, tty ? cyan : blue, "Checking %s validMessage for %i", tty ? "TTY" : "SOCKET", hdr->cmd);
-      debugRF(tty ? cyan : blue, tty ? rc->tty_ibuf : rc->sock_ibuf);
+      debugRF(tty ? cyan : blue, tty ? rc->tty_ibuf : rc->sock_ibuf, tty ? rc->tty_ilen : rc->sock_ilen);
       switch (hdr->cmd) {
          // they all have a crc, check it
          case LBC_EXPOSE:
@@ -240,7 +242,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
    }
    err = errno; // save errno
    DDCMSG(D_RF, tty ? cyan : blue, "%s WROTE %i BYTES", tty ? "TTY" : "SOCKET", s);
-   debugRF(tty ? cyan : blue, tty ? rc->tty_obuf : rc->sock_obuf);
+   debugRF(tty ? cyan : blue, tty ? rc->tty_obuf : rc->sock_obuf, tty ? rc->tty_olen : rc->sock_olen);
 
    // did it fail?
    if (s <= 0) {
@@ -466,13 +468,13 @@ int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
    DDCMSG(D_RF, CYAN, "t2s_handle_REQUEST_NEW(%8p, %i, %i)", rc, start, end);
 
    // remember last low/high devid
-   DCMSG(BLACK, "Setting low/high to %i/%i", pkt->low_dev, pkt->high_dev);
+   DDCMSG(D_TIME, BLACK, "Setting low/high to %i/%i", pkt->low_dev, pkt->high_dev);
    rc->devid_last_low = pkt->low_dev;
    rc->devid_last_high = pkt->high_dev;
 
    // remember timeslot length
    rc->timeslot_length = pkt->slottime * 5; // convert to milliseconds
-   DCMSG(BLACK, "Setting timeslot length to %i", rc->timeslot_length);
+   DDCMSG(D_TIME, BLACK, "Setting timeslot length to %i", rc->timeslot_length);
 
    return doNothing;
 } 
@@ -492,9 +494,11 @@ int t2s_handle_ASSIGN_ADDR(rf_connection_t *rc, int start, int end) {
 // transfer tty data to the socket
 int tty2sock(rf_connection_t *rc) {
    int start, end, mnum, retval = doNothing; // start doing nothing
+   int added_to_buf = 0;
 
    // read all available valid messages up until I have to do something on return
    while (retval == doNothing && (mnum = validMessage(rc, &start, &end, 1)) != -1) { // 1 for tty
+      int use_command = 1;
       switch (mnum) {
          t2s_HANDLE_RF (STATUS_REQ); // keep track of ids
          t2s_HANDLE_RF (EXPOSE); // keep track of ids
@@ -509,20 +513,29 @@ int tty2sock(rf_connection_t *rc) {
          t2s_HANDLE_RF (REQUEST_NEW); // keep track of devids
          t2s_HANDLE_RF (ASSIGN_ADDR); // keep track of ids
          default:
+            use_command = 0; // ignore requests from other clients
             break;
       }
-      // copy the found message to the socket "out" buffer
-      addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
 
-      // clear out the found message
-      clearBuffer(rc, end, 1); // 1 for tty
+      // was it a valid command that we handled?
+      if (use_command) {
+         // copy the found message to the socket "out" buffer
+         addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
+         added_to_buf = 1;
 
-      // change the start time to now
-      clock_gettime(CLOCK_MONOTONIC,&rc->time_start);
-      rc->timeout_start = rc->time_start; // reset the start time as well
-      rc->timeout_end = rc->time_start; // reset the end time as well
-      DDCMSG(D_PACKET, RED, "Clock changed to %i:%i", rc->time_start.tv_sec, rc->time_start.tv_nsec);
+         // clear out the found message
+         clearBuffer(rc, end, 1); // 1 for tty
 
+         // change the start time to now
+         clock_gettime(CLOCK_MONOTONIC,&rc->time_start);
+         rc->timeout_start = rc->time_start; // reset the start time as well
+         rc->timeout_end = rc->time_start; // reset the end time as well
+         DDCMSG(D_PACKET, RED, "Clock changed to %i:%i", rc->time_start.tv_sec, rc->time_start.tv_nsec);
+      }
+   }
+   
+   // if we put anything in the socket "out" buffer...
+   if (added_to_buf) {
       // the socket needs to write it out now and whatever the t2s_* handler said to do
       retval |= mark_sockWrite; 
    }
@@ -602,7 +615,7 @@ int s2t_handle_DEVICE_REG(rf_connection_t *rc, int start, int end) {
    int i;
    LB_device_reg_t *pkt = (LB_device_reg_t *)(rc->sock_ibuf + start);
    DDCMSG(D_RF, CYAN, "s2t_handle_DEVICE_REG(%8p, %i, %i)", rc, start, end);
-   debugRF(black, rc->sock_ibuf + start);
+   debugRF(black, rc->sock_ibuf + start, end-start);
    addDevidToNowDevIDs(rc, pkt->devid);
    return doNothing;
 } 
@@ -634,11 +647,11 @@ int sock2tty(rf_connection_t *rc) {
    }
 
    // find which timeslot I'm in (the mcp should always leave us with exactly one of these tests as true)
-   DCMSG(BLACK, "Finding timeslot uinsg rc->id_index (%i) or rc->devid_last_high (%i)", rc->id_index, rc->devid_last_high);
+   DDCMSG(D_TIME, BLACK, "Finding timeslot uinsg rc->id_index (%i) or rc->devid_last_high (%i)", rc->id_index, rc->devid_last_high);
    if (rc->id_index >= 0) {
       // timeslot is decided by which address I am in the chain
       int i;
-      DCMSG(BLACK, "Finding timeslot using rc->id_index %i", rc->id_index);
+      DDCMSG(D_TIME, BLACK, "Finding timeslot using rc->id_index %i", rc->id_index);
       // find the lowest matching address
       for (ts = 0; ts < min(rc->id_lasttime_index+1, MAX_IDS); ts++) {
          for (i = 0; i < min(rc->id_index+1, MAX_IDS); i++) {
@@ -652,11 +665,11 @@ int sock2tty(rf_connection_t *rc) {
       rc->id_index = -1;
    } else if (rc->devid_last_high >= 0) {
       int i;
-      DCMSG(BLACK, "Finding timeslot using rc->devid_last_high %i", rc->devid_last_high);
+      DDCMSG(D_TIME, BLACK, "Finding timeslot using rc->devid_last_high %i", rc->devid_last_high);
       ts = 0xffff; // start off as a really big number
       // timeslot is decided by which devid I am in the range, find lowest devid
       for (i = 0; i < min(rc->devid_index+1, MAX_IDS); i++) {
-         DCMSG(BLACK, "Looking %i-%i < %i for index %i", rc->devids[i], rc->devid_last_low, ts, i);
+         DDCMSG(D_TIME, BLACK, "Looking %i-%i < %i for index %i", rc->devids[i], rc->devid_last_low, ts, i);
          if ((rc->devids[i] - rc->devid_last_low) < ts) {
             ts = rc->devids[i] - rc->devid_last_low; // exact match would be 0 slot, then 1, etc.
             DCMSG(BLACK, "Found new low: %i", ts);
@@ -675,7 +688,7 @@ int sock2tty(rf_connection_t *rc) {
 
    // label to jump to when I found my timeslot
    found_ts:
-   DCMSG(BLACK, "Found timeout slot: %i", ts);
+   DDCMSG(D_TIME, BLACK, "Found timeout slot: %i", ts);
 
    // change timeout
    doTimeAfter(rc, rc->timeslot_length * (ts + 1)); // timeslot length * timeslot I'm in, minimum of timeslot_length
