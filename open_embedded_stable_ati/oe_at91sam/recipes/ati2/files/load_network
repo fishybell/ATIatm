@@ -89,22 +89,40 @@ def_progs() {
          ;;
    esac
 
+   # old way
    # start the radio convertor
-   BASE=""
-   case $board in
-      HHC|BASE)
-         BASE="-b $ip"
-         ;;
-      RELAY)
-         BASE="-s /dev/ttyS2 -r"
-         ;;
-   esac
+   #BASE=""
+   #case $board in
+   #   HHC|BASE)
+   #      BASE="-b $ip"
+   #      ;;
+   #   RELAY)
+   #      BASE="-s /dev/ttyS2 -r"
+   #      ;;
+   #esac
    if [ "$comm" == "radio" ] ; then
+      # old way
       # listen or connect on the "connect-to" port
-      radio_conv -p $cport -s /dev/ttyS1 $BASE -vv -k &
+      #radio_conv -p $cport -s /dev/ttyS1 $BASE -vv -k &
+      
+      # new way
+      case $board in
+         HHC|BASE)
+            # boot RFmaster
+            /home/root/RFmaster.arm -s /dev/ttyS1 -v 0 &
+            ;;
+         *)
+            # boot slaveboss, wait for it to boot, then RFslave
+            /home/root/slaveboss.arm -v 0 &
+            sleep 1
+            /home/root/RFslave.new.arm -s /dev/ttyS1 -v 0 &
+            ;;
+      esac
+      cport=14000
       ip="127.0.0.1"
    fi
    export ip=$ip
+   export cport=$cport
 }
 
 # grab eeprom values
