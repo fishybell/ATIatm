@@ -233,7 +233,6 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
 
       *end = *start + hl;
       DDCMSG(D_RF,RED, "RF validMessage (cmd %i)", hdr->cmd);
-      debugRF(RED, fc->rf_ibuf, fc->rf_ilen);
       switch (hdr->cmd) {
          // they all have a crc, check it
          case LBC_EXPOSE:
@@ -288,6 +287,7 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
    }
   
    // read all available valid messages
+   debugRF(RED, fc->rf_ibuf, fc->rf_ilen);
    while (retval == doNothing && (mnum = validMessage(fc, &start, &end)) != -1) {
       if (!packetForMe(fc, start)) {
          DDCMSG(D_RF,RED,"Ignored RF message %d",mnum);

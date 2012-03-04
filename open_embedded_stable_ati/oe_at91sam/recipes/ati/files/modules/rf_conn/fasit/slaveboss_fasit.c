@@ -266,9 +266,9 @@ int fasit2rf(fasit_connection_t *fc, char *buf, int s) {
    }
   
    // read all available valid messages
+   debugFASIT(YELLOW, fc->fasit_ibuf, fc->fasit_ilen);
    while (retval == doNothing && (mnum = validMessage(fc, &start, &end)) != 0) {
       DDCMSG(D_PACKET,CYAN,"Recieved FASIT message %d",mnum);
-      debugFASIT(YELLOW, fc->fasit_ibuf + start, end-start);
       switch (mnum) {
          HANDLE_FASIT (2004);
          HANDLE_FASIT (2005);

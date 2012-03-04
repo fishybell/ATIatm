@@ -1,4 +1,5 @@
 #include "rf_debug.h"
+#include "RFslave.h"
 
 void debug_STATUS_REQ(int color, LB_packet_t *pkt) {
    LB_status_req_t *p = (LB_status_req_t*)pkt;
@@ -91,7 +92,9 @@ void debugRF(int color, char *packet, int len) {
    int start = 0;
    while (start < len) {
       LB_packet_t *pkt = (LB_packet_t*)(packet+start);
+      DCMSG(color, "RF msg buffer size: %i", len);
       DCMSG_HEXB(color, "Raw RF msg: ", packet+start, RF_size(pkt->cmd));
+      usleep(500000);
       switch (pkt->cmd) {
          case LBC_STATUS_REQ:
             debug_STATUS_REQ(color,pkt); break;
@@ -128,7 +131,7 @@ void debugRF(int color, char *packet, int len) {
          case LBC_ASSIGN_ADDR:
             debug_ASSIGN_ADDR(color,pkt); break;
       }
-      start += RF_size(pkt->cmd);
+      start += max(1,RF_size(pkt->cmd));
    }
 }
 

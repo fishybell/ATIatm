@@ -29,7 +29,6 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
 
       *end = *start + hl;
       DDCMSG(D_RF, tty ? cyan : blue, "Checking %s validMessage for %i", tty ? "TTY" : "SOCKET", hdr->cmd);
-      debugRF(tty ? cyan : blue, tty ? rc->tty_ibuf : rc->sock_ibuf, tty ? rc->tty_ilen : rc->sock_ilen);
       switch (hdr->cmd) {
          // they all have a crc, check it
          case LBC_EXPOSE:
@@ -497,6 +496,7 @@ int tty2sock(rf_connection_t *rc) {
    int added_to_buf = 0;
 
    // read all available valid messages up until I have to do something on return
+   debugRF(cyan, rc->tty_ibuf, rc->tty_ilen);
    while (retval == doNothing && (mnum = validMessage(rc, &start, &end, 1)) != -1) { // 1 for tty
       int use_command = 1;
       switch (mnum) {
@@ -523,15 +523,15 @@ int tty2sock(rf_connection_t *rc) {
          addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
          added_to_buf = 1;
 
-         // clear out the found message
-         clearBuffer(rc, end, 1); // 1 for tty
-
          // change the start time to now
          clock_gettime(CLOCK_MONOTONIC,&rc->time_start);
          rc->timeout_start = rc->time_start; // reset the start time as well
          rc->timeout_end = rc->time_start; // reset the end time as well
          DDCMSG(D_PACKET, RED, "Clock changed to %i:%i", rc->time_start.tv_sec, rc->time_start.tv_nsec);
       }
+
+      // clear out the found message
+      clearBuffer(rc, end, 1); // 1 for tty
    }
    
    // if we put anything in the socket "out" buffer...
@@ -629,6 +629,7 @@ int sock2tty(rf_connection_t *rc) {
    DCMSG(BLACK, "Called sock2tty");
 
    // read all available valid messages up until I have to do something on return
+   debugRF(blue, rc->sock_ibuf, rc->sock_ilen);
    while (retval == doNothing && (mnum = validMessage(rc, &start, &end, 0)) != -1) { // 0 for socket
       switch (mnum) {
          s2t_HANDLE_RF (STATUS_RESP_LIFTER); // keep track of ids
