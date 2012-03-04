@@ -25,7 +25,7 @@ void debug_14400(int color, char *packet);
 void debug_14401(int color, char *packet);
  
 // debug generic FASIT packet
-void debugFASIT(int color, char *packet);
+void debugFASIT(int color, char *packet, int len);
 
 #endif
 

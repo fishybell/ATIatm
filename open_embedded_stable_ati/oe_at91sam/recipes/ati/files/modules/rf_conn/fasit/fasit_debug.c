@@ -2,76 +2,79 @@
 #include "mcp.h"
 
 // debug an FASIT packet
-void debugFASIT(int color, char *packet) {
-   FASIT_header *hdr = (FASIT_header*)(packet);
-   DCMSG_HEXB(color, "Raw FASIT msg: ", packet, htons(hdr->length));
-   DCMSG(color, "HEADER\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d", htons(hdr->num), htons(hdr->icd1), htons(hdr->icd2), htonl(hdr->seq), htonl(hdr->rsrvd), htons(hdr->length));
+void debugFASIT(int color, char *packet, int len) {
+   int start = 0;
+   while (start < len) {
+      FASIT_header *hdr = (FASIT_header*)(packet+start);
+      DCMSG_HEXB(color, "Raw FASIT msg: ", packet+start, htons(hdr->length));
+      DCMSG(color, "HEADER\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d", htons(hdr->num), htons(hdr->icd1), htons(hdr->icd2), htonl(hdr->seq), htonl(hdr->rsrvd), htons(hdr->length));
 
-   switch (htons(hdr->num)) {
-      case 100:
-      case 2006:
-      default:
-         DCMSG(color, "Debugging header only...");
-         break;
-      case 2000:
-         debug_2000(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2004:
-         debug_2004(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2005:
-         debug_2005(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2100:
-         debug_2100(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2101:
-         debug_2101(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2102:
-         debug_2102(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2110:
-         debug_2110(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2111:
-         debug_2111(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2112:
-         debug_2112(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2113:
-         debug_2113(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2114:
-         debug_2114(color, packet + sizeof(FASIT_header));
-         break; 
-      case 2115:
-         debug_2115(color, packet + sizeof(FASIT_header));
-         break; 
-      case 13110:
-         debug_13110(color, packet + sizeof(FASIT_header));
-         break; 
-      case 13112:
-         debug_13112(color, packet + sizeof(FASIT_header));
-         break; 
-      case 14110:
-         debug_14110(color, packet + sizeof(FASIT_header));
-         break; 
-      case 14112:
-         debug_14112(color, packet + sizeof(FASIT_header));
-         break; 
-      case 14200:
-         debug_14200(color, packet + sizeof(FASIT_header));
-         break; 
-      case 14400:
-         debug_14400(color, packet + sizeof(FASIT_header));
-         break; 
-      case 14401:
-         debug_14401(color, packet + sizeof(FASIT_header));
-         break; 
+      switch (htons(hdr->num)) {
+         case 100:
+         case 2006:
+         default:
+            DCMSG(color, "Debugging header only...");
+            break;
+         case 2000:
+            debug_2000(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2004:
+            debug_2004(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2005:
+            debug_2005(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2100:
+            debug_2100(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2101:
+            debug_2101(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2102:
+            debug_2102(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2110:
+            debug_2110(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2111:
+            debug_2111(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2112:
+            debug_2112(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2113:
+            debug_2113(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2114:
+            debug_2114(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 2115:
+            debug_2115(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 13110:
+            debug_13110(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 13112:
+            debug_13112(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 14110:
+            debug_14110(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 14112:
+            debug_14112(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 14200:
+            debug_14200(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 14400:
+            debug_14400(color, packet + start + sizeof(FASIT_header));
+            break; 
+         case 14401:
+            debug_14401(color, packet + start + sizeof(FASIT_header));
+            break; 
+      }
+      start += htons(hdr->length);
    }
-
 }
 
 // individual message debuggers
