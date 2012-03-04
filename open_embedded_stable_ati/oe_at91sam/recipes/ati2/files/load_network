@@ -109,13 +109,13 @@ def_progs() {
       case $board in
          HHC|BASE)
             # boot RFmaster
-            /home/root/RFmaster.arm -s /dev/ttyS1 -v 0 &
+            /home/root/RFmaster.arm -t /dev/ttyS1 -v 0 &
             ;;
          *)
             # boot slaveboss, wait for it to boot, then RFslave
             /home/root/slaveboss.arm -v 0 &
             sleep 1
-            /home/root/RFslave.new.arm -s /dev/ttyS1 -v 0 &
+            /home/root/RFslave.new.arm -r /dev/ttyS1 -v 0 &
             ;;
       esac
       cport=14000
