@@ -1,2 +1,2 @@
 # for wireless networks when the transceiver (wifi, wimax or uhf/vhf radio) is not attached to this device
-echo -n "local" | /usr/bin/eeprom_rw write -addr 0x80 -size 6 -blank 0x40
+echo -n "local" | /usr/bin/eeprom_rw write -addr 0x80 -size 6 -blank 0x3F

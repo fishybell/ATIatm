@@ -1,1 +1,1 @@
-echo -n "radio" | /usr/bin/eeprom_rw write -addr 0x80 -size 6 -blank 0x40
+echo -n "radio" | /usr/bin/eeprom_rw write -addr 0x80 -size 6 -blank 0x3F

@@ -1,4 +1,4 @@
 echo -n "Enter new IP Address: "
 read ip_address
 size=$(echo $ip_address | wc -c)
-echo -n $ip_address | /usr/bin/eeprom_rw write -addr 0xC0 -size $size -blank 0x40
+echo -n $ip_address | /usr/bin/eeprom_rw write -addr 0xC0 -size $size -blank 0x3F

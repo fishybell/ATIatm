@@ -1,2 +1,2 @@
 # for devices directly attached to the wifi transceiver
-echo -n "wifi" | /usr/bin/eeprom_rw write -addr 0x80 -size 5 -blank 0x40
+echo -n "wifi" | /usr/bin/eeprom_rw write -addr 0x80 -size 5 -blank 0x3F

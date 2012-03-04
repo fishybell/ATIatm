@@ -1,4 +1,4 @@
 echo -n "Enter new connect port number: "
 read port
 size=$(echo $port | wc -c)
-echo -n $port | /usr/bin/eeprom_rw write -addr 0x240 -size $size -blank 0x40
+echo -n $port | /usr/bin/eeprom_rw write -addr 0x240 -size $size -blank 0x3F
