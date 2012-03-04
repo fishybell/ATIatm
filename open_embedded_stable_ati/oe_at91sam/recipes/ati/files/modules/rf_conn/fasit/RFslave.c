@@ -45,7 +45,8 @@ void HandleSlaveRF(int RFfd){
     int gathered;
     uint8 crc;
     
-    int slottime,my_slot,total_slots;
+    int slottime,my_slot,total_slots,resp_slot;
+    int fragment;
     int low_dev,high_dev;
     
     fd_set rf_or_mcp;
@@ -57,6 +58,7 @@ void HandleSlaveRF(int RFfd){
     LB_request_new_t *LB_new;
     LB_device_reg_t *LB_devreg;
     LB_assign_addr_t *LB_addr;
+    LB_status_resp_lifter_t *LB_resp;
     LB_expose_t *LB_exp;
     
     RF_addr=2047;	//  means it is unassigned.  we will always respond to the request_new in our temp slot
@@ -84,16 +86,20 @@ void HandleSlaveRF(int RFfd){
 	}
 	/* Receive message, or continue to recieve message from RF */
 
+	resp_slot=0;
+	
 	DDCMSG(D_VERY,GREEN,"RFslave: gathered %d  into Rx[%d:%d]:%d"
 	      ,gathered,Rx->head-Rx->buf,Rx->tail-Rx->buf,Queue_Depth(Rx));
 
-	while (gathered>=3){
-	    DDCMSG(D_VERY,GREEN,"RFslave: while(gathered[%d]>=3)  into Rx[%d:%d]:%d"
-		   ,gathered,Rx->head-Rx->buf,Rx->tail-Rx->buf,Queue_Depth(Rx));
-	    
+	fragment=0;
+	while (gathered>=3&& !fragment){
 	    LB=(LB_packet_t *)Rx->head;	// map the header in
-	    // we have a chance of a compelete packet
 	    size=RF_size(LB->cmd);
+	    
+	    DDCMSG(D_VERY,GREEN,"RFslave: while(gathered[%d]>=3) cmd=%d size=%d into Rx[%d:%d]:%d"
+		   ,gathered,LB->cmd,size,Rx->head-Rx->buf,Rx->tail-Rx->buf,Queue_Depth(Rx));
+
+	    // we have a chance of a compelete packet
 	    if (Queue_Depth(Rx) >= size){
 		//  we do have a complete packet
 		// we could check the CRC and dump it here
@@ -189,10 +195,54 @@ void HandleSlaveRF(int RFfd){
 			    }
 			    break;
 
+			case LBC_STATUS_REQ:
+			    // lets fake a status so we can send back and see the RFmaster handle it right.
+
+			    // create a RESPONSE packet
+			    LB_resp =(LB_status_resp_lifter_t *)(&rLB);	// map our bitfields in
+			    LB_resp->cmd=LBC_STATUS_RESP_LIFTER;
+			    LB_resp->addr=RF_addr;			    
+			    LB_resp->hits=1;			// fake '1'
+			    LB_resp->expose=1;			// fake '1'
+			    set_crc8(&rLB);	// calculates the correct CRC and adds it to the end of the packet payload
+			    DDCMSG(D_RF,BLUE,"Recieved 'Status request'.  respond with a LBC_STATUS_RESP_LIFTER");
+
+// now send it to the RF master
+// after waiting for our timeslot:
+// this is only for the dumb test.
+// Nates slave boss will need to be less dumb about this -
+// it will have to queue packets to send and later do them at the right time.
+// because this code will barf on more than one resp to it
+			    usleep(slottime*(resp_slot+1)*1000);	// plus 1 is the holdoff
+			    DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
+
+			    result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
+			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
+				sprintf(hbuf,"new device response to RFmaster devid=0x%06X len=%2d wrote %d\n"
+					,LB_devreg->devid,RF_size(LB_devreg->cmd),result);
+				DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
+			    }
+
+				// finish waiting for the slots before proceding
+			    usleep(slottime*(total_slots-(resp_slot+1))*1000);
+			    DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
+
+
+			    
+			    if (LB->addr==RF_addr){
+				DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd= %d",RF_addr,cmd);
+				LB_exp =(LB_expose_t *)(LB);	// map our bitfields in
+
+				DDCMSG(D_RF,BLUE,"Expose: exp hitmode tokill react mfs thermal\n"
+				       "        %3d   %3d     %3d   %3d  %3d   %3d",LB_exp->expose,LB_exp->hitmode,LB_exp->tokill,LB_exp->react,LB_exp->mfs,LB_exp->thermal);
+			    }
+			    break;
+
 			default:
 
 			    if (LB->addr==RF_addr){
 				DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd = %d",RF_addr,LB->cmd);
+				
 			    }		    
 			    break;
 		    }  // switch LB cmd
@@ -205,12 +255,15 @@ void HandleSlaveRF(int RFfd){
 			DeQueue(Rx,1);	// delete just one byte
 			gathered--;
 		    } else { // the packet was not for us, skip it
+			if (QueuePtype(Rx)==2) resp_slot++;	// we have to count to find our slot
 			DDCMSG(D_RF,BLUE,"NOT for us.  DeQueueing %d bytes.",size);
 			DeQueue(Rx,size);	// delete just the packet we used
 			gathered-=size;					
 		    }
 		}
-	    } // if there was a full packet
+	    } else {  // if there was a full packet
+		fragment=1;	// force it out of the while
+	    }
 	}//  while we have gathered at least enough for a packet
     } // while forever
 }// end of handleSlaveRF

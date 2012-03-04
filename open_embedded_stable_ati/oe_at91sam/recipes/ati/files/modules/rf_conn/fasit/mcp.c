@@ -355,10 +355,21 @@ int main(int argc, char **argv) {
 			}
 			// this packet must also get sent to the minion
 			result=write(taddr[taddr_cnt].fd,LB_addr,RF_size(LB_addr->cmd));
+			if (result<0) {
+			    DDCMSG(D_RF,RED,"MCP: 2 Sent %d bytes to minion %d at fd=%d\n",result,mID,ev.data.fd);
+			    exit(-1);
+			}
+			
 			DDCMSG(D_RF,BLUE,"MCP: 2 Sent %d bytes to minion %d  fd=%d",result,mID,taddr[taddr_cnt].fd);
 
 			// now send it to the RF master
 			result=write(RF_sock,LB_addr,RF_size(LB_addr->cmd));
+			if (result<0) {
+			    strerror_r(errno,buf,BufSize);			    
+			    DDCMSG(D_RF,RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
+			    exit(-1);
+			}
+			
 			DDCMSG(D_RF,RED,"MCP: 1 Sent %d bytes to RF fd=%d",result,RF_sock);
 
 
@@ -374,8 +385,14 @@ int main(int argc, char **argv) {
 			}
 
 			// do the copy down here
-			result=write(ev.data.fd,LB,RF_size(LB->cmd));
-			DDCMSG(D_RF,BLUE,"MCP: 3 Sent %d bytes to minion %d at fd=%d\n",result,mID,ev.data.fd);
+			result=write(taddr[LB->addr].fd,LB,RF_size(LB->cmd));
+			if (result<0) {
+			    strerror_r(errno,buf,BufSize);			    
+			    DDCMSG(D_RF,RED,"MCP:  write to minion %d error %s  fd=%d\n",mID,buf,taddr[LB->addr].fd);
+			    exit(-1);
+			}
+
+			DDCMSG(D_RF,BLUE,"MCP: 3 Sent %d bytes to minion %d at fd=%d\n",result,mID,taddr[LB->addr].fd);
 
 		    }
 
@@ -406,6 +423,12 @@ int main(int argc, char **argv) {
 
 		    // do the copy down here
 		    result=write(RF_sock,LB,RF_size(LB->cmd));
+		    if (result<0) {
+			strerror_r(errno,buf,BufSize);			    
+			DDCMSG(D_RF,RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
+			exit(-1);
+		    }
+
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 			sprintf(hbuf,"MCP: passing Minion %d's LB packet to RFmaster address=%d  cmd=%d  length=%d msglen=%d \n"
 				,mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
