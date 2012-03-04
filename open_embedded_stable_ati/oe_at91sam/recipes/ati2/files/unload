@@ -8,6 +8,19 @@ killall -q -9 event_conn
 killall -q -9 bit_button
 killall -q -9 user_conn
 killall -q -9 ping
+killall -q -9 slaveboss.arm
+# kill these more nicely
+if ps aufx | grep -q "RF.*arm" ; then
+   killall -q RFmaster.arm
+   killall -q RFslave.arm
+   killall -q RFslave.new.arm
+   killall -q RFdump.arm
+   sleep 2
+   killall -q -9 RFmaster.arm
+   killall -q -9 RFslave.arm
+   killall -q -9 RFslave.new.arm
+   killall -q -9 RFdump.arm
+fi
 
 # recursive unload function
 unmod () {
