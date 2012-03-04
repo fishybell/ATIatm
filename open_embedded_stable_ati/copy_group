@@ -89,8 +89,8 @@ foreach host $hosts {
 
     # copy rf_conn
     cd rf_conn/fasit
-    eval spawn scp [glob *.arm] root@sam$num:/home/root
-    eval $doshh
+    eval spawn scp [glob *.arm] root@$host:/home/root
+    eval $dossh
 
     # copy ati2
     cd ../../../../../ati2
