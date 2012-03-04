@@ -140,7 +140,6 @@ int main(int argc, char **argv) {
    struct epoll_event ev, events[MAX_EVENTS]; // temporary event, main event list
    int efd, nfds; // file descriptors for sockets
    char *ttyport = "/dev/ttyS1";
-   struct termios oldtio; // the original state of the serial device
    struct termios newtio; // the new state of the serial device
    rf_connection_t rc;
 
@@ -207,23 +206,11 @@ int main(int argc, char **argv) {
    setnonblocking(rc.sock, 1); // socket first time
    DCMSG(BLACK,"RFSLAVE: RF socket fd: %i", rc.sock);
 
-   // open tty and setup the serial device (copy the old settings to oldtio)
-   rc.tty = open(ttyport, O_RDWR | O_NOCTTY);
-   if (rc.tty < 0) {
-      perror("Error opening tty port: ");
-      DieWithError("open");
+   // open tty and setup the serial device
+   rc.tty = open_port(ttyport);
+   if (rc.tty <= 0) {
+      DieWithError("Is unhappy tty");
    }
-   tcgetattr(rc.tty, &oldtio);
-   D_memset(&newtio, 0, sizeof(newtio));
-   newtio.c_cflag = BAUDRATE | CRTSCTS | CS8 | CLOCAL | CREAD;
-   newtio.c_iflag = 0;
-   newtio.c_oflag = 0;
-   newtio.c_lflag = 0;
-   newtio.c_cc[VTIME] = 0;     // inter-character timer unused
-   newtio.c_cc[VMIN] = 1;      // read a minimum of 1 character
-   tcflush(rc.tty, TCIFLUSH);
-   tcsetattr(rc.tty, TCSANOW, &newtio);
-   setnonblocking(rc.tty, 0); // not a socket
    DCMSG(BLACK,"RFSLAVE: RF tty fd: %i", rc.tty);
 
    // setup epoll
@@ -327,11 +314,6 @@ int main(int argc, char **argv) {
             done = 1; // exit
          }
       }
-   }
-
-   // reset serial device
-   if (rc.tty > 0) {
-      tcsetattr(rc.tty, TCSANOW, &oldtio);
    }
 
    // close tty and socket
