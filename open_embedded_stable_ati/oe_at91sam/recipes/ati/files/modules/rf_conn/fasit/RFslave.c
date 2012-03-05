@@ -360,7 +360,7 @@ int main(int argc, char **argv) {
 //   Okay,   set up the RF modem link here
 
    RFfd=open_port(ttyport); 
-   DCMSG(RED,"opened port %s for serial link to radio as fd %d.  CURRENTLY BLOCKING IO",ttyport,RFfd);
+   DCMSG(RED,"opened port %s for serial link to radio as fd %d.  ",ttyport,RFfd);
    
    HandleSlaveRF(RFfd);
    DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");

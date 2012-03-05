@@ -423,8 +423,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 		case CID_Status_Request:
 		    // send 2102 status
-			DDCMSG(D_PACKET,BLUE,"CID_Status_Request   send 2102 status  hdr->num=%d, hdr->seq=%d",
-			       htons(header->num),htonl(header->seq));
+		    DDCMSG(D_PACKET,BLUE,"CID_Status_Request   send 2102 status  hdr->num=%d, hdr->seq=%d",
+			   htons(header->num),htonl(header->seq));
 			
 		    sendStatus2102(1,header,minion); // forces sending of a 2102
 		    // AND/OR? send 2115 MILES shootback status if supported
@@ -442,9 +442,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    LB_status_req->cmd=LBC_STATUS_REQ;
 		    LB_status_req->addr=minion->RF_addr;
 
-
-		    // should probably be a minion->S (state) timer for status
-		    // minion->S.exp.timer=5;
+		    minion->S.status.flags=F_told_RCC;
+		    minion->S.status.timer=20;
 
 		    // calculates the correct CRC and adds it to the end of the packet payload
 		    // also fills in the length field

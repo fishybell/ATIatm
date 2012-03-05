@@ -83,6 +83,7 @@ typedef struct minion_state {
     uint32			cap;	// actual capability bitfield - u32 to keep alignment
     state_u8_item_t		fault;	// maybe not really an item
 //  miles=1, NES=2, gps=4, the rest are reserved for now - but should maybe include movers and stuff	
+    state_u8_item_t		status;	
     state_u8_item_t		exp;	// exposure state
     state_u8_item_t		asp;
     state_u16_item_t		dir;
@@ -129,7 +130,10 @@ typedef struct minion_state {
 #define F_up2date	0	// RF and internal state match
 #define F_tell_RF	0x100	// RF needs update 
 #define F_told_RF	0x200	// RF updated, waiting for ack 
-#define F_tell_RCC	0x400	// internal state right, FASIT needs update 
+#define F_tell_RCC	0x400	// internal state right, FASIT needs update
+#define F_told_RCC	0x800	// We told FASIT our internal state, waiting on RF 
+
+
 
 
 uint64 htonll( uint64 id);
@@ -212,7 +216,7 @@ void *minion_thread(thread_data_t *);
 					fprintf(stdout, "DEBUG:\x1B[3%d;%dm",(SC)&7,((SC)>>3)&1); \
 					char *_data = (char*)data; \
 					for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
-					fprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
+					fprintf(stdout, " in %s at line %i\x1B[30;0m\n", __FILE__, __LINE__); \
 				    }; fflush(stdout); }}
 
 
@@ -221,14 +225,14 @@ void *minion_thread(thread_data_t *);
 					fprintf(stdout, "\x1B[3%d;%dm%s",(SC)&7,((SC)>>3)&1,hbuf); \
 					char *_data = (char*)data; \
 					for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
-					fprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
+					fprintf(stdout, " in %s at line %i\x1B[30;0m\n", __FILE__, __LINE__); \
 				    }; fflush(stdout); }}
 
 #define DDCMSG_HEXB(DBG,SC,hbuf,data, size)  { if (verbose&(DBG)) {{ \
 					    fprintf(stdout, "\x1B[3%d;%dm%s",(SC)&7,((SC)>>3)&1,hbuf); \
 					    char *_data = (char*)data; \
 					    for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
-					    fprintf(stdout, " in %s at line %i\n", __FILE__, __LINE__); \
+					    fprintf(stdout, " in %s at line %i\x1B[30;0m\n", __FILE__, __LINE__); \
 					}; fflush(stdout); }}
 
 

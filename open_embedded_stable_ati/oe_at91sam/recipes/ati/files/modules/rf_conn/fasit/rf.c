@@ -59,6 +59,22 @@ int QueuePtype(queue_t *M){
     return(0);
 }
 
+// does the same as QueuePtype only with a buffer - uses CRC8 to decide if it was complete
+int Ptype(char *buf){
+    int crc;
+    LB_packet_t *LB;
+
+    LB=(LB_packet_t *)buf;
+    if (LB->cmd==LBC_ILLEGAL) return(0);    
+    crc=crc8(buf);
+    if (!crc){ // there seemed to be a good command
+	if (LB->cmd==LBC_REQUEST_NEW) return(1);
+	if (LB->cmd==LBC_STATUS_REQ) return(2);
+	return(3);
+    }
+    return(0);
+}
+
 // remove count bytes from the head of the queue and normalize the queue
 void DeQueue(queue_t *M,int count){
     memmove(M->buf,M->head+count,Queue_Depth(M));
@@ -178,6 +194,156 @@ int gather_rf(int fd, char *tail, char *head,int max){
     }
 }
 
+void DDpacket(uint8 *buf,int len){
+    uint8 *buff;
+    char cmdname[32],hbuf[100],qbuf[200];
+    LB_packet_t *LB;
+    LB_device_reg_t *LB_devreg;
+    LB_assign_addr_t *LB_addr;
+    LB_request_new_t *LB_new;
+    
+    int i,plen,addr,devid,ptype,pnum,color;
+
+    buff=buf;	// copy ptr so we can mess with it
+    pnum=1;
+    // while we have complete packets (and we don't go beyond the end)
+    while(((buff-buf)<len)&&(ptype=Ptype(buff))) {
+
+	switch (ptype){
+	    case 1:
+		color=YELLOW;
+		break;
+	    case 2:
+		color=BLUE;
+		break;
+	    case 3:
+		color=GREEN;
+		break;
+	    default:
+		color=RED;
+	}
+	
+	LB=(LB_packet_t *)buff;
+	plen=RF_size(LB->cmd);
+	addr=RF_size(LB->addr);
+	switch (LB->cmd) {
+	    case LBC_DEVICE_REG:
+	    {
+		LB_device_reg_t *L=(LB_device_reg_t *)LB;
+		strcpy(cmdname,"Device_Reg");
+		sprintf(hbuf,"devid=%3x devtype=%x",L->devid,L->dev_type);
+		color=MAGENTA;
+	    }
+		break;
+
+	    case LBC_STATUS_REQ:
+		strcpy(cmdname,"Status_Req");
+		sprintf(hbuf,"address=%3d",LB->addr);
+		break;
+
+	    case LBC_EXPOSE:
+		strcpy(cmdname,"Expose");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		break;
+
+	    case LBC_MOVE:
+		strcpy(cmdname,"Move");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		break;
+
+	    case LBC_CONFIGURE_HIT:
+		strcpy(cmdname,"Configure_Hit");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		break;
+
+	    case LBC_GROUP_CONTROL:
+		strcpy(cmdname,"Group_Control");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		break;
+
+	    case LBC_AUDIO_CONTROL:
+		strcpy(cmdname,"Audio_Control");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		break;
+
+	    case LBC_POWER_CONTROL:
+		strcpy(cmdname,"Power_Control");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		break;
+
+	    case LBC_PYRO_FIRE:
+		strcpy(cmdname,"Pyro_Fire");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		break;
+
+	    case LBC_STATUS_RESP_LIFTER:
+		strcpy(cmdname,"Status_Resp_Lifter");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		color=MAGENTA;
+		break;
+
+	    case LBC_STATUS_RESP_MOVER:
+		strcpy(cmdname,"Status_Resp_Mover");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		color=MAGENTA;
+		break;
+
+	    case LBC_STATUS_RESP_EXT:
+		strcpy(cmdname,"Status_Resp_Ext");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		color=MAGENTA;
+		break;
+
+	    case LBC_STATUS_NO_RESP:
+		strcpy(cmdname,"Status_No_Resp");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		color=MAGENTA;
+		break;
+
+	    case LBC_QEXPOSE:
+		strcpy(cmdname,"Qexpose");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		break;
+
+	    case LBC_QCONCEAL:
+		strcpy(cmdname,"Qconceal");
+		sprintf(hbuf,"address=%3d .....",LB->addr);
+		break;
+
+	    case LBC_REQUEST_NEW:
+	    {
+		LB_request_new_t *L=(LB_request_new_t *)LB;
+		strcpy(cmdname,"Request_New");
+		sprintf(hbuf,"rereg=%d lowdev=%3x highdev=%3x slottime=%d(%dms)  ",L->reregister,L->low_dev,L->high_dev,L->slottime,L->slottime*5);
+	    }
+		break;
+
+	    case LBC_ASSIGN_ADDR:
+	    {
+		LB_assign_addr_t *L=(LB_assign_addr_t *)LB;
+		strcpy(cmdname,"Assign_Addr");
+		sprintf(hbuf,"rereg=%d devid=%3x new_addr=%3d",L->reregister,L->devid,L->new_addr);
+	    }
+		break;
+
+	    default:
+		strcpy(cmdname,"UNKNOWN COMMAND");
+		sprintf(hbuf," ... ... ... ");
+
+	}
+
+	sprintf(qbuf,"  %2d:  %s  %s  ",pnum,cmdname,hbuf);
+	printf("\x1B[3%d;%dm%s",(color)&7,((color)>>3)&1,qbuf);
+	for (i=0; i<plen-1; i++) printf("%02x.", buff[i]);
+	printf("%02x\n", buff[plen-1]);
+	buff+=plen;
+	pnum++;
+    }
+}
+
+
+
+   
 #define false 0
 #define true ~false
 

@@ -39,7 +39,8 @@ int main(int argc, char **argv) {
     taddr_t taddr[100];
     int cmd,crcFlag,plength,dev_addr;
     thread_data_t *minion;
-
+    int rereg=1;
+    
     LB_packet_t *LB,LB_buf;
 
     LB_request_new_t *LB_new;
@@ -191,7 +192,7 @@ int main(int argc, char **argv) {
 	ready_fd_count = epoll_wait(fds, events, MAX_NUM_Minions, timeout);
 	DDCMSG(D_POLL,RED,"epoll_wait over   ready_fd_count = %d",ready_fd_count);
 
-	if (timeout<3000) timeout = 30000;
+	if (timeout<3000) timeout = 10000;
 	
 	//  if we have no minions, or we have been idle long enough - so we
 	//      build a LB packet "request new devices"
@@ -202,6 +203,8 @@ int main(int argc, char **argv) {
 	    //   for now the request new devices will just use payload len=0
 	    LB_new=(LB_request_new_t *) &LB_buf;
 	    LB_new->cmd=LBC_REQUEST_NEW;
+	    LB_new->reregister=rereg;	// we want rereg==1 just the first time through
+	    rereg=0;
 	    LB_new->low_dev=low_dev;
 	    LB_new->high_dev=high_dev;
 	    LB_new->slottime=slottime/5;	// adjust to 5ms granularity
@@ -222,13 +225,25 @@ int main(int argc, char **argv) {
 		// if we have data from RF, it is a LB packet we need to decode and pass on,
 		// or one of our 'special packets' that means something else - irregardless we have to
 		// have a case statement to process it properly
-//////////////////////////////////////////////////////////////////////////////////////////////		
+////////////////////////////////////////////////////////////////////////////////////////////
+		DDCMSG(D_POLL,RED,"ready_fd   %d  RF_sock=%d",events[ready_fd].data.fd,RF_sock);
+		usleep(100000);
 		if (RF_sock==events[ready_fd].data.fd){
 		    msglen=read(RF_sock, buf, 1023);
+		    if (msglen<0) {
+			strerror_r(errno,buf,BufSize);			    
+			DDCMSG(D_RF,RED,"MCP: RF_sock error %s  fd=%d\n",buf,RF_sock);
+			exit(-1);
+		    }
+		    if (msglen==0) {
+			DDCMSG(D_RF,RED,"MCP: RF_sock returned 0 -   Socket to RFmaster closed.");
+			exit(-1);
+		    }
+
 
 		    LB=(LB_packet_t *)buf;
 		    // do some checking - like to see if the CRC is OKAY
-		    // although the CRC could be done in the RFmaster process
+		    // although the CRC should be done in the RFmaster process
 
 		    // actually can't check until we know how long it is
 //		    DDCMSG(D_RF,RED,"crc=%d  checked = %d",LB->crc,crc8(&LB,2));
@@ -242,6 +257,8 @@ int main(int argc, char **argv) {
 		    //  mcp only handles registration and addressing packets,
 		    //  mcp also has to pass new_address LB packets on to the minion so it can figure out it's own RF_address
 		    //  mcp passes all other LB packets on to the minions they are destined for
+
+		    DDpacket(buf,msglen);
 
 		    if  (LB->cmd==LBC_DEVICE_REG){
 			LB_devreg =(LB_device_reg_t *)(LB);	// change our pointer to the correct packet type
@@ -329,98 +346,93 @@ int main(int argc, char **argv) {
 
 			    /***   end of create a new minion 
 			     ****************************************************************************/
-			}  //  end of check to see if we already had a minion this devID
+			} // we don't have this devid, so create a minion for it
 
-		    
+		    		    
 			// we send this even if we already had this devid - the slave might have rebooted
 			// taddr_cnt  should be the RF_addr slot  it already had
 
 			LB_addr =(LB_assign_addr_t *)(&LB_buf);	// map our bitfields in
 
 			LB_addr->cmd=LBC_ASSIGN_ADDR;
-			LB_addr->reregister=0;			
+			LB_addr->reregister=1;			
 			LB_addr->devid=taddr[taddr_cnt].devid;	// get what might have been given out earlier
 			LB_addr->new_addr=taddr_cnt;		// the actual slot is the perm address
 
-			DDCMSG(D_RF,RED,"MCP: Build a LB device addr packet to assign the address slot %4d (0x%x)  %4d (0x%x)"
+			DDCMSG(D_RF,RED,"MCP: regX Build a LB device addr packet to assign the address slot %4d (0x%x)  %4d (0x%x)"
 			       ,taddr_cnt,taddr_cnt,LB_addr->new_addr,LB_addr->new_addr);
 
 			// calculates the correct CRC and adds it to the end of the packet payload
 			// also fills in the length field
 			set_crc8(LB_addr);
 			if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			    sprintf(hbuf,"MCP: LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",
+			    sprintf(hbuf,"MCP: regX LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",
 				    taddr_cnt,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
 			    DDCMSG_HEXB(D_RF,BLUE,hbuf,LB_addr,7);
 			}
 			// this packet must also get sent to the minion
 			result=write(taddr[taddr_cnt].fd,LB_addr,RF_size(LB_addr->cmd));
 			if (result<0) {
-			    DDCMSG(D_RF,RED,"MCP: 2 Sent %d bytes to minion %d at fd=%d\n",result,mID,ev.data.fd);
+			    DDCMSG(D_RF,RED,"MCP: regX Sent %d bytes to minion %d at fd=%d\n",result,taddr_cnt,taddr[taddr_cnt].fd);
 			    exit(-1);
 			}
 			
-			DDCMSG(D_RF,BLUE,"MCP: 2 Sent %d bytes to minion %d  fd=%d",result,mID,taddr[taddr_cnt].fd);
+			DDCMSG(D_RF,BLUE,"MCP: regX  Sent %d bytes to minion %d  fd=%d",result,taddr_cnt,taddr[taddr_cnt].fd);
 
 			// now send it to the RF master
 			result=write(RF_sock,LB_addr,RF_size(LB_addr->cmd));
 			if (result<0) {
 			    strerror_r(errno,buf,BufSize);			    
-			    DDCMSG(D_RF,RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
+			    DDCMSG(D_RF,RED,"MCP: regX write to RF_sock error %s  fd=%d\n",buf,RF_sock);
 			    exit(-1);
 			}
 			
-			DDCMSG(D_RF,RED,"MCP: 1 Sent %d bytes to RF fd=%d",result,RF_sock);
-
+			DDCMSG(D_RF,RED,"MCP: regX Sent %d bytes to RF fd=%d",result,RF_sock);
 
 		    } else {	// it is any other command than dev regx
 			// which means we just copy it on to the minion so it can process it
 
 			// just display the packet for debugging
 			LB=(LB_packet_t *)buf;
-			if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			    sprintf(hbuf,"MCP: passing RF packet from RF_addr %4d on to Minion %d.   cmd=%2d  length=%d msglen=%d \n"
-				    ,LB->addr, mID,LB->cmd,RF_size(LB->cmd),msglen);
-			    DDCMSG_HEXB(D_RF,BLUE,hbuf,LB,RF_size(LB->cmd));
+
+			
+			if (taddr[LB->addr].inuse){			    
+			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
+				sprintf(hbuf,"MCP: passing RF packet from RF_addr %4d on to Minion %d.   cmd=%2d  length=%d msglen=%d \n"
+					,LB->addr, mID,LB->cmd,RF_size(LB->cmd),msglen);
+				DDCMSG_HEXB(D_RF,BLUE,hbuf,LB,RF_size(LB->cmd));
+			    }
+
+			    // do the copy down here
+			    result=write(taddr[LB->addr].fd,LB,RF_size(LB->cmd));
+			    if (result<0) {
+				strerror_r(errno,buf,BufSize);			    
+				DDCMSG(D_RF,RED,"MCP:  write to minion %d error %s  fd=%d\n",mID,buf,taddr[LB->addr].fd);
+				exit(-1);
+			    }
+
+			    DDCMSG(D_RF,BLUE,"MCP: 3 Sent %d bytes to minion %d at fd=%d\n",result,mID,taddr[LB->addr].fd);
+
 			}
+		    } // else it is a command other than devreg
+		} // if it was a RF_sock fd that was ready
 
-			// do the copy down here
-			result=write(taddr[LB->addr].fd,LB,RF_size(LB->cmd));
-			if (result<0) {
-			    strerror_r(errno,buf,BufSize);			    
-			    DDCMSG(D_RF,RED,"MCP:  write to minion %d error %s  fd=%d\n",mID,buf,taddr[LB->addr].fd);
-			    exit(-1);
-			}
-
-			DDCMSG(D_RF,BLUE,"MCP: 3 Sent %d bytes to minion %d at fd=%d\n",result,mID,taddr[LB->addr].fd);
-
-		    }
-
-		}
 		else { // it is from a minion
-
 		    //   we have to do some processing, mainly just pass on to the RF_sock
-
 		    /***
 		     *** we are ready to read from a minion - use the event.data.ptr to know the minion
 		     ***   we should just have to copy the message down to the RF
 		     ***   and we need to deal with special cases like the minion dieing.
-		     ***
-		     ***/
-
+		     ***   */
 		    //		    minion_fd=events[ready_fd].data.fd;	// don't know what this is , but it aint right
 		    minion=(thread_data_t *)events[ready_fd].data.ptr;
 		    minion_fd=minion->minion;		    
 		    mID=minion->mID;
 		    DDCMSG(D_POLL,YELLOW,"MCP: fd %d for minion %d ready  [RF_addr=%d]\n",minion_fd,mID,minion->RF_addr);
-
 		    if(minion_fd>2048) exit(-1);
-
 		    msglen=read(minion_fd, buf, 1023);
-
 		    // just display the packet for debugging
 		    LB=(LB_packet_t *)buf;
-
 		    // do the copy down here
 		    result=write(RF_sock,LB,RF_size(LB->cmd));
 		    if (result<0) {
@@ -428,7 +440,6 @@ int main(int argc, char **argv) {
 			DDCMSG(D_RF,RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
 			exit(-1);
 		    }
-
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 			sprintf(hbuf,"MCP: passing Minion %d's LB packet to RFmaster address=%d  cmd=%d  length=%d msglen=%d \n"
 				,mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
@@ -436,6 +447,7 @@ int main(int argc, char **argv) {
 		    }
 
 		} // it is from a minion
+
 	    } //  for all the ready fd's
 	}  // else we did not time out
     } //while forever loop

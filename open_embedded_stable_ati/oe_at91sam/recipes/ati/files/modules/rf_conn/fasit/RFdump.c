@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
 //   Okay,   set up the RF modem link here
 
    RFfd=open_port(ttyport); 
-   DCMSG(RED,"opened port %s for serial link to radio as fd %d.  CURRENTLY BLOCKING IO",ttyport,RFfd);
+   DCMSG(RED,"opened port %s for serial link to radio as fd %d.  ",ttyport,RFfd);
 
    Rptr=Rstart=Rbuf;
 
@@ -146,8 +146,14 @@ int main(int argc, char **argv) {
 	       for (int i=0; i<gathered-1; i++) printf("%02x.", Rstart[i]);
 	   }
 	   printf("%02x\n", Rstart[gathered-1]);
+
+	   DDpacket(Rstart,gathered);
+	   
 	   Rptr=Rstart=Rbuf;
        }
+
+
+
    }
 }
 

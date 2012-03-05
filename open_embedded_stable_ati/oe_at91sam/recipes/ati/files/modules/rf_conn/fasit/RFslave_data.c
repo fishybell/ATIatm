@@ -104,8 +104,7 @@ int getTimeout(rf_connection_t *rc) {
 
    // subtract microseconds, possibly "carrying the one"
    if (rc->timeout_start.tv_nsec < tv.tv_nsec) {
-      // we need to carry
-      tv.tv_nsec -= 1000000000l;
+      // we need to carry.tv_nsec -= 1000000000l;
       if (tv.tv_sec >= 0) {
          tv.tv_sec--;
       } else {

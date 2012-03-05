@@ -51,7 +51,7 @@ int QueuePtype(queue_t *M);
 //     that is probably bit-packed
 
 //  the command ID's
-#define LBC_STATUS_REQ			0
+#define LBC_ILLEGAL			0
 #define LBC_EXPOSE			1
 #define LBC_MOVE			2
 #define LBC_CONFIGURE_HIT		3
@@ -68,6 +68,7 @@ int QueuePtype(queue_t *M);
 
 #define LBC_QEXPOSE			16
 #define LBC_QCONCEAL			17
+#define LBC_STATUS_REQ			18
 
 #define LBC_DEVICE_REG			29
 #define LBC_REQUEST_NEW			30
@@ -312,5 +313,8 @@ int RF_size(int cmd);
 uint32 getDevID (void);
 int gather_rf(int fd, char *pos, char *start,int max);
 void print_verbosity(void);
+void DDpacket(uint8 *buf,int len);
+
+
 
 #endif

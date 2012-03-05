@@ -403,6 +403,7 @@ int main(int argc, char **argv) {
     int slottime,total_slots;
     int low_dev,high_dev;
 
+    slottime=0;
     verbose=0;
     xmit=0;		// used for testing
     RFmasterport = defaultPORT;
@@ -462,8 +463,6 @@ int main(int argc, char **argv) {
     DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
     DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
 
-    
-    DCMSG(YELLOW,"RFmaster: slottime =%2dms",slottime);
 
     //   Okay,   set up the RF modem link here
 
