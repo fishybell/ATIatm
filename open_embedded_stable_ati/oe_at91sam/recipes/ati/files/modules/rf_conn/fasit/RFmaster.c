@@ -183,7 +183,7 @@ void HandleRF(int MCPsock,int RFfd){
 		
 		// loop until we are out of complete packets, and place them into the Tx queue
 		burst=3;		// remembers if we upt a type2 into the burst
-		remaining_time =100;	// reset our remaining_time before we are allowed to Tx again
+		remaining_time =1000;	// reset our remaining_time before we are allowed to Tx again   time needs to be smarter
 		
 		while((ptype=QueuePtype(Rx))&&		/* we have a complete packet */
 		      burst &&				/* and burst is not 0 (0 forces us to send) */
@@ -197,10 +197,11 @@ void HandleRF(int MCPsock,int RFfd){
 			LB_new =(LB_request_new_t *) Rx->head;	// we need to parse out the slottime, high_dev and low_dev from this packet.
 			slottime=LB_new->slottime*5;		// convert passed slottime back to milliseconds
 			low_dev=LB_new->low_dev;
-			total_slots=high_dev-low_dev+2;		// total number of slots with end padding
+			total_slots=34;		// total number of slots with end padding
 			burst=0;
 			remaining_time =(total_slots)*slottime;	// set up the timer
-
+			DDCMSG(D_TIME,YELLOW,"RFmaster:  setting remaining_time to %d  total_slots=%d slottime=%d",
+			       remaining_time,total_slots,slottime);
 			ReQueue(Tx,Rx,RF_size(LB_new->cmd));	// move it to the Tx queue
 			
 //			DCMSG(YELLOW,"RFmaster: requeued into M1[%d:%d]:%d s%d  size=%d",
@@ -213,6 +214,9 @@ void HandleRF(int MCPsock,int RFfd){
 			if (ptype==2) {
 			    burst=2;
 			    remaining_time +=slottime;	// add time for a response to this one
+			    DDCMSG(D_TIME,YELLOW,"RFmaster:  incrementing remaining_time by slottime to %d  slottime=%d",
+				   remaining_time,slottime);
+			    
 			}			    
 		    }
 		}  // end of while loop to build the Tx packet
@@ -471,6 +475,10 @@ int main(int argc, char **argv) {
 
     RFfd=open_port(ttyport, 0); // 0 for non-blocking
 
+    if (RFfd<0) {
+	DCMSG(RED,"RFmaster: comm port could not be opened. Shutting down");
+	exit(-1);
+    }
 
     //  this section is just used for testing   
     if (xmit){	
