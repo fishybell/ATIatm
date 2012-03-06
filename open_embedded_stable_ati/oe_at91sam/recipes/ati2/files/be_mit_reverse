@@ -1,4 +1,4 @@
 echo -n "Enter MIT Reverse (0|1): "
 read mitr
 size=$(echo $mitr | wc -c)
-echo -n $mitr | /usr/bin/eeprom_rw write -addr 0x42C -size $size -blank 0x04
+echo -n $mitr | /usr/bin/eeprom_rw write -addr 0x42C -size $size -blank 0x03

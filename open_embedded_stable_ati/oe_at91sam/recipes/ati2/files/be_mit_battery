@@ -1,4 +1,4 @@
 echo -n "Enter MIT battery default: "
 read mitb
 size=$(echo $mitb | wc -c)
-echo -n $mitb | /usr/bin/eeprom_rw write -addr 0x418 -size $size -blank 0x08
+echo -n $mitb | /usr/bin/eeprom_rw write -addr 0x418 -size $size -blank 0x07

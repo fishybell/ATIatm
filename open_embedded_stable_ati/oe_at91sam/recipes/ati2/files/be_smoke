@@ -1,4 +1,4 @@
 echo -n "Is there Smoke (0-no, 1-yes)?: "
 read smk
 size=$(echo $smk | wc -c)
-echo -n $smk | /usr/bin/eeprom_rw write -addr 0x300 -size $size -blank 0x04
+echo -n $smk | /usr/bin/eeprom_rw write -addr 0x300 -size $size -blank 0x03

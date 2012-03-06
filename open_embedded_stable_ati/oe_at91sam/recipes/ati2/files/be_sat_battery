@@ -1,4 +1,4 @@
 echo -n "Enter SAT battery default: "
 read satb
 size=$(echo $satb | wc -c)
-echo -n $satb | /usr/bin/eeprom_rw write -addr 0x408 -size $size -blank 0x08
+echo -n $satb | /usr/bin/eeprom_rw write -addr 0x408 -size $size -blank 0x07

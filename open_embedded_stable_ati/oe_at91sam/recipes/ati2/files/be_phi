@@ -1,4 +1,4 @@
 echo -n "Is there a Positive Hit Inidicator (0-no, 1-yes)?: "
 read phi
 size=$(echo $phi | wc -c)
-echo -n $phi | /usr/bin/eeprom_rw write -addr 0x380 -size $size -blank 0x04
+echo -n $phi | /usr/bin/eeprom_rw write -addr 0x380 -size $size -blank 0x03

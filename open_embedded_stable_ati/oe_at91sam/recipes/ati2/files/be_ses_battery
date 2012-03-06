@@ -1,4 +1,4 @@
 echo -n "Enter SES battery default: "
 read sesb
 size=$(echo $sesb | wc -c)
-echo -n $sesb | /usr/bin/eeprom_rw write -addr 0x410 -size $size -blank 0x08
+echo -n $sesb | /usr/bin/eeprom_rw write -addr 0x410 -size $size -blank 0x07
