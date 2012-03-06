@@ -137,7 +137,7 @@ typedef struct minion_state {
 
 
 uint64 htonll( uint64 id);
-int open_port(char *sport);
+int open_port(char *sport, int blocking);
 void timestamp(struct timespec *elapsed_time, struct timespec *istart_time, struct timespec *time_diff);
 
 /* create thread argument struct for thr_func() */
