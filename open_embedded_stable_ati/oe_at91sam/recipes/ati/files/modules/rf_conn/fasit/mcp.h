@@ -203,7 +203,7 @@ void *minion_thread(thread_data_t *);
 
 #define C_DEBUG 1
 
-#define DDCMSG(DEB,SC, FMT, ...) { if (((DEB)&verbose)==(DEB)) { fprintf(stdout, "\x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
+#define DDCMSG(DEB,SC, FMT, ...) { if ((DEB)&verbose) { fprintf(stdout, "\x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
 #define DCMSG(SC, FMT, ...) { if (C_DEBUG) { fprintf(stdout, "\x1B[3%d;%dm" FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
 #define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm" FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
 #define DCOLOR(SC) { if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm",SC&7,(SC>>3)&1); fflush(stdout);}}
@@ -229,7 +229,7 @@ void *minion_thread(thread_data_t *);
 					fprintf(stdout, " in %s at line %i\x1B[30;0m\n", __FILE__, __LINE__); \
 				    }; fflush(stdout); }}
 
-#define DDCMSG_HEXB(DBG,SC,hbuf,data, size)  { if ((verbose&(DBG))==(DBG)) {{ \
+#define DDCMSG_HEXB(DBG,SC,hbuf,data, size)  { if (verbose&(DBG)) {{ \
 					    fprintf(stdout, "\x1B[3%d;%dm%s",(SC)&7,((SC)>>3)&1,hbuf); \
 					    char *_data = (char*)data; \
 					    for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
