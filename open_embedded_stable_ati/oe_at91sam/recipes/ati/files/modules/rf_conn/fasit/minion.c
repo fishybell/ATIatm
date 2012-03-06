@@ -124,8 +124,9 @@ int write_FASIT_msg(thread_data_t *minion,void *hdr,int hlen,void *msg,int mlen)
 	sprintf(hbuf,"minion %d: sent %d chars body to RCC   ",minion->mID,iov[1].iov_len);	
 	DDCMSG_HEXB(D_PACKET,BLUE,hbuf,iov[1].iov_base,iov[1].iov_len);
 
-    } else {
-	perror("writing stream message");
+    }
+    if (result<0) {
+	perror("write_FASIT_msg:   error writing stream message");
     }
     return(result);
 }
@@ -865,10 +866,12 @@ void *minion_thread(thread_data_t *minion){
 		DCMSG(RED,"minion %d: socket to MCP closed, we are FREEEEEeeee!!!", minion->mID);
 		exit(-2);  /* this minion dies!  possibly it should do something else - but maybe it dies of happyness  */
 	    }
+	    
+	    timestamp(&elapsed_time,&istart_time,&delta_time);	
+	    DDCMSG(D_TIME,CYAN,"MINION %d: End of MCP Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld"
+		   ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);	    
 	}
 
-	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	DDCMSG(D_TIME,CYAN,"MINION %d: End of MCP Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	/**********************************    end of reading and processing the mcp command  ***********************/
 	
 	/*************** check to see if there is something to read from the rcc   **************************/
@@ -906,21 +909,21 @@ void *minion_thread(thread_data_t *minion){
 		DCMSG(RED,"MINION %d: which means it likely has closed!", minion->mID);
 		exit(-1);
 	    }
+	    timestamp(&elapsed_time,&istart_time,&delta_time);	
+	    DDCMSG(D_TIME,CYAN,"MINION %d: End of RCC Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld"
+		   ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 	}
-	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	DDCMSG(D_TIME,CYAN,"MINION %d: End of RCC Parse at %6ld.%09ld timestamp, delta=%1ld.%09ld"
-	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-
 	/**************   end of rcc command parsing   ****************/
 	/**  first we just update our counter, and if less then a tenth of a second passed,
 	 **  skip the timer updates and reloop, using a new select value that is a fraction of a tenth
 	 **
 	 **/
-	
+
+#if 0
 	timestamp(&elapsed_time,&istart_time,&delta_time);
 	DDCMSG(D_TIME,CYAN,"MINION %d: Begin timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-
+#endif
 	/***   if the elapsed_time is greater than a tenth of a second,
 	 ***   subtract out the number of tenths to use in updating our
 	 ***   timers.    otherwise set up the timeout for the next select
@@ -1019,10 +1022,11 @@ void *minion_thread(thread_data_t *minion){
 		}  // end of switch
 	    }   // else clause - exp flag
 	} // if clause - exp flag not set
-
+#if 0
 	timestamp(&elapsed_time,&istart_time,&delta_time);
 	DDCMSG(D_TIME,CYAN,"MINION %d: End timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+#endif
     }  // while forever
 }  // end of minon thread
 

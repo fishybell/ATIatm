@@ -135,17 +135,25 @@ void HandleSlaveRF(int RFfd){
 			     ****      */
 
 			    slottime=LB_new->slottime*5;	// we always pick up the latest slottime
-			    
 			    low_dev=LB_new->low_dev;
+			    DDCMSG(D_RF,RED,"Rxed 'request new devices'    devid=%x  low_dev=%x  RF_addr=%d",
+				   DevID,low_dev, RF_addr);
+			    
 			    resp=0;
-			    if ((DevID>=low_dev)&&(DevID<low_dev+32)){
-				if (LB_new->forget_addr&BV(DevID-low_dev)){	// checks if our bit is set	
+			    if ((DevID>=low_dev)&&(DevID<low_dev+32)){		// check range
+				DDCMSG(D_RF,RED,"Rxed 'request new devices'    in range  devid=%x  low_dev=%x  RF_addr=%d",
+				       DevID,low_dev, RF_addr);				
+				if (LB_new->forget_addr&BV(DevID-low_dev)){	// checks if our bit is set
+				    DDCMSG(D_RF,RED,"Recieved 'request new devices'   responding...  BV(%x-%x=%d)=%d AND forgetbits[%x] =%d  setting 2047",
+					   DevID,low_dev,DevID-low_dev,BV(DevID-low_dev),LB_new->forget_addr,LB_new->forget_addr&BV(DevID-low_dev));	// we must forget our address
+				    
 				    RF_addr=2047;	// we must forget our address
 				    resp=1;
 				} else if (RF_addr==2047){
 				    resp=1;
 				}
 			    }
+
 
 			    // now we must respond if 'resp' is true
 
@@ -159,8 +167,11 @@ void HandleSlaveRF(int RFfd){
 				LB_devreg =(LB_device_reg_t *)(&rLB);	// map our bitfields in
 				LB_devreg->dev_type=devtype;		// use the option we were invoked with
 				LB_devreg->devid=DevID;			// Actual 3 significant bytes of MAC address
+				
+				DDCMSG(D_RF,RED,"Recieved 'request new devices'   responding...  BV(%x-%x=%d)=%d AND forget bit=%d and RF_addr=%d",
+				       DevID,low_dev,DevID-low_dev,BV(DevID-low_dev),LB_new->forget_addr&BV(DevID-low_dev), RF_addr);	// we must forget our address
 
-				DDCMSG(D_RF,BLUE,"Recieved 'request new devices' set slottime=%dms total_slots=%d my_slot=%d RF_addr=%d",
+				DDCMSG(D_RF,RED,"Recieved 'request new devices' set slottime=%dms total_slots=%d my_slot=%d RF_addr=%d",
 				   slottime,total_slots,my_slot,RF_addr);			    			    
 
 		// calculates the correct CRC and adds it to the end of the packet payload
@@ -170,7 +181,7 @@ void HandleSlaveRF(int RFfd){
 		// after waiting for our timeslot:   which is slottime*(MAC&MASK) for now
 
 				usleep(slottime*(my_slot)*1000);	// plus 1 is the holdoff
-				DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
+				DDCMSG(D_TIME,CYAN," pre-slot sleep for %dms.   slottime=%d total_slots=%d my_slot=%d",slottime*(my_slot),slottime,total_slots,my_slot);
 			    
 				result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
 				if (verbose&D_RF){	// don't do the sprintf if we don't need to
@@ -181,9 +192,12 @@ void HandleSlaveRF(int RFfd){
 			    
 				// finish waiting for the slots before proceding
 				usleep(slottime*(total_slots-my_slot)*1000);
-				DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
+				DDCMSG(D_TIME,CYAN,"post-slot sleep for %dms.   slottime=%d total_slots=%d my_slot=%d",slottime*(total_slots-my_slot),slottime,total_slots,my_slot);
 
-			    }
+			    } else {
+				DDCMSG(D_RF,RED,"Recieved 'request new devices'   NOT RESPONDING...  BV(%x-%x=%d)=%d AND forget bit=%d and RF_addr=%d",
+				       DevID,low_dev,DevID-low_dev,BV(DevID-low_dev),LB_new->forget_addr&BV(DevID-low_dev), RF_addr);	// we must forget our address
+							    }
 			    break;
 
 			case LBC_ASSIGN_ADDR:

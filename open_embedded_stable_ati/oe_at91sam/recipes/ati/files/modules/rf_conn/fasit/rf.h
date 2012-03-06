@@ -10,9 +10,14 @@
 #define D_TIME		0x10
 #define D_VERY		0x20
 #define D_MEGA		0x80
+#define D_NEW		0x100
+#define D_MINION	0x200
 
 #include "mcp.h"
 
+
+#define min(a, b) ( a > b ? b : a )
+#define max(a, b) ( a > b ? a : b )
 
 //   used to get a bit position mask
 #define BV(BIT) (1<<(BIT))
@@ -196,7 +201,10 @@ typedef struct LB_request_new_t {
 // since this packet happens so seldom I see no good reason to try and
 // bit pack smaller than this
 typedef struct LB_device_reg_t {
-    //  6 bytes
+    //  6 bytes < 8 bytes
+    //   if it grows to 8 bytes we cannot respond in chunks of 32
+    //    (maybe!)  I was afraid of ever-running the 256 byte radio buffer,
+    //     but it might not work that way.
     uint32 cmd:5 __attribute__ ((packed));
     uint32 pad:3 __attribute__ ((packed));
     uint32 devid:24 __attribute__ ((packed));

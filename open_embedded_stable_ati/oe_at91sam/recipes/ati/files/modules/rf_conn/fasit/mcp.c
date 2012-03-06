@@ -3,7 +3,6 @@
 #include "rf.h"
 
 thread_data_t minions[2046];	// we do start at 0 and there cannot be more than 2046
-addr_t addr_pool[2048];		// 0 and 2047 cannot be used
 struct sockaddr_in fasit_addr;
 int verbose;
 int slottime,total_slots;
@@ -25,6 +24,29 @@ void print_help(int exval) {
 
 #define BufSize 1024
 
+
+/**  has to figure out what devid's are in use so we can set up the forget bits
+ **
+ **  */
+uint32 set_forget_bits(int low_dev,int high_dev,addr_t *addr_pool,int max_addr){
+int addr,testid;
+uint32 bits=0xffffffff;		// forget them all by default
+
+addr=1;
+    DDCMSG(D_MEGA,RED,"SFB:------------------------ max_addr=%d",max_addr);
+    high_dev=min(low_dev+31,high_dev);	// look for only devid's within 31 of low_dev, or < high_dev
+    while (addr<max_addr){	// spin through our addresses
+	testid=addr_pool[addr].devid;
+	if ((testid>=low_dev)&&(testid<=high_dev)){	// we have match
+	    bits^=BV(testid-low_dev);	// turn off the forget bit for this devid
+	}
+	DDCMSG(D_MEGA,BLUE,"SFB:  addr=%d testid=%x  bits=0x%8x",addr,testid,bits);
+	addr++;		// try the next address
+    }
+    return(bits);
+}
+
+
 int main(int argc, char **argv) {
     struct epoll_event ev, events[MAX_NUM_Minions];    
     int opt,fds,nfds,minion_fd;
@@ -40,9 +62,11 @@ int main(int argc, char **argv) {
     int cmd,crcFlag,plength,dev_addr;
     thread_data_t *minion;
     int rereg=1;
+    addr_t addr_pool[2048];	// 0 and 2047 cannot be used
+    int max_addr;		//  count of our max_addr given out
+
     
     LB_packet_t *LB,LB_buf;
-
     LB_request_new_t *LB_new;
     LB_device_reg_t *LB_devreg;
     LB_assign_addr_t *LB_addr;
@@ -131,6 +155,7 @@ int main(int argc, char **argv) {
 	addr_pool[i].inuse=0;
 	addr_pool[i].mID=0;
     }
+    max_addr=1;	// 0 is unused.  max_addr==1 also means empty
     
     total_slots=high_dev-low_dev+2;
     if (!slottime || (high_dev<low_dev)){
@@ -208,10 +233,17 @@ int main(int argc, char **argv) {
 	//
 	if (!ready_fd_count /* || idle long enough */  ){
 	    DDCMSG(D_RF,RED,"MCP:  Build a LB request new devices messages");
+/***  we need to use the range we were invoked with
+ ***  we need to handle a range greater than 32
+ ***  the forget_addr needs to be set by looking at the addr_pool
+ ***     call a function to get the forget bits - so we can reduce code clutter
+ ***  */
+	    
 	    //   for now the request new devices will just use payload len=0
 	    LB_new=(LB_request_new_t *) &LB_buf;
 	    LB_new->cmd=LBC_REQUEST_NEW;
-	    LB_new->forget_addr=0xffffffff;	// tell everybody to forget
+	    
+	    LB_new->forget_addr=set_forget_bits(low_dev,high_dev,addr_pool,max_addr);	// tell everybody to forget
 	    LB_new->low_dev=low_dev;
 	    LB_new->slottime=slottime/5;	// adjust to 5ms granularity
 	    
@@ -284,29 +316,38 @@ int main(int argc, char **argv) {
 			 ****************************************************************************/
 		    
 /////////   CHECK if we already have a minion with this devID
+			DDCMSG(D_NEW,RED,"MCP: CHECK for minion with this devID   max_addr=%d  devID=%06x",max_addr,LB_devreg->devid);
+			
 			addr_cnt=1;		//  step through to check if we already had this one
-			while ((addr_pool[addr_cnt].devid!=LB_devreg->devid)&&(!addr_pool[addr_cnt].inuse)) addr_cnt++;
+			DDCMSG(D_NEW,RED,"MCP:     ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) && (!addr_pool[%d].inuse=%d)",
+			      addr_cnt,max_addr,addr_cnt,addr_pool[addr_cnt].devid, LB_devreg->devid, addr_cnt,addr_pool[addr_cnt].inuse);
+			
+			while ((addr_cnt<max_addr)&&(addr_pool[addr_cnt].devid!=LB_devreg->devid)) {
+			DDCMSG(D_NEW,RED,"MCP: ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) ... (addr_pool[%d].inuse=%d)",
+				  addr_cnt,max_addr,addr_cnt,addr_pool[addr_cnt].devid, LB_devreg->devid, addr_cnt,addr_pool[addr_cnt].inuse);
+			    addr_cnt++;
+			}
 
-			if (addr_cnt<2047) {
-			    // we already have this devID, so reconnect
-			    DCMSG(RED,"MCP: needs to be some code to reconnect the minon and RFslave  devid=%06x\nsleep(10)",LB_devreg->devid);
-			    DCMSG(RED,"MCP: or maybe it just ignores this packet");
-			    sleep(10);
-			    
+			if (addr_cnt<max_addr) {
+			    // we already have this devID, so reconnect because the RFslave probably rebooted or something
+			    DCMSG(RED,"MCP: just send a new address assignmentto reconnect  the minon and RFslave  devid=%06x",LB_devreg->devid);
+
 			} else {
 			    // we do not have this devID.  Look for the first free address to use
 			    addr_cnt=1;		//  step through to check to find unused
 			    while (addr_pool[addr_cnt].inuse) addr_cnt++;	// look for an unused address slot
-
+			    DDCMSG(D_NEW,YELLOW,"MCP: check for unused addr addr_cnt=%d ",addr_cnt);
+			    
 			    if (addr_cnt>2046){
-				DDCMSG(D_RF,RED,"MCP: RFslave sent LB_DEVICE_REG packet. all RF addresses in  devtype=%d devid=0x%06x"
+				DCMSG(RED,"MCP: all RF addresses in use  devtype=%d devid=0x%06x"
 				       ,LB_devreg->dev_type,LB_devreg->devid);
 			    } else {
-
-				// we have a free address at addr_cnt		
+				// we have a free address at addr_cnt
+				max_addr=max(max_addr,addr_cnt+1);	// we probably have a higher address in use
 				mID+=1;	// increment our minion count
 				addr_pool[addr_cnt].mID=mID;			// update the addr_pool
 				addr_pool[addr_cnt].devid=LB_devreg->devid;
+				addr_pool[addr_cnt].inuse=1;			// make sure we mark that we are in use!
 
 				/* open a bidirectional pipe for communication with the minion  */
 				if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &minions[mID].mcp_sock))){
@@ -333,14 +374,14 @@ int main(int argc, char **argv) {
 				
 				if (child) {
 				    /* This is the parent. */
-				    DCMSG(RED,"MCP forked minion %d", mID);
+				    DDCMSG(D_MINION,RED,"MCP forked minion %d", mID);
 				    close(minions[mID].mcp_sock);
 
 				} else {
 				    /* This is the child. */
 				    close(minions[mID].minion);
 				    minion_thread(&minions[mID]);
-				    DCMSG(RED,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
+				    DDCMSG(D_MINION,RED,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
 
 				    break;	// if we come back , bail to another level or something more fatal
 				}
@@ -356,7 +397,7 @@ int main(int argc, char **argv) {
 				    return 1;
 				}
 
-				DDCMSG(D_RF,RED,"MCP: assigning address slot #%d  mID=%d inuse=%d "
+				DDCMSG(D_NEW,RED,"MCP: assigning address slot #%d  mID=%d inuse=%d "
 				       ,addr_cnt,addr_pool[addr_cnt].mID,addr_pool[addr_cnt].inuse);
 
 
@@ -375,7 +416,7 @@ int main(int argc, char **argv) {
 			LB_addr->devid=addr_pool[addr_cnt].devid;	// get what might have been given out earlier
 			LB_addr->new_addr=addr_cnt;			// the actual slot is the perm address
 
-			DDCMSG(D_RF,RED,"MCP: regX Build a LB device addr packet to assign the address slot %4d %4d"
+			DDCMSG(D_NEW,RED,"MCP: regX Build a LB device addr packet to assign the address slot %4d %4d"
 			       ,addr_cnt,LB_addr->new_addr);
 
 		    // calculates the correct CRC and adds it to the end of the packet payload
@@ -390,21 +431,21 @@ int main(int argc, char **argv) {
 		    // this packet must also get sent to the minion
 			result=write(minions[addr_pool[addr_cnt].mID].minion,LB_addr,RF_size(LB_addr->cmd));
 			if (result<0) {
-			    DDCMSG(D_RF,RED,"MCP: regX Sent %d bytes to minion %d at fd=%d\n",result,addr_cnt,minions[addr_pool[addr_cnt].mID].minion);
+			    DDCMSG(D_NEW,RED,"MCP: regX Sent %d bytes to minion %d at fd=%d\n",result,addr_cnt,minions[addr_pool[addr_cnt].mID].minion);
 			    exit(-1);
 			}
 
-			DDCMSG(D_RF,BLUE,"MCP: regX  Sent %d bytes to minion %d  fd=%d",result,addr_pool[addr_cnt].mID,minions[addr_pool[addr_cnt].mID].minion);
+			DDCMSG(D_NEW,BLUE,"MCP: regX  Sent %d bytes to minion %d  fd=%d",result,addr_pool[addr_cnt].mID,minions[addr_pool[addr_cnt].mID].minion);
 
 		    // now send it to the RF master
 			result=write(RF_sock,LB_addr,RF_size(LB_addr->cmd));
 			if (result<0) {
 			    strerror_r(errno,buf,BufSize);			    
-			    DDCMSG(D_RF,RED,"MCP: regX write to RF_sock error %s  fd=%d\n",buf,RF_sock);
+			    DCMSG(RED,"MCP: regX write to RF_sock error %s  fd=%d\n",buf,RF_sock);
 			    exit(-1);
 			}
 
-			DDCMSG(D_RF,RED,"MCP: regX Sent %d bytes to RF fd=%d",result,RF_sock);
+			DDCMSG(D_NEW,RED,"MCP: regX Sent %d bytes to RF fd=%d",result,RF_sock);
 			
 			// done handling the device_reg packet
 		    } else {	// it is any other command than dev regx
@@ -423,7 +464,7 @@ int main(int argc, char **argv) {
 			    result=write(minions[addr_pool[addr_cnt].mID].minion,LB,RF_size(LB->cmd));			    
 			    if (result<0) {
 				strerror_r(errno,buf,BufSize);			    
-				DDCMSG(D_RF,RED,"MCP:  write to minion %d error %s  fd=%d\n",mID,buf,minions[addr_pool[addr_cnt].mID].minion);
+				DCMSG(RED,"MCP:  write to minion %d error %s  fd=%d\n",mID,buf,minions[addr_pool[addr_cnt].mID].minion);
 				exit(-1);
 			    }
 
@@ -452,7 +493,7 @@ int main(int argc, char **argv) {
 		    result=write(RF_sock,LB,RF_size(LB->cmd));
 		    if (result<0) {
 			strerror_r(errno,buf,BufSize);			    
-			DDCMSG(D_RF,RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
+			DCMSG(RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
 			exit(-1);
 		    }
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
