@@ -158,7 +158,7 @@ int RF_size(int cmd){
 	    return (6);
 	    
 	case  LBC_REQUEST_NEW:
-	    return (9);
+	    return (10);
 	    
 	case  LBC_ASSIGN_ADDR:
 	    return (7);
@@ -314,7 +314,7 @@ void DDpacket(uint8 *buf,int len){
 	    {
 		LB_request_new_t *L=(LB_request_new_t *)LB;
 		strcpy(cmdname,"Request_New");
-		sprintf(hbuf,"rereg=%d lowdev=%3x highdev=%3x slottime=%d(%dms)  ",L->reregister,L->low_dev,L->high_dev,L->slottime,L->slottime*5);
+		sprintf(hbuf,"lowdev=%3x forget_addr=%8x slottime=%d(%dms)  ",L->low_dev,L->forget_addr,L->slottime,L->slottime*5);
 	    }
 		break;
 

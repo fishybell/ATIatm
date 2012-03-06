@@ -42,7 +42,7 @@ void HandleSlaveRF(int RFfd){
     char *Mptr, Mstart, Mend;
     queue_t *Rx;    
     char *Rptr, *Rstart;    
-    int gathered;
+    int gathered,resp;
     uint8 crc;
     
     int slottime,my_slot,total_slots,resp_slot;
@@ -121,33 +121,44 @@ void HandleSlaveRF(int RFfd){
 		    switch (LB->cmd){
 			case LBC_REQUEST_NEW:
 			    LB_new =(LB_request_new_t *) LB;
+			    
 
 			    /****      we have a request_new
 			     ****
 			     ****      We respond
-			     ****      if our devid is in range
-			     ****      AND
-			     ****      our RF_addr=2047 OR reregister=1
+			     ****      if our devid is in range AND forget_addr true
+			     ****         our devid is in range AND ( !forget_addr and RF_addr==2047)
 			     ****
+			     ****      also,
+			     ****      if our devid is in range AND forget_addr true
+			     ****         we must forget our old address (change RF_addr to 2047)
 			     ****      */
-			    low_dev=LB_new->low_dev;
-			    high_dev=LB_new->high_dev;
 
-			    if (((DevID>=low_dev)&&(DevID<=high_dev)) &&
-				  ((RF_addr==2047)||LB_new->reregister)){   // passed the test
+			    slottime=LB_new->slottime*5;	// we always pick up the latest slottime
+			    
+			    low_dev=LB_new->low_dev;
+			    resp=0;
+			    if ((DevID>=low_dev)&&(DevID<low_dev+32)){
+				if (LB_new->forget_addr&BV(DevID-low_dev)){	// checks if our bit is set	
+				    RF_addr=2047;	// we must forget our address
+				    resp=1;
+				} else if (RF_addr==2047){
+				    resp=1;
+				}
+			    }
+
+			    // now we must respond if 'resp' is true
+
+			    if (resp){
 								
-				slottime=LB_new->slottime*5;
-				total_slots=high_dev-low_dev+2;	// total number of slots with end padding
+				my_slot=DevID-low_dev+1;	// the slot we should respond in
+				total_slots=34;			// total number of slots with end padding
 
 		// create a RESPONSE packet
 				rLB.cmd=LBC_DEVICE_REG;
 				LB_devreg =(LB_device_reg_t *)(&rLB);	// map our bitfields in
 				LB_devreg->dev_type=devtype;		// use the option we were invoked with
 				LB_devreg->devid=DevID;			// Actual 3 significant bytes of MAC address
-			    // respond in a slot that is DevID-low_dev, at an address 1710 more than that
-				my_slot=DevID-low_dev;
-				total_slots=high_dev-low_dev;
-				my_slot++;		// add the holdoff in, so we never use slot zero
 
 				DDCMSG(D_RF,BLUE,"Recieved 'request new devices' set slottime=%dms total_slots=%d my_slot=%d RF_addr=%d",
 				   slottime,total_slots,my_slot,RF_addr);			    			    

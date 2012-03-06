@@ -144,7 +144,7 @@ void timestamp(struct timespec *elapsed_time, struct timespec *istart_time, stru
 typedef struct _thread_data_t {
     /* don't mess with the order of mcp and minion */
     int mcp_sock;	// socket to mcp
-    int minion;
+    int minion;		// fd to minion
     /*  okay for changes again */
     int status;
     int PID;
@@ -156,14 +156,12 @@ typedef struct _thread_data_t {
     minion_state_t S;	// the whol state of this minion
 } thread_data_t;
 
-/* create simple struct to keep track of temporary addresses */
-typedef struct taddr_t {
-    int fd;
-    int addr;
+/* create simple struct to keep track of the address pool */
+typedef struct addr_t {
     uint32 devid;
     int mID;
     int inuse;
-} taddr_t;
+} addr_t;
 
 //   possible status for thread_data status that we need to deal with
 #define S_closed 0

@@ -13,6 +13,11 @@
 
 #include "mcp.h"
 
+
+//   used to get a bit position mask
+#define BV(BIT) (1<<(BIT))
+
+
 typedef struct queue_tag {
     char *tail;		//  end of queue - insertion point
     char *head;		// start of queue - we remove fifo usually
@@ -155,7 +160,8 @@ typedef struct LB_status_no_resp_t {
     uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_status_no_resp_t;
 
-// LBC_REQUEST_NEW packet
+#if 0
+// old LBC_REQUEST_NEW packet
 typedef struct LB_request_new_t {
 //  9 bytes
     uint32 cmd:5 __attribute__ ((packed));
@@ -168,6 +174,21 @@ typedef struct LB_request_new_t {
 
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:24 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_request_new_t;
+#endif
+
+// LBC_REQUEST_NEW packet
+typedef struct LB_request_new_t {
+//  10 bytes
+    uint32 cmd:5 __attribute__ ((packed));
+    uint32 padding0:3 __attribute__ ((packed));
+    uint32 low_dev:24 __attribute__ ((packed));		// lowest devID
+
+    uint32 forget_addr:32 __attribute__ ((packed));	// bitfield of which slaves should forget their current addresses
+    
+    uint32 slottime:8 __attribute__ ((packed));		// slottime (multiply by 5ms)
+    uint32 crc:8 __attribute__ ((packed));
+    uint32 padding:16 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_request_new_t;
 
 // LBC_DEVICE_REG packet

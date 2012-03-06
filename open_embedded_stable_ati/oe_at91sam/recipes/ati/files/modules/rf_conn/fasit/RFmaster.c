@@ -103,6 +103,10 @@ void HandleRF(int MCPsock,int RFfd){
 	 *   the RFmaster to just pass data back and forth.
 	 */
 
+
+	DDCMSG(D_MEGA,YELLOW,"RFmaster:  before select remaining_time=%d  Rx[%d] Tx[%d]"
+	       ,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
+	
 	timeout.tv_sec=remaining_time/1000;
 	timeout.tv_usec=(remaining_time%1000)*1000;
 	sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
@@ -193,7 +197,6 @@ void HandleRF(int MCPsock,int RFfd){
 			LB_new =(LB_request_new_t *) Rx->head;	// we need to parse out the slottime, high_dev and low_dev from this packet.
 			slottime=LB_new->slottime*5;		// convert passed slottime back to milliseconds
 			low_dev=LB_new->low_dev;
-			high_dev=LB_new->high_dev;
 			total_slots=high_dev-low_dev+2;		// total number of slots with end padding
 			burst=0;
 			remaining_time =(total_slots)*slottime;	// set up the timer
@@ -495,7 +498,6 @@ int main(int argc, char **argv) {
 
 	RQ->cmd=LBC_REQUEST_NEW;
 	RQ->low_dev=low_dev;
-	RQ->high_dev=high_dev;
 	RQ->slottime=slottime/5;
 	// calculates the correct CRC and adds it to the end of the packet payload
 	// also fills in the length field
