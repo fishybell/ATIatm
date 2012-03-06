@@ -184,22 +184,22 @@ void *minion_thread(thread_data_t *);
 //  colors for the DCMSG  
 #define black	0
 #define red	1
-#define green	7
-#define yellow	5
+#define green	2
+#define yellow	3
 #define blue	4
-#define magenta 3
+#define magenta 5
 #define cyan	6
-#define gray	2
+#define gray	7
 
 //  these are the 'bold/bright' colors
 #define BLACK	8
 #define RED	9
-#define GREEN	15
-#define YELLOW	13
+#define GREEN	10
+#define YELLOW	11
 #define BLUE	12
-#define MAGENTA 11
+#define MAGENTA 13
 #define CYAN	14
-#define GRAY	10
+#define GRAY	15
 
 #define C_DEBUG 1
 
