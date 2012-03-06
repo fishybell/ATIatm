@@ -20,13 +20,18 @@
      * Returns the file descriptor on success or -1 on error.
      */
 
-int open_port(char *sport){
+int open_port(char *sport, int blocking){
     int fd,speed,myspeed; /* File descriptor for the port */
     struct termios my_termios;
     struct termios new_termios;
     char buf[200];
 
-    fd = open(sport, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    // open as blocking or non-blocking
+    if (blocking) {
+       fd = open(sport, O_RDWR | O_NOCTTY);
+    } else {
+       fd = open(sport, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    }
 
     if (fd == -1) {
        /*

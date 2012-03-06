@@ -370,7 +370,7 @@ int main(int argc, char **argv) {
     
 //   Okay,   set up the RF modem link here
 
-   RFfd=open_port(ttyport); 
+   RFfd=open_port(ttyport, 0);  // 0 for non-blocking
    DCMSG(RED,"opened port %s for serial link to radio as fd %d.  ",ttyport,RFfd);
    
    HandleSlaveRF(RFfd);
