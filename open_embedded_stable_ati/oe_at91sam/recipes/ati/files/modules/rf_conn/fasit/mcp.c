@@ -15,12 +15,15 @@ void print_help(int exval) {
     printf("  -p 4000       set FASIT server port address\n");
     printf("  -r 127.0.0.1  set RFmaster server IP address\n");
     printf("  -m 4004       set RFmaster server port address\n");
+    printf("  -t 50         hunttime in seconds.  Time we wait before doing a slave hunt again\n");
     printf("  -s 150        slottime in ms (5ms granules, 1275 ms max\n");
     printf("  -d 0x20       Lowest devID to find\n");
     printf("  -D 0x30       Highest devID to find\n");
     print_verbosity();
     exit(exval);
 }
+
+
 
 #define BufSize 1024
 
@@ -64,7 +67,7 @@ int main(int argc, char **argv) {
     int rereg=1;
     addr_t addr_pool[2048];	// 0 and 2047 cannot be used
     int max_addr;		//  count of our max_addr given out
-
+    int hunttime,slave_hunting,low;
     
     LB_packet_t *LB,LB_buf;
     LB_request_new_t *LB_new;
@@ -84,7 +87,9 @@ int main(int argc, char **argv) {
     minnum = 0;	// now start with no minions
     verbose=0;
 
-
+    slave_hunting=1;	// want to hunt on startup
+    hunttime=30;
+    
     /* start with a clean address structures */
     memset(&fasit_addr, 0, sizeof(struct sockaddr_in));
     fasit_addr.sin_family = AF_INET;
@@ -95,7 +100,7 @@ int main(int argc, char **argv) {
     RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");		// RFmaster server the MCP connects to
     RF_addr.sin_port = htons(4004);				// RFmaster server port number
 
-    while((opt = getopt(argc, argv, "hv:m:r:p:f:s:d:D:")) != -1) {
+    while((opt = getopt(argc, argv, "hv:m:r:p:f:s:d:D:t:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
@@ -107,6 +112,10 @@ int main(int argc, char **argv) {
 
 	    case 's':
 		slottime = atoi(optarg);	// leave it in ms until it gets sent in a packet
+		break;
+		
+	    case 't':
+		hunttime = atoi(optarg);	// time in seconds before we hunt for slaves again
 		break;
 
 	    case 'd':
@@ -148,7 +157,8 @@ int main(int argc, char **argv) {
     DCMSG(BLUE,"MCP: verbosity is set to 0x%x", verbose);
     DCMSG(BLUE,"MCP: FASIT SERVER address = %s:%d", inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port));
     DCMSG(BLUE,"MCP: RFmaster SERVER address = %s:%d", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port));
-
+    print_verbosity_bits();
+    
     // zero the address pool
     for(i=0; i<2048; i++) {
 	addr_pool[i].devid=0;
@@ -157,7 +167,6 @@ int main(int argc, char **argv) {
     }
     max_addr=1;	// 0 is unused.  max_addr==1 also means empty
     
-    total_slots=high_dev-low_dev+2;
     if (!slottime || (high_dev<low_dev)){
 	DCMSG(RED,"\nMCP: slottime=%d must be set and high_dev=%d cannot be less than low_dev=%d",slottime,high_dev,low_dev);
 	exit(-1);
@@ -220,7 +229,7 @@ int main(int argc, char **argv) {
     while(1) {
 
 	// wait for data from either the RFmaster or from a minion
-//	DDCMSG(D_POLL,RED,"epoll_wait with %i timeout", timeout);
+	DDCMSG(D_POLL,RED,"epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
 
 	ready_fd_count = epoll_wait(fds, events, MAX_NUM_Minions, timeout);
 	DDCMSG(D_POLL,RED,"epoll_wait over   ready_fd_count = %d",ready_fd_count);
@@ -232,7 +241,25 @@ int main(int argc, char **argv) {
 	//  send_LB();   // send it
 	//
 	if (!ready_fd_count /* || idle long enough */  ){
-	    DDCMSG(D_RF,RED,"MCP:  Build a LB request new devices messages");
+
+	    if (slave_hunting==1){
+		low=low_dev;
+		timeout=slottime*40;	// idle time to wait for next go around
+		slave_hunting++;
+	    } else if (slave_hunting>1&&slave_hunting<(((high_dev-low_dev)/16)+2)){
+		low=low_dev+((slave_hunting-1)*16);	// step through 16 at a time after the first 2
+		if (low>=high_dev) low=low_dev;		// if we went to far, redo the bottom end
+		timeout=slottime*40;	// idle time to wait for next go around
+		slave_hunting++;
+	    } else if (slave_hunting){
+		// the hunt is over, for now
+		slave_hunting=0;
+		timeout=hunttime*1000;
+		low=low_dev;		// restart the next hunt at the low dev		
+	    } 
+		
+		
+	    DDCMSG(D_NEW,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
 /***  we need to use the range we were invoked with
  ***  we need to handle a range greater than 32
  ***  the forget_addr needs to be set by looking at the addr_pool
@@ -243,8 +270,8 @@ int main(int argc, char **argv) {
 	    LB_new=(LB_request_new_t *) &LB_buf;
 	    LB_new->cmd=LBC_REQUEST_NEW;
 	    
-	    LB_new->forget_addr=set_forget_bits(low_dev,high_dev,addr_pool,max_addr);	// tell everybody to forget
-	    LB_new->low_dev=low_dev;
+	    LB_new->forget_addr=set_forget_bits(low,high_dev,addr_pool,max_addr);	// tell everybody to forget
+	    LB_new->low_dev=low;
 	    LB_new->slottime=slottime/5;	// adjust to 5ms granularity
 	    
 	    // calculates the correct CRC and adds it to the end of the packet payload
@@ -254,9 +281,8 @@ int main(int argc, char **argv) {
 	    result=write(RF_sock,LB_new,RF_size(LB_new->cmd));
 	    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 		sprintf(hbuf,"MCP: sent %d (%d) bytes  LB request_newdev  ",result,RF_size(LB_new->cmd));
-		DCMSG_HEXB(YELLOW,hbuf,LB_new, RF_size(LB_new->cmd));
+		DDCMSG_HEXB(D_RF,YELLOW,hbuf,LB_new, RF_size(LB_new->cmd));
 	    }
-	    
 	} else { // we have some fd's ready
 	    // check for ready minions or RF
 	    for (ready_fd=0; ready_fd<ready_fd_count; ready_fd++) {
@@ -270,11 +296,11 @@ int main(int argc, char **argv) {
 		    msglen=read(RF_sock, buf, 1023);
 		    if (msglen<0) {
 			strerror_r(errno,buf,BufSize);			    
-			DDCMSG(D_RF,RED,"MCP: RF_sock error %s  fd=%d\n",buf,RF_sock);
+			DCMSG(RED,"MCP: RF_sock error %s  fd=%d\n",buf,RF_sock);
 			exit(-1);
 		    }
 		    if (msglen==0) {
-			DDCMSG(D_RF,RED,"MCP: RF_sock returned 0 -   Socket to RFmaster closed.");
+			DCMSG(RED,"MCP: RF_sock returned 0 -   Socket to RFmaster closed.");
 			exit(-1);
 		    }
 
@@ -289,7 +315,7 @@ int main(int argc, char **argv) {
 
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 			sprintf(hbuf,"MCP: read of LB packet from RFmaster address=%d  cmd=%d  msglen=%d \n",LB->addr,LB->cmd,msglen);
-			DCMSG_HEXB(YELLOW,hbuf,buf,msglen);
+			DDCMSG_HEXB(D_RF,YELLOW,hbuf,buf,msglen);
 		    }
 		    //      process recieved LB packets 
 		    //  mcp only handles registration and addressing packets,
@@ -431,7 +457,7 @@ int main(int argc, char **argv) {
 		    // this packet must also get sent to the minion
 			result=write(minions[addr_pool[addr_cnt].mID].minion,LB_addr,RF_size(LB_addr->cmd));
 			if (result<0) {
-			    DDCMSG(D_NEW,RED,"MCP: regX Sent %d bytes to minion %d at fd=%d\n",result,addr_cnt,minions[addr_pool[addr_cnt].mID].minion);
+			    DCMSG(RED,"MCP: regX Sent %d bytes to minion %d at fd=%d\n",result,addr_cnt,minions[addr_pool[addr_cnt].mID].minion);
 			    exit(-1);
 			}
 
@@ -485,7 +511,10 @@ int main(int argc, char **argv) {
 		    minion_fd=minion->minion;		    
 		    mID=minion->mID;
 		    DDCMSG(D_POLL,YELLOW,"MCP: fd %d for minion %d ready  [RF_addr=%d]\n",minion_fd,mID,minion->RF_addr);
-		    if(minion_fd>2048) exit(-1);
+		    if(minion_fd>2048){
+			DCMSG(RED,"MCP:  Trying create more than 2048 minions!  Call the Wizard");
+			exit(-1);
+		    }
 		    msglen=read(minion_fd, buf, 1023);
 		    // just display the packet for debugging
 		    LB=(LB_packet_t *)buf;

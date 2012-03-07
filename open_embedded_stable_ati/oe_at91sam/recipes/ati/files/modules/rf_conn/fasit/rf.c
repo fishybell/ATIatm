@@ -105,9 +105,24 @@ void print_verbosity(void){
     printf("  -v 8	    sets D_POLL  \n");
     printf("  -v 10	    sets D_TIME  \n");
     printf("  -v 20	    sets D_VERY  \n");
+    printf("  -v 40	    sets D_NEW  \n");
     printf("  -v 80	    sets D_MEGA  \n");
-    printf("  -v 3F	    sets all of the above  \n");
+    printf("  -v 100	    sets D_MINION  \n");
+    printf("  -v 1FF	    sets all of the above  \n");
 }
+
+void print_verbosity_bits(void){
+    DDCMSG(D_PACKET	,black,"  D_PACKET");
+    DDCMSG(D_RF		,black,"  D_RF");
+    DDCMSG(D_CRC	,black,"  D_CRC");
+    DDCMSG(D_POLL	,black,"  D_POLL");
+    DDCMSG(D_TIME	,black,"  D_TIME");
+    DDCMSG(D_VERY	,black,"  D_VERY");
+    DDCMSG(D_NEW	,black,"  D_NEW");   
+    DDCMSG(D_MEGA	,black,"  D_MEGA");
+    DDCMSG(D_MINION	,black,"  D_MINION");
+}
+
 
 int RF_size(int cmd){
     // set LB_size  based on which command it is
@@ -466,7 +481,7 @@ void set_crc8(void *buf) {
 
     if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
 	sprintf(hbuf,"set_crc8: LB len=%d set crc=0x%x  ",RF_size(LB->cmd),crc);
-	DCMSG_HEXB(YELLOW,hbuf,buf,size+1);
+	DDCMSG_HEXB(D_CRC,YELLOW,hbuf,buf,size+1);
     }
 }
 
@@ -492,10 +507,10 @@ uint8 crc8(void *buf) {
     if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
 	if (crc) {
 	    sprintf(hbuf,"crc8: LB len=%d  BAD CRC=0x%x  ",RF_size(LB->cmd),crc);
-	    DCMSG_HEXB(RED,hbuf,buf,size+1);
+	    DDCMSG_HEXB(D_CRC,RED,hbuf,buf,size+1);
 	} else {
 	    sprintf(hbuf,"crc8: LB len=%d  GOOD CRC=0x%x  ",RF_size(LB->cmd),crc);
-	    DCMSG_HEXB(YELLOW,hbuf,buf,size+1);
+	    DDCMSG_HEXB(D_CRC,YELLOW,hbuf,buf,size+1);
 	}
     }
     return crc;

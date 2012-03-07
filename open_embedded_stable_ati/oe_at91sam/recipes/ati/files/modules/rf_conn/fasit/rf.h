@@ -39,6 +39,7 @@ int QueuePtype(queue_t *M);
 
 #define Queue_Depth(M) ((M)->tail - (M)->head)
 
+void print_verbosity_bits(void);
 
 //}
 

@@ -193,6 +193,7 @@ int main(int argc, char **argv) {
    DCMSG(BLACK,"SLAVEBOSS: verbosity is set to 0x%x", verbose);
    DCMSG(BLACK,"SLAVEBOSS: listen FASIT address = %s:%d", inet_ntoa(faddr.sin_addr),htons(faddr.sin_port));
    DCMSG(BLACK,"SLAVEBOSS: listen RF address = %s:%d", inet_ntoa(raddr.sin_addr),htons(raddr.sin_port));
+   print_verbosity_bits();
 
    // setup listening for RF client
    if ((rfsock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {

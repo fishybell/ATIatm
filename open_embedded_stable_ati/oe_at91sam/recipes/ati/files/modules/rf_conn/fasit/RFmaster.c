@@ -230,9 +230,7 @@ void HandleRF(int MCPsock,int RFfd){
 		DDCMSG(D_MEGA,CYAN,"RFmaster:  before Tx to RF.  Tx[%d]",Queue_Depth(Tx));
 
 		if (Queue_Depth(Tx)){  // if we have something to Tx, Tx it.
-		    sprintf(buf,"MCP-> RF  [Que=%2d]  ",Queue_Depth(Tx));
-		    DCMSG_HEXB(YELLOW,buf,Tx->head,Queue_Depth(Tx));
-
+		    
 		    result=write(RFfd,Tx->head,Queue_Depth(Tx));
 		    if (result<0){
 			strerror_r(errno,buf,200);		    
@@ -241,8 +239,10 @@ void HandleRF(int MCPsock,int RFfd){
 			if (!result){
 			    DCMSG(RED,"RFmaster:  write Tx queue to RF returned 0");
 			}
-			sprintf(buf,"MCP-> RF  [%2d]  ",result);
-			DCMSG_HEXB(BLUE,buf,Tx->head,result);
+			if (verbose&D_RF){
+			    sprintf(buf,"MCP-> RF  [%2d]    ",result);
+			    DDCMSG_HEXB(D_RF,BLUE,buf,Tx->head,result);
+			}
 		    }
 		    DeQueue(Tx,Queue_Depth(Tx));
 		}
@@ -256,8 +256,6 @@ void HandleRF(int MCPsock,int RFfd){
 	    }
 	}
 
-
-	
 	//  Testing has shown that we generally get 8 character chunks from the serial port
 	//  when set up the way it is right now.
 	// we must splice them back together
@@ -319,20 +317,13 @@ void HandleRF(int MCPsock,int RFfd){
 	    }  // if gathered >=3
 	} // if this fd is ready
 
-
-
-/***************    if we have data to read from the MCP, read it then sort it into the three packet-type queues.
- ***************    prefixing a sequence number so we don't send any data out-of-order when we do our sorting and bandwidth optimizing
- ***************    
- ***************   If the socket to MCP closed, we free the dynamically allocated queues and then we return to main
- ***************   which waits for another MCP to connect
- ***************
+/***************     reads the message from MCP into the Rx Queue
  ***************/
 
 	if (FD_ISSET(MCPsock,&rf_or_mcp)){
 	    /* Receive message from MCP and read it directly into the Rx buffer */
 	    MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);	    
-	    DCMSG(YELLOW,"RFmaster: read %d from MCP.",MsgSize);
+	    DDCMSG(D_PACKET,YELLOW,"RFmaster: read %d from MCP.",MsgSize);
 
 	    if (MsgSize<0){
 		strerror_r(errno,buf,200);
@@ -360,6 +351,7 @@ void HandleRF(int MCPsock,int RFfd){
 
 		Rx->tail+=MsgSize;	// add on the new length
 		bytecount=Queue_Depth(Rx);
+		DDCMSG(D_PACKET,YELLOW,"RFmaster: Rx[%d]",bytecount);
 
 // we don't need to parse or anything....
 
@@ -469,6 +461,7 @@ int main(int argc, char **argv) {
     DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);
     DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
     DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
+    print_verbosity_bits();
 
 
     //   Okay,   set up the RF modem link here

@@ -383,13 +383,15 @@ int main(int argc, char **argv) {
     DCMSG(YELLOW,"A/B set for Low power.\n");
     
 //   Okay,   set up the RF modem link here
+    print_verbosity_bits();
 
    RFfd=open_port(ttyport, 0);  // 0 for non-blocking
    DCMSG(RED,"opened port %s for serial link to radio as fd %d.  ",ttyport,RFfd);
    
    HandleSlaveRF(RFfd);
    DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");
-	
+
+
 }
 
 
