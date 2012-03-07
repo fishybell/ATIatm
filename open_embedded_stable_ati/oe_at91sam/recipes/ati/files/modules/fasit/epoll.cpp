@@ -343,6 +343,7 @@ const char *usage = "Usage: %s [options]\n\
       ses_client = factory->newConn <SES_Client> ();
    }
    if (startSIT) {
+      sleep(8);
       sit_client = factory->newConn <SIT_Client> ();
    }
    if (startMIT) {
@@ -380,11 +381,12 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
             setnonblocking(client, true); // socket
             FASIT_TCP *fasit_tcp;
             // attach client to MIT?
-            if (mit_client != NULL && !mit_client->hasSIT()) {
+            if (mit_client != NULL/* && !mit_client->hasSIT()*/) {
                fasit_tcp = mit_client->addSIT(client);
                if (fasit_tcp == NULL) {
                   continue;
                }
+               mit_client->didFailure(ERR_connected_SIT);
                IMSG("Attached SIT to MIT\n")
             } else {
                // connect new client as proxy
@@ -396,7 +398,7 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
             ev.data.ptr = (void*)fasit_tcp;
             if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, client, &ev) < 0) {
                IERROR("epoll set insertion error: fd=%d\n", client)
-               return 1;
+//               return 1;
             }
          } else if (events[n].data.ptr != NULL) {
             Connection *conn = (Connection*)events[n].data.ptr;

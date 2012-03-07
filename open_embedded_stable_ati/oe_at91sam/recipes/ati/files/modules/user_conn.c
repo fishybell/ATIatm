@@ -448,6 +448,12 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                    case ERR_invalid_exception:
                       snprintf(wbuf, 1024, "U invalid exception\n");
                       break;
+                   case ERR_disconnected_SIT:
+                      snprintf(wbuf, 1024, "U disconnected SIT\n");
+                      break;
+                   case ERR_connected_SIT:
+                      snprintf(wbuf, 1024, "U connected SIT\n");
+                      break;
                    case ERR_critical_battery:
                       snprintf(wbuf, 1024, "U critical battery\n");
                       break;

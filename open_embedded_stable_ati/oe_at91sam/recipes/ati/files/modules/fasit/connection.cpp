@@ -60,8 +60,11 @@ FUNCTION_START("::~Connection()")
    }
 
    // stop watching for the connection and close it
-   epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
-   close(fd);
+   if (fd >= 0) {
+      epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
+      close(fd);
+      fd = -1;
+   }
 
    // free the write buffer
    list<char*>::iterator it; // iterator for write buffer
@@ -445,9 +448,11 @@ FUNCTION_START("::addToEPoll(int fd, void *ptr)");
    bool retval = true;
    ev.events = EPOLLIN;
    ev.data.ptr = (void*)ptr;
+   if (fd >= 0) {
    if (epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ev) < 0) {
       // failure to add fd to epoll
       retval = false;
+   }
    }
 
 FUNCTION_INT("::addToEPoll(int fd, void *ptr)", retval);

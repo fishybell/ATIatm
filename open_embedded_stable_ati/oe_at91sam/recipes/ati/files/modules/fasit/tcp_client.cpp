@@ -35,8 +35,11 @@ FUNCTION_INT("::reconnect()", false)
    }
 
    // remove dead socket from of epoll
-   epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
-   close(fd);
+   if (fd >= 0) {
+      epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
+      close(fd);
+      fd = -1;
+   }
 
    // clear buffers
    list<char*>::iterator it; // iterator for write buffer

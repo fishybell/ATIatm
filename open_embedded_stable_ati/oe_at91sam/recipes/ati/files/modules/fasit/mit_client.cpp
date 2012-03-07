@@ -54,7 +54,6 @@ FUNCTION_END("::~MIT_Client()")
 
 void MIT_Client::Reset() {
 FUNCTION_START("::Reset()");
-      int pid;
       signal(SIGCHLD, SIG_IGN);
       if (!fork()) {
         sleep(2);
@@ -65,8 +64,8 @@ FUNCTION_START("::Reset()");
          execl("/usr/bin/restart", "restart", (char *)0 );
          exit(0);
       }
-      pid = getpid();
-      kill(pid, SIGQUIT);
+//      pid = getpid();
+//      kill(pid, SIGQUIT);
 FUNCTION_END("::Reset()");
 }
 
@@ -138,6 +137,7 @@ bool MIT_Client::hasSIT() {
    FUNCTION_START("::hasSIT()");
    // is the attached SIT object fake or real?
    if (hasPair()) {
+      if (att_SIT == NULL) return false;
       bool ret = att_SIT->attached();
       FUNCTION_INT("::hasSIT()", ret);
       return ret;
@@ -151,14 +151,16 @@ FASIT_TCP *MIT_Client::addSIT(int fd) {
 FUNCTION_START("::addSIT(int fd)")
 
    // are we already attached to a SIT?
-   if (hasSIT()) {
+/*   if (hasSIT()) {
       return NULL;
-   }
+   } */
 
    // delete old fake SIT
    server = NULL;
    delete att_SIT;
 
+   memset(&lastSITdevcaps, 0, sizeof(FASIT_2111));
+   memset(&lastSITstatus, 0, sizeof(FASIT_2102));
    // connect with valid socket
    att_SIT = new attached_SIT_Client(this, fd, -1); // invalid tnum
    server = att_SIT;
@@ -183,8 +185,12 @@ FUNCTION_START("::delSIT()")
    // delete SIT connection points
    // TODO -- clear lastSIT* ?
 
+   didFailure(ERR_disconnected_SIT);
+
+   memset(&lastSITdevcaps, 0, sizeof(FASIT_2111));
+   memset(&lastSITstatus, 0, sizeof(FASIT_2102));
    // create a new dummy SIT 
-   att_SIT = new attached_SIT_Client(NULL, 0, -1); // invalid tnum
+   att_SIT = new attached_SIT_Client(NULL, -1, -1); // invalid tnum
    server = att_SIT;
 
 FUNCTION_END("::delSIT()")
@@ -286,6 +292,8 @@ FUNCTION_INT("::handle_100(int start, int end)", 0)
 }
 
 int MIT_Client::handle_2100(int start, int end) {
+   int pid;
+   int resetMIT = false;
 FUNCTION_START("::handle_2100(int start, int end)")
 
    // do handling of message
@@ -318,6 +326,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
          // also supposed to reset all values to the 'initial exercise step value'
          //  which I am not sure if it is different than ordinary inital values 
          Reset();
+         resetMIT = true;
          break;
 
       case CID_Move_Request:
@@ -348,6 +357,11 @@ FUNCTION_START("::handle_2100(int start, int end)")
    }
 
 FUNCTION_INT("::handle_2100(int start, int end)", 0)
+   if (resetMIT) {
+      att_SIT->forceQueueDump();
+      pid = getpid();
+      kill(pid, SIGQUIT);
+   }
    return 0;
 }
 
