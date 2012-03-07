@@ -88,7 +88,8 @@ int getTimeout(rf_connection_t *rc) {
    // get current time
    clock_gettime(CLOCK_MONOTONIC,&tv);
 
-   DDCMSG(D_TIME, RED, "Now: %i:%i, Then: %i:%i=>", tv.tv_sec, tv.tv_nsec, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec, rc->timeout_end.tv_sec, rc->timeout_end.tv_nsec);
+   DDCMSG(D_TIME, RED, "Now: %5ld.%09ld, Then:  %5ld.%09ld=>   SomeOther:  %5ld.%09ld",
+	  tv.tv_sec, tv.tv_nsec, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec, rc->timeout_end.tv_sec, rc->timeout_end.tv_nsec);
    // subtract seconds straight out
    tv.tv_sec = rc->timeout_start.tv_sec - tv.tv_sec;
 
@@ -117,7 +118,7 @@ int getTimeout(rf_connection_t *rc) {
 
    // convert to milliseconds
    ret = (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000l);
-   DDCMSG(D_TIME, RED, "Later: %i:%i => %i", tv.tv_sec, tv.tv_nsec, ret);
+   DDCMSG(D_TIME, RED, "Later: %5ld.%09ld => %i", tv.tv_sec, tv.tv_nsec, ret);
 
    // timeout early so we wait just the right amount of time later with waitRest()
    if (ret <= 5) {
@@ -129,7 +130,7 @@ int getTimeout(rf_connection_t *rc) {
 
 // set the timeout for X milliseconds after the start time
 void doTimeAfter(rf_connection_t *rc, int msecs) {
-   DDCMSG(D_TIME, RED, "Add to timeout %i, %i:%i", msecs, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec);
+   DDCMSG(D_TIME, RED, "Add to timeout %i, %5ld.%09ld", msecs, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec);
    // set infinite wait by making the start and end time the same
    if (msecs == INFINITE) {
       rc->timeout_start.tv_sec = rc->time_start.tv_sec;
@@ -156,7 +157,7 @@ void doTimeAfter(rf_connection_t *rc, int msecs) {
       rc->timeout_end.tv_nsec -= 1000000000l;
    }
 
-   DDCMSG(D_TIME, RED, "Timeout changed to %i:%i => %i:%i", rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec, rc->timeout_end.tv_sec, rc->timeout_end.tv_nsec);
+   DDCMSG(D_TIME, RED, "Timeout changed to %5ld.%09ld => %5ld.%09ld", rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec, rc->timeout_end.tv_sec, rc->timeout_end.tv_nsec);
 }
 
 // wait until the timeout time arrives (the epoll timeout will get us close)
@@ -167,7 +168,7 @@ void waitRest(rf_connection_t *rc) {
    do {
       // get current time
       clock_gettime(CLOCK_MONOTONIC,&tv);
-      DDCMSG(D_TIME, RED, "Looking if %i:%i > %i:%i", tv.tv_sec, tv.tv_nsec, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec);
+      DDCMSG(D_TIME, RED, "Looking if %5ld.%09ld > %5ld.%09ld", tv.tv_sec, tv.tv_nsec, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec);
    } while (tv.tv_sec < rc->timeout_start.tv_sec || /* old seconds are greater OR ...*/
            (tv.tv_sec == rc->timeout_start.tv_sec && /* ... [seconds are equal AND ... */
             tv.tv_nsec < rc->timeout_start.tv_nsec)); /* ... old microseconds are greater] */
@@ -466,9 +467,9 @@ int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
    DDCMSG(D_RF, CYAN, "t2s_handle_REQUEST_NEW(%8p, %i, %i)", rc, start, end);
 
    // remember last low/high devid
-   DDCMSG(D_TIME, BLACK, "Setting low/high to %i/%i", pkt->low_dev, pkt->high_dev);
+   DDCMSG(D_TIME, BLACK, "Setting low/high to %i/%i", pkt->low_dev, pkt->low_dev+31);
    rc->devid_last_low = pkt->low_dev;
-   rc->devid_last_high = pkt->high_dev;
+   rc->devid_last_high = pkt->low_dev+31;
 
    // remember timeslot length
    rc->timeslot_length = pkt->slottime * 5; // convert to milliseconds
@@ -526,7 +527,7 @@ int tty2sock(rf_connection_t *rc) {
          clock_gettime(CLOCK_MONOTONIC,&rc->time_start);
          rc->timeout_start = rc->time_start; // reset the start time as well
          rc->timeout_end = rc->time_start; // reset the end time as well
-         DDCMSG(D_PACKET, RED, "Clock changed to %i:%i", rc->time_start.tv_sec, rc->time_start.tv_nsec);
+         DDCMSG(D_PACKET, RED, "Clock changed to %5ld.%09ld", rc->time_start.tv_sec, rc->time_start.tv_nsec);
       }
 
       // clear out the found message

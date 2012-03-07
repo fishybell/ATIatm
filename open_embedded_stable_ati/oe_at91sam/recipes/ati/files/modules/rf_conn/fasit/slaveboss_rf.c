@@ -42,33 +42,36 @@ static int packetForMe(fasit_connection_t *fc, int start) {
    DDCMSG_HEXB(D_RF, RED, "RF packetForMe:", fc->rf_ibuf+start, fc->rf_ilen-start);
    if (hdr->cmd == LBC_REQUEST_NEW) {
       // special case check: check reregister or devid range
-      LB_request_new_t *msg = (LB_request_new_t*)hdr;
-      if (msg->reregister) {
-DDCMSG(D_RF,RED, "RF Packet for everyone: %i", hdr->addr);
-         return 1; // for everyone, which includes me
+       LB_request_new_t *msg = (LB_request_new_t*)hdr;
+       
+       if (msg->low_dev <= fc->devid && msg->low_dev+31 >= fc->devid) {
+	   if (msg->forget_addr&BV(fc->devid-msg->low_dev)){	// checks if our bit forget bit is set
+	       DDCMSG(D_RF,RED, "RF Packet for my devid range: %x:%x  and forget bit is set for our devid", msg->low_dev, msg->low_dev+31);
+	       return 1;	// it is for us, (and up to 31 others)  and the forget bit is set so in HANDLE request_new we mustchange our address to 2047
+	   } else if (fc->id==2047){
+	       DDCMSG(D_RF,RED, "RF Packet for my devid range: %x:%x  and our address is 2047", msg->low_dev, msg->low_dev+31);
+	       return 1;	// we have no address so it is for us (and up to 31 other slaves)
+	   }
       } else if (fc->target_type == RF_Type_Unknown) {
-DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %i:%i", msg->low_dev, msg->high_dev);
+DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %x", msg->low_dev);
          return 0; // doesn't matter if I'm in the range or not, I've haven't finished connecting
       } else if (fc->id != 2047) {
-DDCMSG(D_RF,RED, "RF Packet ignored based on already having registered as %i: %i:%i", fc->id, msg->low_dev, msg->high_dev);
+DDCMSG(D_RF,RED, "RF Packet ignored based on already having registered as %i: %x", fc->id, msg->low_dev);
          return 0; // have already registered
-      } else if (msg->low_dev <= fc->devid && msg->high_dev >= fc->devid) {
-DDCMSG(D_RF,RED, "RF Packet for my devid range: %i:%i", msg->low_dev, msg->high_dev);
-         return 1;
       }
-DDCMSG(D_RF,RED, "RF Packet outside my devid range: %i:%i", msg->low_dev, msg->high_dev);
+DDCMSG(D_RF,RED, "RF Packet outside my devid range: %x  OR forget bit not set OR our address %d not 2047", msg->low_dev,fc->id);
       return 0;
    } else if (hdr->cmd == LBC_ASSIGN_ADDR) {
       // special case: check devid match (ignore reregister bit if it still exists in packet)
       LB_assign_addr_t *msg = (LB_assign_addr_t*)hdr;
       if (msg->devid == fc->devid) {
-DDCMSG(D_RF,RED, "RF Packet for my devid: %i:%i", msg->devid, fc->devid);
+DDCMSG(D_RF,RED, "RF Packet for my devid: %x:%x", msg->devid, fc->devid);
          return 1;
       } else if (fc->target_type == RF_Type_Unknown) {
-DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %i", msg->devid);
+DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %x", msg->devid);
          return 0;
       } else {
-DDCMSG(D_RF,RED, "RF Packet for someone else's devid: %i:%i", msg->devid, fc->devid);
+DDCMSG(D_RF,RED, "RF Packet for someone else's devid: %x:%x", msg->devid, fc->devid);
          return 0;
       }
    }
@@ -697,29 +700,20 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
 int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end) {
    LB_request_new_t *pkt = (LB_request_new_t *)(fc->rf_ibuf + start);
    DDCMSG(D_RF|D_VERY,RED, "handle_REQUEST_NEW(%8p, %i, %i)", fc, start, end);
+
+   // if we got here, we must forget our old address
+   fc->id=2047;
    // only send a registry if I have a fully connected fasit client
    if (fc->target_type == RF_Type_Unknown) {
       DDCMSG(D_RF, RED, "haven't finished connecting yet, can't register");
       return doNothing;
    }
 
-   // register if I'm in the dev range
-   if (fc->devid >= pkt->low_dev &&
-       fc->devid <= pkt->high_dev) {
-      // check if I'm already registered
-      if (fc->id == 2047) {
-         return send_DEVICE_REG(fc); // register now
-      } else {
-         DDCMSG(D_RF, RED, "Already registered");
-         return doNothing; // already registered
-      }
-   } else if (pkt->reregister) {
-      return send_DEVICE_REG(fc); // re-register
-   } else {
-      DDCMSG(D_RF, RED, "Don't register now");
-      return doNothing; // don't register now
-   }
+   // I must already have matched 'packetforme' to get here, so I should send the dev registration
+
+   return send_DEVICE_REG(fc); // register now
 }
+
 
 int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end) {
    LB_assign_addr_t *pkt = (LB_assign_addr_t *)(fc->rf_ibuf + start);

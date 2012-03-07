@@ -74,17 +74,17 @@ void debug_QCONCEAL(int color, LB_packet_t *pkt) {
 
 void debug_DEVICE_REG(int color, LB_packet_t *pkt) {
    LB_device_reg_t *p = (LB_device_reg_t*)pkt;
-   DCMSG(color, "LBC_DEVICE_REG: cmd: %i, dev_type: %i, devid: %02X:%02X:%02X:%02X, crc: %02X", p->cmd, p->dev_type, (p->devid & 0xff000000) >> 24, (p->devid & 0xff0000) >> 16, (p->devid & 0xff00) >> 8, p->devid & 0xff, p->crc);
+   DCMSG(color, "LBC_DEVICE_REG: cmd: %i, dev_type: %x, devid: %x, crc: %02X", p->cmd, p->dev_type, p->devid, p->crc);
 }
 
 void debug_REQUEST_NEW(int color, LB_packet_t *pkt) {
    LB_request_new_t *p = (LB_request_new_t*)pkt;
-   DCMSG(color, "LBC_REQUEST_NEW: cmd: %i, reregister: %i, low_dev: %02X:%02X:%02X:%02X, high_dev: %02X:%02X:%02X:%02X, slottime: %i", p->cmd, p->reregister, (p->low_dev & 0xff000000) >> 24, (p->low_dev & 0xff0000) >> 16, (p->low_dev & 0xff00) >> 8, p->low_dev & 0xff, (p->high_dev & 0xff000000) >> 24, (p->high_dev & 0xff0000) >> 16, (p->high_dev & 0xff00) >> 8, p->high_dev & 0xff, p->slottime);
+   DCMSG(color, "LBC_REQUEST_NEW: cmd: %i, forget_addr: %8x, low_dev: %x, slottime: %i", p->cmd, p->forget_addr, p->low_dev, p->slottime);
 }
 
 void debug_ASSIGN_ADDR(int color, LB_packet_t *pkt) {
    LB_assign_addr_t *p = (LB_assign_addr_t*)pkt;
-   DCMSG(color, "LBC_ASSIGN_ADDR: cmd: %i, reregister=%i, devid =0x%06X, new_addr: %i, crc: %02X", p->cmd, p->reregister, p->devid, p->new_addr, p->crc);
+   DCMSG(color, "LBC_ASSIGN_ADDR: cmd: %i, reregister=%i, devid =%x, new_addr: %i, crc: %02X", p->cmd, p->reregister, p->devid, p->new_addr, p->crc);
 }
 
 // debug an RF packet

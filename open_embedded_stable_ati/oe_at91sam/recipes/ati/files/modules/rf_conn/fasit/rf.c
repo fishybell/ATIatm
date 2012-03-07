@@ -339,6 +339,8 @@ void DDpacket(uint8 *buf,int len){
 	buff+=plen;
 	pnum++;
     }
+    printf("\x1B[30;0m");
+
 }
 
 

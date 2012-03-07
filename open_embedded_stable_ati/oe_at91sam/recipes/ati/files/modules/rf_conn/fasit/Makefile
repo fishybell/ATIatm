@@ -14,8 +14,8 @@ MCFILES = serial.c timestamp.c htonll.c rf.c
 
 
 
-default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm
-#default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm RFslave.new RFslave.new.arm slaveboss.arm slavetest
+#default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm
+default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm RFslave.new RFslave.new.arm slaveboss.arm slavetest
 
 mcp : mcp.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c $(MCFILES)

@@ -141,7 +141,8 @@ int main(int argc, char **argv) {
 	   timestamp(&elapsed_time,&istart_time,&delta_time);
 	   sprintf(buf,"%4ld.%03ld  %2d    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,gathered);
 
-	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
+//	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
+	   printf("%s",buf);
 	   if(gathered>1){
 	       for (int i=0; i<gathered-1; i++) printf("%02x.", Rstart[i]);
 	   }

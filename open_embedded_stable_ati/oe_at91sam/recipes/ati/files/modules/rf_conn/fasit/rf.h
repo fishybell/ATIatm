@@ -9,9 +9,9 @@
 #define D_POLL		8
 #define D_TIME		0x10
 #define D_VERY		0x20
+#define D_NEW		0x40
 #define D_MEGA		0x80
-#define D_NEW		0x100
-#define D_MINION	0x200
+#define D_MINION	0x100
 
 #include "mcp.h"
 
