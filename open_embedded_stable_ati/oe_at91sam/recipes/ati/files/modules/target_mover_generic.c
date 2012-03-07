@@ -27,7 +27,7 @@
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
-static int mover_type = 1; // 0 = infantry/36v KBB controller, 1 = armor, 2 = infantry/36v KDZ controller, 3 = error
+static int mover_type = 1; // 0 = infantry/24v KBB controller, 1 = armor, 2 = infantry/48v KDZ controller, 3 = error
 module_param(mover_type, int, S_IRUGO);
 static int kp_m = -1, kp_d = -1,  ki_m = -1, ki_d = -1, kd_m = -1, kd_d = -1, min_effort = -1, max_accel = -1, max_deccel = -1;
 module_param(kp_m, int, S_IRUGO);
