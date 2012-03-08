@@ -757,8 +757,6 @@ void *minion_thread(thread_data_t *minion){
 
     i=0;
 
-
-
     // main loop 
     //   respond to the mcp commands
     // respond to FASIT commands
@@ -780,19 +778,23 @@ void *minion_thread(thread_data_t *minion){
     // now we must get a connection or new connection to the range control
     // computer (RCC) using fasit.
 
-	    minion->rcc_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-	    if(minion->rcc_sock < 0)   {
-		perror("socket() failed");
-	    }
+	    do {
+		minion->rcc_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if(minion->rcc_sock < 0)   {
+		    perror("socket() failed");
+		}
 
-	    result=connect(minion->rcc_sock,(struct sockaddr *) &fasit_addr, sizeof(struct sockaddr_in));
-	    if (result<0){
-		strerror_r(errno,buf,BufSize);
-		DCMSG(RED,"minion %d: fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),buf);
-		exit(-1);
-	    }
-
-    // we now have a socket.
+		result=connect(minion->rcc_sock,(struct sockaddr *) &fasit_addr, sizeof(struct sockaddr_in));
+		if (result<0){
+		    strerror_r(errno,buf,BufSize);
+		    DCMSG(RED,"minion %d: fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),buf);
+		    DCMSG(RED,"minion %d:   waiting for a bit and then re-trying ", minion->mID);
+		    minion->rcc_sock=-1;	// make sure it is marked as closed
+		    sleep(2);		// adding a little extra wait
+		}
+	    } while (result<0);
+	    
+	    // we now have a socket.
 	    DCMSG(BLUE,"minion %d: has a socket to a RCC", minion->mID);
 	}
 	
