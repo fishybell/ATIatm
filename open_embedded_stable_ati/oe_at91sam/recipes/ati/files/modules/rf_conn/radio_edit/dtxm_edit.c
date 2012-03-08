@@ -1,6 +1,10 @@
 #include "radio_edit.h"
+#include "rf.h"
 
 int verbose, RFfd;
+
+// a small delay that we inject into the reading/writing portions of the code
+#define SMALL_DELAY usleep(100);
 
 // tcp port we'll listen to for new connections
 #define defaultPORT "/dev/ttyS1"
@@ -22,6 +26,7 @@ void print_help(int exval) {
    printf("dtxm_edit [-h] [-v verbosity] [-t serial_device] \n\n");
    printf("  -h              print this help and exit\n");
    printf("  -t /dev/ttyS1   set serial port device\n");
+   printf("  -q [1:2:3]      run test read/read-raw/read-write\n");
    print_verbosity();    
    exit(exval);
 }
@@ -50,7 +55,7 @@ const radio_eeprom_t radio_map[] = {
    {0x0010, "SRXCHGP", 1},
    {0x0012, "TXTIMOUT", 1},
    {0x0025, "MODEL", 2},
-   {0x0027, "MODEL", 5},
+   {0x0027, "SNUM", 5},
    {0x002C, "DATMAN", 2},
    {0x002E, "PINIT", 3},
    {0x0031, "DATPROG", 2},
@@ -232,6 +237,52 @@ const radio_eeprom_t radio_map[] = {
    {0x017A, "RP_GROUP_MASK", 1},
    {0x017B, "RP_UNIT_MASK", 1},
    {0x017C, "RP_SUBUNIT_MASK", 1},
+   {0x017D, "Unknown", 3},
+   {0x0180, "Unknown", 3},
+   {0x0183, "Unknown", 3},
+   {0x0186, "Unknown", 3},
+   {0x0189, "Unknown", 3},
+   {0x018C, "Unknown", 3},
+   {0x018F, "Unknown", 3},
+   {0x0192, "Unknown", 3},
+   {0x0195, "Unknown", 1},
+   {0x0196, "EECHANNEL", 1},
+   {0x0197, "Unknown", 1},
+   {0x0198, "Unknown", 3},
+   {0x019B, "Unknown", 3},
+   {0x019E, "Unknown", 3},
+   {0x01A1, "Unknown", 3},
+   {0x01A4, "Unknown", 3},
+   {0x01A7, "Unknown", 3},
+   {0x01AA, "Unknown", 3},
+   {0x01AD, "Unknown", 3},
+   {0x01B0, "Unknown", 3},
+   {0x01B3, "Unknown", 3},
+   {0x01B6, "Unknown", 3},
+   {0x01B9, "Unknown", 3},
+   {0x01BC, "Unknown", 3},
+   {0x01BF, "Unknown", 3},
+   {0x01C2, "Unknown", 3},
+   {0x01C5, "Unknown", 3},
+   {0x01C8, "Unknown", 3},
+   {0x01CB, "Unknown", 3},
+   {0x01CE, "Unknown", 3},
+   {0x01D1, "Unknown", 3},
+   {0x01D4, "Unknown", 3},
+   {0x01D7, "Unknown", 3},
+   {0x01DA, "Unknown", 3},
+   {0x01DD, "Unknown", 3},
+   {0x01E0, "Unknown", 3},
+   {0x01E3, "Unknown", 3},
+   {0x01E6, "Unknown", 3},
+   {0x01E9, "Unknown", 3},
+   {0x01EC, "Unknown", 3},
+   {0x01EF, "Unknown", 3},
+   {0x01F2, "Unknown", 3},
+   {0x01F5, "Unknown", 3},
+   {0x01F8, "Unknown", 3},
+   {0x01FB, "Unknown", 3},
+   {0x01FE, "Unknown", 3},
    {0, NULL, 0},
 };
 
@@ -240,96 +291,267 @@ const radio_eeprom_t radio_map[] = {
  *****************************************************/
 #define R_ECHO 1
 #define R_NOECHO 0
-void writeRadio(int fd, char *buf, int s, int echo) {
-   int r;
-   // write it out
-   DDCMSG(D_RADIO_VERY, BLUE, "Writing to radio: %s", buf);
-   DDCMSG_HEXB(D_RADIO_VERY, BLUE, "In hex: ", buf, s);
-   if ((r = write(fd, buf, s)) != s) {
-      if (r <= 0) {
-         DieWithError("Could not write data");
-      } else if (r < s) {
-         DieWithError("Could not write all data");
-      }
-   }
-//   usleep(90000); // slight delay
-   //fsync(fd); 
-   // read back the echo
-   //s++; // we write a \r, but read a \r\n
-   if (echo) {
-      char *nbuf = malloc(s+1);
-      DDCMSG(D_RADIO_MEGA, BLUE, "Going to try to read %i (%s)", s, buf);
-      while ((r = read(fd, nbuf, s)) > 0) {
-//         usleep(90000); // slight delay
-         nbuf[r+1] = '\0';
-         DDCMSG(D_RADIO_MEGA, BLUE, "Read back %i (%s) of %i", r, nbuf, s);
-         if (s == r ) {
-            DDCMSG(D_RADIO_MEGA, BLUE, "done reading...");
-            break;
+char writeRadio(int fd, char *buf, int s, int echo) { // returns the first byte read of the response if echo is set.
+   char retval = '\0';
+   // if we're not looking for an echo ...
+   if (!echo) {
+      // ... write the whole thing out at once if possible
+      int r;
+      // write it out
+      DDCMSG(D_RADIO_VERY, BLUE, "!echo: Writing to radio: %s", buf);
+      DDCMSG_HEXB(D_RADIO_VERY, BLUE, "!echo: In hex: ", buf, s);
+      if ((r = write(fd, buf, s)) != s) {
+         if (r <= 0) {
+            DieWithError("!echo: Could not write data");
+         } else if (r < s) {
+            DieWithError("!echo: Could not write all data");
          }
-         s -= r;
-         DDCMSG(D_RADIO_MEGA, BLUE, "going to read again %i", s);
       }
-      if (r < 0) {
-         DCMSG(RED, "Read back %i (%s) instead of %i (%s)", r, nbuf, s, buf);
-         free(nbuf);
-         DieWithError("Radio did not echo back");
+      fsync(fd); 
+   } else {
+      // ... but if we are looking for an echo, write a character, read it back, etc. until we've written the whole string
+      int i; // character we're writing now
+      int r; // response when writing/reading
+      char ibuf; // single character buffer for reading back
+      DDCMSG(D_RADIO_VERY, BLUE, "echo: Writing to radio: %s", buf);
+      for (i = 0; i < s; i++) {
+         DDCMSG(D_RADIO_MEGA, BLUE, "echo: Writing %i (%02X) @ %i", buf[i], buf[i], i);
+         while ((r = write(fd, buf+i, 1)) <= 0) { // keep trying to write the single byte...
+            if (errno != EAGAIN) { // ...but die if we had a real error
+               DieWithError("echo: Failed to write");
+            }
+            SMALL_DELAY; 
+         }
+         SMALL_DELAY; 
+         while ((r = read(fd, &ibuf, 1)) <= 0) { // keep trying to read the single byte...
+            if (errno != EAGAIN) { // ...but die if we had a real error
+               DieWithError("echo: Failed to write");
+            }
+            SMALL_DELAY; 
+         }
+         SMALL_DELAY; 
+         DDCMSG(D_RADIO_MEGA, BLUE, "echo: Read back %i (%02X)", ibuf, ibuf);
+         while ((buf[i] != '\r' && buf[i] != '\n') && (ibuf == '\r' || ibuf == '\n')) {
+            // ignore extraneous <cr> or <nl> bytes
+            while ((r = read(fd, &ibuf, 1)) <= 0) { // keep trying to read the single byte...
+               if (errno != EAGAIN) { // ...but die if we had a real error
+                  DieWithError("echo: Failed to write");
+               }
+               SMALL_DELAY; 
+            }
+            SMALL_DELAY; 
+         }
       }
-      free(nbuf);
+      // and for good measure, read extra bytes (yes we need to do this to read the \r and \n it tacks on)
+      ibuf = '\r';
+      while (ibuf == '\r' || ibuf == '\n') {
+         while ((r = read(fd, &ibuf, 1)) <= 0) { // keep trying to read the single byte...
+            if (errno != EAGAIN) { // ...but die if we had a real error
+               DieWithError("echo: Failed to write");
+            }
+         }
+         DDCMSG(D_RADIO_MEGA, BLUE, "echo: Read back final %i (%02X)", ibuf, ibuf);
+         SMALL_DELAY; 
+      }
+      retval = ibuf;
    }
    DDCMSG(D_RADIO_MEGA, BLUE, "...returning");
+   return retval;
 }
 
 int readRadio(int fd, char *buf, int s) {
-   int err, r = read(fd, buf, s);
-//   usleep(90000); // slight delay
-   err = errno;
-   if (r <= 0) {
-      DieWithError("Could not read data");
+   int r = 0; // bytes read
+   int c; // bytes read this time
+   int m = s; // bytes remaining to read
+   DDCMSG(D_RADIO_VERY, YELLOW, "Going to read %i bytes", m);
+   while (m > 0) {
+      int err;
+      DDCMSG(D_RADIO_MEGA, RED, "...attempting m: %i, r: %i, c: %i", m, r, c);
+      c = read(fd, buf+r, m);
+      err = errno;
+      DDCMSG(D_RADIO_MEGA, RED, "...attempted m: %i, r: %i, c: %i, errno: %i", m, r, c, err);
+      if (c <= 0 && err != EAGAIN) {
+         DieWithError("Fail on read...");
+      }
+      if (errno != EAGAIN) {
+         DDCMSG(D_RADIO_MEGA, YELLOW, "...read %i bytes...", c);
+         //buf[r+1] = '\0';
+         //DDCMSG(D_RADIO_MEGA, YELLOW, "Bytes so far: %s", buf);
+         DDCMSG_HEXB(D_RADIO_MEGA, YELLOW, "\nIn hex: ", buf, c);
+         r += c; // bytes read, up
+         m -= c; // bytes remaining, down
+      }
    }
-   DDCMSG(D_RADIO_VERY, CYAN, "Read from radio: %s", buf);
-   DDCMSG_HEXB(D_RADIO_VERY, CYAN, "In hex: ", buf, r);
-   return s;
+   DDCMSG(D_RADIO_VERY, YELLOW, "Read %i bytes", r);
+   return r;
 }
 
 // opens a tty to the radio and gets it into programming mode (returns -1 on error)
 void OpenRadio(char *tty, int *fd) {
    int times=0;
-   uint8 test_int;
+   uint8 test_int = 0x55; // will not be this value if read correctly (max of 7 if working)
    // open port
-   *fd = open_port(tty, 1); // 1 for blocking
+   *fd = open_port(tty, 0); // 0 for non-blocking
 
    // set into programming mode
    while (++times <= 3) {
       DDCMSG(D_RADIO, BLACK, "Entering programming mode (%i)", times);
+      //writeRadioNow(*fd, "+", 1);
       writeRadio(*fd, "+", 1, R_NOECHO);
       sleep(1);
    }
 
    // verify we're in programming mode by reading a memory address
    DDCMSG(D_RADIO, BLACK, "Verifying programming mode");
-   test_int = ReadRadioEepromInt8(*fd, 0x0196, 1);
+   test_int = ReadRadioEepromInt8(*fd, 0x0196); // address corresponds to EECHANNEL
    DDCMSG(D_RADIO, BLACK, "Test value read %i, expected %i", test_int, 0x03);
+   if (test_int >= 8) {
+      DieWithError("Could not enter programming mode");
+   }
 }
 
 // returns the radio to operating mode and closes a the radio file descriptor
 void CloseRadio(int fd) {
    DDCMSG(D_RADIO, BLACK, "Closing programming mode");
-   writeRadio(fd, "*00\r", 4, R_ECHO);
+   //writeRadioNow(fd, "*00\r", 4);
+   writeRadio(fd, "*00\r", 4, R_NOECHO);
    close(fd);
 }
 
 // reads a string from the radio eeprom
+void WriteRadioEepromStr(int fd, int addr, int size, char *src_buf) {
+   int p = (8*2); // size of payload, double size (for hexification)
+   int s = p + 19 + 13; // payload size + size of format1 + size of format2
+   const char *format1 = "*0202620%i%02X%02X004452%s"; // most of command to write eeprom
+   const char *format2 = "80\r*02026540\r"; // rest of command and verify command
+   char *buf = malloc(p+1); // allocate area for payload and null terminator
+   char *mid_buf = malloc(p + 19 + 1); // allow for payload and format1 and null terminator
+   char *final_buf = malloc(s+1); // allow for null terminator
+   char *ret_buf = malloc(p + 2 +1); // allow for hex return and <cr><nl>NULL
+   int i;
+   
+   // check contraints
+   if (size > 8 || size <= 0) {
+      int nsize = 0;
+      free(buf);
+      free(mid_buf);
+      free(final_buf);
+      free(ret_buf);
+      DDCMSG(D_RADIO_VERY,RED, "Wrong size value: %i...calling recursively", size);
+//      DieWithError("Could not write radio EEPROM");
+      while (nsize < size) {
+         int n = min(8, size-nsize); // read up to 8 bytes at a time
+         WriteRadioEepromStr(fd, addr+nsize, n, src_buf+nsize);
+         nsize+=8; // move on to the next 8
+      }
+      return;
+   }
+   if (addr >= 0xffff || addr < 0) {
+      free(buf);
+      free(mid_buf);
+      free(final_buf);
+      free(ret_buf);
+      DCMSG(RED, "Wrong addr value: %8X", addr);
+      DieWithError("Could not write radio EEPROM");
+   }
+
+   // format message
+   for (i = 0; i < size; i++) { // print payload
+      DDCMSG(D_RADIO_MEGA, YELLOW, "Creating payload %i (%02X) @ %08X", i, src_buf[i], buf + (i*2));
+      snprintf(buf + (i*2), 3, "%02X", src_buf[i]); // 3 = 2 hex digits + null
+   }
+   memset(buf+(size*2), '0', p-(size*2)); // fill up to null terminator with ascii zero
+   buf[p] = '\0'; // null terminate
+   DDCMSG(D_RADIO_VERY, YELLOW, "Created payload: %s @ %08X", buf, buf);
+   DDCMSG_HEXB(D_RADIO_MEGA, YELLOW, "In hex:", buf, p+1);
+   snprintf(mid_buf, p + 19 + 1, format1, size, (addr & 0xff00) >> 8, addr & 0xff, buf); // print most of command and payload
+   DDCMSG(D_RADIO_MEGA, YELLOW, "Created partial message: %s", mid_buf);
+   snprintf(final_buf, s + 1, "%s%s", mid_buf, format2);
+   DDCMSG(D_RADIO_MEGA, YELLOW, "Created final message: %s", final_buf);
+
+#if 0   
+   free(buf);
+   free(mid_buf);
+   free(final_buf);
+   free(ret_buf);
+return;
+#endif
+
+   // tell radio what we're writing ...
+   DDCMSG(D_RADIO_VERY, YELLOW, "Writing %i bytes to radio to write %i bytes to EEPROM:\r\n<<<\r\n\t\t\t%s\r\n>>>", s, size, final_buf);
+   ret_buf[0] = writeRadio(fd, final_buf, s, R_ECHO);
+
+   // ... and read verification ...
+   p = (size*2) + 1; // for actual bytes written plus carraige return and line feed, minus one already read
+   s=readRadio(fd, ret_buf+1, p);
+   if (s > 0) {
+      i = s; // for the byte we already read
+      DDCMSG(D_RADIO_VERY, YELLOW, "Read %i bytes", s);
+      if (s < p) {
+         while ((s = read(fd, ret_buf+i, p)) > 0) {
+            DDCMSG(D_RADIO_MEGA, RED, "Null terminating: %i %i", i, s);
+            ret_buf[i+s+1] = '\0';
+            DDCMSG(D_RADIO_MEGA, YELLOW, "Read back %i (%s) of %i", s, ret_buf+i, p);
+            if (p == s) {
+               DDCMSG(D_RADIO_MEGA, YELLOW, "done reading...");
+               break;
+            }
+            p -= s; // amount left to read goes down
+            i += s; // total amount read goes up
+            DDCMSG(D_RADIO_MEGA, YELLOW, "going to read again %i", s);
+         }
+      }
+      DDCMSG(D_RADIO_MEGA, YELLOW, "Total read: %i", i);
+
+   } else {
+      DDCMSG(D_RADIO_VERY, RED, "Read %i bytes", s);
+      DieWithError("Did not write correctly");
+   }
+   ret_buf[i+1] = '\0'; // null terminate
+   DDCMSG(D_RADIO_VERY, YELLOW, "Read back %i <<<%s>>>", i, ret_buf);
+    
+   free(buf);
+   free(mid_buf);
+   free(final_buf);
+   free(ret_buf);
+}
+
+// writes an int to the radio eeprom
+void WriteRadioEepromInt32(int fd, int addr, uint32 src_int) {
+   DDCMSG(D_RADIO_VERY, CYAN, "Writeing uint32 to radio EEPROM (%04X) by using 4 byte string...", addr);
+   WriteRadioEepromStr(fd, addr, sizeof(uint32), (char*)&src_int);
+}
+
+// writes an int to the radio eeprom
+void WriteRadioEepromInt16(int fd, int addr, uint16 src_int) {
+   DDCMSG(D_RADIO_VERY, CYAN, "Writeing uint16 to radio EEPROM (%04X) by using 2 byte string...", addr);
+   WriteRadioEepromStr(fd, addr, sizeof(uint16), (char*)&src_int);
+}
+
+// writes an int to the radio eeprom
+void WriteRadioEepromInt8(int fd, int addr, uint8 src_int) {
+   DDCMSG(D_RADIO_VERY, CYAN, "Writeing uint8 to radio EEPROM (%04X) by using 1 byte string...", addr);
+   WriteRadioEepromStr(fd, addr, sizeof(uint8), (char*)&src_int);
+}
+
+// reads a string from the radio eeprom
 void ReadRadioEepromStr(int fd, int addr, int size, char *dest_buf) {
-   int s, i, r=((size*2)+2);
-   char *buf = malloc(r+1); // enough to de-hexify it and have extra on end for <cr><nl>NULL
-   char msgbuf[18];
+   int s, i, r=((size*2)+1);
+   char *buf = malloc(r+3); // enough to de-hexify it and have extra on end for <cr><nl>NULL
+   char msgbuf[17];
 
    // check contraints
-   if (size >= 8 || size < 0) {
+   if (size > 8 || size <= 0) {
+      int nsize = 0;
       free(buf);
-      DCMSG(RED, "Wrong size value: %i", size);
-      DieWithError("Could not read radio EEPROM");
+//      DDCMSG(D_RADIO_VERY,RED, "Wrong size value: %i...calling recursively", size);
+//      DieWithError("Could not read radio EEPROM");
+      while (nsize < size) {
+         int n = min(8, size-nsize); // read up to 8 bytes at a time
+         ReadRadioEepromStr(fd, addr+nsize, n, dest_buf+nsize);
+         nsize+=8; // move on to the next 8
+      }
+      return;
    }
    if (addr >= 0xffff || addr < 0) {
       free(buf);
@@ -338,31 +560,31 @@ void ReadRadioEepromStr(int fd, int addr, int size, char *dest_buf) {
    }
 
    // tell radio what EEPROM we're reading ...
-   DDCMSG(D_RADIO_VERY, CYAN, "Reading string (%i) from radio EEPROM (%04X)", size, addr);
-   snprintf(msgbuf, 18, "*0202620%i%02X%02X40\r\n", size, (addr & 0xff00) >> 8, addr & 0xff);
-   writeRadio(fd, msgbuf, 17, R_ECHO);
+//   DDCMSG(D_RADIO_VERY, CYAN, "Reading string (%i) from radio EEPROM (%04X)", size, addr);
+   snprintf(msgbuf, 17, "*0202620%i%02X%02X40\r", size, (addr & 0xff00) >> 8, addr & 0xff);
+//   DDCMSG(D_RADIO, CYAN, "Using msg: %s", msgbuf);
+   buf[0] = writeRadio(fd, msgbuf, 16, R_ECHO);
 
    // ... and read it ...
-   s=readRadio(fd, buf, r);
+   s=readRadio(fd, buf+1, r);
    if (s > 0) {
-      i = s;
-      DDCMSG(D_RADIO_VERY, CYAN, "Read %i bytes", s);
+      i = s; // for the byte we already read
+//      DDCMSG(D_RADIO_VERY, CYAN, "Read %i bytes", s);
       if (s < r) {
          while ((s = read(fd, buf+i, r)) > 0) {
-//            usleep(90000); // slight delay
-            DDCMSG(D_RADIO_MEGA, RED, "Null terminating: %i %i", i, s);
+//            DDCMSG(D_RADIO_MEGA, RED, "Null terminating: %i %i", i, s);
             buf[i+s+1] = '\0';
-            DDCMSG(D_RADIO_MEGA, BLUE, "Read back %i (%s) of %i", s, buf+i, r);
+//            DDCMSG(D_RADIO_MEGA, BLUE, "Read back %i (%s) of %i", s, buf+i, r);
             if (r == s) {
-               DDCMSG(D_RADIO_MEGA, BLUE, "done reading...");
+//               DDCMSG(D_RADIO_MEGA, BLUE, "done reading...");
                break;
             }
             r -= s; // amount left to read goes down
             i += s; // total amount read goes up
-            DDCMSG(D_RADIO_MEGA, BLUE, "going to read again %i", s);
+//            DDCMSG(D_RADIO_MEGA, BLUE, "going to read again %i", s);
          }
       }
-      DDCMSG(D_RADIO_MEGA, BLUE, "Total read: %i", i);
+//      DDCMSG(D_RADIO_MEGA, BLUE, "Total read: %i", i);
    } else {
       DDCMSG(D_RADIO_VERY, RED, "Read %i bytes", s);
       DieWithError("Did not read correctly");
@@ -384,24 +606,24 @@ void ReadRadioEepromStr(int fd, int addr, int size, char *dest_buf) {
 }
 
 // reads an int from the radio eeprom
-uint32 ReadRadioEepromInt32(int fd, int addr, int size) {
-   uint32 ret;
+uint32 ReadRadioEepromInt32(int fd, int addr) {
+   uint32 ret=0;
    DDCMSG(D_RADIO_VERY, CYAN, "Reading uint32 from radio EEPROM (%04X) by using 4 byte string...", addr);
    ReadRadioEepromStr(fd, addr, sizeof(uint32), (char*)&ret);
    return ret;
 }
 
 // reads an int from the radio eeprom
-uint16 ReadRadioEepromInt16(int fd, int addr, int size) {
-   uint16 ret;
+uint16 ReadRadioEepromInt16(int fd, int addr) {
+   uint16 ret=0;
    DDCMSG(D_RADIO_VERY, CYAN, "Reading uint16 from radio EEPROM (%04X) by using 2 byte string...", addr);
    ReadRadioEepromStr(fd, addr, sizeof(uint16), (char*)&ret);
    return ret;
 }
 
 // reads an int from the radio eeprom
-uint8 ReadRadioEepromInt8(int fd, int addr, int size) {
-   uint8 ret;
+uint8 ReadRadioEepromInt8(int fd, int addr) {
+   uint8 ret=0;
    DDCMSG(D_RADIO_VERY, CYAN, "Reading uint8 from radio EEPROM (%04X) by using 1 byte string...", addr);
    ReadRadioEepromStr(fd, addr, sizeof(uint8), (char*)&ret);
    return ret;
@@ -425,6 +647,7 @@ uint8 ReadRadioEepromInt8(int fd, int addr, int size) {
 
 
 int main(int argc, char **argv) {
+   int test_r = 0, test_raw = 0, test_rw = 0;
    int opt;
    int c;
    uint8 test_int8;
@@ -442,30 +665,37 @@ int main(int argc, char **argv) {
 
    strcpy(ttyport,"/dev/ttyS1");
    
-   while((opt = getopt(argc, argv, "hv:t:")) != -1) {
+   while((opt = getopt(argc, argv, "hv:t:q:")) != -1) {
       switch(opt) {
          case 'h':
-         print_help(0);
-         break;
+            print_help(0);
+            break;
+
+         case 'q':
+            switch (strtoul(optarg,NULL,16)) {
+               case 1: test_r = 1; break;
+               case 2: test_raw = 1; break;
+               case 3: test_rw = 1; break;
+            }
+            break;
 
          case 'v':
-         verbose = strtoul(optarg,NULL,16);
-         break;
+            verbose = strtoul(optarg,NULL,16);
+            break;
 
          case 't':
-         strcpy(ttyport,optarg);
-         break;
+            strcpy(ttyport,optarg);
+            break;
          
          case ':':
-         fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
-         print_help(1);
-         break;
+            fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+            print_help(1);
+            break;
 
          case '?':
-         fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
-         print_help(1);
-
-         break;
+            fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+            print_help(1);
+            break;
       }
    }
 
@@ -474,31 +704,83 @@ int main(int argc, char **argv) {
    // set up the RF modem link
    OpenRadio(ttyport, &RFfd); 
 
-   // for now, just read what's in the radios EEPROM and write it out 
-   c = 0;
-   while (radio_map[c].name != NULL) {
-      switch (radio_map[c].size) {
-         case sizeof(uint8):
-            test_int8 = ReadRadioEepromInt8(RFfd, radio_map[c].addr, sizeof(uint8));
-            DDCMSG(D_RADIO, BLACK, "Read %i (%02X) from 0x%04X (%s)", test_int8, test_int8, radio_map[c].addr, radio_map[c].name);
-            break;
-         case sizeof(uint16):
-            test_int16 = ReadRadioEepromInt16(RFfd, radio_map[c].addr, sizeof(uint16));
-            DDCMSG(D_RADIO, BLACK, "Read %i (%04X) from 0x%04X (%s)", test_int16, test_int16, radio_map[c].addr, radio_map[c].name);
-            break;
-         case sizeof(uint32):
-            test_int32 = ReadRadioEepromInt32(RFfd, radio_map[c].addr, sizeof(uint32));
-            DDCMSG(D_RADIO, BLACK, "Read %i (%08X) from 0x%04X (%s)", test_int32, test_int32, radio_map[c].addr, radio_map[c].name);
-            break;
-         default:
-            ReadRadioEepromStr(RFfd, radio_map[c].addr, radio_map[c].size, test_buf);
-            test_buf[radio_map[c].size+1] = '\0'; // null terminate
-            DDCMSG(D_RADIO, BLACK, "Read <<<%s>>> from 0x%04X (%s)", test_buf, radio_map[c].addr, radio_map[c].name);
-            DDCMSG(D_RADIO, BLACK, "In hex: ", test_buf, radio_map[c].size);
-            break;
+   if (test_r) { /* test read */
+      // for now, just read what's in the radios EEPROM and write it out 
+      c = 0;
+      while (radio_map[c].name != NULL) {
+         switch (radio_map[c].size) {
+            case sizeof(uint8):
+               test_int8 = ReadRadioEepromInt8(RFfd, radio_map[c].addr);
+               DDCMSG(D_RADIO, BLACK, "%04X\t%08X\t%s", radio_map[c].addr, test_int8, radio_map[c].name);
+               break;
+            case sizeof(uint16):
+               test_int16 = ReadRadioEepromInt16(RFfd, radio_map[c].addr);
+               DDCMSG(D_RADIO, BLACK, "%04X\t%08X\t%s", radio_map[c].addr, test_int16, radio_map[c].name);
+               break;
+            case sizeof(uint32):
+               test_int32 = ReadRadioEepromInt32(RFfd, radio_map[c].addr);
+               DDCMSG(D_RADIO, BLACK, "%04X\t%08X\t%s", radio_map[c].addr, test_int32, radio_map[c].name);
+               break;
+            case 3:
+               ReadRadioEepromStr(RFfd, radio_map[c].addr, radio_map[c].size, test_buf);
+               DDCMSG(D_RADIO, BLACK, "%04X\t%02X.%02X.%02X\t%s", radio_map[c].addr, test_buf[0], test_buf[1], test_buf[2], radio_map[c].name);
+               break;
+            case 5:
+               ReadRadioEepromStr(RFfd, radio_map[c].addr, radio_map[c].size, test_buf);
+               DDCMSG(D_RADIO, BLACK, "%04X\t%02X.%02X.%02X.%02X.%02X\t%s", radio_map[c].addr, test_buf[0], test_buf[1], test_buf[2], test_buf[3], test_buf[4], radio_map[c].name);
+               break;
+            default:
+               ReadRadioEepromStr(RFfd, radio_map[c].addr, radio_map[c].size, test_buf);
+               DDCMSG(D_RADIO, BLACK, "Read %i from 0x%04X (%s)", radio_map[c].size, radio_map[c].addr, radio_map[c].name);
+               DDCMSG_HEXB(D_RADIO, BLACK, "In hex: ", test_buf, radio_map[c].size);
+               break;
+         }
+         usleep(300000); // small delay
+         c++; // loop through entire map
       }
-      c++; // loop through entire map
+
+   } else if (test_raw) { /* test raw-read */
+
+      // grab raw eeprom (entire 0x000 -> 0x1ff
+      for (c = 0; c < 0x1ff; c+=16) {
+            ReadRadioEepromStr(RFfd, c, 16, test_buf);
+            DDCMSG(D_RADIO, BLACK, "%04X\t%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X", c, test_buf[0], test_buf[1], test_buf[2], test_buf[3], test_buf[4], test_buf[5], test_buf[6], test_buf[7], test_buf[8], test_buf[9], test_buf[10], test_buf[11], test_buf[12], test_buf[13], test_buf[14], test_buf[15]);
+      }
+
+   } else if (test_rw) { /* test read/write */
+      // grab customer id
+      ReadRadioEepromStr(RFfd, 0x0033, 35, test_buf);
+      DDCMSG(D_RADIO, BLACK, "Read %i from 0x%04X (%s)", 35, 0x0033, "CUSTID");
+      DDCMSG_HEXB(D_RADIO, BLACK, "In hex: ", test_buf, 35);
+
+      // change it
+      test_buf[0] = 0x30;
+      test_buf[1] = 0x31;
+      test_buf[2] = 0x32;
+      test_buf[3] = 0x33;
+      test_buf[4] = 0x34;
+      test_buf[5] = 0x00;
+      DDCMSG(D_RADIO, BLACK, "Overwriting 5 bytes of 35: %s", test_buf);
+      WriteRadioEepromStr(RFfd, 0x0033, 5, test_buf);
+      DDCMSG(D_RADIO, BLACK, "Overwriting 1 byte: %02X", '?');
+      WriteRadioEepromInt8(RFfd, 0x0038, '?');
+      DDCMSG(D_RADIO, BLACK, "Overwriting 2 bytes: %04X", 0x5051);
+      WriteRadioEepromInt16(RFfd, 0x0039, 0x5051);
+      DDCMSG(D_RADIO, BLACK, "Overwriting 4 bytes: %08X", 0x40414243);
+      WriteRadioEepromInt32(RFfd, 0x003B, 0x40414243);
+      test_int8 = ReadRadioEepromInt8(RFfd, 0x0038);
+      DDCMSG(D_RADIO, BLACK, "Read from 0x0038: %02X", test_int8);
+      test_int16 = ReadRadioEepromInt16(RFfd, 0x0039);
+      DDCMSG(D_RADIO, BLACK, "Read from 0x0039: %04X", test_int16);
+      test_int32 = ReadRadioEepromInt32(RFfd, 0x003B);
+      DDCMSG(D_RADIO, BLACK, "Read from 0x003B: %08X", test_int32);
+
+      // read it again
+      ReadRadioEepromStr(RFfd, 0x0033, 35, test_buf);
+      DDCMSG(D_RADIO, BLACK, "Read %i from 0x%04X (%s)", 35, 0x0033, "CUSTID");
+      DDCMSG_HEXB(D_RADIO, BLACK, "In hex: ", test_buf, 35);
    }
+
 
    // close radio and soft-reset it
    CloseRadio(RFfd);
