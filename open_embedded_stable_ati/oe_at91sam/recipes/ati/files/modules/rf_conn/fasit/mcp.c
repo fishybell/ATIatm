@@ -314,8 +314,8 @@ int main(int argc, char **argv) {
 		    // Iff the CRC is okay we can process it, otherwise throw it away
 
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			sprintf(hbuf,"MCP: read of LB packet from RFmaster address=%d  cmd=%d  msglen=%d \n",LB->addr,LB->cmd,msglen);
-			DDCMSG_HEXB(D_RF,YELLOW,hbuf,buf,msglen);
+			sprintf(hbuf,"MCP: read of LB packet from RFmaster address=%d  cmd=%d  msglen=%d",LB->addr,LB->cmd,msglen);
+			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,buf,msglen);
 		    }
 		    //      process recieved LB packets 
 		    //  mcp only handles registration and addressing packets,
@@ -449,9 +449,9 @@ int main(int argc, char **argv) {
 		    // also fills in the length field
 			set_crc8(LB_addr);
 			if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			    sprintf(hbuf,"MCP: regX LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d\n",
+			    sprintf(hbuf,"MCP: regX LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d",
 				    addr_cnt,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
-			    DDCMSG_HEXB(D_RF,BLUE,hbuf,LB_addr,7);
+			    DDCMSG2_HEXB(D_RF,BLUE,hbuf,LB_addr,7);
 			}	
 
 		    // this packet must also get sent to the minion
@@ -481,9 +481,9 @@ int main(int argc, char **argv) {
 			LB=(LB_packet_t *)buf;
 			if (addr_pool[LB->addr].inuse){			    
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-				sprintf(hbuf,"MCP: passing RF packet from RF_addr %4d on to Minion %d.   cmd=%2d  length=%d msglen=%d \n"
+				sprintf(hbuf,"MCP: passing RF packet from RF_addr %4d on to Minion %d.   cmd=%2d  length=%d msglen=%d"
 					,LB->addr, mID,LB->cmd,RF_size(LB->cmd),msglen);
-				DDCMSG_HEXB(D_RF,BLUE,hbuf,LB,RF_size(LB->cmd));
+				DDCMSG2_HEXB(D_RF,BLUE,hbuf,LB,RF_size(LB->cmd));
 			    }
 
 			    // do the copy down here
@@ -526,9 +526,9 @@ int main(int argc, char **argv) {
 			exit(-1);
 		    }
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			sprintf(hbuf,"MCP: passing Minion %d's LB packet to RFmaster address=%d  cmd=%d  length=%d msglen=%d \n"
+			sprintf(hbuf,"MCP: passing Minion %d's LB packet to RFmaster address=%d  cmd=%d  length=%d msglen=%d"
 				,mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
-			DDCMSG_HEXB(D_RF,YELLOW,hbuf,buf,RF_size(LB->cmd));
+			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,buf,RF_size(LB->cmd));
 		    }
 
 		} // it is from a minion

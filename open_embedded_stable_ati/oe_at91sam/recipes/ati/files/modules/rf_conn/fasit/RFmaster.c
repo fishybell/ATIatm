@@ -240,7 +240,7 @@ void HandleRF(int MCPsock,int RFfd){
 			    DCMSG(RED,"RFmaster:  write Tx queue to RF returned 0");
 			}
 			if (verbose&D_RF){
-			    sprintf(buf,"MCP-> RF  [%2d]    ",result);
+			    sprintf(buf,"MCP-> RF  [%2d]  ",result);
 			    DDCMSG_HEXB(D_RF,BLUE,buf,Tx->head,result);
 			}
 		    }
@@ -297,14 +297,14 @@ void HandleRF(int MCPsock,int RFfd){
 			    DDCMSG_HEXB(D_RF,RED,buf,Rstart,size);
 			}
 		    } else {
-			DCMSG(RED,"RF packet with BAD CRC ignored");
+			DDCMSG(D_RF,RED,"RF packet with BAD CRC ignored");
 		    }
 
 		    if ((Rptr-Rstart) > size){
 			Rstart+=size;	// step ahead to the next packet
 			DDCMSG(D_VERY,RED,"Stepping to next packet, Rstart=%d Rptr=%d size=%d ",Rstart-Rbuf,Rptr-Rbuf,size);
 			sprintf(buf,"  Next 8 chars in Rbuf at Rstart  ");
-			DCMSG_HEXB(RED,buf,Rstart,8);
+			DDCMSG_HEXB(D_VERY,RED,buf,Rstart,8);
 
 		    } else {
 			Rptr=Rstart=Rbuf;	// reset to the beginning of the buffer

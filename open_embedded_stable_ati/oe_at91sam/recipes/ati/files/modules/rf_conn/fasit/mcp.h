@@ -229,15 +229,26 @@ void *minion_thread(thread_data_t *);
 					fprintf(stdout, "          "); \
 					for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
 					fprintf(stdout, " in %s at line %i\x1B[30;0m\n", __FILE__, __LINE__); \
-				    }; fflush(stdout); }}
+					}; fflush(stdout); }}
 
-#define DDCMSG_HEXB(DBG,SC,hbuf,data, size)  { if ((verbose&(DBG))==(DBG)) {{ \
-					    fprintf(stdout, "\x1B[3%d;%dm[%03x] %s",(SC)&7,((SC)>>3)&1,(DBG),hbuf); \
+//  this one prints the hex dump on next line, and prefixs the second line with [dbg]
+#define DDCMSG2_HEXB(DBG,SC,hbuf,data, size)  { if ((verbose&(DBG))==(DBG)) {{ \
+					    fprintf(stdout, "\x1B[3%d;%dm[%03x] %s\n",(SC)&7,((SC)>>3)&1,(DBG),hbuf); \
 					    char *_data = (char*)data; \
 					    fprintf(stdout, "[%03x]    ", (DBG)); \
 					    for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
 					    fprintf(stdout, " in %s at line %i\x1B[30;0m\n", __FILE__, __LINE__); \
 					}; fflush(stdout); }}
+
+
+//  this one prints the hex dump on the same line as 'hbuf'
+#define DDCMSG_HEXB(DBG,SC,hbuf,data, size)  { if ((verbose&(DBG))==(DBG)) {{ \
+						 fprintf(stdout, "\x1B[3%d;%dm[%03x] %s",(SC)&7,((SC)>>3)&1,(DBG),hbuf); \
+						 char *_data = (char*)data; \
+						 fprintf(stdout, "  "); \
+						 for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
+						 fprintf(stdout, " in %s at line %i\x1B[30;0m\n", __FILE__, __LINE__); \
+					     }; fflush(stdout); }}
 
 
 
