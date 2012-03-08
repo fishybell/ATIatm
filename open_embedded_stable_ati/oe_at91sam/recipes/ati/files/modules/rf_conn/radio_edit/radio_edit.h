@@ -24,16 +24,16 @@ void CloseRadio(int fd);
 // reads a string from the radio eeprom
 void ReadRadioEepromStr(int fd, int addr, int size, char *dest_buf);
 // reads an int from the radio eeprom
-uint32 ReadRadioEepromInt32(int fd, int addr, int size);
-uint16 ReadRadioEepromInt16(int fd, int addr, int size);
-uint8 ReadRadioEepromInt8(int fd, int addr, int size);
+uint32 ReadRadioEepromInt32(int fd, int addr);
+uint16 ReadRadioEepromInt16(int fd, int addr);
+uint8 ReadRadioEepromInt8(int fd, int addr);
 
 // writes a string to the radio eeprom
 void WriteRadioEepromStr(int fd, int addr, int size, char *src_buf);
 // writes an int to the radio eeprom
-void WriteRadioEepromInt32(int fd, int addr, int size, uint32 src_int);
-void WriteRadioEepromInt16(int fd, int addr, int size, uint16 src_int);
-void WriteRadioEepromInt8(int fd, int addr, int size, uint8 src_int);
+void WriteRadioEepromInt32(int fd, int addr, uint32 src_int);
+void WriteRadioEepromInt16(int fd, int addr, uint16 src_int);
+void WriteRadioEepromInt8(int fd, int addr, uint8 src_int);
 
 
 #endif
