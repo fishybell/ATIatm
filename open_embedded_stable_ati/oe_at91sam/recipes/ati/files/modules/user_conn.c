@@ -547,7 +547,7 @@ char* readEeprom(int address, int size) {
    buffer[size+1] = '\0'; // null terminate read buffer
 
    // create command
-   snprintf(cmd, 256, "/usr/bin/eeprom_rw read -addr 0x%02X -size 0x%02X", address, size);
+   snprintf(cmd, 256, "/usr/bin/eeprom_rw read -addr 0x%04X -size 0x%02X", address, size);
    
    // run command and send data, return result
    return runCmd(cmd, 1, buffer, size); // 1 == read
@@ -558,7 +558,7 @@ char* writeEeprom(int address, int size, int blank, char *data) {
    char cmd[256];
 
    // create command
-   snprintf(cmd, 256, "/usr/bin/eeprom_rw write -addr 0x%02X -size %i -blank 0x%02X", address, size, blank);
+   snprintf(cmd, 256, "/usr/bin/eeprom_rw write -addr 0x%04X -size %i -blank 0x%02X", address, size, blank);
    
    // run command and send data, return result
    return runCmd(cmd, 0, data, size); // 0 == write
