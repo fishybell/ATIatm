@@ -18,7 +18,7 @@ using namespace std;
 /*************************************************************/
 int Eeprom::ReadEeprom(int address, int size, int default_int) {
    char wbuf[1024];
-   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%02X -size 0x%02X\n", address, size);
+   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%04X -size 0x%02X\n", address, size);
    return Eeprom::runCMD(wbuf, 1, default_int); // 1 == read
 }
 
@@ -29,7 +29,7 @@ int Eeprom::ReadEeprom(int address, int size, int default_int) {
 /*************************************************************/
 void Eeprom::ReadEeprom(int address, int size, char* default_string, char *dest_buf) {
    char wbuf[1024];
-   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%02X -size 0x%02X\n", address, size);
+   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%04X -size 0x%02X\n", address, size);
    Eeprom::runCMD(wbuf, 1, default_string, dest_buf); // 1 == read
 }
 
