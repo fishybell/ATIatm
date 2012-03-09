@@ -8,7 +8,7 @@
  *************************************************************/
 void ReadEepromStr(int address, int size, char* default_string, char *dest_buf) {
    char wbuf[1024];
-   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%02X -size 0x%02X\n", address, size);
+   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%04X -size 0x%02X\n", address, size);
    runCMDstr(wbuf, default_string, dest_buf);
 }
 
@@ -19,8 +19,17 @@ void ReadEepromStr(int address, int size, char* default_string, char *dest_buf) 
  *************************************************************/
 int ReadEepromInt(int address, int size, int default_int) {
    char wbuf[1024];
-   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%02X -size 0x%02X\n", address, size);
+   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw read -addr 0x%04X -size 0x%02X\n", address, size);
    return runCMDint(wbuf, default_int);
+}
+
+/***************************************************************
+ * Writes data from the specified address at the specified size.
+ *************************************************************/
+void WriteEepromInt(int address, int size, int default_int) {
+   char wbuf[1024];
+   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw write -addr 0x%04X -size 0x%02X -blank 0x%02X\n", address, size, size);
+   runCMDintW(wbuf, default_int, size);
 }
 
 /*************************************************************
@@ -103,6 +112,39 @@ int runCMDint(char *cmd, int default_int) {
 	  output = default_int;
    }
    return output;	
+}
+
+/*************************************************************
+ * Opens up the memory location for writing.
+ *************************************************************/
+void runCMDintW(char *cmd, int default_int, int size) {
+   char data[1024];
+   int output;
+   FILE *fp;
+   int buffer_max = 256;
+   int index = 0, r = 1;
+   int status;
+
+   // open pipe
+   fp = popen(cmd, "w");
+   if (fp == NULL) {
+      DieWithError("Error: fp is NULL");
+   }
+
+   // format data
+   snprintf(data, min(size,1024), "%i", default_int);
+
+   // write
+   while (index < 1024 && r > 0 && index < size) {
+      r = fwrite(data + index, min(size,buffer_max), sizeof(char), fp);
+      index += r;
+   }
+
+   // close pipe
+   status = pclose(fp);
+   if (status == -1) {
+      DieWithError("Error: could not close");
+   }
 }
 
 
