@@ -10,9 +10,8 @@ FASIT=../fasit
 SYSROOT=$(OE)/tmp/staging/armv5te-angstrom-linux-gnueabi
 XGCC = $(OE)/tmp/cross/armv5te/bin/arm-angstrom-linux-gnueabi-gcc
 
-HFILES = $(FASIT)/mcp.h $(FASIT)/rf.h eeprom.h
+HFILES = $(FASIT)/mcp.h $(FASIT)/rf.h eeprom.h ../../defaults.h
 MCFILES = $(FASIT)/serial.c $(FASIT)/timestamp.c $(FASIT)/htonll.c $(FASIT)/rf.c eeprom.c
-
 
 default: dtxm_edit dtxm_edit.arm
 
