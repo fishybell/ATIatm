@@ -301,6 +301,9 @@ int main(int argc, char **argv) {
 		    }
 		    if (msglen==0) {
 			DCMSG(RED,"MCP: RF_sock returned 0 -   Socket to RFmaster closed.");
+			DCMSG(RED,"MCP:   This is where the code should loop and try to reconnect to the RFmaster.");
+			DCMSG(RED,"MCP:   The whole chunk of code for attaching to the RFmaster should be brought inside the while(forever) loop");
+			DCMSG(RED,"MCP:   then the loop will hang until there is an RFmaster to attach or re-attach to.");
 			exit(-1);
 		    }
 
