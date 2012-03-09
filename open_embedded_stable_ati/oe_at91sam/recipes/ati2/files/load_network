@@ -106,6 +106,11 @@ def_progs() {
       #radio_conv -p $cport -s /dev/ttyS1 $BASE -vv -k &
       
       # new way
+      # load radio defaults onto radio
+      if [ -f /usr/bin/dtxm_edit ] ; then
+         # this will be very quick if we don't need to change settings, and very slow if we do
+         /usr/bin/dtxm_edit
+      fi
       case $board in
          HHC|BASE)
             # boot RFmaster
