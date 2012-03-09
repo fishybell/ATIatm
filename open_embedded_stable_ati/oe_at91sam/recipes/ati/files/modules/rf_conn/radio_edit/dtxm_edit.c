@@ -1,16 +1,22 @@
 #include "radio_edit.h"
 #include "rf.h"
+#include "eeprom.h"
+#include "../../defaults.h"
 
 int verbose, RFfd;
 
 // a small delay that we inject into the reading/writing portions of the code
-#define SMALL_DELAY usleep(100);
+//#define SMALL_DELAY usleep(100); DCMSG(RED, ".%i", __LINE__);
+#define SMALL_DELAY usleep(10);
 
 // tcp port we'll listen to for new connections
 #define defaultPORT "/dev/ttyS1"
 
 // size of client buffer
 #define CLIENT_BUFFER 1024
+
+// number of times to keep trying a read
+#define TIMEOUT 0xfff
 
 void DieWithError(char *errorMessage){
    char buf[200];
@@ -293,6 +299,7 @@ const radio_eeprom_t radio_map[] = {
 #define R_NOECHO 0
 char writeRadio(int fd, char *buf, int s, int echo) { // returns the first byte read of the response if echo is set.
    char retval = '\0';
+   int timeout=TIMEOUT; // we won't loop forever
    // if we're not looking for an echo ...
    if (!echo) {
       // ... write the whole thing out at once if possible
@@ -317,14 +324,14 @@ char writeRadio(int fd, char *buf, int s, int echo) { // returns the first byte 
       for (i = 0; i < s; i++) {
          DDCMSG(D_RADIO_MEGA, BLUE, "echo: Writing %i (%02X) @ %i", buf[i], buf[i], i);
          while ((r = write(fd, buf+i, 1)) <= 0) { // keep trying to write the single byte...
-            if (errno != EAGAIN) { // ...but die if we had a real error
+            if (errno != EAGAIN && timeout-- > 0) { // ...but die if we had a real error
                DieWithError("echo: Failed to write");
             }
             SMALL_DELAY; 
          }
          SMALL_DELAY; 
          while ((r = read(fd, &ibuf, 1)) <= 0) { // keep trying to read the single byte...
-            if (errno != EAGAIN) { // ...but die if we had a real error
+            if (errno != EAGAIN && timeout-- > 0) { // ...but die if we had a real error
                DieWithError("echo: Failed to write");
             }
             SMALL_DELAY; 
@@ -334,7 +341,7 @@ char writeRadio(int fd, char *buf, int s, int echo) { // returns the first byte 
          while ((buf[i] != '\r' && buf[i] != '\n') && (ibuf == '\r' || ibuf == '\n')) {
             // ignore extraneous <cr> or <nl> bytes
             while ((r = read(fd, &ibuf, 1)) <= 0) { // keep trying to read the single byte...
-               if (errno != EAGAIN) { // ...but die if we had a real error
+               if (errno != EAGAIN && timeout-- > 0) { // ...but die if we had a real error
                   DieWithError("echo: Failed to write");
                }
                SMALL_DELAY; 
@@ -346,7 +353,7 @@ char writeRadio(int fd, char *buf, int s, int echo) { // returns the first byte 
       ibuf = '\r';
       while (ibuf == '\r' || ibuf == '\n') {
          while ((r = read(fd, &ibuf, 1)) <= 0) { // keep trying to read the single byte...
-            if (errno != EAGAIN) { // ...but die if we had a real error
+            if (errno != EAGAIN && timeout-- > 0) { // ...but die if we had a real error
                DieWithError("echo: Failed to write");
             }
          }
@@ -363,6 +370,7 @@ int readRadio(int fd, char *buf, int s) {
    int r = 0; // bytes read
    int c; // bytes read this time
    int m = s; // bytes remaining to read
+   int timeout=TIMEOUT; // we won't loop forever
    DDCMSG(D_RADIO_VERY, YELLOW, "Going to read %i bytes", m);
    while (m > 0) {
       int err;
@@ -370,7 +378,7 @@ int readRadio(int fd, char *buf, int s) {
       c = read(fd, buf+r, m);
       err = errno;
       DDCMSG(D_RADIO_MEGA, RED, "...attempted m: %i, r: %i, c: %i, errno: %i", m, r, c, err);
-      if (c <= 0 && err != EAGAIN) {
+      if (c <= 0 && err != EAGAIN && timeout-- > 0) {
          DieWithError("Fail on read...");
       }
       if (errno != EAGAIN) {
@@ -539,6 +547,7 @@ void ReadRadioEepromStr(int fd, int addr, int size, char *dest_buf) {
    int s, i, r=((size*2)+1);
    char *buf = malloc(r+3); // enough to de-hexify it and have extra on end for <cr><nl>NULL
    char msgbuf[17];
+   int timeout=TIMEOUT; // we won't loop forever
 
    // check contraints
    if (size > 8 || size <= 0) {
@@ -571,7 +580,7 @@ void ReadRadioEepromStr(int fd, int addr, int size, char *dest_buf) {
       i = s; // for the byte we already read
 //      DDCMSG(D_RADIO_VERY, CYAN, "Read %i bytes", s);
       if (s < r) {
-         while ((s = read(fd, buf+i, r)) > 0) {
+         while ((s = read(fd, buf+i, r)) > 0 && timeout-- > 0) {
 //            DDCMSG(D_RADIO_MEGA, RED, "Null terminating: %i %i", i, s);
             buf[i+s+1] = '\0';
 //            DDCMSG(D_RADIO_MEGA, BLUE, "Read back %i (%s) of %i", s, buf+i, r);
@@ -655,10 +664,6 @@ int main(int argc, char **argv) {
    uint32 test_int32;
    char test_buf[128];
    char ttyport[32];    /* default to ttyS1  */
-   char frequency[64];  /* default frequency (as a string) */
-   uint8 powerLow;      /* low power setting */
-   uint8 powerHigh;     /* high power setting */
-   char radioWritten;   /* radio parameters have been written to radio EEPROM */
 
    RFfd=-1;             /* File descriptor for RFmodem serial port */
    verbose=0;           /* Verbosity bitfield */
@@ -701,10 +706,10 @@ int main(int argc, char **argv) {
 
    DDCMSG(D_PORT, BLACK, "Watching comm port = <%s>\n", ttyport);
 
-   // set up the RF modem link
-   OpenRadio(ttyport, &RFfd); 
-
    if (test_r) { /* test read */
+      // set up the RF modem link
+      OpenRadio(ttyport, &RFfd); 
+
       // for now, just read what's in the radios EEPROM and write it out 
       c = 0;
       while (radio_map[c].name != NULL) {
@@ -739,7 +744,11 @@ int main(int argc, char **argv) {
          c++; // loop through entire map
       }
 
+      // close radio and soft-reset it
+      CloseRadio(RFfd);
    } else if (test_raw) { /* test raw-read */
+      // set up the RF modem link
+      OpenRadio(ttyport, &RFfd); 
 
       // grab raw eeprom (entire 0x000 -> 0x1ff
       for (c = 0; c < 0x1ff; c+=16) {
@@ -747,7 +756,12 @@ int main(int argc, char **argv) {
             DDCMSG(D_RADIO, BLACK, "%04X\t%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X", c, test_buf[0], test_buf[1], test_buf[2], test_buf[3], test_buf[4], test_buf[5], test_buf[6], test_buf[7], test_buf[8], test_buf[9], test_buf[10], test_buf[11], test_buf[12], test_buf[13], test_buf[14], test_buf[15]);
       }
 
+      // close radio and soft-reset it
+      CloseRadio(RFfd);
    } else if (test_rw) { /* test read/write */
+      // set up the RF modem link
+      OpenRadio(ttyport, &RFfd); 
+
       // grab customer id
       ReadRadioEepromStr(RFfd, 0x0033, 35, test_buf);
       DDCMSG(D_RADIO, BLACK, "Read %i from 0x%04X (%s)", 35, 0x0033, "CUSTID");
@@ -779,11 +793,84 @@ int main(int argc, char **argv) {
       ReadRadioEepromStr(RFfd, 0x0033, 35, test_buf);
       DDCMSG(D_RADIO, BLACK, "Read %i from 0x%04X (%s)", 35, 0x0033, "CUSTID");
       DDCMSG_HEXB(D_RADIO, BLACK, "In hex: ", test_buf, 35);
+
+      // close radio and soft-reset it
+      CloseRadio(RFfd);
+   } else { /* actual task is being run */
+      char frequency[RADIO_FREQ_SIZE+1];  /* default frequency (as a string) */
+      uint8 powerLow;        /* low power setting */
+      uint8 powerHigh;       /* high power setting */
+      char radioWritten;     /* radio parameters have been written to radio EEPROM */
+      float frequency_f;      /* frequency as a float */
+      char frequency_bcd[3]; /* frequency as bcd */
+      char *frequency_check;
+
+      // read EEPROM settings from board
+      ReadEepromStr(RADIO_FREQ_LOC, RADIO_FREQ_SIZE, RADIO_FREQ, frequency);
+      DDCMSG(D_EEPROM, RED, "Read radio frequency: %s", frequency);
+      powerLow = ReadEepromInt(RADIO_POWER_L_LOC, RADIO_POWER_L_SIZE, RADIO_POWER_L);
+      DDCMSG(D_EEPROM, RED, "Read radio low power: %i", powerLow);
+      powerHigh = ReadEepromInt(RADIO_POWER_H_LOC, RADIO_POWER_H_SIZE, RADIO_POWER_H);
+      DDCMSG(D_EEPROM, RED, "Read radio high power: %i", powerHigh);
+      radioWritten = ReadEepromInt(RADIO_WRITTEN_LOC, RADIO_WRITTEN_SIZE, RADIO_WRITTEN);
+      DDCMSG(D_EEPROM, RED, "Read radio written: %i|%c", radioWritten, radioWritten);
+
+      // verify frequency is valid
+      frequency_f = strtof(frequency, &frequency_check);
+      DDCMSG(D_EEPROM_VERY, RED, "Read radio frequency float: %f", frequency_f);
+      if (frequency_check == frequency || errno == ERANGE) {
+         DieWithError("Invalid frequency");
+      }
+      
+      // check if they need to be written
+      if (radioWritten == 'N') {
+         // set up the RF modem link
+         OpenRadio(ttyport, &RFfd); 
+
+         // write power to radio
+         for (c = 0; c < 8; c++) { // 8 channels of low power
+            DDCMSG(D_EEPROM|D_RADIO, YELLOW, "Writing powerLow @ %04X : %i", (0x012e)+c, powerLow);
+            WriteRadioEepromInt8(RFfd, (0x012e)+c, powerLow);
+         }
+         for (c = 0; c < 8; c++) { // 8 channels of high power
+            DDCMSG(D_EEPROM|D_RADIO, YELLOW, "Writing powerHigh @ %04X : %i", 0x0126+c, powerHigh);
+            WriteRadioEepromInt8(RFfd, 0x0126+c, powerHigh);
+         }
+
+         // convert frequency to bcd
+         frequency_bcd[0] = ((((int)(frequency_f / 100) & 0x0f) << 4) | ((int)(frequency_f / 10) % 10));
+         frequency_bcd[1] = ((((int)(frequency_f) % 10) << 4) | ((int)(frequency_f * 10) % 10));
+         frequency_bcd[2] = ((((int)(frequency_f * 100) % 10) << 4) | (((int)(frequency_f * 1000) % 10)));
+         DDCMSG(D_EEPROM_MEGA, YELLOW, "Converted frequency to bcd: %02X:%02X:%02X", frequency_bcd[0], frequency_bcd[1], frequency_bcd[2]);
+         
+         // write frequency to radio
+         for (c = 0; c < 8; c++) { // 8 channels of low power
+            DDCMSG(D_EEPROM|D_RADIO, YELLOW, "Writing TX frequency @ %04X : %02X:%02X:%02X", (0x0056)+(c*3), frequency_bcd[0], frequency_bcd[1], frequency_bcd[2]);
+            WriteRadioEepromStr(RFfd, (0x0056)+(c*3), 3, frequency_bcd);
+            DDCMSG(D_EEPROM|D_RADIO, YELLOW, "Writing RX frequency @ %04X : %02X:%02X:%02X", (0x009E)+(c*3), frequency_bcd[0], frequency_bcd[1], frequency_bcd[2]);
+            WriteRadioEepromStr(RFfd, (0x009E)+(c*3), 3, frequency_bcd);
+         }
+
+         // write other radio settings
+         DDCMSG(D_EEPROM|D_RADIO|D_VERY, YELLOW, "Writing EECHANNEL @ 0x0196 : 1");
+         WriteRadioEepromInt8(RFfd, 0x0196, 1);
+         DDCMSG(D_EEPROM|D_RADIO|D_VERY, YELLOW, "Writing Hardware Flow Control @ 0x015B : 0xFF");
+         WriteRadioEepromInt8(RFfd, 0x015B, 0xFF);
+         test_int8 = ReadRadioEepromInt8(RFfd, 0x0000);
+         DDCMSG(D_EEPROM|D_RADIO|D_MEGA, YELLOW, "Read flags from 0x0000: %02X", test_int8);
+         if (!(test_int8 & 0x02)) {
+            test_int8 |= 0x02; // set extended channel mode
+            DDCMSG(D_EEPROM|D_RADIO|D_MEGA, YELLOW, "Writing flags to 0x0000: %02X", test_int8);
+            WriteRadioEepromInt8(RFfd, 0x0000, test_int8);
+         }
+
+         // close radio and soft-reset it
+         CloseRadio(RFfd);
+
+         // save that we wrote it to the radio
+         WriteEepromInt(RADIO_WRITTEN_LOC, RADIO_WRITTEN_SIZE, 'Y');
+      }
    }
-
-
-   // close radio and soft-reset it
-   CloseRadio(RFfd);
 }
 
 
