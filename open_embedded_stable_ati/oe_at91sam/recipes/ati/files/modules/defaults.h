@@ -420,6 +420,25 @@
 
 #define THM_SIZE 4
 
+// radio defaults
+#define RADIO_FREQ "405.000"
+#define RADIO_FREQ_LOC 0x500
+#define RADIO_FREQ_SIZE 0x4f
+
+#define RADIO_POWER_L 1
+#define RADIO_POWER_L_LOC 0x550
+#define RADIO_POWER_L_SIZE 0x4
+
+#define RADIO_POWER_H 25
+#define RADIO_POWER_H_LOC 0x554
+#define RADIO_POWER_H_SIZE 0x4
+
+#define RADIO_WRITTEN 'N'
+#define RADIO_WRITTEN_LOC 0x558
+#define RADIO_WRITTEN_SIZE 0x4
+
+
+
 
 // ,.. defaults
 
