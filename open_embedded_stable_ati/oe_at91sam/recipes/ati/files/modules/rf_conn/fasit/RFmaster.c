@@ -6,6 +6,9 @@ int verbose;	// globals
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
 
+// tcp port we'll listen to for SmartRange radio interface
+#define smartrangePORT 4008
+
 // size of client buffer
 #define CLIENT_BUFFER 1024
 
@@ -42,7 +45,7 @@ void DieWithError(char *errorMessage){
 #define Rxsize 16384
 #define Txsize 256
 
-void HandleRF(int MCPsock,int RFfd){
+void HandleRF(int MCPsock,int risock,int RFfd){
     struct timespec elapsed_time, start_time, istart_time,delta_time;
     queue_t *Rx,*Tx;
     int seq=1;		// the packet sequence numbers
@@ -51,6 +54,7 @@ void HandleRF(int MCPsock,int RFfd){
     char buf[200];        /* text Buffer  */
     char  *Rptr,*Rstart;
     int size,gathered,delta,remaining_time,bytecount;
+    int riclient=-1;    /* radio interface client socket */
     int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
     fd_set rf_or_mcp;
     struct timeval timeout;
@@ -93,6 +97,10 @@ void HandleRF(int MCPsock,int RFfd){
 	/* create a fd_set so we can monitor both the mcp and the connection to the RCC*/
 	FD_ZERO(&rf_or_mcp);
 	FD_SET(MCPsock,&rf_or_mcp);		// we are interested hearing the mcp
+	FD_SET(risock,&rf_or_mcp);		// we are interested hearing the Radio Interface listen socket
+   if (riclient > 0) {
+      FD_SET(riclient,&rf_or_mcp); // only add riclient to select when it exists
+   }
 	FD_SET(RFfd,&rf_or_mcp);		// we also want to hear from the RF world
 
 	/*   actually for now we will block until we have data - no need to timeout [yet?]
@@ -317,9 +325,40 @@ void HandleRF(int MCPsock,int RFfd){
 	    }  // if gathered >=3
 	} // if this fd is ready
 
+   // read range interface client
+	if (FD_ISSET(riclient,&rf_or_mcp)){
+      int size;
+      char buf[128];
+      int err;
+      size=read(riclient,buf,128);
+      err = errno;
+      if (size < 0) {
+         DDCMSG(D_PACKET, YELLOW, "Range Interface dead");
+         close(riclient);
+         riclient = -1;
+      } else {
+         DDCMSG(D_PACKET, YELLOW, "Read from Range Interface %i bytes: %s", buf);
+      }
+   }
+
+   // accept range interface client
+	if (FD_ISSET(risock,&rf_or_mcp)){
+      int newclient = -1;
+      struct sockaddr_in ClntAddr;	/* Client address */
+      unsigned int clntLen;               /* Length of client address data structure */
+      // close existing one
+      if (riclient > 0) {
+         close(riclient);
+         riclient = -1;
+      }
+      if ((newclient = accept(risock, (struct sockaddr *) &ClntAddr,  &clntLen)) > 0) {
+         // replace existing riclient with new one
+         riclient = newclient;
+      }// if error, ignore
+   }
+
 /***************     reads the message from MCP into the Rx Queue
  ***************/
-
 	if (FD_ISSET(MCPsock,&rf_or_mcp)){
 	    /* Receive message from MCP and read it directly into the Rx buffer */
 	    MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);	    
@@ -365,7 +404,8 @@ void HandleRF(int MCPsock,int RFfd){
 void print_help(int exval) {
     printf("RFmaster [-h] [-v num] [-t comm] [-p port] [-x delay] \n\n");
     printf("  -h            print this help and exit\n");
-    printf("  -p 4000       set listen port\n");
+    printf("  -p 4004       set mcp listen port\n");
+    printf("  -i 4008       set radio interface listen port\n");
     printf("  -t /dev/ttyS1 set serial port device\n");
     printf("  -x 800        xmit test, xmit a request devices every arg milliseconds (default=disabled=0)\n");
     printf("  -s 150        slottime in ms (5ms granules, 1275 ms max  ONLY WITH -x\n");
@@ -391,11 +431,14 @@ void print_help(int exval) {
 
 int main(int argc, char **argv) {
     int serversock;			/* Socket descriptor for server connection */
+    int risock;			/* Socket descriptor for radio interface connection */
     int MCPsock;			/* Socket descriptor to use */
     int RFfd;				/* File descriptor for RFmodem serial port */
     struct sockaddr_in ServAddr;	/* Local address */
+    struct sockaddr_in RiAddr;	/* Radio Interface address */
     struct sockaddr_in ClntAddr;	/* Client address */
     unsigned short RFmasterport;	/* Server port */
+    unsigned short SRport;	/* SmartRange port */
     unsigned int clntLen;               /* Length of client address data structure */
     char ttyport[32];	/* default to ttyS0  */
     int opt,xmit;
@@ -406,6 +449,7 @@ int main(int argc, char **argv) {
     verbose=0;
     xmit=0;		// used for testing
     RFmasterport = defaultPORT;
+    SRport = smartrangePORT;
     strcpy(ttyport,"/dev/ttyS0");
 
 
@@ -425,6 +469,10 @@ int main(int argc, char **argv) {
 
 	    case 'p':
 		RFmasterport = atoi(optarg);
+		break;
+
+	    case 'i':
+		SRport = atoi(optarg);
 		break;
 
 	    case 's':
@@ -460,6 +508,7 @@ int main(int argc, char **argv) {
     }
     DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);
     DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
+    DCMSG(YELLOW,"RFmaster: listen for SmartRange on TCP/IP port %d",SRport);
     DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
     print_verbosity_bits();
 
@@ -534,13 +583,28 @@ int main(int argc, char **argv) {
     if (bind(serversock, (struct sockaddr *) &ServAddr, sizeof(ServAddr)) < 0)
 	DieWithError("bind() failed");
 
+    /* Construct local address structure */
+    memset(&RiAddr, 0, sizeof(RiAddr));   /* Zero out structure */
+    RiAddr.sin_family = AF_INET;                /* Internet address family */
+    RiAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
+    RiAddr.sin_port = htons(SRport);      /* Local port */
+
+    /* Bind to the local address */
+    if (bind(risock, (struct sockaddr *) &RiAddr, sizeof(RiAddr)) < 0)
+	DieWithError("bind() failed");
+
     /* Set the size of the in-out parameter */
     clntLen = sizeof(ClntAddr);
 
     /* Mark the socket so it will listen for incoming connections */
     /* the '1' for MAXPENDINF might need to be a '0')  */
     if (listen(serversock, 2) < 0)
-	DieWithError("listen() failed");
+	DieWithError("listen(serversock) failed");
+
+    /* Mark the socket so it will listen for incoming connections */
+    /* the '1' for MAXPENDINF might need to be a '0')  */
+    if (listen(risock, 2) < 0)
+	DieWithError("listen(risock) failed");
 
     for (;;) {
 
@@ -551,7 +615,7 @@ int main(int argc, char **argv) {
 	/* MCPsock is connected to a Master Control Program! */
 
 	DCMSG(BLUE,"Good connection to MCP <%s>  (or telnet or somebody)", inet_ntoa(ClntAddr.sin_addr));
-	HandleRF(MCPsock,RFfd);
+	HandleRF(MCPsock,risock,RFfd);
 	DCMSG(RED,"Connection to MCP closed.   listening for a new MCP");
 
     }
