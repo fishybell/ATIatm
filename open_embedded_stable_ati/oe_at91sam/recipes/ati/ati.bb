@@ -36,6 +36,7 @@ do_install(){
     install -d ${D}/etc
     install -d ${D}/usr/bin
     install -m 0644 ${S}/*.ko ${D}${TARGET_MODULES_INSTALL_DIR}
+    install -m 0755 ${S}/*.arm ${D}$/usr/bin
     install -m 0644 ${WORKDIR}/asoundrc ${D}/etc/asound.conf
     install -m 0755 ${S}/user_conn ${D}/usr/bin
     install -m 0755 ${S}/bit_button ${D}/usr/bin
