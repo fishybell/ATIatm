@@ -25,7 +25,7 @@ ifeq (${CURD},modules)
 endif
 
 BFILES :=bit_button user_conn fasit_conn event_conn bcast_server bcast_client
-default: ${BFILES}
+default: ${BFILES} rf
 	make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- -C ${KDIR} SUBDIRS=${PWD}  modules
 	
 user_conn: user_conn.c netlink_shared.h netlink_user.h
@@ -46,8 +46,16 @@ bcast_client: ${EC_DIR}/bcast_client.c ${EC_DIR}/bcast.h
 bcast_server: ${EC_DIR}/bcast_server.c ${EC_DIR}/bcast.h
 	${CC} ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -I${EC_DIR} ${EC_DIR}/bcast_server.c -o bcast_server
 
+rf:
+	${MAKE} -C rf_conn/fasit
+	${MAKE} -C rf_conn/radio_edit
+	cp rf_conn/fasit/*.arm .
+	cp rf_conn/radio_edit/*.arm .
+
 clean:
 	${RM} .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers ${BFILES}
 	${MAKE} -C fasit clean
 	${MAKE} -C connector clean
+	${MAKE} -C rf_conn/fasit clean
+	${MAKE} -C rf_conn/radio_edit clean
 
