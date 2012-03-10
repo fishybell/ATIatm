@@ -107,20 +107,20 @@ def_progs() {
       
       # new way
       # load radio defaults onto radio
-      if [ -f /usr/bin/dtxm_edit ] ; then
+      if [ -f /usr/bin/dtxm_edit.arm ] ; then
          # this will be very quick if we don't need to change settings, and very slow if we do
-         /usr/bin/dtxm_edit
+         /usr/bin/dtxm_edit.arm -v f
       fi
       case $board in
          HHC|BASE)
             # boot RFmaster
-            /home/root/RFmaster.arm -t /dev/ttyS1 -v 0 &
+            /usr/bin/RFmaster.arm -t /dev/ttyS1 -v 0 &
             ;;
          *)
             # boot slaveboss, wait for it to boot, then RFslave
-            /home/root/slaveboss.arm -v 0 &
+            /usr/bin/slaveboss.arm -v 0 &
             sleep 1
-            /home/root/RFslave.new.arm -r /dev/ttyS1 -v 0 &
+            /usr/bin/RFslave.new.arm -r /dev/ttyS1 -v 0 &
             ;;
       esac
       cport=14000
