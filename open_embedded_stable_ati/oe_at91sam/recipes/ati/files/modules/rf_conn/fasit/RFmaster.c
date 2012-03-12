@@ -239,6 +239,14 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
 		if (Queue_Depth(Tx)){  // if we have something to Tx, Tx it.
 		    
+          // when we're sending, we're busy, tell the Radio Interface client
+          if (riclient > 0) {
+              char ri_buf[128];
+              DDCMSG(D_VERY, YELLOW, "Remaining time: %d %d", remaining_time, slottime);
+              snprintf(ri_buf, 128, "B %i\r", (5 * (Queue_Depth(Tx)) / 3) + 37 + remaining_time); // number of bytes * baud rate = milliseconds (9600 baud / 2 for overhead => 600 bytes a second => 5/3 second for 1000 bytes) + transmit delays
+              write(riclient, ri_buf, strnlen(ri_buf, 128));
+          }
+
 		    result=write(RFfd,Tx->head,Queue_Depth(Tx));
 		    if (result<0){
 			strerror_r(errno,buf,200);		    
@@ -253,6 +261,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 			}
 		    }
 		    DeQueue(Tx,Queue_Depth(Tx));
+
 		}
 		timestamp(&elapsed_time,&istart_time,&delta_time);
 		DDCMSG(D_MEGA,CYAN,"RFmaster:  Just might have Tx'ed to RF   at %5ld.%09ld timestamp, delta=%5ld.%09ld"
@@ -261,6 +270,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 		rfcount+=MsgSize;
 		cps=(double) rfcount/(double)elapsed_time.tv_sec;
 		DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
+
 	    }
 	}
 
@@ -269,7 +279,15 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 	// we must splice them back together
 	//  which means we have to be aware of the Low Bandwidth protocol
 	//  if we have data to read from the RF, read it then blast it back upstream to the MCP
+   DDCMSG(D_MEGA,BLACK,"RFmaster checking FD_ISSET(RFfd)");
 	if (FD_ISSET(RFfd,&rf_or_mcp)){
+
+       // while gathering RF data, we're busy, tell the Radio Interface client
+       if (riclient > 0) {
+           write(riclient, "B\r", 2);
+       }
+
+	    DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(RFfd)");
 	    /* Receive message, or continue to recieve message from RF */
 
 	    //    MAKE SURE THE RFfd is non-blocking!!!	
@@ -280,6 +298,11 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 	    /* Receive message, or continue to recieve message from RF */
 	    DDCMSG(D_VERY,GREEN,"RFmaster: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
 		   gathered,Rptr-Rbuf,Rstart-Rbuf,Rptr-Rstart);
+
+       // after gathering RF data, we're free, tell the Radio Interface client
+       if (riclient > 0) {
+           write(riclient, "F\r", 2);
+       }
 
 	    if (gathered>=3){
 		// we have a chance of a compelete packet
@@ -326,13 +349,15 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 	} // if this fd is ready
 
    // read range interface client
-	if (FD_ISSET(riclient,&rf_or_mcp)){
+   DDCMSG(D_MEGA,BLACK,"RFmaster checking FD_ISSET(riclient)");
+	if (riclient > 0 && FD_ISSET(riclient,&rf_or_mcp)){
+	    DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(riclient)");
       int size;
       char buf[128];
       int err;
       size=read(riclient,buf,128);
       err = errno;
-      if (size < 0) {
+      if (size <= 0) {
          DDCMSG(D_PACKET, YELLOW, "Range Interface dead");
          close(riclient);
          riclient = -1;
@@ -342,7 +367,9 @@ void HandleRF(int MCPsock,int risock,int RFfd){
    }
 
    // accept range interface client
+   DDCMSG(D_MEGA,BLACK,"RFmaster checking FD_ISSET(risock)");
 	if (FD_ISSET(risock,&rf_or_mcp)){
+	    DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(risock)");
       int newclient = -1;
       struct sockaddr_in ClntAddr;	/* Client address */
       unsigned int clntLen;               /* Length of client address data structure */
@@ -359,7 +386,9 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
 /***************     reads the message from MCP into the Rx Queue
  ***************/
+   DDCMSG(D_MEGA,BLACK,"RFmaster checking FD_ISSET(MCPsock)");
 	if (FD_ISSET(MCPsock,&rf_or_mcp)){
+	    DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(MCPsock)");
 	    /* Receive message from MCP and read it directly into the Rx buffer */
 	    MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);	    
 	    DDCMSG(D_PACKET,YELLOW,"RFmaster: read %d from MCP.",MsgSize);
@@ -571,7 +600,10 @@ int main(int argc, char **argv) {
     //  now Create socket for the incoming connection */
 
     if ((serversock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-	DieWithError("socket() failed");
+	DieWithError("socket(serversock) failed");
+
+    if ((risock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+	DieWithError("socket(risock) failed");
 
     /* Construct local address structure */
     memset(&ServAddr, 0, sizeof(ServAddr));   /* Zero out structure */
@@ -581,7 +613,7 @@ int main(int argc, char **argv) {
 
     /* Bind to the local address */
     if (bind(serversock, (struct sockaddr *) &ServAddr, sizeof(ServAddr)) < 0)
-	DieWithError("bind() failed");
+	DieWithError("bind(serversock) failed");
 
     /* Construct local address structure */
     memset(&RiAddr, 0, sizeof(RiAddr));   /* Zero out structure */
@@ -591,7 +623,7 @@ int main(int argc, char **argv) {
 
     /* Bind to the local address */
     if (bind(risock, (struct sockaddr *) &RiAddr, sizeof(RiAddr)) < 0)
-	DieWithError("bind() failed");
+	DieWithError("bind(risock) failed");
 
     /* Set the size of the in-out parameter */
     clntLen = sizeof(ClntAddr);
