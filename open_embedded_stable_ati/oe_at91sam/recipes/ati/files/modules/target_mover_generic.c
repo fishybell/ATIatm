@@ -2553,8 +2553,8 @@ static void do_position(struct work_struct * work)
             len = atomic_read(&internal_length);
             pos = atomic_read(&position);
             if (len != 0 &&
-                  ((dir == MOVER_DIRECTION_FORWARD) && (pos > (len + 100))) ||
-                  ((dir == MOVER_DIRECTION_REVERSE) && (pos < -100))) {
+                  (((dir == MOVER_DIRECTION_FORWARD) && (pos > (len + 100))) ||
+                  ((dir == MOVER_DIRECTION_REVERSE) && (pos < -100)))) {
                do_fault(ERR_stop_by_distance);
                hardware_speed_set(0);
             }
