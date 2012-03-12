@@ -139,8 +139,8 @@ board=`is_board`
 
 # set keepalive timeouts
 sysctl -w \
- net.ipv4.tcp_keepalive_time=20 \
- net.ipv4.tcp_keepalive_intvl=10 \
+ net.ipv4.tcp_keepalive_time=2 \
+ net.ipv4.tcp_keepalive_intvl=1 \
  net.ipv4.tcp_keepalive_probes=3 \
  net.ipv4.tcp_retries1=1 \
  net.ipv4.tcp_retries2=1 \
