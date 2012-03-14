@@ -291,7 +291,7 @@ int main(int argc, char **argv) {
 		// have a case statement to process it properly
 ////////////////////////////////////////////////////////////////////////////////////////////
 		DDCMSG(D_POLL,RED,"ready_fd   %d  RF_sock=%d",events[ready_fd].data.fd,RF_sock);
-		usleep(100000);
+//   major slow debug line		usleep(100000);
 		if (RF_sock==events[ready_fd].data.fd){
 		    msglen=read(RF_sock, buf, 1023);
 		    if (msglen<0) {
