@@ -15,12 +15,14 @@ if ps aufx | grep -q "RF.*arm" ; then
    killall -q RFslave.new.arm
    killall -q RFdump.arm
    killall -q slaveboss.arm
+   killall -q dtxm_edit.arm
    sleep 2
    killall -q -9 RFmaster.arm
    killall -q -9 RFslave.arm
    killall -q -9 RFslave.new.arm
    killall -q -9 RFdump.arm
    killall -q -9 slaveboss.arm
+   killall -q -9 dtxm_edit.arm
 fi
 
 # recursive unload function
