@@ -108,6 +108,7 @@ int send_2100_status_req(fasit_connection_t *fc);
 int send_2100_exposure(fasit_connection_t *fc, int exp);
 int send_2100_power(fasit_connection_t *fc, int cmd);
 int send_2100_movement(fasit_connection_t *fc, int move, float speed);
+int send_2100_estop(fasit_connection_t *fc);
 int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int tokill, int sens, int mode, int burst);
 int handle_2101(fasit_connection_t *fc, int start, int end);
 int handle_2102(fasit_connection_t *fc, int start, int end);

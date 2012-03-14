@@ -410,7 +410,7 @@ int send_2100_exposure(fasit_connection_t *fc, int exp) {
 int send_2100_movement(fasit_connection_t *fc, int move, float speed) {
    FASIT_header hdr;
    FASIT_2100 bdy;
-   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_exposure(%8p, %i, %f)", fc, move, speed);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_movement(%8p, %i, %f)", fc, move, speed);
    defHeader(fc, 2100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
 
@@ -419,6 +419,23 @@ int send_2100_movement(fasit_connection_t *fc, int move, float speed) {
    bdy.cid = CID_Move_Request;
    bdy.move = move;
    bdy.speed = htonf(speed);
+
+   // send
+   queueMsg(fc, &hdr, sizeof(FASIT_header));
+   queueMsg(fc, &bdy, sizeof(FASIT_2100));
+   return mark_fasitWrite;
+}
+
+int send_2100_estop(fasit_connection_t *fc) {
+   FASIT_header hdr;
+   FASIT_2100 bdy;
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_estop(%8p)", fc);
+   defHeader(fc, 2100, &hdr); // sets the sequence number and other data
+   hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
+
+   // fill in body
+   D_memset(&bdy, 0, sizeof(FASIT_2100));
+   bdy.cid = CID_Stop;
 
    // send
    queueMsg(fc, &hdr, sizeof(FASIT_header));
