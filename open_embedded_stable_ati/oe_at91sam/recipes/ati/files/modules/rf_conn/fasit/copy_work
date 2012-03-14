@@ -20,6 +20,7 @@ if {[string match -nocase *w* $num]} {
 # check for dx box copy
 set host "sam$num"
 set pass "shoot"
+set dir "/usr/bin/"
 if {[string match -nocase dx* $num]} {
     puts -nonewline "Password for dx box? "
     system "stty -echo"
@@ -27,10 +28,11 @@ if {[string match -nocase dx* $num]} {
     gets stdin pass
     system "stty echo"
     set host $num
+    set dir "~/"
 }
 
 system sed -i -e "s/^$host.*//" ~/.ssh/known_hosts
-eval spawn scp RFmaster RFdump RFslave.new [glob *.arm] root@$host:~/
+eval spawn scp RFmaster RFdump RFslave.new [glob *.arm] root@$host:$dir
 set timeout $delay
 while 1 {
     expect {
