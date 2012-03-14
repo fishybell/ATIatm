@@ -519,19 +519,31 @@ int main(int argc, char **argv) {
 			exit(-1);
 		    }
 		    msglen=read(minion_fd, buf, 1023);
-		    // just display the packet for debugging
 		    LB=(LB_packet_t *)buf;
-		    // do the copy down here
-		    result=write(RF_sock,LB,RF_size(LB->cmd));
-		    if (result<0) {
-			strerror_r(errno,buf,BufSize);			    
-			DCMSG(RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
-			exit(-1);
-		    }
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			sprintf(hbuf,"MCP: passing Minion %d's LB packet to RFmaster address=%d  cmd=%d  length=%d msglen=%d"
+			sprintf(hbuf,"MCP: read Minion %d's LB packet. address=%d  cmd=%d  length=%d msglen=%d"
 				,mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
 			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,buf,RF_size(LB->cmd));
+		    }
+		    if (!msglen){
+			DCMSG(RED,"MCP:  read from minion returned 0!\n");
+			sleep(1);
+		    } else {
+
+			// just display the packet for debugging
+			LB=(LB_packet_t *)buf;
+			// do the copy down here
+			result=write(RF_sock,LB,RF_size(LB->cmd));
+			if (result<0) {
+			    strerror_r(errno,buf,BufSize);			    
+			    DCMSG(RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
+			    exit(-1);
+			}
+			if (verbose&D_RF){	// don't do the sprintf if we don't need to
+			    sprintf(hbuf,"MCP: passing Minion %d's LB packet to RFmaster address=%d  cmd=%d  length=%d write returned=%d"
+				    ,mID,LB->addr,LB->cmd,RF_size(LB->cmd),result);
+			    DDCMSG2_HEXB(D_RF,YELLOW,hbuf,buf,RF_size(LB->cmd));
+			}
 		    }
 
 		} // it is from a minion

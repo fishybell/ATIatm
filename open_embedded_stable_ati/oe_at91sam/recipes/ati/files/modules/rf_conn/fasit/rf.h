@@ -80,6 +80,9 @@ void print_verbosity_bits(void);
 #define LBC_QEXPOSE			16
 #define LBC_QCONCEAL			17
 #define LBC_STATUS_REQ			18
+#define LBC_REPORT_REQ			19
+
+#define LBC_EVENT_REPORT		20
 
 #define LBC_DEVICE_REG			29
 #define LBC_REQUEST_NEW			30
@@ -95,8 +98,9 @@ typedef struct LB_packet_tag {
     uint16 payload[24] __attribute__ ((packed)); // has room for some max payload (48 bytes now) and the CRC byte    
 } __attribute__ ((packed))  LB_packet_t;
 
-// LBC_STATUS_REQ packet
-//
+
+//                                                  LBC_STATUS_REQ packet
+//   LBC_STATUS_REQ packet
 typedef struct LB_status_req_t {
     // 1 * 32 bytes = 1 long - padding = 3 bytes
     uint32 cmd:5 __attribute__ ((packed));
@@ -105,8 +109,8 @@ typedef struct LB_status_req_t {
     uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_status_req_t;
 
+//                                               LBC_STATUS_RESP_LIFTER packet
 // LBC_STATUS_RESP_LIFTER packet
-//
 typedef struct LB_status_resp_lifter_t {
     // 1 * 32 bytes = 1 long - padding = 4 bytes
     uint32 cmd:5 __attribute__ ((packed));
@@ -116,8 +120,8 @@ typedef struct LB_status_resp_lifter_t {
     uint32 crc:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_status_resp_lifter_t;
 
+//                                              LBC_STATUS_RESP_MOVER packet
 // LBC_STATUS_RESP_MOVER packet
-//
 typedef struct LB_status_resp_mover_t {
     // 2 * 32 bytes = 2 long - padding = 8 bytes
     uint32 cmd:5 __attribute__ ((packed));
@@ -217,23 +221,66 @@ typedef struct LB_assign_addr_t {
     uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed)) LB_assign_addr_t;
 
+//                                                LBC_EXPOSE
 // LBC_EXPOSE
 //    we still have 4 more bits
 typedef struct LB_expose {
-    // 2 * 32 bytes = 2 long - padding = 5 bytes
+    // 6
     uint32 cmd:5 __attribute__ ((packed));
     uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+    
+    uint32 event:6 __attribute__ ((packed));
     uint32 expose:1 __attribute__ ((packed));
     uint32 hitmode:1 __attribute__ ((packed));
     uint32 tokill:4 __attribute__ ((packed));
     uint32 react:3 __attribute__ ((packed));
-    uint32 mfs:2 __attribute__ ((packed));
     uint32 thermal:1 __attribute__ ((packed));
-    uint32 pad:4 __attribute__ ((packed));
 
+    uint32 mfs:2 __attribute__ ((packed));
+    uint32 pad:6 __attribute__ ((packed));
+    uint32 crc:8 __attribute__ ((packed));
+    uint32 padding:16 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_expose_t;
+
+//                                                LBC_QCONCEAL
+// LBC_QCONCEAL
+//    
+typedef struct LB_qconceal {
+    // 5 bytes
+    uint32 cmd:5 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed));	// destination address (always from basestation)
+    uint32 event:5 __attribute__ ((packed));	// rolling event sequence number
+    uint32 uptime:11 __attribute__ ((packed));	// time target was up, in deciseconds ( max 102.3 seconds)
+    
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:24 __attribute__ ((packed));
-} __attribute__ ((packed))  LB_expose_t;
+} __attribute__ ((packed))  LB_qconceal_t;
+
+//                                                  LBC_REPORT_REQ packet
+//   LBC_REPORT_REQ packet
+typedef struct LB_report_req {
+    // 4 bytes
+    uint32 cmd:5 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+    uint32 event:6 __attribute__ ((packed));
+    uint32 padding:2 __attribute__ ((packed));
+    uint32 crc:8 __attribute__ ((packed));
+
+} __attribute__ ((packed))  LB_report_req_t;
+
+//                                                  LBC_EVENT_REPORT packet
+//   LBC_EVENT_REPORT packet
+typedef struct LB_event_report {
+    // 4 bytes
+    uint32 cmd:5 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+    uint32 event:6 __attribute__ ((packed));
+    uint32 padding:2 __attribute__ ((packed));
+    uint32 hits:8 __attribute__ ((packed));
+    uint32 crc:8 __attribute__ ((packed));
+
+} __attribute__ ((packed))  LB_event_report_t;
+
 
 // LBC_MOVE
 //    we still have 4 more bits

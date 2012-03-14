@@ -49,13 +49,22 @@ enum {
     BLANK_ALWAYS,           /* hit sensor disabled blank */
 };
 
+typedef struct state_exp_item {
+    uint8	 data;
+    uint8	 newdata;
+    uint16	 event;
+    uint16	 flags;
+    uint16	 timer;
+    struct timespec elapsed_time;
+} state_exp_item_t ;
+
 typedef struct state_u8_item {
     uint8	 data;
     uint8	 newdata;
     uint16	 _pad1;
     uint16	 flags;
     uint16	 timer;
-} state_u8_item_t ;
+} state_u8_item_t;
 
 typedef struct state_s16_item {
     int16 data;
@@ -80,11 +89,14 @@ typedef struct state_float_item {
 
 
 typedef struct minion_state {
-    uint32			cap;	// actual capability bitfield - u32 to keep alignment
+    uint32			cap;	// actual capability bitfield - u32 to keep alignment    
+    uint16			state_timer;	// when we next need to process the state
+    uint16			padding0;	//   extra space for now
     state_u8_item_t		fault;	// maybe not really an item
 //  miles=1, NES=2, gps=4, the rest are reserved for now - but should maybe include movers and stuff	
     state_u8_item_t		status;	
-    state_u8_item_t		exp;	// exposure state
+    state_exp_item_t		exp;	// exposure state has more stuff
+    state_u8_item_t		event;	// used for timer events
     state_u8_item_t		asp;
     state_u16_item_t		dir;
     state_u8_item_t		move;
@@ -132,8 +144,7 @@ typedef struct minion_state {
 #define F_told_RF	0x200	// RF updated, waiting for ack 
 #define F_tell_RCC	0x400	// internal state right, FASIT needs update
 #define F_told_RCC	0x800	// We told FASIT our internal state, waiting on RF 
-
-
+#define F_needs_report	0x010	// there needs to be an event report
 
 
 uint64 htonll( uint64 id);

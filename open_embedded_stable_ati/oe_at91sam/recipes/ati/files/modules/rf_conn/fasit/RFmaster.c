@@ -244,23 +244,23 @@ void HandleRF(int MCPsock,int risock,int RFfd){
               char ri_buf[128];
               DDCMSG(D_VERY, YELLOW, "Remaining time: %d %d", remaining_time, slottime);
               snprintf(ri_buf, 128, "B %i\r", (5 * (Queue_Depth(Tx)) / 3) + 37 + remaining_time); // number of bytes * baud rate = milliseconds (9600 baud / 2 for overhead => 600 bytes a second => 5/3 second for 1000 bytes) + transmit delays
-              write(riclient, ri_buf, strnlen(ri_buf, 128));
+              result=write(riclient, ri_buf, strnlen(ri_buf, 128));
           }
 
-		    result=write(RFfd,Tx->head,Queue_Depth(Tx));
-		    if (result<0){
-			strerror_r(errno,buf,200);		    
-			DCMSG(RED,"RFmaster:  write Tx queue to RF error %s",buf);
-		    } else {
-			if (!result){
-			    DCMSG(RED,"RFmaster:  write Tx queue to RF returned 0");
-			}
-			if (verbose&D_RF){
-			    sprintf(buf,"MCP-> RF  [%2d]  ",result);
-			    DDCMSG_HEXB(D_RF,BLUE,buf,Tx->head,result);
-			}
-		    }
-		    DeQueue(Tx,Queue_Depth(Tx));
+	  result=write(RFfd,Tx->head,Queue_Depth(Tx));
+	  if (result<0){
+	      strerror_r(errno,buf,200);		    
+	      DCMSG(RED,"RFmaster:  write Tx queue to RF error %s",buf);
+	  } else {
+	      if (!result){
+		  DCMSG(RED,"RFmaster:  write Tx queue to RF returned 0");
+	      }
+	      if (verbose&D_RF){
+		  sprintf(buf,"MCP-> RF  [%2d]  ",result);
+		  DDCMSG_HEXB(D_RF,BLUE,buf,Tx->head,result);
+	      }
+	  }
+	  DeQueue(Tx,Queue_Depth(Tx));
 
 		}
 		timestamp(&elapsed_time,&istart_time,&delta_time);
@@ -362,7 +362,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
          close(riclient);
          riclient = -1;
       } else {
-         DDCMSG(D_PACKET, YELLOW, "Read from Range Interface %i bytes: %s", buf);
+         DDCMSG(D_PACKET, YELLOW, "Read from Range Interface %i bytes: %s", size,buf);
       }
    }
 

@@ -276,13 +276,12 @@ int send_2101_ACK(FASIT_header *hdr,int response,thread_data_t *minion) {
 
 /********
  ********
- ********
  ********       moved the message handling to this function so multiple packets can be handled cleanly
  ********
- ********
+ ********   timestamp is sent in too.
  ********/
 
-int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
+int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct timespec *elapsed_time){
 
     int result;
     char hbuf[100];
@@ -294,7 +293,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
     FASIT_2110	 *message_2110;
     FASIT_13110	 *message_13110;
 
-    uint8 LB_buf[48];
+    LB_packet_t		LB_buf;
     LB_device_reg_t	*LB_devreg;
     LB_status_req_t	*LB_status_req;
     LB_expose_t		*LB_exp;
@@ -302,8 +301,9 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
     LB_configure_t	*LB_configure;
     LB_audio_control_t	*LB_audio;
     LB_pyro_fire_t	*LB_pyro;
-
+    LB_qconceal_t	*LB_qcon;
     
+
     // map header and body for both message and response
     header = (FASIT_header*)(buf);
     DDCMSG(D_PACKET,BLUE,"MINION %d: Handle_FASIT_msg recieved fasit packet num=%d seq=%d length=%d packetlen=%d",
@@ -312,7 +312,6 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
     // now we need to parse and respond to the message we just recieved
     // we have received a message from the mcp, process it
     // it is either a command, or it is an RF response from our slave
-
     
     switch (htons(header->num)) {
 	case 100:
@@ -357,7 +356,6 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 
 	    DDCMSG(D_PACKET,BLUE,"MINION %d: fasit packet 2100, CID=%d", minion->mID,message_2100->cid);
 
-
 	    // Just parse out the command for now and print a pretty message
 	    switch (message_2100->cid) {
 		case CID_No_Event:
@@ -397,11 +395,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    break;
 	    }
 
-	    DDCMSG(D_PACKET,CYAN,"Full message decomposition....");
-	    DDCMSG(D_PACKET,CYAN,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d"
+	    DDCMSG(D_VERY,CYAN,"Full message decomposition....");
+	    DDCMSG(D_VERY,CYAN,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d"
 		  ,htons(header->num),htons(header->icd1),htons(header->icd2),htonl(header->seq),htons(header->rsrvd),htons(header->length));
 
-	    DDCMSG(D_PACKET,CYAN,"\t\t\t\t\t\t\tmessage body\n"\
+	    DDCMSG(D_VERY,CYAN,"\t\t\t\t\t\t\tmessage body\n"\
 		  "C-ID | Expos | Aspct |  Dir | Move |  Speed | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n"\
 		  "%3d    %3d     %3d     %2d    %3d    %7.2f     %4d     %2d     %3d     %3d     %3d    %3d   %5d ",
 		  message_2100->cid,message_2100->exp,message_2100->asp,message_2100->dir,message_2100->move,message_2100->speed
@@ -439,57 +437,103 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen){
 		    }
 
 //		    also build an LB packet  to send
-		    LB_status_req  =(LB_status_req_t *)LB_buf;	// make a pointer to our buffer so we can use the bits right
+		    LB_status_req  =(LB_status_req_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
 		    LB_status_req->cmd=LBC_STATUS_REQ;
 		    LB_status_req->addr=minion->RF_addr;
 
 		    minion->S.status.flags=F_told_RCC;
 		    minion->S.status.timer=20;
-
+		    minion->S.state_timer = min(minion->S.state_timer,minion->S.status.timer);
 		    // calculates the correct CRC and adds it to the end of the packet payload
 		    // also fills in the length field
 		    set_crc8(LB_status_req);
 		    
 		    // now send it to the MCP master
 		    result=write(minion->mcp_sock,LB_status_req,RF_size(LB_status_req->cmd));
+		    //  sent LB
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",
 				minion->mID,minion->RF_addr,LB_status_req->cmd,RF_size(LB_status_req->cmd));
 			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_status_req,RF_size(LB_status_req->cmd));
 			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_status_req->cmd),minion->mcp_sock);
 		    }
-//  sent LB
 		    break;
 
 		case CID_Expose_Request:
 		    DDCMSG(D_PACKET,BLUE,"CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",message_2100->exp);
 //		    also build an LB packet  to send
-		    LB_exp =(LB_expose_t *)LB_buf;	// make a pointer to our buffer so we can use the bits right
-		    LB_exp->cmd=LBC_EXPOSE;
-		    LB_exp->addr=minion->RF_addr;
 
-		    //				minion->S.exp.data=0;			// cheat and set the current state to 45
-		    minion->S.exp.newdata=message_2100->exp;	// set newdata to be the future state
 		    if (message_2100->exp==90){
-			LB_exp->expose=1;
-			minion->S.exp.flags=F_exp_expose_A;	// start it moving to expose
-		    } else if (message_2100->exp==00){
-			LB_exp->expose=0;
-			minion->S.exp.flags=F_exp_conceal_A;	// start it moving to conceal
-		    }
-		    minion->S.exp.timer=5;
+			LB_exp =(LB_expose_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
+			LB_exp->cmd=LBC_EXPOSE;
+			LB_exp->addr=minion->RF_addr;
 
-		    //  really need to fill in with the right stuff
-		    LB_exp->hitmode=0;
-		    LB_exp->tokill=0;
-		    LB_exp->react=0;
-		    LB_exp->mfs=0;
-		    LB_exp->thermal=0;
-	    // calculates the correct CRC and adds it to the end of the packet payload
-	    // also fills in the length field
-		    set_crc8(LB_exp);
-	    // now send it to the MCP master
-		    result=write(minion->mcp_sock,LB_exp,RF_size(LB_exp->cmd));
+//				minion->S.exp.data=0;			// cheat and set the current state to 45
+			minion->S.exp.newdata=message_2100->exp;	// set newdata to be the future state
+			if (message_2100->exp==90){
+			    LB_exp->expose=1;
+			    minion->S.exp.flags=F_exp_expose_A;	// start it moving to expose
+			} else if (message_2100->exp==00){
+			    LB_exp->expose=0;
+			    minion->S.exp.flags=F_exp_conceal_A;	// start it moving to conceal
+			}
+
+			minion->S.exp.timer=1;
+			if (minion->S.state_timer) {
+			    minion->S.state_timer = min(minion->S.state_timer,minion->S.exp.timer);
+			} else {
+			    minion->S.state_timer = minion->S.exp.timer;
+			}
+			minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec;
+			minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
+
+
+			LB_exp->event=++minion->S.exp.event;	// fill in the event
+
+			//  really need to fill in with the right stuff
+			LB_exp->hitmode=0;
+			LB_exp->tokill=0;
+			LB_exp->react=0;
+			LB_exp->mfs=0;
+			LB_exp->thermal=0;
+			// calculates the correct CRC and adds it to the end of the packet payload
+			// also fills in the length field
+			set_crc8(LB_exp);
+			// now send it to the MCP master
+			
+		    } else {
+			int uptime;
+			// we must assume that it is a 'conceal' that followed the last expose.
+			//        so now the event is over and we need to send the qconceal command
+			//        and the termination of the event time and stuff
+
+			uptime=(elapsed_time->tv_sec - minion->S.exp.elapsed_time.tv_sec)*10;	//  find uptime in tenths of a second
+			uptime+=(elapsed_time->tv_nsec - minion->S.exp.elapsed_time.tv_nsec)/100000000L;	//  find uptime in tenths of a second
+
+			if (uptime>0x7FF){
+			    uptime=0x7ff;		// set time to max (204.7 seconds) if it was too long
+			} else {
+			    uptime&= 0x7ff;
+			}
+			LB_qcon =(LB_qconceal_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
+			LB_qcon->cmd=LBC_QCONCEAL;
+			LB_qcon->addr=minion->RF_addr;
+			LB_qcon->event=minion->S.exp.event;
+			LB_qcon->uptime=uptime;
+			set_crc8(LB_exp);
+			
+			// we also need a report for this event from the target, so we will have to send a request_rep packet soon.
+			// but we don't want to send it right yet.
+			//  sending the request report would need to happen not much later than the next expose command - at the latest
+
+			minion->S.event.flags|=F_needs_report;
+			minion->S.event.data=minion->S.exp.event;
+			minion->S.event.timer = 50;	// lets try 5.0 seconds
+			minion->S.state_timer = min(minion->S.state_timer,minion->S.event.timer);
+			
+		    }
+		    
+		    result=write(minion->mcp_sock,&LB_buf,RF_size(LB_buf.cmd));
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",minion->mID,minion->RF_addr,LB_exp->cmd,RF_size(LB_exp->cmd));
 			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_exp,RF_size(LB_exp->cmd));
@@ -730,8 +774,6 @@ void *minion_thread(thread_data_t *minion){
     LB_assign_addr_t *LB_addr;
     LB_expose_t *LB_exp;
 
-
-
     
     initialize_state( &minion->S);
 
@@ -760,6 +802,7 @@ void *minion_thread(thread_data_t *minion){
     // main loop 
     //   respond to the mcp commands
     // respond to FASIT commands
+    //     loop and reconnect to FASIT if it disconnects.
     //  feed the MCP packets to send out the RF transmitter
     // update our state when MCP commands are RF packets back from our slave(s)
     //
@@ -767,9 +810,9 @@ void *minion_thread(thread_data_t *minion){
     // setup the timeout for the first select.   subsequent selects have the timout set
     // in the timer related bits at the end of the loop
     //  the goal is to update all our internal state timers with tenth second resolution
-    timeout.tv_sec=0;
-    timeout.tv_usec=100000;
 
+    minion->S.state_timer=100;	// every 10.0 seconds, worst case
+    
     clock_gettime(CLOCK_MONOTONIC_RAW,&istart_time);	// get the intial current time
     minion->rcc_sock=-1;	// mark the socket so we know to open again
     while(1) {
@@ -792,16 +835,18 @@ void *minion_thread(thread_data_t *minion){
 		    minion->rcc_sock=-1;	// make sure it is marked as closed
 		    sleep(2);		// adding a little extra wait
 		}
+		
 	    } while (result<0);
-	    
+// actually we really shouldn't stay in the above loop if disconnected, we need to keep updating minion states
+//	    and communicating with the RF slaves.
+//   also we need to loop through because if we are stuck in a loop above we will not see that the
+//   MCP has died, and we would become zombies.  
+
+
 	    // we now have a socket.
 	    DCMSG(BLUE,"minion %d: has a socket to a RCC", minion->mID);
 	}
 	
-	timestamp(&elapsed_time,&istart_time,&delta_time);
-	DDCMSG(D_TIME,CYAN,"MINION %d: Top of main loop at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-	
-	clock_gettime(CLOCK_MONOTONIC_RAW,&start_time);	// mark the start time so we can run the timers
 
 	/* create a fd_set so we can monitor both the mcp and the connection to the RCC*/
 	FD_ZERO(&rcc_or_mcp);
@@ -813,17 +858,32 @@ void *minion_thread(thread_data_t *minion){
 	 * that we have to process
 	 */
 
-	timeout.tv_sec=0;
-	timeout.tv_usec=100000;	
-	sock_ready=select(FD_SETSIZE,&rcc_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);	
 
+	
+	timeout.tv_sec=minion->S.state_timer/10;
+	timeout.tv_usec=100000*(minion->S.state_timer%10);
+	
+	timestamp(&elapsed_time,&istart_time,&delta_time);
+	DDCMSG(D_TIME,CYAN,"MINION %d: before Select state_timer=%d   at %6ld.%09ld timestamp, delta=%1ld.%09ld",
+	       minion->S.state_timer,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+
+	clock_gettime(CLOCK_MONOTONIC_RAW,&start_time);	// mark the start time so we can run the timers
+	
+	sock_ready=select(FD_SETSIZE,&rcc_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);	
+	// if we are running on linux, timeout wll have a remaining time left in it if one of the file descriptors was ready.
+	// we are going to use that for now
+
+	minion->S.state_timer=(timeout.tv_sec*10)+(timeout.tv_usec/100000L);
+
+	
 	if (sock_ready<0){
 	    perror("NOTICE!  select error : ");
 	    exit(-1);
 	}
 
 	timestamp(&elapsed_time,&istart_time,&delta_time);	
-	DDCMSG(D_TIME,CYAN,"MINION %d:  After Select at %6ld.%09ld timestamp, delta=%1ld.%09ld",minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+	DDCMSG(D_TIME,CYAN,"MINION %d:  After Select state_timer=%d at %6ld.%09ld timestamp, delta=%1ld.%09ld",
+	       minion->S.state_timer,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 
 	//check to see if the MCP has any commands for us
 	if (FD_ISSET(minion->mcp_sock,&rcc_or_mcp)){
@@ -840,10 +900,10 @@ void *minion_thread(thread_data_t *minion){
 
 		LB=(LB_packet_t *)buf;	// map the header in
 		crc= crc8(LB);
-		DCMSG(YELLOW,"MINION %d: LB packet (cmd=%2d addr=%d crc=%d)", minion->mID,LB->cmd,LB->addr,crc);
+		DDCMSG(D_PACKET,YELLOW,"MINION %d: LB packet (cmd=%2d addr=%d crc=%d)", minion->mID,LB->cmd,LB->addr,crc);
 		switch (LB->cmd){
 		    case LBC_REQUEST_NEW:
-			DCMSG(YELLOW,"Recieved 'request new devices' packet.");
+			DDCMSG(D_NEW,YELLOW,"Recieved 'request new devices' packet.");
 		// the response was created when the MCP spawned us, so we do nothing for this packet
 
 			break;
@@ -852,12 +912,12 @@ void *minion_thread(thread_data_t *minion){
 			LB_addr =(LB_assign_addr_t *)(LB);	// map our bitfields in
 
 			minion->RF_addr=LB_addr->new_addr;	// set our new address
-			DCMSG(YELLOW,"Minion %d: parsed 'device address' packet.  new minion->RF_addr=%d",minion->mID,minion->RF_addr);
+			DDCMSG(D_NEW,YELLOW,"Minion %d: parsed 'device address' packet.  new minion->RF_addr=%d",minion->mID,minion->RF_addr);
 			
 			break;
 
 		    default:
-			DCMSG(YELLOW,"Minion %d:  don't do anything",minion->mID);
+			DDCMSG(D_PACKET,YELLOW,"Minion %d:  recieved a cmd=%d    don't do anything",minion->mID,LB->cmd);
 
 			break;
 		}  // switch LB cmd
@@ -900,7 +960,7 @@ void *minion_thread(thread_data_t *minion){
 		    timestamp(&elapsed_time,&istart_time,&delta_time);	
 		    DDCMSG(D_TIME,CYAN,"MINION %d:  Packet %d recieved at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 			   ,minion->mID,htons(header->num),elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-		    handle_FASIT_msg(minion,tbuf,length);
+		    handle_FASIT_msg(minion,tbuf,length,&elapsed_time);
 		    result-=length;			// reset the length to handle a possible next message in this packet
 		    tbuf+=length;			// step ahead to next message
 		    header = (FASIT_header*)(tbuf);	// find out how long of message we have
@@ -926,16 +986,21 @@ void *minion_thread(thread_data_t *minion){
 	 **
 	 **/
 
+
+	/***   what we do is use the minion's state_timer to determine how long to wait
+	 ***   set up above in the select.
+	 ***      if the select times out, we are good.
+	 ***      if the select had a file descriptor ready, then we probably didn't wait long enough.
+	 ***      [[[[ FIX THAT ]]]]
+	 ***
+	 ***      otherwise, if we got here at least one of our timers has expired signifying that
+	 ***      some item[s] in the state need some action.
+	 ***/
+	
 #if 0
 	timestamp(&elapsed_time,&istart_time,&delta_time);
 	DDCMSG(D_TIME,CYAN,"MINION %d: Begin timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-#endif
-	/***   if the elapsed_time is greater than a tenth of a second,
-	 ***   subtract out the number of tenths to use in updating our
-	 ***   timers.    otherwise set up the timeout for the next select
-	 ***   to be the remaining portion of a whole tenth of a second and loop
-	 ***/
 
 	elapsed_tenths = elapsed_time.tv_sec*10+(elapsed_time.tv_nsec/100000000L);
 
@@ -949,6 +1014,9 @@ void *minion_thread(thread_data_t *minion){
 	    timeout.tv_sec=0;
 	    timeout.tv_usec=100000;
 	}
+
+#endif
+	
 	/**********    now update all the time related bits
 	 **
 	 **  we reached this point because either there was a RCC or MCP communication,

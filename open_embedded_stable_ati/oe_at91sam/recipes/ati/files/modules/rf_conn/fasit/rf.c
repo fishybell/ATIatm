@@ -129,7 +129,10 @@ int RF_size(int cmd){
     switch (cmd){
 	case  LBC_STATUS_REQ:
 	    return (3);
-	    
+
+	case  LBC_EVENT_REPORT:
+	    return (3);
+
 	case  LBC_STATUS_RESP_LIFTER:
 	    return (4);
 	    
@@ -143,7 +146,7 @@ int RF_size(int cmd){
 	    return (3);
 	    
 	case  LBC_EXPOSE:
-	    return (5);
+	    return (6);
 	    
 	case  LBC_MOVE:
 	    return (5);
@@ -167,7 +170,7 @@ int RF_size(int cmd){
 	    return (3);
 	    
 	case  LBC_QCONCEAL:
-	    return (3);
+	    return (5);
 	    
 	case  LBC_DEVICE_REG:
 	    return (6);
@@ -256,9 +259,28 @@ void DDpacket(uint8 *buf,int len){
 		sprintf(hbuf,"address=%3d",LB->addr);
 		break;
 
+	    case LBC_REPORT_REQ:
+	    {
+		LB_report_req_t *L=(LB_report_req_t *)LB;
+		strcpy(cmdname,"Report_Req");
+		sprintf(hbuf,"address=%3d   event=%2d",L->addr,L->event);
+	    }
+		break;
+
+	    case LBC_EVENT_REPORT:
+	    {
+		LB_event_report_t *L=(LB_event_report_t *)LB;
+		strcpy(cmdname,"Event_Report");
+		sprintf(hbuf,"address=%3d   event=%2d hit_count=%d",L->addr,L->event,L->hits);
+	    }
+		break;
+
 	    case LBC_EXPOSE:
+	    {
+		LB_expose_t *L=(LB_expose_t *)LB;
 		strcpy(cmdname,"Expose");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"address=%3d event=%2d .....",L->addr,L->event);
+	    }
 		break;
 
 	    case LBC_MOVE:
@@ -321,8 +343,11 @@ void DDpacket(uint8 *buf,int len){
 		break;
 
 	    case LBC_QCONCEAL:
+	    {
+		LB_qconceal_t *L=(LB_qconceal_t *)LB;
 		strcpy(cmdname,"Qconceal");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"address=%3d event=%2d uptime=%d dsec .....",L->addr,L->event,L->uptime);
+	    }
 		break;
 
 	    case LBC_REQUEST_NEW:
