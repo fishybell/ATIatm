@@ -521,7 +521,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 			LB_qcon->addr=minion->RF_addr;
 			LB_qcon->event=minion->S.exp.event;
 			LB_qcon->uptime=uptime;
-			set_crc8(LB_exp);
+			set_crc8(LB_qcon);
 			
 			// we also need a report for this event from the target, so we will have to send a request_rep packet soon.
 			// but we don't want to send it right yet.
