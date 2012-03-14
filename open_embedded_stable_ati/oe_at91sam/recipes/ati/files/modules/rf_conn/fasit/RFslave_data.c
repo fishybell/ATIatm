@@ -89,7 +89,7 @@ int getTimeout(rf_connection_t *rc) {
    clock_gettime(CLOCK_MONOTONIC,&tv);
 
    DDCMSG(D_TIME, RED, "Now: %5ld.%09ld, Then:  %5ld.%09ld=>   SomeOther:  %5ld.%09ld",
-	  tv.tv_sec, tv.tv_nsec, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec, rc->timeout_end.tv_sec, rc->timeout_end.tv_nsec);
+     tv.tv_sec, tv.tv_nsec, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec, rc->timeout_end.tv_sec, rc->timeout_end.tv_nsec);
    // subtract seconds straight out
    tv.tv_sec = rc->timeout_start.tv_sec - tv.tv_sec;
 
