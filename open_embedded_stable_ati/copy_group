@@ -84,16 +84,15 @@ foreach host $hosts {
     cd oe_at91sam/recipes/ati/files/modules
     eval spawn scp user_conn bit_button fasit_conn event_conn bcast_server bcast_client root@$host:/usr/bin
     eval $dossh
-    eval spawn scp [glob *.ko] root@$host:/home/root
+    eval spawn scp [glob *.ko] root@$host:/usr/bin/
     eval $dossh
 
-    # copy rf_conn
-    cd rf_conn/fasit
-    eval spawn scp [glob *.arm] root@$host:/home/root
+    # copy rf_conn and radio_edit directories
+    eval spawn scp [glob *.arm] root@$host:/usr/bin/
     eval $dossh
 
     # copy ati2
-    cd ../../../../../ati2
+    cd ../../../ati2
     eval spawn scp [glob files/be_* ] [glob files/is_* ] [glob files/has_* ] files/TTMT files/BASE files/EIM files/HHC [glob files/load_*] files/unload files/SES files/SIT files/SAT files/MIT files/MAT files/start files/stop files/restart root@$host:/usr/bin
     eval $dossh
 
