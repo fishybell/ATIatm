@@ -299,6 +299,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
     LB_expose_t		*LB_exp;
     LB_move_t		*LB_move;
     LB_configure_t	*LB_configure;
+    LB_power_control_t	*LB_power;
     LB_audio_control_t	*LB_audio;
     LB_pyro_fire_t	*LB_pyro;
     LB_qconceal_t	*LB_qcon;
@@ -473,7 +474,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 			if (message_2100->exp==90){
 			    LB_exp->expose=1;
 			    minion->S.exp.flags=F_exp_expose_A;	// start it moving to expose
-			} else if (message_2100->exp==00){
+			} else if (message_2100->exp==0){
 			    LB_exp->expose=0;
 			    minion->S.exp.flags=F_exp_conceal_A;	// start it moving to conceal
 			}
@@ -553,6 +554,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 		    // send 2101 ack
 		    DDCMSG(D_PACKET,BLUE,"CID_Reset_Device  send 'S'uccess ack.   set lastHitCal.* to defaults") ;
 		    send_2101_ACK(header,'S',minion);
+          // TODO -- this opens a serious can of worms, should probably handle via minion telling RFmaster to set the forget bit and resetting its own state
+
 		    // also supposed to reset all values to the 'initial exercise step value'
 		    //  which I am not sure if it is different than ordinary inital values 
 		    //			    fake_sens = 1;
@@ -589,17 +592,51 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 #endif
 		    break;
 
+      case CID_Stop: /* handle emergency stop the same as a move request */
 		case CID_Move_Request:
+		    DDCMSG(D_PACKET,BLUE,"CID_Move_Request  send 'S'uccess ack.   message_2100->speed=%d, message_2100->move=%d",message_2100->speed, message_2100->move);
+//		    also build an LB packet  to send
+		    LB_move =(LB_move_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
+		    LB_move->cmd=LBC_MOVE;
+		    LB_move->addr=minion->RF_addr;
+
+		    //				minion->S.exp.data=0;			// cheat and set the current state to 45
+		    minion->S.speed.newdata=message_2100->speed;	// set newdata to be the future state
+		    minion->S.move.newdata=message_2100->move;	// set newdata to be the future state
+		    minion->S.speed.timer=10; // will reach speed in this many deciseconds
+          // minion->S.move.timer=10; TODO -- do we need this?
+
+          LB_move->speed = ((int)(message_2100->speed * 100)) & 0x7ff;
+          if (message_2100->move == 2) {
+            LB_move->direction = 0;
+          } else if (message_2100->move ==1) {
+            LB_move->direction = 1;
+          } else {
+            LB_move->direction = 0;
+            LB_move->speed = 0;
+          }
+          if (message_2100->cid == CID_Stop) {
+             LB_move->speed = 2047; // emergency stop speed
+          }
+	    // calculates the correct CRC and adds it to the end of the packet payload
+	    // also fills in the length field
+		    set_crc8(LB_move);
+	    // now send it to the MCP master
+		    result=write(minion->mcp_sock,LB_move,RF_size(LB_move->cmd));
+		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
+			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",minion->mID,minion->RF_addr,LB_move->cmd,RF_size(LB_move->cmd));
+			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_move,RF_size(LB_move->cmd));
+			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_move->cmd),minion->mcp_sock);
+		    }
+//  sent LB
+    
 		    // send 2101 ack  (2102's will be generated at start and stop of actuator)
-		    DDCMSG(D_PACKET,BLUE,"CID_Move_Request  send 'S'uccess ack.   TODO send the move to the kernel?") ;        
-		    send_2101_ACK(header,'S',minion);
+		    send_2101_ACK(header,'S',minion);    // TRACR Cert complains if these are not there
 
-
-
-
-
-		    
-		    break;
+		    // it should happen in this many deciseconds
+		    //  - fasit device cert seems to come back immeadiately and ask for status again, and
+		    //    that is causing a bit of trouble.		    break;
+         break;
 
 		case CID_Config_Hit_Sensor:
 		    DDCMSG(D_PACKET,BLUE,"CID_Config_Hit_Sensor  send a 2102 in response") ;
@@ -614,6 +651,37 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 			  ,message_2100->on,htons(message_2100->hit),message_2100->react,htons(message_2100->tokill),htons(message_2100->sens)
 			  ,message_2100->mode,htons(message_2100->burst));
 
+//		    also build an LB packet  to send
+		    LB_configure =(LB_configure_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
+		    LB_configure->cmd=LBC_CONFIGURE_HIT;
+		    LB_configure->addr=minion->RF_addr;
+
+          LB_configure->hitmode = (message_2100->mode == 2 ? 1 : 0); // burst / single
+          LB_configure->tokill =  htons(message_2100->tokill);
+          LB_configure->react = message_2100->react & 0x07;
+          LB_configure->sensitivity = htons(message_2100->sens);
+          LB_configure->timehits = (htons(message_2100->burst) / 5) & 0x0f; // convert
+          // find hitcountset value
+          if (htons(message_2100->hit) == htons(message_2100->tokill)) {
+             LB_configure->hitcountset = 3; // set to hits-to-kill value
+          } else if (minion->S.hit.data == (htons(message_2100->hit)) - 1) {
+             LB_configure->hitcountset = 2; // incriment by one
+          } else if (htons(message_2100->hit) == 0) {
+             LB_configure->hitcountset = 1; // reset to zero
+          } else {
+             LB_configure->hitcountset = 0; // no change
+          }
+
+	    // calculates the correct CRC and adds it to the end of the packet payload
+	    // also fills in the length field
+		    set_crc8(LB_configure);
+	    // now send it to the MCP master
+		    result=write(minion->mcp_sock,LB_configure,RF_size(LB_configure->cmd));
+		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
+			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",minion->mID,minion->RF_addr,LB_configure->cmd,RF_size(LB_configure->cmd));
+			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_configure,RF_size(LB_configure->cmd));
+			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_configure->cmd),minion->mcp_sock);
+	    }  
 		    //      actually Riptide says that the FASIT spec is wrong and should not send an ACK here
 		    //				send_2101_ACK(header,'S',minion); // FASIT Cert seems to complain about this ACK
 
@@ -679,21 +747,51 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 		    // send 2113 GPS Location
 		    break;
 
-		case CID_Shutdown:
-		    DDCMSG(D_PACKET,BLUE,"CID_Shutdown...shutting down") ; 
-		    //			    doShutdown();
-		    break;
 		case CID_Sleep:
-		    DDCMSG(D_PACKET,BLUE,"CID_Sleep...sleeping") ; 
-		    //			    doSleep();
-		    break;
 		case CID_Wake:
-		    DDCMSG(D_PACKET,BLUE,"CID_Wake...waking") ; 
-		    //			    doWake();
-		    break;
-	    }  
+		case CID_Shutdown:
+//		    also build an LB packet  to send
+		    LB_power =(LB_power_control_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
+		    LB_power->cmd=LBC_POWER_CONTROL;
+		    LB_power->addr=minion->RF_addr;
 
-	    break;
+          switch (message_2100->cid) {
+             case CID_Sleep:
+                DDCMSG(D_PACKET,BLUE,"CID_Sleep...sleeping") ; 
+                LB_power->pcmd = 1;
+                break;
+             case CID_Wake:
+                DDCMSG(D_PACKET,BLUE,"CID_Wake...waking") ; 
+                LB_power->pcmd = 2;
+                break;
+             case CID_Shutdown:
+                DDCMSG(D_PACKET,BLUE,"CID_Shutdown...shutting down") ; 
+                LB_power->pcmd = 3;
+                break;
+          }
+
+	    // calculates the correct CRC and adds it to the end of the packet payload
+	    // also fills in the length field
+		    set_crc8(LB_power);
+	    // now send it to the MCP master
+		    result=write(minion->mcp_sock,LB_power,RF_size(LB_power->cmd));
+		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
+			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",minion->mID,minion->RF_addr,LB_power->cmd,RF_size(LB_power->cmd));
+			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_power,RF_size(LB_power->cmd));
+			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_power->cmd),minion->mcp_sock);
+		    }
+//  sent LB
+    
+		    // send 2101 ack  (2102's will be generated at start and stop of actuator)
+		    send_2101_ACK(header,'S',minion);    // TRACR Cert complains if these are not there
+
+		    // it should happen in this many deciseconds
+		    //  - fasit device cert seems to come back immeadiately and ask for status again, and
+		    //    that is causing a bit of trouble.		    break;
+
+		    break;
+      }
+      break;
 
 	case 2110:
 	    message_2110 = (FASIT_2110*)(buf + sizeof(FASIT_header));
