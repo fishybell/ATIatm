@@ -688,7 +688,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    bdy.cmd = LBC_DEVICE_REG;
    bdy.dev_type = fc->target_type;
    bdy.devid = fc->devid;
-   DCMSG(BLACK, "Going to pass devid: %02X:%02X:%02X:%02X", (bdy.devid & 0xff000000) >> 24, (bdy.devid & 0xff0000) >> 16, (bdy.devid & 0xff00) >> 8, bdy.devid & 0xff);
+   DDCMSG(D_RF|D_MEGA, BLACK, "Going to pass devid: %02X:%02X:%02X:%02X", (bdy.devid & 0xff000000) >> 24, (bdy.devid & 0xff0000) >> 16, (bdy.devid & 0xff00) >> 8, bdy.devid & 0xff);
 
    // put in the crc and send
    set_crc8(&bdy);

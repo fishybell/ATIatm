@@ -48,7 +48,7 @@ void setnonblocking(int sock) {
 
    // disable Nagle's algorithm so we send messages as discrete packets
    if (setsockopt(sock, SOL_SOCKET, TCP_NODELAY, &yes, sizeof(int)) == -1) {
-      DCMSG(RED, "Could not disable Nagle's algorithm\n");
+      DDCMSG(D_MEGA, RED, "Could not disable Nagle's algorithm\n");
       perror("setsockopt(TCP_NODELAY)");
    }
 
@@ -71,38 +71,38 @@ void setnonblocking(int sock) {
 int handleRet(int ret, fasit_connection_t *fc, int efd) {
    struct epoll_event ev; // temp event
    int done = 0;
-   DCMSG(RED, "start...%i[%i]: %08X...", ret, fc->index, fc);
+   DDCMSG(D_MEGA, RED, "start...%i[%i]: %08X...", ret, fc->index, fc);
    if (ret == doNothing) { return done; }
    if (ret & mark_rfWrite) {
-      DCMSG(RED, "mark_rfWrite: %i", fc->rf);
+      DDCMSG(D_MEGA, RED, "mark_rfWrite: %i", fc->rf);
       D_memset(&ev, 0, sizeof(ev));
       ev.data.fd = fc->rf;
       ev.events = EPOLLIN | EPOLLOUT;
       epoll_ctl(efd, EPOLL_CTL_MOD, fc->rf, &ev);
    }
    if (ret & mark_fasitWrite) {
-      DCMSG(RED, "mark_fasitWrite: %i", fc->fasit);
+      DDCMSG(D_MEGA, RED, "mark_fasitWrite: %i", fc->fasit);
       D_memset(&ev, 0, sizeof(ev));
       ev.data.ptr = fc;
       ev.events = EPOLLIN | EPOLLOUT;
       epoll_ctl(efd, EPOLL_CTL_MOD, fc->fasit, &ev);
    }
    if (ret & mark_rfRead) { // mark_rfRead overwrites mark_rfWrite
-      DCMSG(RED, "mark_rfRead: %i", fc->rf);
+      DDCMSG(D_MEGA, RED, "mark_rfRead: %i", fc->rf);
       D_memset(&ev, 0, sizeof(ev));
       ev.data.fd = fc->rf;
       ev.events = EPOLLIN;
       epoll_ctl(efd, EPOLL_CTL_MOD, fc->rf, &ev);
    }
    if (ret & mark_fasitRead) { // mark_fasitRead overwrites mark_fasitWrite
-      DCMSG(RED, "mark_fasitRead, %i", fc->fasit);
+      DDCMSG(D_MEGA, RED, "mark_fasitRead, %i", fc->fasit);
       D_memset(&ev, 0, sizeof(ev));
       ev.data.ptr = fc;
       ev.events = EPOLLIN;
       epoll_ctl(efd, EPOLL_CTL_MOD, fc->fasit, &ev);
    }
    if (ret & rem_rfEpoll) {
-      DCMSG(RED, "rem_rfEpoll: %i", fc->rf);
+      DDCMSG(D_MEGA, RED, "rem_rfEpoll: %i", fc->rf);
       epoll_ctl(efd, EPOLL_CTL_DEL, fc->rf, NULL);
          perror("errno: ");
       close(fc->rf); // nothing to do if errors...ignore return value from close()
@@ -110,7 +110,7 @@ int handleRet(int ret, fasit_connection_t *fc, int efd) {
       done = 1; // TODO -- don't be done, accept again on rfclient
    }
    if (ret & rem_fasitEpoll) {
-      DCMSG(RED, "rem_fasitEpoll: %i", fc->fasit);
+      DDCMSG(D_MEGA, RED, "rem_fasitEpoll: %i", fc->fasit);
       int index = fc->index;
       epoll_ctl(efd, EPOLL_CTL_DEL, fc->fasit, NULL);
          perror("errno: ");
@@ -126,13 +126,13 @@ int handleRet(int ret, fasit_connection_t *fc, int efd) {
       D_memset(&ev, 0, sizeof(ev));
       ev.events = EPOLLIN; // only for reading to start
       ev.data.fd = fc->rf;
-DCMSG(GREEN,"ADDING %i TO EPOLL(rfclient)", fc->rf);
+DDCMSG(D_MEGA, GREEN,"ADDING %i TO EPOLL(rfclient)", fc->rf);
       if (epoll_ctl(efd, EPOLL_CTL_ADD, fc->rf, &ev) < 0) {
-         DCMSG(RED, "slaveboss epoll add rfclient failed");
+         DDCMSG(D_MEGA, RED, "slaveboss epoll add rfclient failed");
          done = 1;
       }
    }
-   DCMSG(RED, "...end");
+   DDCMSG(D_MEGA, RED, "...end");
    return done;
 }
 
@@ -217,17 +217,17 @@ int main(int argc, char **argv) {
    while (!done && !close_nicely) {
       // wait for a single RF client
       struct sockaddr_in caddr; // client address
-      DCMSG(YELLOW, "WAITING FOR RF ACCEPT");
+      DDCMSG(D_MEGA, YELLOW, "WAITING FOR RF ACCEPT");
       rfclient = accept(rfsock, (struct sockaddr *) &caddr, &flen);
-      DCMSG(BLACK,"SLAVEBOSS: client RF address = %s:%d", inet_ntoa(caddr.sin_addr),htons(caddr.sin_port));
+      DDCMSG(D_MEGA, BLACK,"SLAVEBOSS: client RF address = %s:%d", inet_ntoa(caddr.sin_addr),htons(caddr.sin_port));
       if (rfclient <= 0) {
-         DCMSG(RED, "slaveboss accept() failed");
+         DDCMSG(D_MEGA, RED, "slaveboss accept() failed");
          perror("errno: ");
          exit(1);
          continue;
       }
       setnonblocking(rfclient);
-      DCMSG(YELLOW, "RF ACCEPTED %i", rfclient);
+      DDCMSG(D_MEGA, YELLOW, "RF ACCEPTED %i", rfclient);
 
       // setup listening for FASIT client
       if ((fasitsock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -245,7 +245,7 @@ int main(int argc, char **argv) {
       ev.events = EPOLLIN; // only for reading to start
       // listen to the fasit socket always
       ev.data.fd = fasitsock; // remember for later
-      DCMSG(GREEN,"ADDING %i TO EPOLL(fasitsock)", fasitsock);
+      DDCMSG(D_MEGA, GREEN,"ADDING %i TO EPOLL(fasitsock)", fasitsock);
       if (epoll_ctl(efd, EPOLL_CTL_ADD, fasitsock, &ev) < 0) {
          DieWithError("epoll listener insertion error");
       }
@@ -254,14 +254,14 @@ int main(int argc, char **argv) {
       // after accepting RF client, accept any number of FASIT clients and parse
       //    the messages back and forth
       while (!done && !close_nicely) {
-         DCMSG(YELLOW, "SLAVEBOSS EPOLL WAITING");
+         DDCMSG(D_MEGA, YELLOW, "SLAVEBOSS EPOLL WAITING");
          // wait for something to happen
          nfds = epoll_wait(efd, events, MAX_EVENTS, -1); // infinite timeout
          
          // parse all waiting connections
          for (n = 0; !done && !close_nicely && n < nfds; n++) {
             if (events[n].data.fd == rfclient) { // Read/Write from rfclient
-               DCMSG(YELLOW, "events[%i].events: %i rfclient", n, events[n].events);
+               DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i rfclient", n, events[n].events);
 
                // closed socket?
                if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
@@ -299,16 +299,16 @@ int main(int argc, char **argv) {
                // new FASIT socket connection
                int index = -1;
                int newsock = accept(fasitsock, (struct sockaddr *) &caddr, &flen);
-               DCMSG(BLACK,"SLAVEBOSS: client FASIT address = %s:%d", inet_ntoa(caddr.sin_addr),htons(caddr.sin_port));
+               DDCMSG(D_MEGA, BLACK,"SLAVEBOSS: client FASIT address = %s:%d", inet_ntoa(caddr.sin_addr),htons(caddr.sin_port));
 
                if (newsock <= 0) {
-                  DCMSG(RED, "slaveboss accept() failed");
+                  DDCMSG(D_MEGA, RED, "slaveboss accept() failed");
                   perror("errno: ");
                   exit(1);
                   continue;
                }
                setnonblocking(newsock);
-               DCMSG(YELLOW, "FASIT ACCEPTED");
+               DDCMSG(D_MEGA, YELLOW, "FASIT ACCEPTED");
 
                // find slot to put it in
                for (i = 0; i < MAX_CONNECTIONS && index == -1; i++) {
@@ -319,7 +319,7 @@ int main(int argc, char **argv) {
                      fconns[i].fasit = newsock;
                      fconns[i].id = 2047; // TODO -- random number
                      fconns[i].index = i; // remember its own index
-   DCMSG(GREEN,"ADDING rf:%i fasit:%i TO fconns[%i]: %08X", fconns[i].rf, fconns[i].fasit, i, &fconns[i]);
+   DDCMSG(D_MEGA, GREEN,"ADDING rf:%i fasit:%i TO fconns[%i]: %08X", fconns[i].rf, fconns[i].fasit, i, &fconns[i]);
                      fconns[i].target_type = RF_Type_Unknown; // unknown target type
 
                      // are we the last slot?
@@ -332,7 +332,7 @@ int main(int argc, char **argv) {
                // couldn't add, too many connections
                if (index == -1) {
                   close(newsock);
-                  DCMSG(RED, "slaveboss fconns add fasit client failed");
+                  DDCMSG(D_MEGA, RED, "slaveboss fconns add fasit client failed");
                   continue;
                }
 
@@ -340,9 +340,9 @@ int main(int argc, char **argv) {
                D_memset(&ev, 0, sizeof(ev));
                ev.events = EPOLLIN; // only for reading to start
                ev.data.ptr = &fconns[index];
-   DCMSG(GREEN,"ADDING %i TO EPOLL(newsock)", newsock);
+   DDCMSG(D_MEGA, GREEN,"ADDING %i TO EPOLL(newsock)", newsock);
                if (epoll_ctl(efd, EPOLL_CTL_ADD, newsock, &ev) < 0) {
-                  DCMSG(RED, "slaveboss epoll add fasit client failed");
+                  DDCMSG(D_MEGA, RED, "slaveboss epoll add fasit client failed");
                   continue;
                }
 
@@ -351,7 +351,7 @@ int main(int argc, char **argv) {
             } else if (events[n].data.ptr != NULL) {
                // mangle and send to to rf connection
                fasit_connection_t *fc = (fasit_connection_t*) events[n].data.ptr;
-               DCMSG(YELLOW, "events[%i].events: %i %08X", n, events[n].events, fc);
+               DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i %08X", n, events[n].events, fc);
 
                // closed socket?
                if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
@@ -375,10 +375,10 @@ int main(int argc, char **argv) {
                   } else {
                      // fasit2rf will decide whether to handle the packet or not
                      while (!done && !close_nicely && (ret = fasit2rf(fc, tbuf, ms)) != doNothing) {
-                        DCMSG(CYAN, "FASIT ret is %i", ret);
+                        DDCMSG(D_MEGA, CYAN, "FASIT ret is %i", ret);
                         done = handleRet(ret, fc, efd);
                      }
-                     DCMSG(BLUE, "FASIT ret is %i", ret);
+                     DDCMSG(D_MEGA, BLUE, "FASIT ret is %i", ret);
                   }
                }
             }
@@ -396,11 +396,11 @@ int main(int argc, char **argv) {
 
 #ifdef DEBUG_MEM
 void *__D_memcpy(void *dest, const void *src, size_t n, char* f, int l) {
-   DCMSG(black, "memcpy(%8p, %8p, %i) @ %s:%i", dest, src, n, f, l);
+   DDCMSG(D_MEGA, black, "memcpy(%8p, %8p, %i) @ %s:%i", dest, src, n, f, l);
    return memcpy(dest,src,n);
 }
 void *__D_memset(void *s, int c, size_t n, char* f, int l) {
-   DCMSG(black, "memset(%8p, %i, %i) @ %s:%i", s, c, n, f, l);
+   DDCMSG(D_MEGA, black, "memset(%8p, %i, %i) @ %s:%i", s, c, n, f, l);
    return memset(s,c,n);
 }
 #endif

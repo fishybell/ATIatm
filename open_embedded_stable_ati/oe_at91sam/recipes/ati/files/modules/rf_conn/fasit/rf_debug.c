@@ -90,6 +90,7 @@ void debug_ASSIGN_ADDR(int color, LB_packet_t *pkt) {
 // debug an RF packet
 void debugRF(int color, char *packet, int len) {
    int start = 0;
+   if (!(verbose & D_MEGA)) { return; }
    while (start < len) {
       LB_packet_t *pkt = (LB_packet_t*)(packet+start);
       DCMSG(color, "RF msg buffer size: %i", len);

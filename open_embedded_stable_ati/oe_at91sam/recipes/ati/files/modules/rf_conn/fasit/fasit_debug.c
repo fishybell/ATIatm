@@ -1,9 +1,11 @@
 #include "fasit_debug.h"
 #include "mcp.h"
+#include "RFslave.h"
 
 // debug an FASIT packet
 void debugFASIT(int color, char *packet, int len) {
    int start = 0;
+   if (!(verbose & D_MEGA)) { return; }
    while (start < len) {
       FASIT_header *hdr = (FASIT_header*)(packet+start);
       DCMSG_HEXB(color, "Raw FASIT msg: ", packet+start, htons(hdr->length));

@@ -300,18 +300,18 @@ int rcWrite(rf_connection_t *rc, int tty) {
 // clear "in" buffer for tty
 static void clearBuffer_tty(rf_connection_t *rc, int end) {
    if (end >= rc->tty_ilen) {
-DCMSG(RED, "clearing entire buffer");
+DDCMSG(D_MEGA, RED, "clearing entire buffer");
       // clear the entire buffer
       rc->tty_ilen = 0;
    } else {
       // clear out everything up to and including end
       char tbuf[RF_BUF_SIZE];
-DCMSG(RED, "clearing buffer partially: %i-%i", rc->tty_ilen, end);
+DDCMSG(D_MEGA, RED, "clearing buffer partially: %i-%i", rc->tty_ilen, end);
       D_memcpy(tbuf, rc->tty_ibuf + (sizeof(char) * end), rc->tty_ilen - end);
       D_memcpy(rc->tty_ibuf, tbuf, rc->tty_ilen - end);
       rc->tty_ilen -= end;
    }
-DCMSG(RED, "buffer after: %i", rc->tty_ilen);
+DDCMSG(D_MEGA, RED, "buffer after: %i", rc->tty_ilen);
 }
 
 // clear "in" buffer for socket
@@ -497,7 +497,7 @@ int tty2sock(rf_connection_t *rc) {
 
    // read all available valid messages up until I have to do something on return
    debugRF(cyan, rc->tty_ibuf, rc->tty_ilen);
-   while (retval == doNothing && (mnum = validMessage(rc, &start, &end, 1)) != -1) { // 1 for tty
+   while ((retval == doNothing || retval == mark_sockWrite) && (mnum = validMessage(rc, &start, &end, 1)) != -1) { // 1 for tty
       int use_command = 1;
       switch (mnum) {
          t2s_HANDLE_RF (STATUS_REQ); // keep track of ids
@@ -547,7 +547,7 @@ int tty2sock(rf_connection_t *rc) {
 void addAddrToNowIDs(rf_connection_t *rc, int addr) {
    int i;
    // check to see if we already of this one in the list
-   DCMSG(BLACK, "Adding addr %i", addr);
+   DDCMSG(D_MEGA, BLACK, "Adding addr %i", addr);
    for (i = 0; i < min(MAX_IDS, rc->id_index+1); i++) {
       if (rc->ids[i] == addr) {
          return;
@@ -558,14 +558,14 @@ void addAddrToNowIDs(rf_connection_t *rc, int addr) {
    if (++rc->id_index < MAX_IDS) {
       rc->ids[rc->id_index] = addr;
    }
-   DCMSG(BLACK, "rc->id_index %i", rc->id_index);
+   DDCMSG(D_MEGA, BLACK, "rc->id_index %i", rc->id_index);
 }
 
 // find devid from socket to tty message for finding timeslot on way back to tty
 void addDevidToNowDevIDs(rf_connection_t *rc, int devid) {
    int i;
    // check to see if we already of this one in the list
-   DCMSG(BLACK, "Adding devid: %02X:%02X:%02X:%02X", (devid & 0xff000000) >> 24, (devid & 0xff0000) >> 16, (devid & 0xff00) >> 8, devid & 0xff);
+   DDCMSG(D_MEGA, BLACK, "Adding devid: %02X:%02X:%02X:%02X", (devid & 0xff000000) >> 24, (devid & 0xff0000) >> 16, (devid & 0xff00) >> 8, devid & 0xff);
    for (i = 0; i < min(MAX_IDS, rc->devid_index+1); i++) {
       if (rc->devids[i] == devid) {
          return;
@@ -576,7 +576,7 @@ void addDevidToNowDevIDs(rf_connection_t *rc, int devid) {
    if (++rc->devid_index < MAX_IDS) {
       rc->devids[rc->devid_index] = devid;
    }
-   DCMSG(BLACK, "rc->devid_index %i", rc->devid_index);
+   DDCMSG(D_MEGA, BLACK, "rc->devid_index %i", rc->devid_index);
 }
 
 int s2t_handle_STATUS_RESP_LIFTER(rf_connection_t *rc, int start, int end) {
@@ -626,7 +626,7 @@ int s2t_handle_DEVICE_REG(rf_connection_t *rc, int start, int end) {
 // transfer socket data to the tty and set up delay times
 int sock2tty(rf_connection_t *rc) {
    int start, end, mnum, ts = 0, retval = doNothing; // start doing nothing
-   DCMSG(BLACK, "Called sock2tty");
+   DDCMSG(D_MEGA, BLACK, "Called sock2tty");
 
    // read all available valid messages up until I have to do something on return
    debugRF(blue, rc->sock_ibuf, rc->sock_ilen);
@@ -673,10 +673,10 @@ int sock2tty(rf_connection_t *rc) {
          DDCMSG(D_TIME, BLACK, "Looking %i-%i < %i for index %i", rc->devids[i], rc->devid_last_low, ts, i);
          if ((rc->devids[i] - rc->devid_last_low) < ts) {
             ts = rc->devids[i] - rc->devid_last_low; // exact match would be 0 slot, then 1, etc.
-            DCMSG(BLACK, "Found new low: %i", ts);
+            DDCMSG(D_VERY, BLACK, "Found new low: %i", ts);
          }
       }
-      DCMSG(BLACK, "Ended up with %i", ts);
+      DDCMSG(D_VERY, BLACK, "Ended up with %i", ts);
       if (ts == 0xffff || ts < 0) {
          ts = 0; // should never get here, but just in case be a sane value
       }

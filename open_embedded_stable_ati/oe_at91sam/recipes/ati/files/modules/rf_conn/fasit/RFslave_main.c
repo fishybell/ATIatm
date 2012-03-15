@@ -91,46 +91,46 @@ int handleRet(int ret, rf_connection_t *rc, int efd) {
    int done = 0;
    if (ret == doNothing) { return done; }
    if (ret & mark_ttyWrite) {
-      DCMSG(RED, "mark_ttyWrite: %i", rc->tty);
+      DDCMSG(D_MEGA, RED, "mark_ttyWrite: %i", rc->tty);
       D_memset(&ev, 0, sizeof(ev));
       ev.data.fd = rc->tty;
       ev.events = EPOLLIN | EPOLLOUT;
       epoll_ctl(efd, EPOLL_CTL_MOD, rc->tty, &ev);
    }
    if (ret & mark_sockWrite) {
-      DCMSG(RED, "mark_sockWrite: %i", rc->sock);
+      DDCMSG(D_MEGA, RED, "mark_sockWrite: %i", rc->sock);
       D_memset(&ev, 0, sizeof(ev));
       ev.data.fd = rc->sock;
       ev.events = EPOLLIN | EPOLLOUT;
       epoll_ctl(efd, EPOLL_CTL_MOD, rc->sock, &ev);
    }
    if (ret & mark_ttyRead) { // mark_ttyRead overwrites mark_ttyWrite
-      DCMSG(RED, "mark_ttyRead: %i", rc->tty);
+      DDCMSG(D_MEGA, RED, "mark_ttyRead: %i", rc->tty);
       D_memset(&ev, 0, sizeof(ev));
       ev.data.fd = rc->tty;
       ev.events = EPOLLIN;
       epoll_ctl(efd, EPOLL_CTL_MOD, rc->tty, &ev);
    }
    if (ret & mark_sockRead) { // mark_sockRead overwrites mark_sockWrite
-      DCMSG(RED, "mark_sockRead, %i", rc->sock);
+      DDCMSG(D_MEGA, RED, "mark_sockRead, %i", rc->sock);
       D_memset(&ev, 0, sizeof(ev));
       ev.data.fd = rc->sock;
       ev.events = EPOLLIN;
       epoll_ctl(efd, EPOLL_CTL_MOD, rc->sock, &ev);
    }
    if (ret & rem_ttyEpoll) {
-      DCMSG(RED, "rem_ttyEpoll: %i", rc->tty);
+      DDCMSG(D_MEGA, RED, "rem_ttyEpoll: %i", rc->tty);
       epoll_ctl(efd, EPOLL_CTL_DEL, rc->tty, NULL);
       close(rc->tty); // nothing to do if errors...ignore return value from close()
       done = 1; // TODO -- don't be done
    }
    if (ret & rem_sockEpoll) {
-      DCMSG(RED, "rem_sockEpoll: %i", rc->sock);
+      DDCMSG(D_MEGA, RED, "rem_sockEpoll: %i", rc->sock);
       epoll_ctl(efd, EPOLL_CTL_DEL, rc->sock, NULL);
       close(rc->sock); // nothing to do if errors...ignore return value from close()
       done = 1; // TODO -- don't be done
    }
-   DCMSG(RED, "...end");
+   DDCMSG(D_MEGA, RED, "...end");
    return done;
 }
 
@@ -204,14 +204,14 @@ int main(int argc, char **argv) {
       DieWithError("connect");
    }
    setnonblocking(rc.sock, 1); // socket first time
-   DCMSG(BLACK,"RFSLAVE: RF socket fd: %i", rc.sock);
+   DDCMSG(D_MEGA, BLACK,"RFSLAVE: RF socket fd: %i", rc.sock);
 
    // open tty and setup the serial device
    rc.tty = open_port(ttyport,0);   // non-blocking
    if (rc.tty <= 0) {
       DieWithError("Is unhappy tty");
    }
-   DCMSG(BLACK,"RFSLAVE: RF tty fd: %i", rc.tty);
+   DDCMSG(D_MEGA, BLACK,"RFSLAVE: RF tty fd: %i", rc.tty);
 
    // setup epoll
    efd = epoll_create(MAX_CONNECTIONS);
@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
    // main loop
    while (!done && !close_nicely) {
       int timeout = getTimeout(&rc); // find out timeout...
-      DCMSG(YELLOW, "RFSLAVE EPOLL WAITING %i msecs", timeout);
+      DDCMSG(D_MEGA, YELLOW, "RFSLAVE EPOLL WAITING %i msecs", timeout);
       // wait for something to happen
       nfds = epoll_wait(efd, events, MAX_EVENTS, timeout); // ...and pass it directly in
 
@@ -250,7 +250,7 @@ int main(int argc, char **argv) {
          handleRet(mark_ttyWrite, &rc, efd); // we want the tty to be available for writing...
          // timed out, either wait for a while, or do everything now
          if (getTimeout(&rc) >= 10) { // long timeout (10 milliseconds) still exists
-            DCMSG(YELLOW, "Epoll timed out, going back...");
+            DDCMSG(D_MEGA, YELLOW, "Epoll timed out, going back...");
          
             continue; // ...so come back and wait the rest of the time right before tty writing
          } else if (timeout == 0) { // no timeout exists
@@ -266,9 +266,9 @@ int main(int argc, char **argv) {
       
       // parse all waiting connections
       for (n = 0; !done && !close_nicely && n < nfds; n++) {
-         DCMSG(YELLOW, "Looking at %i in events...", n);
+         DDCMSG(D_MEGA, YELLOW, "Looking at %i in events...", n);
          if (events[n].data.fd == rc.tty) { // Read/Write from tty
-            DCMSG(YELLOW, "events[%i].events: %i tty", n, events[n].events);
+            DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i tty", n, events[n].events);
 
             // closed socket?
             if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
                }
             }
          } else if (events[n].data.fd == rc.sock) { // Read/Write from socket
-            DCMSG(YELLOW, "events[%i].events: %i socket", n, events[n].events);
+            DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i socket", n, events[n].events);
 
             // closed socket?
             if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
@@ -310,7 +310,7 @@ int main(int argc, char **argv) {
                }
             }
          } else {
-            DCMSG(YELLOW, "events[%i].events: %i unknown: %i", n, events[n].events, events[n].data.fd);
+            DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i unknown: %i", n, events[n].events, events[n].data.fd);
             done = 1; // exit
          }
       }
@@ -325,11 +325,11 @@ int main(int argc, char **argv) {
 
 #ifdef DEBUG_MEM
 void *__D_memcpy(void *dest, const void *src, size_t n, char* f, int l) {
-   DCMSG(black, "memcpy(%8p, %8p, %i) @ %s:%i", dest, src, n, f, l);
+   DDCMSG(D_MEGA, black, "memcpy(%8p, %8p, %i) @ %s:%i", dest, src, n, f, l);
    return memcpy(dest,src,n);
 }
 void *__D_memset(void *s, int c, size_t n, char* f, int l) {
-   DCMSG(black, "memset(%8p, %i, %i) @ %s:%i", s, c, n, f, l);
+   DDCMSG(D_MEGA, black, "memset(%8p, %i, %i) @ %s:%i", s, c, n, f, l);
    return memset(s,c,n);
 }
 #endif
