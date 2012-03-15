@@ -103,7 +103,7 @@ void debug_2100(int color, char *packet) {
    DCMSG(color, "\t\t\t\t\t\t\tmessage body\n"\
       "C-ID | Expos | Aspct |  Dir | Move |  Speed | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n"\
           "%3d    %3d     %3d     %2d    %3d    %7.2f     %4d     %2d     %3d     %3d     %3d    %3d   %5d ",
-      msg->cid, msg->exp, msg->asp, msg->dir, msg->move, msg->speed, msg->on, htons(msg->hit), msg->react, htons(msg->tokill), htons(msg->sens), msg->mode, htons(msg->burst));
+      msg->cid, msg->exp, msg->asp, htons(msg->dir), msg->move, htonf(msg->speed), msg->on, htons(msg->hit), msg->react, htons(msg->tokill), htons(msg->sens), msg->mode, htons(msg->burst));
 }
 
 void debug_2101(int color, char *packet) {
@@ -118,7 +118,7 @@ void debug_2102(int color, char *packet) {
    DCMSG(color, "\t\t\t\t\t\t\tmessage body\n "\
          "PSTAT | Fault | Expos | Aspct |  Dir | Move |  Speed  | POS | Type | Hits | On/Off | React | ToKill | Sens | Mode | Burst\n"\
          "  %3d    %3d     %3d     %3d     %3d    %3d    %6.2f    %3d   %3d    %3d      %3d     %3d      %3d     %3d    %3d    %3d ",
-         msg->body.pstatus, msg->body.fault, msg->body.exp, msg->body.asp, msg->body.dir, msg->body.move, msg->body.speed, msg->body.pos, msg->body.type, htons(msg->body.hit),
+         msg->body.pstatus, htons(msg->body.fault), msg->body.exp, msg->body.asp, htons(msg->body.dir), msg->body.move, htonf(msg->body.speed), msg->body.pos, msg->body.type, htons(msg->body.hit),
          msg->body.hit_conf.on, msg->body.hit_conf.react, htons(msg->body.hit_conf.tokill), htons(msg->body.hit_conf.sens), msg->body.hit_conf.mode, htons(msg->body.hit_conf.burst));
 }
 

@@ -501,6 +501,7 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
    // convert speed
    float speed = pkt->speed / 100.0;
    DDCMSG(D_RF|D_VERY,RED, "handle_MOVE(%8p, %i, %i)", fc, start, end);
+   DDCMSG(D_RF, BLUE, "handle_MOVE(%f, %i)", speed, pkt->direction ? 1 : 2);
    if (pkt->speed == 2047) {
       // send e-stop message
       return send_2100_estop(fc);
