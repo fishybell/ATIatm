@@ -90,6 +90,7 @@ typedef struct state_float_item {
 
 typedef struct minion_state {
     uint32			cap;	// actual capability bitfield - u32 to keep alignment    
+    uint8         dev_type;   // FASIT device type
     uint16			state_timer;	// when we next need to process the state
     uint16			padding0;	//   extra space for now
     state_u8_item_t		fault;	// maybe not really an item
