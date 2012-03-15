@@ -1587,7 +1587,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      if (arg3 > 1) { // are they passing in information?
                         snprintf(wbuf, 1024, "I U %s\n", writeEeprom(RADIO_FREQ_LOC, arg3, RADIO_FREQ_SIZE, cmd+arg2)); // writes and prints out what it wrote
                         // writes not written
-                        writeEeprom(RADIO_WRITTEN_LOC, 1, RADIO_WRITTEN_SIZE, RADIO_WRITTEN)
+                        writeEeprom(RADIO_WRITTEN_LOC, 1, RADIO_WRITTEN_SIZE, RADIO_WRITTEN);
                      } else { // they are reading information
                         snprintf(wbuf, 1024, "I U %s\n", readEeprom(RADIO_FREQ_LOC, RADIO_FREQ_SIZE)); // reads and prints out what it read
                      }
@@ -1596,7 +1596,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      if (arg3 > 1) { // are they passing in information?
                         snprintf(wbuf, 1024, "I V %s\n", writeEeprom(RADIO_POWER_L_LOC, arg3, RADIO_POWER_L_SIZE, cmd+arg2)); // writes and prints out what it wrote
                         // writes not written
-                        writeEeprom(RADIO_WRITTEN_LOC, 1, RADIO_WRITTEN_SIZE, RADIO_WRITTEN)
+                        writeEeprom(RADIO_WRITTEN_LOC, 1, RADIO_WRITTEN_SIZE, RADIO_WRITTEN);
                      } else { // they are reading information
                         snprintf(wbuf, 1024, "I V %s\n", readEeprom(RADIO_POWER_L_LOC, RADIO_POWER_L_SIZE)); // reads and prints out what it read
                      }
@@ -1605,7 +1605,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      if (arg3 > 1) { // are they passing in information?
                         snprintf(wbuf, 1024, "I W %s\n", writeEeprom(RADIO_POWER_H_LOC, arg3, RADIO_POWER_H_SIZE, cmd+arg2)); // writes and prints out what it wrote
                         // writes not written
-                        writeEeprom(RADIO_WRITTEN_LOC, 1, RADIO_WRITTEN_SIZE, RADIO_WRITTEN)
+                        writeEeprom(RADIO_WRITTEN_LOC, 1, RADIO_WRITTEN_SIZE, RADIO_WRITTEN);
                      } else { // they are reading information
                         snprintf(wbuf, 1024, "I W %s\n", readEeprom(RADIO_POWER_H_LOC, RADIO_POWER_H_SIZE)); // reads and prints out what it read
                      }
