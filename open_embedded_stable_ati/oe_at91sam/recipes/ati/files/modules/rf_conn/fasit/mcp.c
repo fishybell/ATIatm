@@ -1,6 +1,7 @@
 #include "mcp.h"
 #include "fasit_c.h"
 #include "rf.h"
+#include "slaveboss.h"
 
 thread_data_t minions[2046];	// we do start at 0 and there cannot be more than 2046
 struct sockaddr_in fasit_addr;
@@ -395,8 +396,36 @@ int main(int argc, char **argv) {
 				minions[mID].devid=LB_devreg->devid;	// use the actual device id (MAC address)
 				minions[mID].seq=0;	// the seq number for this minions transmissions to RCC
 
-				if (LB_devreg->dev_type==1)
-				    minions[mID].S.cap|=PD_NES;	// add the NES capability
+            switch (LB_devreg->dev_type) {
+                case RF_Type_SIT_W_MFS:
+                    minions[mID].S.cap|=PD_NES;	// add the NES capability
+                    minions[mID].S.dev_type = Type_SIT;
+                    break;
+                case RF_Type_SIT:
+                    minions[mID].S.dev_type = Type_SIT;
+                    break;
+                case RF_Type_SAT:
+                    minions[mID].S.dev_type = Type_SAT;
+                    break;
+                case RF_Type_HSAT:
+                    minions[mID].S.dev_type = Type_HSAT;
+                    break;
+                case RF_Type_SES:
+                    minions[mID].S.dev_type = Type_SES;
+                    break;
+                case RF_Type_BES:
+                    minions[mID].S.dev_type = Type_BES;
+                    break;
+                case RF_Type_MIT:
+                    minions[mID].S.dev_type = Type_MIT;
+                    break;
+                case RF_Type_MAT:
+                    minions[mID].S.dev_type = Type_MAT;
+                    break;
+                case RF_Type_Unknown:
+                    minions[mID].S.dev_type = Type_SIT;
+                    break;
+            }
 
 				/*   fork a minion */    
 				if ((child = fork()) == -1) perror("fork");
