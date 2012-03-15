@@ -609,7 +609,7 @@ int SIT_Client::handle_2100(int start, int end) {
                 case 1: lastHitCal.enable_on = ENABLE_ALWAYS; break; // hit sensor On
                 case 2: lastHitCal.enable_on = ENABLE_AT_POSITION; break; // hit sensor On at Position
                 case 3: lastHitCal.enable_on = DISABLE_AT_POSITION; break; // hit sensor Off at Position
-                case 4: lastHitCal.enable_on = BLANK_ON_CONCEALED; break; // hit sensor On Immediately
+                case 4: lastHitCal.enable_on = BLANK_ON_CONCEALED; break; // hit sensor On when exposed
             }
             if (htons(msg->burst)) lastHitCal.seperation = htons(msg->burst);      // spec says we only set if non-Zero
             if (htons(msg->sens)) {
