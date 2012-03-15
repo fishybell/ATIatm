@@ -4,18 +4,6 @@
 #include "slaveboss.h"
 #include "fasit_debug.h"
 
-// for some reason we have a ntohs/htons, but no ntohf/htonf
-float ntohf(float f) {
-   __uint32_t holder = *(__uint32_t*)(&f), after;
-   // byte starts as 1, 2, 3, 4, ends as 4, 3, 2, 1
-   after = ((holder & 0x000000ff) << 24) | \
-           ((holder & 0x0000ff00) << 8) | \
-           ((holder & 0x00ff0000) >> 8) | \
-           ((holder & 0xff000000) >> 24);
-
-   return *(float*)(&after);
-}
-
 // we don't worry about clearing the data before a valid message, just up to the end
 static void clearBuffer(fasit_connection_t *fc, int end) {
    if (end >= fc->fasit_ilen) {
