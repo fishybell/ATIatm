@@ -928,7 +928,13 @@ void lift_event_internal(int etype, bool upload) {
 					}
 					break;
 			}
-			break;
+		   	break;
+        case EVENT_LOWER:
+            if (enable_at == BLANK_ON_CONCEALED) {
+			   // blank when lowering
+               hit_blanking_on();
+            }
+            break;
 		case EVENT_RAISE:
 			if (enable_at == BLANK_ON_CONCEALED) {
 				// we're not concealed, blank a little longer, or stop blanking now
