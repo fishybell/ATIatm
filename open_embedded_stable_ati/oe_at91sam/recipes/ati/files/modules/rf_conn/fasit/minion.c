@@ -1,6 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 #include "fasit_c.h"
+#include "RFslave.h"
 
 #define BufSize 1024
 
@@ -403,7 +404,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 	    DDCMSG(D_VERY,CYAN,"\t\t\t\t\t\t\tmessage body\n"\
 		  "C-ID | Expos | Aspct |  Dir | Move |  Speed | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n"\
 		  "%3d    %3d     %3d     %2d    %3d    %7.2f     %4d     %2d     %3d     %3d     %3d    %3d   %5d ",
-		  message_2100->cid,message_2100->exp,message_2100->asp,message_2100->dir,message_2100->move,message_2100->speed
+		  message_2100->cid,message_2100->exp,message_2100->asp,message_2100->dir,message_2100->move,htonf(message_2100->speed)
 		  ,message_2100->on,htons(message_2100->hit),message_2100->react,htons(message_2100->tokill),htons(message_2100->sens)
 		  ,message_2100->mode,htons(message_2100->burst));
 	    // do the event that was requested
@@ -594,7 +595,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 
       case CID_Stop: /* handle emergency stop the same as a move request */
 		case CID_Move_Request:
-		    DDCMSG(D_PACKET,BLUE,"CID_Move_Request  send 'S'uccess ack.   message_2100->speed=%d, message_2100->move=%d",message_2100->speed, message_2100->move);
+		    DDCMSG(D_PACKET,BLUE,"CID_Move_Request  send 'S'uccess ack.   message_2100->speed=%f, message_2100->move=%i",htonf(message_2100->speed), message_2100->move);
 //		    also build an LB packet  to send
 		    LB_move =(LB_move_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
 		    LB_move->cmd=LBC_MOVE;
@@ -606,16 +607,21 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 		    minion->S.speed.timer=10; // will reach speed in this many deciseconds
           // minion->S.move.timer=10; TODO -- do we need this?
 
-          LB_move->speed = ((int)(message_2100->speed * 100)) & 0x7ff;
+          LB_move->speed = ((int)(htonf(message_2100->speed) * 100)) & 0x7ff;
+          DDCMSG(D_PACKET,BLUE,"CID_Move_Request: speed after: %i", LB_move->speed);
           if (message_2100->move == 2) {
+             DDCMSG(D_PACKET,BLUE,"CID_Move_Request: direction 0");
             LB_move->direction = 0;
           } else if (message_2100->move ==1) {
+             DDCMSG(D_PACKET,BLUE,"CID_Move_Request: direction 1");
             LB_move->direction = 1;
           } else {
+             DDCMSG(D_PACKET,BLUE,"CID_Move_Request: direction 0:2");
             LB_move->direction = 0;
             LB_move->speed = 0;
           }
           if (message_2100->cid == CID_Stop) {
+             DDCMSG(D_PACKET,BLUE,"CID_Move_Request: E-Stop");
              LB_move->speed = 2047; // emergency stop speed
           }
 	    // calculates the correct CRC and adds it to the end of the packet payload
@@ -647,7 +653,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 		    DDCMSG(D_PACKET,BLUE,"\t\t\t\t\t\t\tmessage body\n"\
 			  "C-ID | Expos | Aspct |  Dir | Move |  Speed | On/Off | Hits | React | ToKill | Sens | Mode | Burst\n"\
 			  "%3d    %3d     %3d     %2d    %3d    %7.2f     %4d     %2d     %3d     %3d     %3d    %3d   %5d "
-			  ,message_2100->cid,message_2100->exp,message_2100->asp,message_2100->dir,message_2100->move,message_2100->speed
+			  ,message_2100->cid,message_2100->exp,message_2100->asp,message_2100->dir,message_2100->move,htonf(message_2100->speed)
 			  ,message_2100->on,htons(message_2100->hit),message_2100->react,htons(message_2100->tokill),htons(message_2100->sens)
 			  ,message_2100->mode,htons(message_2100->burst));
 
