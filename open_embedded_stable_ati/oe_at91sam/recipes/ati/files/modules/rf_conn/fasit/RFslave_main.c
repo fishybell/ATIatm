@@ -286,6 +286,13 @@ int main(int argc, char **argv) {
                } else {
                   // tty2sock will transfer the data from the tty to the socket and handle as necessary
                   done = handleRet(tty2sock(&rc), &rc, efd);
+                  
+                  // handle socket write immediately
+                  if (done & mark_sockWrite) {
+                     done ^- mark_sockWrite; // un-mark socket write
+                     done |= mark_sockRead; // continue un-marking
+                     done |= handleRet(sock2tty(&rc), &rc, efd);
+                  }
                }
             }
          } else if (events[n].data.fd == rc.sock) { // Read/Write from socket
