@@ -54,16 +54,19 @@ if  {$argc != 0} {
 #exit
 
 # ask for ip address and connect port
+puts -nonewline "Comm Type? "
+flush stdout
+gets stdin comm
 puts -nonewline "IP Address? "
 flush stdout
 gets stdin ip
 puts -nonewline "Connect Port? "
 flush stdout
 gets stdin port
-puts "ip: $ip, port: $port"
+puts "comm: $comm, ip: $ip, port: $port"
 
 # confirm programming
-puts "About to program $ip:$port onto $targets"
+puts "About to program $ip:$port type $comm onto $targets"
 puts -nonewline "Is this correct (y/N)? " 
 flush stdout
 gets stdin ans
@@ -85,6 +88,8 @@ foreach host $targets {
             timeout { puts "!!! $host is down !!!" ; continue}
         }
         expect "I I $ip"
+        send "i d $comm\r"
+        expect "I D $comm"
         send "i c $port\r"
         expect "I C $port"
         send "i r\r"
