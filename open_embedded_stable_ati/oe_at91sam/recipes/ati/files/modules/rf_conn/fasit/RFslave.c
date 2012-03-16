@@ -116,10 +116,6 @@ void HandleSlaveRF(int RFfd){
 		    DDCMSG(D_TIME,CYAN,"RFslave inside good packet at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 			   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
 
-
-		    resp_slot++;	// keep count of our resonse slot
-	// check the CRC
-	//  if good CRC, parse and respond or whatever
 		    switch (LB->cmd){
 			case LBC_REQUEST_NEW:
 			    LB_new =(LB_request_new_t *) LB;			    
@@ -309,17 +305,20 @@ void HandleSlaveRF(int RFfd){
 		    }  // switch LB cmd
 		    DeQueue(Rx,size);	// delete just the packet we used
 		    gathered-=size;
+		    resp_slot++;	// keep count of our resonse slot
+		    DDCMSG(D_RF,YELLOW," incrementing resp_slot",resp_slot);
+
 		    
 		} else { // if our address matched and the CRC was good
-		    if (!crc) {// actually if the crc is bad we need to dequeue just 1 byte
-			DDCMSG(D_RF,BLUE,"CRC bad.  DeQueueing 1 byte.");
+		    if (crc) {// actually if the crc is bad we need to dequeue just 1 byte
+			DDCMSG(D_RF,RED,"CRC bad.  DeQueueing 1 byte.");
 			DeQueue(Rx,1);	// delete just one byte
 			gathered--;
 		    } else { // the packet was not for us, skip it
 			if (QueuePtype(Rx)==2) resp_slot++;	// we have to count to find our slot
-			DDCMSG(D_RF,BLUE,"NOT for us.  DeQueueing %d bytes.",size);
+			DDCMSG(D_RF,BLUE,"NOT for us.  DeQueueing %d bytes. AND incrementing resp_slot",size);
 			DeQueue(Rx,size);	// delete just the packet we used
-			gathered-=size;					
+			gathered-=size;
 		    }
 		}
 	    } else {  // if there was a full packet
