@@ -245,23 +245,24 @@ int main(int argc, char **argv) {
 
 	    if (slave_hunting==1){
 		low=low_dev;
-		timeout=slottime*40;	// idle time to wait for next go around
 		slave_hunting++;
 	    } else if (slave_hunting>1&&slave_hunting<(((high_dev-low_dev)/16)+2)){
 		low=low_dev+((slave_hunting-1)*16);	// step through 16 at a time after the first 2
 		if (low>=high_dev) low=low_dev;		// if we went to far, redo the bottom end
-		timeout=slottime*40;	// idle time to wait for next go around
 		slave_hunting++;
-	    } else if (slave_hunting){
+	    } else {
 		// the hunt is over, for now
-		slave_hunting=0;
-		timeout=hunttime*1000;
-		low=low_dev+hunt_rotate;		// restart the next hunt at the low dev		
-		hunt_rotate += 32;
-		if (hunt_rotate > (high_dev + 32)) {
-		   hunt_rotate = 0;
-		}
+		slave_hunting=1;
+		low=low_dev;		// restart the hunt at the beginning
+		hunt_rotate = 1;
 	    } 
+
+      // if we've rotated through the hunt, use the hunttime, otherwise use slottime
+		if (hunt_rotate) {
+		    timeout=hunttime*1000;	// idle time to wait for next go around
+      } else {
+		    timeout=slottime*40;	// idle time to wait for next go around
+		}
 		
 		
 	    DDCMSG(D_NEW,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
