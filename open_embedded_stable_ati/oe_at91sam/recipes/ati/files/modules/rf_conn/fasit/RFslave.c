@@ -229,7 +229,7 @@ void HandleSlaveRF(int RFfd){
 				L->event=LC->event;
 				L->hits=rand()%10;			// fake 0 to 10 hits.  
 				set_crc8(&rLB);	// calculates the correct CRC and adds it to the end of the packet payload
-				DDCMSG(D_RF,BLUE,"Recieved 'Report Request'.  respond with a LBC_EVENT_REPORT, event=%d hits=%d",L->event,L->hits);
+				DDCMSG(D_RF,BLUE,"Recieved 'Report Request'.  resp_slot=%d respond with a LBC_EVENT_REPORT, event=%d hits=%d",resp_slot,L->event,L->hits);
 
 				// now send it to the RF master
 				// after waiting for our timeslot:
@@ -270,7 +270,7 @@ void HandleSlaveRF(int RFfd){
 			    LB_resp->hits=1;			// fake '1'
 			    LB_resp->expose=1;			// fake '1'
 			    set_crc8(&rLB);	// calculates the correct CRC and adds it to the end of the packet payload
-			    DDCMSG(D_RF,BLUE,"Recieved 'Status request'.  respond with a LBC_STATUS_RESP_LIFTER");
+			    DDCMSG(D_RF,BLUE,"Recieved 'Status request'. resp_slot=%d respond with a LBC_STATUS_RESP_LIFTER   ",resp_slot);
 
 // now send it to the RF master
 // after waiting for our timeslot:
