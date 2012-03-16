@@ -161,7 +161,7 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
     // Step 15  - Move @ 3 mph
     // Step 16 - Wait for stopped
     const char *scen = "\
-     {Send;R_MOVER;NL_C_MOVE;1;0F80}           -- Move @ 1.5 mph (inverted byte order of 0x800f : 0x8000 + 15) \
+     {Send;R_MOVER;NL_C_MOVE;1;1D80}           -- Move @ 1.5 mph (inverted byte order of 0x800f : 0x8000 + 15) \
      {DoWait;%s;EVENT_STOPPED;15000;%s}        -- Wait 15 seconds for stop (cmd installed below)\
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request MFS state (installed below, timeout of 1/2 second) \
      {SetVarLast;1;;;}                         -- Set response value to register 1 \
@@ -310,11 +310,11 @@ void handle_bit_move(struct nl_handle *handle, int type) {
     switch (type) {
         case BIT_MOVE_FWD:
 //printf("BIT: sending FWD\n");
-            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 15); // fwd at 1.5 mph
+            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 20); // fwd at 1.5 mph
             break;
         case BIT_MOVE_REV:
 //printf("BIT: sending REV\n");
-            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 - 15); // rev at 1.5 mph
+            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 - 20); // rev at 1.5 mph
             break;
         case BIT_MOVE_STOP:
 //printf("BIT: sending STOP\n");
