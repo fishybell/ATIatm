@@ -237,14 +237,14 @@ void DDpacket(uint8 *buf,int len){
 
 	    case LBC_STATUS_REQ:
 		strcpy(cmdname,"Status_Req");
-		sprintf(hbuf,"address=%3d",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d",LB->addr);
 		break;
 
 	    case LBC_REPORT_REQ:
 	    {
 		LB_report_req_t *L=(LB_report_req_t *)LB;
 		strcpy(cmdname,"Report_Req");
-		sprintf(hbuf,"address=%3d   event=%2d",L->addr,L->event);
+		sprintf(hbuf,"RFaddr=%3d   event=%2d",L->addr,L->event);
 	    }
 		break;
 
@@ -252,7 +252,7 @@ void DDpacket(uint8 *buf,int len){
 	    {
 		LB_event_report_t *L=(LB_event_report_t *)LB;
 		strcpy(cmdname,"Event_Report");
-		sprintf(hbuf,"address=%3d   event=%2d hit_count=%d",L->addr,L->event,L->hits);
+		sprintf(hbuf,"RFaddr=%3d   event=%2d hit_count=%d",L->addr,L->event,L->hits);
 	    }
 		break;
 
@@ -260,74 +260,74 @@ void DDpacket(uint8 *buf,int len){
 	    {
 		LB_expose_t *L=(LB_expose_t *)LB;
 		strcpy(cmdname,"Expose");
-		sprintf(hbuf,"address=%3d event=%2d .....",L->addr,L->event);
+		sprintf(hbuf,"RFaddr=%3d event=%2d .....",L->addr,L->event);
 	    }
 		break;
 
 	    case LBC_MOVE:
 		strcpy(cmdname,"Move");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		break;
 
 	    case LBC_CONFIGURE_HIT:
 		strcpy(cmdname,"Configure_Hit");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		break;
 
 	    case LBC_GROUP_CONTROL:
 		strcpy(cmdname,"Group_Control");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		break;
 
 	    case LBC_AUDIO_CONTROL:
 		strcpy(cmdname,"Audio_Control");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		break;
 
 	    case LBC_POWER_CONTROL:
 		strcpy(cmdname,"Power_Control");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		break;
 
 	    case LBC_PYRO_FIRE:
 		strcpy(cmdname,"Pyro_Fire");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		break;
 
 	    case LBC_STATUS_RESP_LIFTER:
 		strcpy(cmdname,"Status_Resp_Lifter");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		color=MAGENTA;
 		break;
 
 	    case LBC_STATUS_RESP_MOVER:
 		strcpy(cmdname,"Status_Resp_Mover");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		color=MAGENTA;
 		break;
 
 	    case LBC_STATUS_RESP_EXT:
 		strcpy(cmdname,"Status_Resp_Ext");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		color=MAGENTA;
 		break;
 
 	    case LBC_STATUS_NO_RESP:
 		strcpy(cmdname,"Status_No_Resp");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		color=MAGENTA;
 		break;
 
 	    case LBC_QEXPOSE:
 		strcpy(cmdname,"Qexpose");
-		sprintf(hbuf,"address=%3d .....",LB->addr);
+		sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
 		break;
 
 	    case LBC_QCONCEAL:
 	    {
 		LB_qconceal_t *L=(LB_qconceal_t *)LB;
 		strcpy(cmdname,"Qconceal");
-		sprintf(hbuf,"address=%3d event=%2d uptime=%d dsec .....",L->addr,L->event,L->uptime);
+		sprintf(hbuf,"RFaddr=%3d event=%2d uptime=%d dsec .....",L->addr,L->event,L->uptime);
 	    }
 		break;
 

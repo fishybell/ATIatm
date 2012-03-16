@@ -97,7 +97,7 @@ void HandleSlaveRF(int RFfd){
 	    size=RF_size(LB->cmd);
 	    
 	    DDCMSG(D_VERY,GREEN,"RFslave: while(gathered[%d]>=3) cmd=%d size=%d into Rx[%d:%d]:%d"
-		   ,gathered,LB->cmd,size,Rx->head-Rx->buf,Rx->tail-Rx->buf,Queue_Depth(Rx));
+		   ,gathered,LB->cmd,size,(int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx));
 
 	    // we have a chance of a compelete packet
 	    if (Queue_Depth(Rx) >= size){
@@ -120,8 +120,7 @@ void HandleSlaveRF(int RFfd){
 	//  if good CRC, parse and respond or whatever
 		    switch (LB->cmd){
 			case LBC_REQUEST_NEW:
-			    LB_new =(LB_request_new_t *) LB;
-			    
+			    LB_new =(LB_request_new_t *) LB;			    
 
 			    /****      we have a request_new
 			     ****
@@ -153,12 +152,10 @@ void HandleSlaveRF(int RFfd){
 				    resp=1;
 				}
 			    }
-
-
+		    
 			    // now we must respond if 'resp' is true
 
 			    if (resp){
-								
 				my_slot=DevID-low_dev+1;	// the slot we should respond in
 				total_slots=34;			// total number of slots with end padding
 
@@ -197,7 +194,7 @@ void HandleSlaveRF(int RFfd){
 			    } else {
 				DDCMSG(D_RF,RED,"Recieved 'request new devices'   NOT RESPONDING...  BV(%x-%x=%d)=%d AND forget bit=%d and RF_addr=%d",
 				       DevID,low_dev,DevID-low_dev,BV(DevID-low_dev),LB_new->forget_addr&BV(DevID-low_dev), RF_addr);	// we must forget our address
-							    }
+			    }
 			    break;
 
 			case LBC_ASSIGN_ADDR:
@@ -220,8 +217,51 @@ void HandleSlaveRF(int RFfd){
 			    }
 			    break;
 
+			case LBC_REPORT_REQ:
+			    if (LB->addr==RF_addr){
+
+				LB_event_report_t *L=(LB_event_report_t *)(&rLB);
+				LB_report_req_t *LC=(LB_report_req_t *)(LB);
+
+				// build a event report to respond to the report request
+				L->cmd=LBC_EVENT_REPORT;
+				L->addr=RF_addr;
+				L->event=LC->event;
+				L->hits=rand()%10;			// fake 0 to 10 hits.  
+				set_crc8(&rLB);	// calculates the correct CRC and adds it to the end of the packet payload
+				DDCMSG(D_RF,BLUE,"Recieved 'Report Request'.  respond with a LBC_EVENT_REPORT, event=%d hits=%d",L->event,L->hits);
+
+				// now send it to the RF master
+				// after waiting for our timeslot:
+				// this is only for the dumb test.
+				// Nates slave boss will need to be less dumb about this -
+				// it will have to queue packets to send and later do them at the right time.
+				// because this code will barf on more than one resp to it
+				usleep(slottime*(resp_slot+1)*1000);	// plus 1 is the holdoff
+				DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
+
+				result=write(RFfd,&rLB,RF_size(L->cmd));
+				if (verbose&D_RF){	// don't do the sprintf if we don't need to
+				    sprintf(hbuf,"Report Request response to RFmaster  len=%2d wrote %d\n"
+					    ,RF_size(L->cmd),result);
+				    DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(L->cmd));
+				}
+
+				// finish waiting for the slots before proceding
+				usleep(slottime*(total_slots-(resp_slot+1))*1000);
+				DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
+
+			    } else {
+				DDCMSG(D_RF,BLUE,"Dest addr=%d Rfaddr=%d doesn't match current address, cmd = %d",LB->addr,RF_addr,LB->cmd);
+			    }
+
+			    break;
+
 			case LBC_STATUS_REQ:
-			    // lets fake a status so we can send back and see the RFmaster handle it right.
+			    if (LB->addr==RF_addr){
+				DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd= %d",RF_addr,cmd);
+
+				// lets fake a status so we can send back and see the RFmaster handle it right.
 
 			    // create a RESPONSE packet
 			    LB_resp =(LB_status_resp_lifter_t *)(&rLB);	// map our bitfields in
@@ -248,27 +288,21 @@ void HandleSlaveRF(int RFfd){
 				DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
 			    }
 
-				// finish waiting for the slots before proceding
+			    // finish waiting for the slots before proceding
 			    usleep(slottime*(total_slots-(resp_slot+1))*1000);
 			    DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
-
-
-			    
-			    if (LB->addr==RF_addr){
-				DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd= %d",RF_addr,cmd);
-				LB_exp =(LB_expose_t *)(LB);	// map our bitfields in
-
-				DDCMSG(D_RF,BLUE,"Expose: exp hitmode tokill react mfs thermal\n"
-				       "        %3d   %3d     %3d   %3d  %3d   %3d",LB_exp->expose,LB_exp->hitmode,LB_exp->tokill,LB_exp->react,LB_exp->mfs,LB_exp->thermal);
+			    } else {
+				DDCMSG(D_RF,BLUE,"Dest addr=%d Rfaddr=%d doesn't match current address, cmd = %d",LB->addr,RF_addr,LB->cmd);
 			    }
 			    break;
 
 			default:
-
 			    if (LB->addr==RF_addr){
-				DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd = %d",RF_addr,LB->cmd);
-				
-			    }		    
+				DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd = %d  needs some CODE! ",RF_addr,LB->cmd);				
+			    } else {
+				DDCMSG(D_RF,BLUE,"Dest addr=%d Rfaddr=%d doesn't match current address, cmd = %d",LB->addr,RF_addr,LB->cmd);
+			    }
+
 			    break;
 		    }  // switch LB cmd
 		    DeQueue(Rx,size);	// delete just the packet we used
