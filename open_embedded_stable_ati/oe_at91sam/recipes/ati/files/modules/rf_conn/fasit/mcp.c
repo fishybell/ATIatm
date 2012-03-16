@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
     int rereg=1;
     addr_t addr_pool[2048];	// 0 and 2047 cannot be used
     int max_addr;		//  count of our max_addr given out
-    int hunttime,slave_hunting,low;
+    int hunttime,slave_hunting,low,hunt_rotate=0;
     
     LB_packet_t *LB,LB_buf;
     LB_request_new_t *LB_new;
@@ -256,7 +256,11 @@ int main(int argc, char **argv) {
 		// the hunt is over, for now
 		slave_hunting=0;
 		timeout=hunttime*1000;
-		low=low_dev;		// restart the next hunt at the low dev		
+		low=low_dev+hunt_rotate;		// restart the next hunt at the low dev		
+		hunt_rotate += 32;
+		if (hunt_rotate > (high_dev + 32)) {
+		   hunt_rotate = 0;
+		}
 	    } 
 		
 		
