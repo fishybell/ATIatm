@@ -128,8 +128,6 @@ int RF_size(int cmd){
     // set LB_size  based on which command it is
     switch (cmd){
 	case  LBC_STATUS_REQ:
-	case  LBC_REPORT_REQ:
-	case  LBC_EVENT_REPORT:
 	case  LBC_STATUS_NO_RESP:
 	case  LBC_QEXPOSE:
 	    return (3);
@@ -137,6 +135,8 @@ int RF_size(int cmd){
 	case  LBC_STATUS_RESP_LIFTER:
 	case  LBC_POWER_CONTROL:
 	case  LBC_PYRO_FIRE:
+	case  LBC_REPORT_REQ:
+	case  LBC_EVENT_REPORT:
 	    return (4);
 	    
 	case  LBC_MOVE:
