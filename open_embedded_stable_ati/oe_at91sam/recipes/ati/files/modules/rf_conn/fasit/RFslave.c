@@ -115,7 +115,9 @@ void HandleSlaveRF(int RFfd){
 		    timestamp(&elapsed_time,&istart_time,&delta_time);
 		    DDCMSG(D_TIME,CYAN,"RFslave inside good packet at %5ld.%09ld timestamp, delta=%5ld.%09ld"
 			   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-		    
+
+
+		    resp_slot++;	// keep count of our resonse slot
 	// check the CRC
 	//  if good CRC, parse and respond or whatever
 		    switch (LB->cmd){
@@ -309,7 +311,7 @@ void HandleSlaveRF(int RFfd){
 		    gathered-=size;
 		    
 		} else { // if our address matched and the CRC was good
-		    if (crc) {// actually if the crc is bad we need to dequeue just 1 byte
+		    if (!crc) {// actually if the crc is bad we need to dequeue just 1 byte
 			DDCMSG(D_RF,BLUE,"CRC bad.  DeQueueing 1 byte.");
 			DeQueue(Rx,1);	// delete just one byte
 			gathered--;
