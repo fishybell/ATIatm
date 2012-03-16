@@ -297,7 +297,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 	    }
 	    /* Receive message, or continue to recieve message from RF */
 	    DDCMSG(D_VERY,GREEN,"RFmaster: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
-		   gathered,Rptr-Rbuf,Rstart-Rbuf,Rptr-Rstart);
+		   gathered,(int)(Rptr-Rbuf),(int)(Rstart-Rbuf),(int)(Rptr-Rstart));
 
        // after gathering RF data, we're free, tell the Radio Interface client
        if (riclient > 0) {
@@ -311,7 +311,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
 		/* Receive message, or continue to recieve message from RF */
 		DDCMSG(D_VERY,GREEN,"RFmaster: cmd=%d addr=%d RF_size =%2d  Rptr-Rstart=%2d  ",
-		       LB->cmd,LB->addr,size,Rptr-Rstart);
+		       LB->cmd,LB->addr,size,(int)(Rptr-Rstart));
 
 		if ((Rptr-Rstart) >= size){
 		    //  we do have a complete packet
@@ -333,13 +333,13 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
 		    if ((Rptr-Rstart) > size){
 			Rstart+=size;	// step ahead to the next packet
-			DDCMSG(D_VERY,RED,"Stepping to next packet, Rstart=%d Rptr=%d size=%d ",Rstart-Rbuf,Rptr-Rbuf,size);
+			DDCMSG(D_VERY,RED,"Stepping to next packet, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
 			sprintf(buf,"  Next 8 chars in Rbuf at Rstart  ");
 			DDCMSG_HEXB(D_VERY,RED,buf,Rstart,8);
 
 		    } else {
 			Rptr=Rstart=Rbuf;	// reset to the beginning of the buffer
-			DDCMSG(D_VERY,RED,"Resetting to beginning of Rbuf, Rstart=%d Rptr=%d size=%d ",Rstart-Rbuf,Rptr-Rbuf,size);
+			DDCMSG(D_VERY,RED,"Resetting to beginning of Rbuf, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
 		    }
 
 		} else { // if (Rptr-Rstart) > size)

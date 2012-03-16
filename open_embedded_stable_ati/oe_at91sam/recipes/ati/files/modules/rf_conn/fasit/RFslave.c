@@ -89,7 +89,7 @@ void HandleSlaveRF(int RFfd){
 	resp_slot=0;
 	
 	DDCMSG(D_VERY,GREEN,"RFslave: gathered %d  into Rx[%d:%d]:%d"
-	      ,gathered,Rx->head-Rx->buf,Rx->tail-Rx->buf,Queue_Depth(Rx));
+	      ,gathered,(int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx));
 
 	fragment=0;
 	while (gathered>=3&& !fragment){

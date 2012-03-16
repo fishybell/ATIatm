@@ -128,59 +128,40 @@ int RF_size(int cmd){
     // set LB_size  based on which command it is
     switch (cmd){
 	case  LBC_STATUS_REQ:
-	    return (3);
-
+	case  LBC_REPORT_REQ:
 	case  LBC_EVENT_REPORT:
+	case  LBC_STATUS_NO_RESP:
+	case  LBC_QEXPOSE:
 	    return (3);
 
 	case  LBC_STATUS_RESP_LIFTER:
-	    return (4);
-	    
-	case  LBC_STATUS_RESP_MOVER:
-	    return (8);
-	    
-	case  LBC_STATUS_RESP_EXT:
-	    return (11);
-	    
-	case  LBC_STATUS_NO_RESP:
-	    return (3);
-	    
-	case  LBC_EXPOSE:
-	    return (6);
-	    
-	case  LBC_MOVE:
-	    return (5);
-	    
-	case  LBC_CONFIGURE_HIT:
-	    return (6);
-	    
-	case  LBC_GROUP_CONTROL:
-	    return (5);
-	    
-	case  LBC_AUDIO_CONTROL:
-	    return (6);
-	    
 	case  LBC_POWER_CONTROL:
-	    return (4);
-
 	case  LBC_PYRO_FIRE:
 	    return (4);
-
-	case  LBC_QEXPOSE:
-	    return (3);
 	    
+	case  LBC_MOVE:
+	case  LBC_GROUP_CONTROL:
 	case  LBC_QCONCEAL:
 	    return (5);
-	    
+
+	case  LBC_EXPOSE:
+	case  LBC_AUDIO_CONTROL:
+	case  LBC_CONFIGURE_HIT:
 	case  LBC_DEVICE_REG:
 	    return (6);
-	    
-	case  LBC_REQUEST_NEW:
-	    return (10);
 	    
 	case  LBC_ASSIGN_ADDR:
 	    return (7);
 
+	case  LBC_STATUS_RESP_MOVER:
+	    return (8);
+	    
+	case  LBC_REQUEST_NEW:
+	    return (10);
+
+	case  LBC_STATUS_RESP_EXT:
+	    return (11);
+	    	    
 	default:
 	    return (1);
     }
@@ -207,7 +188,7 @@ int gather_rf(int fd, char *tail, char *head,int max){
 	}
     } else {
 	tail+=ready;	// increment the position pointer
-	DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",ready,tail-head);
+	DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",ready,(int)(tail-head));
 	return(tail-head);
     }
 }

@@ -90,7 +90,7 @@ typedef struct state_float_item {
 
 typedef struct minion_state {
     uint32			cap;	// actual capability bitfield - u32 to keep alignment    
-    uint8         dev_type;   // FASIT device type
+    uint8			dev_type;   // FASIT device type
     uint16			state_timer;	// when we next need to process the state
     uint16			padding0;	//   extra space for now
     state_u8_item_t		fault;	// maybe not really an item
@@ -140,12 +140,13 @@ typedef struct minion_state {
 #define F_exp_conceal_B	5
 #define F_exp_conceal_C	6
 
-#define F_up2date	0	// RF and internal state match
-#define F_tell_RF	0x100	// RF needs update 
-#define F_told_RF	0x200	// RF updated, waiting for ack 
-#define F_tell_RCC	0x400	// internal state right, FASIT needs update
-#define F_told_RCC	0x800	// We told FASIT our internal state, waiting on RF 
-#define F_needs_report	0x010	// there needs to be an event report
+#define F_up2date		0	// RF and internal state match
+#define F_tell_RF		0x100	// RF needs update 
+#define F_told_RF		0x200	// RF updated, waiting for ack 
+#define F_tell_RCC		0x400	// internal state right, FASIT needs update
+#define F_told_RCC		0x800	// We told FASIT our internal state, waiting on RF 
+#define F_needs_report		0x010	// there needs to be an event report
+#define F_waiting_for_report	0x020	// there needs to be an event report
 
 
 uint64 htonll( uint64 id);
