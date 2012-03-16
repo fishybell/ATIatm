@@ -1,0 +1,1 @@
+./bcast_client_linux -p 4227 -n 30 | grep -v "0\.0\.0\.0" | sort -u | while read i ; do exec 3<> /dev/tcp/$i/4422 ; echo "i b">&3 ; read 0<&3 ; echo -e -n "$i\t$REPLY" ; echo "i m">&3 ; read 0<&3; echo -e "\t\t$REPLY" ; done
