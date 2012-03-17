@@ -87,6 +87,7 @@ void HandleSlaveRF(int RFfd){
 	/* Receive message, or continue to recieve message from RF */
 
 	resp_slot=0;
+	DDCMSG(D_RF,YELLOW," ZEROING resp_slot",resp_slot);
 	
 	DDCMSG(D_VERY,GREEN,"RFslave: gathered %d  into Rx[%d:%d]:%d"
 	      ,gathered,(int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx));
@@ -221,11 +222,25 @@ void HandleSlaveRF(int RFfd){
 				LB_event_report_t *L=(LB_event_report_t *)(&rLB);
 				LB_report_req_t *LC=(LB_report_req_t *)(LB);
 
-				// build a event report to respond to the report request
 				L->cmd=LBC_EVENT_REPORT;
 				L->addr=RF_addr;
 				L->event=LC->event;
 				L->hits=rand()%10;			// fake 0 to 10 hits.  
+
+				/////////////  FUDGE!
+				////////////   the response slot choice is not working right, but Nate has different code to do this, I assume
+				///////////    So for my test, I am going to say there are 10 slots total (and it should be however many
+				//////////     responses are expected)   And I am going to make resp_slot== RFaddr&0x7 
+				/////////      A system like this might actually work pretty good anyway, but it is not ideal
+				////////       
+				total_slots=10;
+				resp_slot=L->addr&0x7;
+				/////
+				///
+				//
+
+				
+				// build a event report to respond to the report request
 				set_crc8(&rLB);	// calculates the correct CRC and adds it to the end of the packet payload
 				DDCMSG(D_RF,BLUE,"Recieved 'Report Request'.  resp_slot=%d respond with a LBC_EVENT_REPORT, event=%d hits=%d",resp_slot,L->event,L->hits);
 
