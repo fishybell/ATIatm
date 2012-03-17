@@ -613,7 +613,7 @@ void do_kill_internal(void) {
 	if (atomic_read(&hits_to_kill) > 0) {
 		stay_up = !atomic_dec_and_test(&kill_counter);
         // If fasit bob then bob after each hit until killed
-        if (atomic_read(&bob_type) == 1 && stay_up) {
+        if (atomic_read(&bob_type) == 1 && stay_up && atomic_read(&after_kill) == 4) {
            enable_battery_check(0); // disable battery checking while motor is on
            set_target_conceal();
            lifter_position_set(LIFTER_POSITION_DOWN); // conceal now 
