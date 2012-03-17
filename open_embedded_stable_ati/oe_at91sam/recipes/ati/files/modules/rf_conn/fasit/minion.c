@@ -374,7 +374,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 		    break;
 
 		case CID_Expose_Request:
-		    DDCMSG(D_PACKET,RED,"CID_Expose_Request:  message_2100->exp=%d",message_2100->exp) ;
+		    DDCMSG(D_PACKET,RED,"Minion %d:CID_Expose_Request:  message_2100->exp=%d",minion->mID,message_2100->exp) ;
 		    break;
 
 		case CID_Reset_Device:
@@ -443,6 +443,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 		    LB_status_req  =(LB_status_req_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
 		    LB_status_req->cmd=LBC_STATUS_REQ;
 		    LB_status_req->addr=minion->RF_addr;
+		    
 
 		    minion->S.status.flags=F_told_RCC;
 		    minion->S.status.timer=20;
@@ -454,19 +455,23 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 		    result=write(minion->mcp_sock,LB_status_req,RF_size(LB_status_req->cmd));
 		    //  sent LB
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",
-				minion->mID,minion->RF_addr,LB_status_req->cmd,RF_size(LB_status_req->cmd));
+			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d result=%d",
+				minion->mID,minion->RF_addr,LB_status_req->cmd,RF_size(LB_status_req->cmd),result);
 			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_status_req,RF_size(LB_status_req->cmd));
-			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_status_req->cmd),minion->mcp_sock);
 		    }
 		    break;
 
 		case CID_Expose_Request:
-		    DDCMSG(D_PACKET,BLUE,"CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",message_2100->exp);
+		    DDCMSG(D_PACKET,BLACK,"Minion %d: CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",minion->mID,message_2100->exp);
 //		    also build an LB packet  to send
-
+		    DDCMSG(D_PACKET,BLACK,"Minion %d: decide if we are going up or going down(exp=%d)",minion->mID,message_2100->exp);
 		    if (message_2100->exp==90){
+			DDCMSG(D_PACKET,BLUE,"Minion %d: decide if we are going up or going down(exp=%d)",minion->mID,message_2100->exp);
+			
 			LB_exp =(LB_expose_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
+			
+			DDCMSG(D_PACKET,BLACK,"Minion %d: we seem to work here******************* &LB_buf=%p",minion->mID,&LB_buf);
+
 			LB_exp->cmd=LBC_EXPOSE;
 			LB_exp->addr=minion->RF_addr;
 
@@ -498,27 +503,32 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 			// we must assume that it is a 'conceal' that followed the last expose.
 			//        so now the event is over and we need to send the qconceal command
 			//        and the termination of the event time and stuff
-
 			uptime=(elapsed_time->tv_sec - minion->S.exp.elapsed_time.tv_sec)*10;	//  find uptime in tenths of a second
 			uptime+=(elapsed_time->tv_nsec - minion->S.exp.elapsed_time.tv_nsec)/100000000L;	//  find uptime in tenths of a second
-
+			
 			if (uptime>0x7FF){
 			    uptime=0x7ff;		// set time to max (204.7 seconds) if it was too long
 			} else {
 			    uptime&= 0x7ff;
 			}
 
-			LB_exp->expose=0;
-			minion->S.exp.flags=F_exp_conceal_A;	// start (faking FASIT) moving to conceal
+			DDCMSG(D_VERY,BLACK,"Minion %d: uptime=%d",minion->mID,uptime);
 
-			
+			minion->S.exp.newdata=0;
+			minion->S.exp.flags=F_exp_conceal_A;	// start (faking FASIT) moving to conceal
+			minion->S.exp.timer=5;
+
+			DDCMSG(D_VERY,BLACK,"Minion %d: &LB_buf=%p",minion->mID,&LB_buf);			
 			LB_qcon =(LB_qconceal_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
+			DDCMSG(D_VERY,BLACK,"Minion %d: map packet in",minion->mID);
+			
 			LB_qcon->cmd=LBC_QCONCEAL;
 			LB_qcon->addr=minion->RF_addr;
 			LB_qcon->event=minion->S.exp.event;
 			LB_qcon->uptime=uptime;
 			set_crc8(LB_qcon);
-			
+			DDCMSG(D_VERY,BLUE,"Minion %d: called set_crc8",minion->mID);
+
 			// we also need a report for this event from the target, so we will have to send a request_rep packet soon.
 			// but we don't want to send it right yet.
 			//  sending the request report would need to happen not much later than the next expose command - at the latest
@@ -528,12 +538,14 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 			minion->S.event.timer = 50;	// lets try 5.0 seconds
 			
 		    }
+
+		    DDCMSG(D_PACKET,BLUE,"Minion %d: send LB up to MCP   ---- or hang on write",minion->mID);
 		    
 		    result=write(minion->mcp_sock,&LB_buf,RF_size(LB_buf.cmd));
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",minion->mID,minion->RF_addr,LB_buf.cmd,RF_size(LB_buf.cmd));
+			sprintf(hbuf,"Minion %d:m LB packet to MCP address=%4d cmd=%2d msglen=%d result=%d",
+				minion->mID,minion->RF_addr,LB_buf.cmd,RF_size(LB_buf.cmd),result);
 			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,&LB_buf,RF_size(LB_buf.cmd));
-			DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_buf.cmd),minion->mcp_sock);
 		    }
 //  sent LB
 
@@ -1020,7 +1032,7 @@ void *minion_thread(thread_data_t *minion){
 			minion->S.hit.newdata=L->hits;	// who knows, may need to add it to hit.newdata
 			DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'Event_report'. hits=%d  sending 2102 status",
 			       minion->mID,minion->RF_addr,L->hits);
-			sendStatus2102(1, NULL,minion);
+			sendStatus2102(0, NULL,minion);
 			
 		    }
 			break;
@@ -1110,7 +1122,7 @@ void *minion_thread(thread_data_t *minion){
 	 ***      some item[s] in the state need some action.
 	 ***/
 
-#if 0
+#if 1
 	timestamp(&elapsed_time,&istart_time,&delta_time);
 	DDCMSG(D_TIME,CYAN,"MINION %d: Begin timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
 	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
@@ -1150,17 +1162,17 @@ void *minion_thread(thread_data_t *minion){
 	if (!minion->S.state_timer)  { // timer reached zero
 	//   We should only do the section if the next timer is really up, and
 	//   not just if another fd was ready about the same time
-	DCMSG(RED,"MINION %d: timer update.   exp.flags=0x%x   event.flags=0x%x"
-	       ,minion->mID,minion->S.exp.flags,minion->S.event.flags);
+	DCMSG(RED,"MINION %d: timer update.   exp.flags=0x%x   event.flags=0x%x",minion->mID,minion->S.exp.flags,minion->S.event.flags);
 	
 	// if there is an expose flag set, we then need to do something
 	if (minion->S.exp.flags!=F_exp_ok) {
 
 	    if (minion->S.exp.timer>elapsed_tenths){
 		minion->S.exp.timer-=elapsed_tenths;	// not timed out.  but decrement out timer
+		DCMSG(RED,"MINION %d: not timed out.   S.exp.timer=%d   S.event.timer=%d",minion->mID,minion->S.exp.timer,minion->S.event.timer);
 
 	    } else {	// timed out,  move to the next state, do what it should.
-
+		
 		switch (minion->S.exp.flags) {
 
 		    case F_exp_expose_A:

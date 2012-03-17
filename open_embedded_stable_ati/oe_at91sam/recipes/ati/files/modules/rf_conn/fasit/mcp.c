@@ -213,13 +213,13 @@ int main(int argc, char **argv) {
      ****************************************************************/
 
     /* set up polling so we can monitor the minions and the RFmaster*/
-    fds = epoll_create(MAX_NUM_Minions);
+    fds = epoll_create(2048);
     memset(&ev, 0, sizeof(ev));
     ev.events = EPOLLIN;
     // listen to the RFmaster
     ev.data.fd = RF_sock; // indicates listener fd
     if (epoll_ctl(fds, EPOLL_CTL_ADD, RF_sock, &ev) < 0) {
-	perror("epoll RF_sock insertion error:\n");
+	perror("MCP: epoll RF_sock insertion error:\n");
 	return 1;
     }
 
@@ -230,10 +230,10 @@ int main(int argc, char **argv) {
     while(1) {
 
 	// wait for data from either the RFmaster or from a minion
-	DDCMSG(D_POLL,RED,"epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
+	DDCMSG(D_POLL,RED,"MCP: epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
 
 	ready_fd_count = epoll_wait(fds, events, MAX_NUM_Minions, timeout);
-	DDCMSG(D_POLL,RED,"epoll_wait over   ready_fd_count = %d",ready_fd_count);
+	DDCMSG(D_POLL,RED,"MCP: epoll_wait over   ready_fd_count = %d",ready_fd_count);
 
 	if (timeout<3000) timeout = 10000;
 	
@@ -242,7 +242,6 @@ int main(int argc, char **argv) {
 	//  send_LB();   // send it
 	//
 	if (!ready_fd_count /* || idle long enough */  ){
-
 	    if (slave_hunting==1){
 		low=low_dev;
 		slave_hunting++;
@@ -260,11 +259,11 @@ int main(int argc, char **argv) {
       // if we've rotated through the hunt, use the hunttime, otherwise use slottime
 		if (hunt_rotate) {
 		    timeout=hunttime*1000;	// idle time to wait for next go around
-      } else {
+		} else {
 		    timeout=slottime*40;	// idle time to wait for next go around
 		}
-		
-		
+
+
 	    DDCMSG(D_NEW,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
 /***  we need to use the range we were invoked with
  ***  we need to handle a range greater than 32
@@ -296,10 +295,12 @@ int main(int argc, char **argv) {
 		// or one of our 'special packets' that means something else - irregardless we have to
 		// have a case statement to process it properly
 ////////////////////////////////////////////////////////////////////////////////////////////
-		DDCMSG(D_POLL,RED,"ready_fd   %d  RF_sock=%d",events[ready_fd].data.fd,RF_sock);
+		DDCMSG(D_POLL,RED,"MCP: ready_fd_count %d  events[ready_fd=%d].data.fd=%d  RF_sock=%d",
+		       ready_fd_count,ready_fd,events[ready_fd].data.fd,RF_sock);
 //   major slow debug line		usleep(100000);
 		if (RF_sock==events[ready_fd].data.fd){
-		    msglen=read(RF_sock, buf, 1023);
+
+		    msglen=read(RF_sock, buf, 1023);    
 		    if (msglen<0) {
 			strerror_r(errno,buf,BufSize);			    
 			DCMSG(RED,"MCP: RF_sock error %s  fd=%d\n",buf,RF_sock);
@@ -313,6 +314,7 @@ int main(int argc, char **argv) {
 			exit(-1);
 		    }
 
+		    DDCMSG(D_POLL,RED,"MCP:  read %d from RF socket",msglen);
 
 		    LB=(LB_packet_t *)buf;
 		    // do some checking - like to see if the CRC is OKAY
@@ -524,7 +526,7 @@ int main(int argc, char **argv) {
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
 				sprintf(hbuf,"MCP: passing RF packet from RF_addr %d on to Minion %d (fd=%d).   cmd=%2d  length=%d msglen=%d"
 					,LB->addr,addr_pool[LB->addr].mID,minions[addr_pool[LB->addr].mID].minion,LB->cmd,RF_size(LB->cmd),msglen);
-				DDCMSG2_HEXB(D_RF,BLUE,hbuf,LB,RF_size(LB->cmd));
+				DDCMSG2_HEXB(D_RF,RED,hbuf,LB,RF_size(LB->cmd));
 			    }
 ////////////////////////////////////////////////////////////////  minions[mID].minion  should be the right fd for the minion   //////////////////////////////////////
 			    // do the copy down here
@@ -542,18 +544,26 @@ int main(int argc, char **argv) {
 		    } // else it is a command other than devreg
 		} // if it was a RF_sock fd that was ready
 
+
 		else { // it is from a minion
 		    //   we have to do some processing, mainly just pass on to the RF_sock
+
+		    DDCMSG(D_POLL,RED,"MCP: ----------------\n-------------------\n------- minion is ready   ");
+		    
 		    /***
 		     *** we are ready to read from a minion - use the event.data.ptr to know the minion
 		     ***   we should just have to copy the message down to the RF
 		     ***   and we need to deal with special cases like the minion dieing.
 		     ***   */
+		    
 		    //		    minion_fd=events[ready_fd].data.fd;	// don't know what this is , but it aint right
 		    minion=(thread_data_t *)events[ready_fd].data.ptr;
 		    minion_fd=minion->minion;		    
 		    mID=minion->mID;
-		    DDCMSG(D_POLL,YELLOW,"MCP: fd %d for minion %d ready  [RF_addr=%d]\n",minion_fd,mID,minion->RF_addr);
+		    DDCMSG(D_POLL,RED,"MCP: events[ready_fd=%d].data.fd=%d ==minion->minion=%d for minion %d ready  [RF_addr=%d]  -}",
+			   ready_fd,events[ready_fd].data.fd,minion_fd,mID,minion->RF_addr);		    
+		    
+		    DDCMSG(D_POLL,BLUE,"MCP: fd %d for minion %d ready  [RF_addr=%d]  -}",minion_fd,mID,minion->RF_addr);
 		    if(minion_fd>2048){
 			DCMSG(RED,"MCP:  Trying create more than 2048 minions!  Call the Wizard");
 			exit(-1);
@@ -561,12 +571,12 @@ int main(int argc, char **argv) {
 		    msglen=read(minion_fd, buf, 1023);
 		    LB=(LB_packet_t *)buf;
 		    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			sprintf(hbuf,"MCP: read Minion %d's LB packet. address=%d  cmd=%d  length=%d msglen=%d"
+			sprintf(hbuf,"MCP: read Minion %d's LB packet. address=%d  cmd=%d  length=%d msglen=%d   -}"
 				,mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
-			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,buf,RF_size(LB->cmd));
+			DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,RF_size(LB->cmd));
 		    }
 		    if (!msglen){
-			DCMSG(RED,"MCP:  read from minion returned 0!\n");
+			DCMSG(RED,"MCP:  attempted read from minion returned 0!\n");
 			sleep(1);
 		    } else {
 			// just display the packet for debugging
@@ -579,9 +589,9 @@ int main(int argc, char **argv) {
 			    exit(-1);
 			}
 			if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			    sprintf(hbuf,"MCP: passing Minion %d's LB packet to RFmaster address=%d  cmd=%d  length=%d write returned=%d"
+			    sprintf(hbuf,"MCP: passing Minion %d's LB packet to RF_addr=%d cmd=%d length=%d result=%d  -}"
 				    ,mID,LB->addr,LB->cmd,RF_size(LB->cmd),result);
-			    DDCMSG2_HEXB(D_RF,YELLOW,hbuf,buf,RF_size(LB->cmd));
+			    DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,RF_size(LB->cmd));
 			}
 		    }
 
