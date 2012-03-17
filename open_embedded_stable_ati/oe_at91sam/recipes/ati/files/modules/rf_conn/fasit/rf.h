@@ -271,7 +271,7 @@ typedef struct LB_report_req {
 //                                                  LBC_EVENT_REPORT packet
 //   LBC_EVENT_REPORT packet
 typedef struct LB_event_report {
-    // 4 bytes
+    // 5 bytes
     uint32 cmd:5 __attribute__ ((packed));
     uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     uint32 event:6 __attribute__ ((packed));

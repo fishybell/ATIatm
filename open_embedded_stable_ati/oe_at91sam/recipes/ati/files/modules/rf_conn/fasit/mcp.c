@@ -494,11 +494,13 @@ int main(int argc, char **argv) {
 		    // this packet must also get sent to the minion
 			result=write(minions[addr_pool[addr_cnt].mID].minion,LB_addr,RF_size(LB_addr->cmd));
 			if (result<0) {
-			    DCMSG(RED,"MCP: regX Sent %d bytes to minion %d at fd=%d\n",result,addr_cnt,minions[addr_pool[addr_cnt].mID].minion);
+			    DCMSG(RED,"MCP: regX Sent %d bytes to minion %d at fd=%d",
+				  result,addr_cnt,minions[addr_pool[addr_cnt].mID].minion);
 			    exit(-1);
 			}
 
-			DDCMSG(D_NEW,BLUE,"MCP: regX  Sent %d bytes to minion %d  fd=%d",result,addr_pool[addr_cnt].mID,minions[addr_pool[addr_cnt].mID].minion);
+			DDCMSG(D_NEW,BLUE,"MCP: regX  Sent %d bytes to minion %d  fd=%d",
+			       result,addr_pool[addr_cnt].mID,minions[addr_pool[addr_cnt].mID].minion);
 
 		    // now send it to the RF master
 			result=write(RF_sock,LB_addr,RF_size(LB_addr->cmd));
@@ -514,24 +516,28 @@ int main(int argc, char **argv) {
 		    } else {	// it is any other command than dev regx
 			// which means we just copy it on to the minion so it can process it
 
+			////   There WAS/is? a bug here where we (the MCP) was sending the packet to the wrong minion
+			////    or maybe we were just mis-displaying which minion we sent it to.  The Fix is in
 			// just display the packet for debugging
 			LB=(LB_packet_t *)buf;
 			if (addr_pool[LB->addr].inuse){			    
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
-				sprintf(hbuf,"MCP: passing RF packet from RF_addr %4d on to Minion %d.   cmd=%2d  length=%d msglen=%d"
-					,LB->addr, mID,LB->cmd,RF_size(LB->cmd),msglen);
+				sprintf(hbuf,"MCP: passing RF packet from RF_addr %d on to Minion %d (fd=%d).   cmd=%2d  length=%d msglen=%d"
+					,LB->addr,addr_pool[LB->addr].mID,minions[addr_pool[LB->addr].mID].minion,LB->cmd,RF_size(LB->cmd),msglen);
 				DDCMSG2_HEXB(D_RF,BLUE,hbuf,LB,RF_size(LB->cmd));
 			    }
 
 			    // do the copy down here
-			    result=write(minions[addr_pool[addr_cnt].mID].minion,LB,RF_size(LB->cmd));			    
+			    result=write(minions[addr_pool[LB->addr].mID].minion,LB,RF_size(LB->cmd));    
 			    if (result<0) {
 				strerror_r(errno,buf,BufSize);			    
-				DCMSG(RED,"MCP:  write to minion %d error %s  fd=%d\n",mID,buf,minions[addr_pool[addr_cnt].mID].minion);
+				DCMSG(RED,"MCP:  write to minion %d error %s  fd=%d",
+				      addr_pool[LB->addr].mID,buf,minions[addr_pool[addr_cnt].mID].minion);
 				exit(-1);
 			    }
 
-			    DDCMSG(D_RF,BLUE,"MCP: 3 Sent %d bytes to minion %d at fd=%d\n",result,mID,minions[addr_pool[addr_cnt].mID].minion);
+			    DDCMSG(D_RF,BLUE,"MCP: @3 Sent %d bytes to minion %d at fd=%d",
+				   result,addr_pool[LB->addr].mID,minions[addr_pool[LB->addr].mID].minion);
 			}  // the address in in use - which is good, we wnat to send it somewhere
 		    } // else it is a command other than devreg
 		} // if it was a RF_sock fd that was ready

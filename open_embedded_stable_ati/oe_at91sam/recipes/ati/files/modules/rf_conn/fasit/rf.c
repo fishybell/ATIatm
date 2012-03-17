@@ -136,12 +136,12 @@ int RF_size(int cmd){
 	case  LBC_POWER_CONTROL:
 	case  LBC_PYRO_FIRE:
 	case  LBC_REPORT_REQ:
-	case  LBC_EVENT_REPORT:
 	    return (4);
 	    
 	case  LBC_MOVE:
 	case  LBC_GROUP_CONTROL:
 	case  LBC_QCONCEAL:
+	case  LBC_EVENT_REPORT:
 	    return (5);
 
 	case  LBC_EXPOSE:

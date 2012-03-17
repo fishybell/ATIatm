@@ -225,7 +225,7 @@ void HandleSlaveRF(int RFfd){
 				L->cmd=LBC_EVENT_REPORT;
 				L->addr=RF_addr;
 				L->event=LC->event;
-				L->hits=rand()%10;			// fake 0 to 10 hits.  
+				L->hits=rand()&0xF;			// fake 0 to 15 hits.  
 
 				/////////////  FUDGE!
 				////////////   the response slot choice is not working right, but Nate has different code to do this, I assume

@@ -172,7 +172,7 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
     //   DCMSG(YELLOW,"retrieved hits with doHits(-1) and setting to %d",hits) ; 
 
     // hit record
-    msg.body.hit = htons(minion->S.hit.newdata);    
+    msg.body.hit = htons(minion->S.hit.newdata);
     msg.body.hit_conf.on = minion->S.on.newdata;
     msg.body.hit_conf.react = minion->S.react.newdata;
     msg.body.hit_conf.tokill = htons(minion->S.tokill.newdata);
@@ -998,7 +998,7 @@ void *minion_thread(thread_data_t *minion){
 
 		LB=(LB_packet_t *)buf;	// map the header in
 		crc= crc8(LB);
-		DDCMSG(D_PACKET,YELLOW,"MINION %d: LB packet (cmd=%2d addr=%d crc=%d)", minion->mID,LB->cmd,LB->addr,crc);
+		DDCMSG(D_RF,YELLOW,"MINION %d: LB packet (cmd=%2d addr=%d crc=%d)", minion->mID,LB->cmd,LB->addr,crc);
 		switch (LB->cmd){
 		    case LBC_REQUEST_NEW:
 			DDCMSG(D_NEW,YELLOW,"Recieved 'request new devices' packet.");
@@ -1014,8 +1014,23 @@ void *minion_thread(thread_data_t *minion){
 			
 			break;
 
+		    case LBC_EVENT_REPORT:
+		    {
+			LB_event_report_t *L=(LB_event_report_t *)(LB);	// map our bitfields in
+			minion->S.hit.newdata=L->hits;	// who knows, may need to add it to hit.newdata
+			DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'Event_report'. hits=%d  sending 2102 status",
+			       minion->mID,minion->RF_addr,L->hits);
+
+			sendStatus2102(1, NULL,minion);
+			
+		    }
+			break;
+
+
+
+			
 		    default:
-			DDCMSG(D_PACKET,YELLOW,"Minion %d:  recieved a cmd=%d    don't do anything",minion->mID,LB->cmd);
+			DDCMSG(D_RF,YELLOW,"Minion %d:  recieved a cmd=%d    don't do anything",minion->mID,LB->cmd);
 
 			break;
 		}  // switch LB cmd
