@@ -472,13 +472,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 
 //				minion->S.exp.data=0;			// cheat and set the current state to 45
 			minion->S.exp.newdata=message_2100->exp;	// set newdata to be the future state
-			if (message_2100->exp==90){
-			    LB_exp->expose=1;
-			    minion->S.exp.flags=F_exp_expose_A;	// start it moving to expose
-			} else if (message_2100->exp==0){
-			    LB_exp->expose=0;
-			    minion->S.exp.flags=F_exp_conceal_A;	// start it moving to conceal
-			}
+			LB_exp->expose=1;
+			minion->S.exp.flags=F_exp_expose_A;	// start (faking FASIT) moving to expose
 
 			minion->S.exp.timer=5;
 
@@ -512,6 +507,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 			} else {
 			    uptime&= 0x7ff;
 			}
+
+			LB_exp->expose=0;
+			minion->S.exp.flags=F_exp_conceal_A;	// start (faking FASIT) moving to conceal
+
+			
 			LB_qcon =(LB_qconceal_t *)&LB_buf;	// make a pointer to our buffer so we can use the bits right
 			LB_qcon->cmd=LBC_QCONCEAL;
 			LB_qcon->addr=minion->RF_addr;
@@ -1020,7 +1020,6 @@ void *minion_thread(thread_data_t *minion){
 			minion->S.hit.newdata=L->hits;	// who knows, may need to add it to hit.newdata
 			DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'Event_report'. hits=%d  sending 2102 status",
 			       minion->mID,minion->RF_addr,L->hits);
-
 			sendStatus2102(1, NULL,minion);
 			
 		    }
@@ -1186,7 +1185,7 @@ void *minion_thread(thread_data_t *minion){
 			break;
 
 		    case F_exp_expose_C:
-			// it timed
+			// it timed out
 			break;
 
 		    case F_exp_conceal_A:
@@ -1265,6 +1264,7 @@ void *minion_thread(thread_data_t *minion){
 	// run through all the timers and get the next time we need to process
 #define Set_Timer(T) { if ((T>0)&&(T<minion->S.state_timer)) minion->S.state_timer=T; }
 
+	
 	minion->S.state_timer = 900;	// put in a worst case starting value of 90 seconds
 	Set_Timer(minion->S.exp.timer);		// if arg is >0 and <timer, it is the new timer
 	Set_Timer(minion->S.event.timer);		// if arg is >0 and <timer, it is the new timer

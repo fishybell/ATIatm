@@ -66,6 +66,7 @@ void HandleSlaveRF(int RFfd){
     DevID=getDevID();
     DCMSG(BLUE,"RFslave: DevID = 0x%06X",DevID);
 
+    srand(DevID);	// randomize - otherwise when we fake hit data, every target looks the same!
     // initialize our gathering buffer
     Rx=queue_init(Rxsize);	// incoming Rx buffer
    

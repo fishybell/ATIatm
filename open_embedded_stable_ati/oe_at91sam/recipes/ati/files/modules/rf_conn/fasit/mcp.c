@@ -401,40 +401,40 @@ int main(int argc, char **argv) {
 				minions[mID].devid=LB_devreg->devid;	// use the actual device id (MAC address)
 				minions[mID].seq=0;	// the seq number for this minions transmissions to RCC
 
-            switch (LB_devreg->dev_type) {
-                case RF_Type_SIT_W_MFS:
-                    minions[mID].S.cap|=PD_NES;	// add the NES capability
-                    minions[mID].S.dev_type = Type_SIT;
-                    break;
-                case RF_Type_SIT:
-                    minions[mID].S.dev_type = Type_SIT;
-                    break;
-                case RF_Type_SAT:
-                    minions[mID].S.dev_type = Type_SAT;
-                    break;
-                case RF_Type_HSAT:
-                    minions[mID].S.dev_type = Type_HSAT;
-                    break;
-                case RF_Type_SES:
-                    minions[mID].S.dev_type = Type_SES;
-                    break;
-                case RF_Type_BES:
-                    minions[mID].S.dev_type = Type_BES;
-                    break;
-                case RF_Type_MIT:
-                    minions[mID].S.dev_type = Type_MIT;
-                    break;
-                case RF_Type_MAT:
-                    minions[mID].S.dev_type = Type_MAT;
-                    break;
-                case RF_Type_Unknown:
-                    minions[mID].S.dev_type = Type_SIT;
-                    break;
-            }
+				switch (LB_devreg->dev_type) {
+				    case RF_Type_SIT_W_MFS:
+					minions[mID].S.cap|=PD_NES;	// add the NES capability
+					minions[mID].S.dev_type = Type_SIT;
+					break;
+				    case RF_Type_SIT:
+					minions[mID].S.dev_type = Type_SIT;
+					break;
+				    case RF_Type_SAT:
+					minions[mID].S.dev_type = Type_SAT;
+					break;
+				    case RF_Type_HSAT:
+					minions[mID].S.dev_type = Type_HSAT;
+					break;
+				    case RF_Type_SES:
+					minions[mID].S.dev_type = Type_SES;
+					break;
+				    case RF_Type_BES:
+					minions[mID].S.dev_type = Type_BES;
+					break;
+				    case RF_Type_MIT:
+					minions[mID].S.dev_type = Type_MIT;
+					break;
+				    case RF_Type_MAT:
+					minions[mID].S.dev_type = Type_MAT;
+					break;
+				    case RF_Type_Unknown:
+					minions[mID].S.dev_type = Type_SIT;
+					break;
+				}
 
 				/*   fork a minion */    
 				if ((child = fork()) == -1) perror("fork");
-				
+
 				if (child) {
 				    /* This is the parent. */
 				    DDCMSG(D_MINION,RED,"MCP forked minion %d", mID);
@@ -460,8 +460,8 @@ int main(int argc, char **argv) {
 				    return 1;
 				}
 
-				DDCMSG(D_NEW,RED,"MCP: assigning address slot #%d  mID=%d inuse=%d "
-				       ,addr_cnt,addr_pool[addr_cnt].mID,addr_pool[addr_cnt].inuse);
+				DDCMSG(D_NEW,RED,"MCP: assigning address slot #%d  mID=%d inuse=%d fd=%d"
+				       ,addr_cnt,addr_pool[addr_cnt].mID,addr_pool[addr_cnt].inuse,minions[addr_pool[addr_cnt].mID].minion);
 
 
 			    /***   end of create a new minion 
@@ -517,8 +517,8 @@ int main(int argc, char **argv) {
 			// which means we just copy it on to the minion so it can process it
 
 			////   There WAS/is? a bug here where we (the MCP) was sending the packet to the wrong minion
-			////    or maybe we were just mis-displaying which minion we sent it to.  The Fix is in
-			// just display the packet for debugging
+			////    No, we are sending the packet back to ourselves..................
+			//       display the packet for debugging
 			LB=(LB_packet_t *)buf;
 			if (addr_pool[LB->addr].inuse){			    
 			    if (verbose&D_RF){	// don't do the sprintf if we don't need to
@@ -526,7 +526,7 @@ int main(int argc, char **argv) {
 					,LB->addr,addr_pool[LB->addr].mID,minions[addr_pool[LB->addr].mID].minion,LB->cmd,RF_size(LB->cmd),msglen);
 				DDCMSG2_HEXB(D_RF,BLUE,hbuf,LB,RF_size(LB->cmd));
 			    }
-
+////////////////////////////////////////////////////////////////  minions[mID].minion  should be the right fd for the minion   //////////////////////////////////////
 			    // do the copy down here
 			    result=write(minions[addr_pool[LB->addr].mID].minion,LB,RF_size(LB->cmd));    
 			    if (result<0) {
@@ -569,7 +569,6 @@ int main(int argc, char **argv) {
 			DCMSG(RED,"MCP:  read from minion returned 0!\n");
 			sleep(1);
 		    } else {
-
 			// just display the packet for debugging
 			LB=(LB_packet_t *)buf;
 			// do the copy down here
