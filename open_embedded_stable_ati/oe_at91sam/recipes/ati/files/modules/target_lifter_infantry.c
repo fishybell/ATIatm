@@ -17,6 +17,7 @@
 #define LIFTER_TYPE  	"infantry"
 
 #define TIMEOUT_IN_SECONDS		3
+#define BOB_TIMEOUT_IN_MILLISECONDS		1000
 #define SENSOR_TIMEOUT_LEAVE_IN_MILLISECONDS		250
 #define SENSOR_TIMEOUT_ARRIVE_IN_MILLISECONDS	2000
 
@@ -107,6 +108,10 @@ static void sensor_timeout_leave_fire(unsigned long data);
 static struct timer_list sensor_timeout_leave_list = TIMER_INITIALIZER(sensor_timeout_leave_fire, 0, 0);
 static void sensor_timeout_arrive_fire(unsigned long data);
 static struct timer_list sensor_timeout_arrive_list = TIMER_INITIALIZER(sensor_timeout_arrive_fire, 0, 0);
+
+// Timer for bob kills
+static void bob_timeout_fire(unsigned long data);
+static struct timer_list bob_timeout_list = TIMER_INITIALIZER(bob_timeout_fire, 0, 0);
 
 //---------------------------------------------------------------------------
 // Maps the position to position name.
@@ -239,6 +244,38 @@ static void sensor_timeout_arrive_fire(unsigned long data)
             do_fault(ERR_not_reach_expose); // Did not reach expose switch
          }
 		}
+    }
+
+//---------------------------------------------------------------------------
+// Starts the timeout timer.
+//---------------------------------------------------------------------------
+static int sensorTimerArriveDirection;
+static void bob_timeout_start()
+	{
+	mod_timer(&bob_timeout_list, jiffies+(BOB_TIMEOUT_IN_MILLISECONDS*HZ/1000));
+	}
+
+//---------------------------------------------------------------------------
+// Stops the timeout timer.
+//---------------------------------------------------------------------------
+static void bob_timeout_stop(void)
+	{
+	del_timer(&bob_timeout_list);
+	}
+
+//---------------------------------------------------------------------------
+// The function that gets called when the timeout fires.
+//---------------------------------------------------------------------------
+static void bob_timeout_fire(unsigned long data)
+    {
+    int readLimit;
+    bob_timeout_stop();
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+
+        lifter_position_set(LIFTER_POSITION_UP);
     }
 
 //---------------------------------------------------------------------------

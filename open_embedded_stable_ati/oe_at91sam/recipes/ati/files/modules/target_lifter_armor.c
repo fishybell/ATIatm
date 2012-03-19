@@ -39,6 +39,7 @@
 #define LIFTER_TYPE  "armor"
 
 #define TIMEOUT_IN_SECONDS  14
+#define BOB_TIMEOUT_IN_MILLISECONDS		500
 #define SENSOR_TIMEOUT_LEAVE_IN_MILLISECONDS		1000
 #define SENSOR_TIMEOUT_ARRIVE_IN_MILLISECONDS	15000
 
@@ -232,6 +233,38 @@ static void sensor_timeout_arrive_fire(unsigned long data)
     }
 
 //---------------------------------------------------------------------------
+// Starts the timeout timer.
+//---------------------------------------------------------------------------
+static int sensorTimerArriveDirection;
+static void bob_timeout_start()
+	{
+	mod_timer(&bob_timeout_list, jiffies+(BOB_TIMEOUT_IN_MILLISECONDS*HZ/1000));
+	}
+
+//---------------------------------------------------------------------------
+// Stops the timeout timer.
+//---------------------------------------------------------------------------
+static void bob_timeout_stop(void)
+	{
+	del_timer(&bob_timeout_list);
+	}
+
+//---------------------------------------------------------------------------
+// The function that gets called when the timeout fires.
+//---------------------------------------------------------------------------
+static void bob_timeout_fire(unsigned long data)
+    {
+    int readLimit;
+    bob_timeout_stop();
+    if (!atomic_read(&full_init))
+        {
+        return;
+        }
+
+        lifter_position_set(LIFTER_POSITION_UP);
+    }
+
+//---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
 static int hardware_motor_on(int direction) {
@@ -385,7 +418,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
 	      if (atomic_read(&at_conceal) ==  1) {
             atomic_set(&at_conceal, 0);
-            lifter_position_set(LIFTER_POSITION_UP);
+            bob_timeout_start();
          }
 
         }
