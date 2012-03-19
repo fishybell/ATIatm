@@ -250,6 +250,8 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_STATUS_RESP_MOVER:
          case LBC_STATUS_RESP_EXT:
          case LBC_STATUS_NO_RESP:
+         case LBC_EVENT_REPORT:
+         case LBC_REPORT_REQ:
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
          case LBC_QEXPOSE:
@@ -303,6 +305,7 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
          } else {
             switch (mnum) {
                HANDLE_RF (STATUS_REQ);
+               HANDLE_RF (REPORT_REQ);
                HANDLE_RF (EXPOSE);
                HANDLE_RF (MOVE);
                HANDLE_RF (CONFIGURE_HIT);
@@ -329,6 +332,52 @@ int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
    // wait 'til we have the most up-to-date information to send
    fc->waiting_status_resp = 1;
    return send_2100_status_req(fc); // gather latest information
+}
+
+int handle_REPORT_REQ(fasit_connection_t *fc, int start, int end) {
+   LB_report_req_t *pkt = (LB_report_req_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_RF|D_VERY,RED, "handle_REPORT_REQ(%8p, %i, %i)", fc, start, end);
+   return send_EVENT_REPORT(fc, pkt->event);
+}
+
+// returns 1 if a > b, 0 if a == b, -1 if a < b
+int compTime(struct timespec a, struct timespec b) {
+   if (a.tv_sec > b.tv_sec) {
+      return 1;
+   } else if (a.tv_sec == b.tv_sec) {
+      if (a.tv_nsec > b.tv_nsec) {
+         return 1;
+      } else if (a.tv_nsec == b.tv_nsec) {
+         return 0;
+      } else {
+         return -1;
+      }
+   } else {
+      return -1;
+   }
+}
+
+int send_EVENT_REPORT(fasit_connection_t *fc, int event) {
+   int i;
+   // create message from parts of fc->last_status
+   LB_event_report_t bdy;
+   DDCMSG(D_RF|D_VERY,RED, "send_EVENT_REPORT(%08X,%i)", fc, event);
+   bdy.cmd = LBC_STATUS_RESP_LIFTER;
+   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
+   bdy.event = event;
+   bdy.hits = 0;
+   for (i = 0; i < fc->hits_per_event[event]; i++) { // find valid hits for this event
+      if (compTime(fc->event_starts[event], fc->hit_times[event][i]) <= 0 &&
+          compTime(fc->event_ends[event], fc->hit_times[event][i]) >= 0) {
+         // hit was between start and end
+         bdy.hits++;
+      }
+   }
+
+   // set crc and send
+   set_crc8(&bdy);
+   queueMsg(fc, &bdy, RF_size(LBC_EVENT_REPORT));
+   return mark_rfWrite;
 }
 
 int send_STATUS_RESP(fasit_connection_t *fc) {
@@ -480,9 +529,13 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
       }
    }
 
+   // change event
+   fc->current_event = pkt->event;
+   clock_gettime(CLOCK_MONOTONIC,&fc->event_starts[fc->current_event]);
+
    // send configure hit sensing
    retval |= send_2100_conf_hit(fc, 4, /* blank on conceal */
-                                0, /* reset hit count */
+                                0, /* reset hit count for this new event */
                                 fc->hit_react, /* remembered hit reaction */
                                 pkt->tokill, /* hits to kill */
                                 fc->hit_sens, /* remembered hit sensitivity */
@@ -676,7 +729,18 @@ int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
+   struct timespec *tv;
+   LB_qconceal_t *pkt = (LB_qconceal_t *)(fc->rf_ibuf + start);
    DDCMSG(D_RF|D_VERY,RED, "handle_QCONCEAL(%8p, %i, %i)", fc, start, end);
+   // remember end time (not now, but the actual end time based on the "up" time)
+   tv = &fc->event_ends[fc->current_event]; // for convenience sake, use a pointer
+   *tv = fc->event_starts[fc->current_event]; // start with a copy
+   tv->tv_nsec += 100000000L * pkt->uptime; // convert deciseconds to nanoseconds
+   while (tv->tv_nsec > 1000000000L) { // carry over any seconds
+      tv->tv_nsec -= 1000000000L;
+      tv->tv_sec++;
+   }
+
    // send exposure request
    return send_2100_exposure(fc, 0); // 0^ = concealed
 }

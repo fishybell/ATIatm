@@ -4,6 +4,29 @@
 #include "slaveboss.h"
 #include "fasit_debug.h"
 
+void log_ResetHits(fasit_connection_t *fc) {
+   int i;
+   DDCMSG(D_PACKET, RED, "Reset hits for %i", fc->current_event);
+   for (i = 0; i< 256; i++) {
+      D_memset(&fc->hit_times[fc->current_event][i], 0, sizeof(struct timespec));
+   }
+   fc->hits_per_event[fc->current_event] = 0;
+}
+
+void log_NewHits(fasit_connection_t *fc, int new_hits) {
+   // got new hits
+   struct timespec tv;
+   clock_gettime(CLOCK_MONOTONIC,&tv);
+   DDCMSG(D_PACKET, RED, "Remembering %i new hits", new_hits);
+   
+   // log each hit time individually
+   while (new_hits-- > 0) {
+      if (++fc->hits_per_event[fc->current_event] <= 255) {
+         fc->hit_times[fc->current_event][fc->hits_per_event[fc->current_event]] = tv;
+      }
+   }
+}
+
 // we don't worry about clearing the data before a valid message, just up to the end
 static void clearBuffer(fasit_connection_t *fc, int end) {
    if (end >= fc->fasit_ilen) {
@@ -451,7 +474,12 @@ int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int t
 
    // remember for later
    fc->hit_on = on;
-   DDCMSG(D_PACKET,CYAN, "Setting Hits to %i", hit);
+   DDCMSG(D_PACKET, RED, "Setting Hits to %i", hit);
+   if (hit > fc->hit_hit) {
+      log_NewHits(fc, hit - fc->hit_hit);
+   } else if (hit == 0) {
+      log_ResetHits(fc);
+   }
    fc->hit_hit = hit;
    fc->hit_react = react;
    fc->hit_tokill = tokill;
@@ -504,7 +532,9 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    }
    // remember hit sensing settings
    fc->hit_on = fc->f2102_resp.body.hit_conf.on;
-   DDCMSG(D_PACKET,CYAN, "Setting Hits to %i", htons(fc->f2102_resp.body.hit));
+   if (htons(fc->f2102_resp.body.hit) > fc->hit_hit) {
+      log_NewHits(fc, htons(fc->f2102_resp.body.hit) - fc->hit_hit);
+   }
    fc->hit_hit = htons(fc->f2102_resp.body.hit);
    fc->hit_react = fc->f2102_resp.body.hit_conf.react;
    fc->hit_tokill = htons(fc->f2102_resp.body.hit_conf.tokill);
@@ -527,7 +557,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
 int send_2110(fasit_connection_t *fc, int on, int mode, int idelay, int rdelay) {
    FASIT_header hdr;
    FASIT_2110 bdy;
-   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_conf_hit(%8p, %i, %i, %i, %i)", fc, on, mode, idelay, rdelay);
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2110(%8p, %i, %i, %i, %i)", fc, on, mode, idelay, rdelay);
    defHeader(fc, 2110, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2110));
 
