@@ -389,11 +389,19 @@ int t2s_handle_STATUS_REQ(rf_connection_t *rc, int start, int end) {
    return doNothing;
 } 
 
+int t2s_handle_REPORT_REQ(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_report_req_t *pkt = (LB_report_req_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_REPORT_REQ(%8p, %i, %i)", rc, start, end);
+   addAddrToLastIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
 int t2s_handle_EXPOSE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_expose_t *pkt = (LB_expose_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_EXPOSE(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
 
@@ -401,7 +409,7 @@ int t2s_handle_MOVE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_move_t *pkt = (LB_move_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_MOVE(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
 
@@ -409,7 +417,7 @@ int t2s_handle_CONFIGURE_HIT(rf_connection_t *rc, int start, int end) {
    int i;
    LB_configure_t *pkt = (LB_configure_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_CONFIGURE_HIT(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
 
@@ -417,7 +425,7 @@ int t2s_handle_GROUP_CONTROL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_group_control_t *pkt = (LB_group_control_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_GROUP_CONTROL(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
 
@@ -425,7 +433,7 @@ int t2s_handle_AUDIO_CONTROL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_audio_control_t *pkt = (LB_audio_control_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_AUDIO_CONTROL(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
 
@@ -433,7 +441,7 @@ int t2s_handle_POWER_CONTROL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_power_control_t *pkt = (LB_power_control_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_POWER_CONTROL(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
 
@@ -441,7 +449,7 @@ int t2s_handle_PYRO_FIRE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_PYRO_FIRE(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
 
@@ -449,7 +457,7 @@ int t2s_handle_QEXPOSE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_QEXPOSE(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
 
@@ -457,7 +465,7 @@ int t2s_handle_QCONCEAL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_QCONCEAL(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
 
@@ -500,18 +508,19 @@ int tty2sock(rf_connection_t *rc) {
    while ((retval == doNothing || retval == mark_sockWrite) && (mnum = validMessage(rc, &start, &end, 1)) != -1) { // 1 for tty
       int use_command = 1;
       switch (mnum) {
-         t2s_HANDLE_RF (STATUS_REQ); // keep track of ids
-         t2s_HANDLE_RF (EXPOSE); // keep track of ids
-         t2s_HANDLE_RF (MOVE); // keep track of ids
-         t2s_HANDLE_RF (CONFIGURE_HIT); // keep track of ids
-         t2s_HANDLE_RF (GROUP_CONTROL); // keep track of ids
-         t2s_HANDLE_RF (AUDIO_CONTROL); // keep track of ids
-         t2s_HANDLE_RF (POWER_CONTROL); // keep track of ids
-         t2s_HANDLE_RF (PYRO_FIRE); // keep track of ids
-         t2s_HANDLE_RF (QEXPOSE); // keep track of ids
-         t2s_HANDLE_RF (QCONCEAL); // keep track of ids
+         t2s_HANDLE_RF (STATUS_REQ); // keep track of ids? yes
+         t2s_HANDLE_RF (REPORT_REQ); // keep track of ids? yes
+         t2s_HANDLE_RF (EXPOSE); // keep track of ids? no
+         t2s_HANDLE_RF (MOVE); // keep track of ids? no
+         t2s_HANDLE_RF (CONFIGURE_HIT); // keep track of ids? no
+         t2s_HANDLE_RF (GROUP_CONTROL); // keep track of ids? no
+         t2s_HANDLE_RF (AUDIO_CONTROL); // keep track of ids? no
+         t2s_HANDLE_RF (POWER_CONTROL); // keep track of ids? no
+         t2s_HANDLE_RF (PYRO_FIRE); // keep track of ids? no
+         t2s_HANDLE_RF (QEXPOSE); // keep track of ids? no
+         t2s_HANDLE_RF (QCONCEAL); // keep track of ids? no
          t2s_HANDLE_RF (REQUEST_NEW); // keep track of devids
-         t2s_HANDLE_RF (ASSIGN_ADDR); // keep track of ids
+         t2s_HANDLE_RF (ASSIGN_ADDR); // keep track of ids? no
          default:
             use_command = 0; // ignore requests from other clients
             break;
@@ -611,6 +620,14 @@ int s2t_handle_STATUS_NO_RESP(rf_connection_t *rc, int start, int end) {
    return doNothing;
 } 
 
+int s2t_handle_EVENT_REPORT(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_event_report_t *pkt = (LB_event_report_t *)(rc->sock_ibuf + start);
+   DDCMSG(D_RF, CYAN, "s2t_handle_EVENT_REPORT(%8p, %i, %i)", rc, start, end);
+   addAddrToNowIDs(rc, pkt->addr);
+   return doNothing;
+} 
+
 int s2t_handle_DEVICE_REG(rf_connection_t *rc, int start, int end) {
    int i;
    LB_device_reg_t *pkt = (LB_device_reg_t *)(rc->sock_ibuf + start);
@@ -636,6 +653,7 @@ int sock2tty(rf_connection_t *rc) {
          s2t_HANDLE_RF (STATUS_RESP_MOVER); // keep track of ids
          s2t_HANDLE_RF (STATUS_RESP_EXT); // keep track of ids
          s2t_HANDLE_RF (STATUS_NO_RESP); // keep track of ids
+         s2t_HANDLE_RF (EVENT_REPORT); // keep track of ids
          s2t_HANDLE_RF (DEVICE_REG); // keep track of devids
          default:
             break;
