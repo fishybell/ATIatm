@@ -314,10 +314,11 @@ int main(int argc, char **argv) {
                for (i = 0; i < MAX_CONNECTIONS && index == -1; i++) {
                   if (fconns[i].rf == 0 && fconns[i].fasit == 0) {
                      // found a slot
+                     D_memset(&fconns[i],0,sizeof(fasit_connection_t));
                      index = i;
                      fconns[i].rf = rfclient;
                      fconns[i].fasit = newsock;
-                     fconns[i].id = 2047; // TODO -- random number
+                     fconns[i].id = 2047; // not registered yet number
                      fconns[i].index = i; // remember its own index
    DDCMSG(D_MEGA, GREEN,"ADDING rf:%i fasit:%i TO fconns[%i]: %08X", fconns[i].rf, fconns[i].fasit, i, &fconns[i]);
                      fconns[i].target_type = RF_Type_Unknown; // unknown target type
