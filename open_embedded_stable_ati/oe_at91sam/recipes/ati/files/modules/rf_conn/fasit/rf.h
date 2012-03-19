@@ -229,15 +229,15 @@ typedef struct LB_expose {
     uint32 cmd:5 __attribute__ ((packed));
     uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
     
-    uint32 event:6 __attribute__ ((packed));
+    uint32 event:5 __attribute__ ((packed));
     uint32 expose:1 __attribute__ ((packed));
     uint32 hitmode:1 __attribute__ ((packed));
     uint32 tokill:4 __attribute__ ((packed));
     uint32 react:3 __attribute__ ((packed));
-    uint32 thermal:1 __attribute__ ((packed));
-
     uint32 mfs:2 __attribute__ ((packed));
-    uint32 pad:6 __attribute__ ((packed));
+
+    uint32 thermal:1 __attribute__ ((packed));
+    uint32 pad:7 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:16 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_expose_t;
@@ -250,7 +250,7 @@ typedef struct LB_qconceal {
     uint32 cmd:5 __attribute__ ((packed));
     uint32 addr:11 __attribute__ ((packed));	// destination address (always from basestation)
     uint32 event:5 __attribute__ ((packed));	// rolling event sequence number
-    uint32 uptime:11 __attribute__ ((packed));	// time target was up, in deciseconds ( max 102.3 seconds)
+    uint32 uptime:11 __attribute__ ((packed));	// time target was up, in deciseconds ( max 204.7 seconds)
     
     uint32 crc:8 __attribute__ ((packed));
     uint32 padding:24 __attribute__ ((packed));
@@ -262,8 +262,8 @@ typedef struct LB_report_req {
     // 4 bytes
     uint32 cmd:5 __attribute__ ((packed));
     uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
-    uint32 event:6 __attribute__ ((packed));
-    uint32 padding:2 __attribute__ ((packed));
+    uint32 event:5 __attribute__ ((packed));
+    uint32 pad:3 __attribute__ ((packed));
     uint32 crc:8 __attribute__ ((packed));
 
 } __attribute__ ((packed))  LB_report_req_t;
@@ -273,11 +273,13 @@ typedef struct LB_report_req {
 typedef struct LB_event_report {
     // 5 bytes
     uint32 cmd:5 __attribute__ ((packed));
-    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
-    uint32 event:6 __attribute__ ((packed));
-    uint32 padding:2 __attribute__ ((packed));
+    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
+    uint32 event:5 __attribute__ ((packed));
+    uint32 pad:3 __attribute__ ((packed));
     uint32 hits:8 __attribute__ ((packed));
+
     uint32 crc:8 __attribute__ ((packed));
+    uint32 padding:24 __attribute__ ((packed));
 
 } __attribute__ ((packed))  LB_event_report_t;
 
