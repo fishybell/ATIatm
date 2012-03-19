@@ -89,6 +89,10 @@ static struct timer_list sensor_timeout_leave_list = TIMER_INITIALIZER(sensor_ti
 static void sensor_timeout_arrive_fire(unsigned long data);
 static struct timer_list sensor_timeout_arrive_list = TIMER_INITIALIZER(sensor_timeout_arrive_fire, 0, 0);
 
+// Timer for bob kills
+static void bob_timeout_fire(unsigned long data);
+static struct timer_list bob_timeout_list = TIMER_INITIALIZER(bob_timeout_fire, 0, 0);
+
 //---------------------------------------------------------------------------
 // Declaration of the function that gets called when the timeout fires.
 //---------------------------------------------------------------------------
