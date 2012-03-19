@@ -20,6 +20,9 @@ default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm RFslave
 mcp : mcp.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c $(MCFILES)
 
+mcp.exe : mcp.c minion.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o mcp.exe mcp.c minion.c $(MCFILES)
+
 RFmaster : RFmaster.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o RFmaster RFmaster.c $(MCFILES)
 
