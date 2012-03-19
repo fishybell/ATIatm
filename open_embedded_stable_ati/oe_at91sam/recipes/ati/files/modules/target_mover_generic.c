@@ -806,6 +806,7 @@ static void velocity_fire(unsigned long data)
         {
         return;
         }
+
     atomic_set(&doing_vel, FALSE);
     schedule_work(&velocity_work); // notify the system
     }
@@ -1726,15 +1727,21 @@ static int speed_from_pwm(int ra) {
 
 static int current_speed10() {
     int vel = atomic_read(&velocity);
+#if 0
+        char *msg = kmalloc(256, GFP_KERNEL);
+        //snprintf(msg, 128, "setpoint:%i; detect:%i", new_speed, input_speed);
+        snprintf(msg, 256, "cs10: (100*(%i/%i)/%i)/%i", RPM_K[mover_type],ENC_PER_REV[mover_type],vel,VELO_K[mover_type]);
+        send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+        kfree(msg);
+#endif
 //    if (vel != 0) {
-//        vel = (100*RPM_K[mover_type]/vel)/VELO_K[mover_type];
+//        vel = (100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel)/VELO_K[mover_type];
 //    }
     if (vel > 0) {
         vel = (100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel)/VELO_K[mover_type];
     } else if (vel < 0) {
         vel = -1 * ((100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/abs(vel))/VELO_K[mover_type]);
     }
-
     return vel;
 }
 
@@ -2621,6 +2628,7 @@ static void pid_step(int delta_t) {
     new_speed = atomic_read(&pid_set_point); // read desired pid set point
 
     // read input speed (adjust speed10 value to 1000*percent)
+//    input_speed = (1000 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type];
     input_speed = percent_from_speed(abs(current_speed10()));
 #ifdef DEBUG_PID
     if (1) {
@@ -2765,7 +2773,17 @@ if (pid_correct_count > 0) {
     if (new_speed == 0) {
        pid_effort = max(pid_effort, 0); // minimum when stopping is 0
     } else {
-       pid_effort = max(pid_effort, min_effort); // minimum when moving
+       if (input_speed <= 90 && min_effort <= 99) {
+         if (new_speed <= 50) {
+            pid_effort = max(pid_effort, 100); // minimum when starting up
+         } else if (new_speed <= 100) {
+            pid_effort = max(pid_effort, 90); // minimum when starting up
+         } else if (new_speed <= 150) {
+            pid_effort = max(pid_effort, 50); // minimum when starting up
+         }
+       } else {
+         pid_effort = max(pid_effort, min_effort); // minimum when moving
+       }
        if (pid_effort == min_effort) {
 #ifndef DEBUG_PID
 //          char *msg = kmalloc(128, GFP_KERNEL);
