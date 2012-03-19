@@ -6,6 +6,7 @@
 
 #define MAX_CONNECTIONS 16
 #define MAX_GROUPS 32
+#define MAX_HIT_EVENTS 32
 
 #define FASIT_BUF_SIZE 4096
 #define RF_BUF_SIZE 1024
@@ -57,15 +58,22 @@ typedef struct fasit_connection {
    int p_zone; // last zone commanded
    int p_fire; // sent "set" fire command (1) or not (0)
 
-   // for 2100 commands
+   // for 2100/2102 commands
    int hit_on;
-   int hit_hit;
+   int hit_hit; // not the hit count we report, but rather the hit count we send over FASIT
    int hit_react;
    int hit_tokill;
    int hit_sens;
    int hit_mode;
    int hit_burst;
    int hit_phi;
+
+   // for hit event logging
+   struct timespec hit_times[MAX_HIT_EVENTS][256]; // remember hits that happened at certain times (maximum of 255 hits per event, count as hit 1 is @ index 1, etc. to hit 255)
+   struct timespec event_starts[MAX_HIT_EVENTS]; // rememeber start of events
+   struct timespec event_ends[MAX_HIT_EVENTS]; // rememeber end of events
+   int hits_per_event[MAX_HIT_EVENTS]; // number of hits for each event
+   int current_event; // start at event 0 (even without an "expose" command with an event #)
 
    // cached responses
    rf_target_type_t target_type;
@@ -130,6 +138,7 @@ void addToFASITBuffer(fasit_connection_t *fc, char *buf, int s);
 
 // rf commands
 int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end);
+int handle_REPORT_REQ(fasit_connection_t *fc, int start, int end);
 int send_STATUS_RESP(fasit_connection_t *fc); // catch-all that finds the right response to send
 int send_STATUS_RESP_LIFTER(fasit_connection_t *fc);
 int send_STATUS_RESP_MOVER(fasit_connection_t *fc);
@@ -145,6 +154,7 @@ int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end);
 int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end);
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end);
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end);
+int send_EVENT_REPORT(fasit_connection_t *fc, int event);
 int send_DEVICE_REG(fasit_connection_t *fc);
 int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end);
 int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end);
