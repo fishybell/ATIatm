@@ -437,6 +437,10 @@
 #define RADIO_WRITTEN_LOC 0x558
 #define RADIO_WRITTEN_SIZE 0x4
 
+// docking defaults
+#define DOCKING_END 0
+#define DOCKING_END_LOC 0x55C
+#define DOCKING_END_SIZE 0x4
 
 
 
