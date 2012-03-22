@@ -53,6 +53,7 @@ int QueuePtype(queue_t *M){
 	if (RF_size(LB->cmd)<=depth){ // there are enough bytes for this command
 	    if (LB->cmd==LBC_REQUEST_NEW) return(1);
 	    if (LB->cmd==LBC_STATUS_REQ) return(2);
+	    if (LB->cmd==LBC_REPORT_REQ) return(2);
 	    return(3);
 	}
     }
