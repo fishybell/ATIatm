@@ -1,7 +1,6 @@
 #include "mcp.h"
 #include "fasit_c.h"
 #include "rf.h"
-#include "slaveboss.h"
 
 thread_data_t minions[2046];	// we do start at 0 and there cannot be more than 2046
 struct sockaddr_in fasit_addr;
