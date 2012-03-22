@@ -20,6 +20,8 @@ void debug_QEXPOSE(int color, LB_packet_t *pkt);
 void debug_QCONCEAL(int color, LB_packet_t *pkt);
 void debug_DEVICE_REG(int color, LB_packet_t *pkt);
 void debug_REQUEST_NEW(int color, LB_packet_t *pkt);
+void debug_REPORT_REQ(int color, LB_packet_t *pkt);
+void debug_EVENT_REPORT(int color, LB_packet_t *pkt);
 void debug_ASSIGN_ADDR(int color, LB_packet_t *pkt);
 
 // debug generic RF packet
