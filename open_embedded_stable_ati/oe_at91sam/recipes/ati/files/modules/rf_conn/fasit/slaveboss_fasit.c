@@ -4,29 +4,6 @@
 #include "slaveboss.h"
 #include "fasit_debug.h"
 
-void log_ResetHits(fasit_connection_t *fc) {
-   int i;
-   DDCMSG(D_PACKET, RED, "Reset hits for %i", fc->current_event);
-   for (i = 0; i< 256; i++) {
-      D_memset(&fc->hit_times[fc->current_event][i], 0, sizeof(struct timespec));
-   }
-   fc->hits_per_event[fc->current_event] = 0;
-}
-
-void log_NewHits(fasit_connection_t *fc, int new_hits) {
-   // got new hits
-   struct timespec tv;
-   clock_gettime(CLOCK_MONOTONIC,&tv);
-   DDCMSG(D_PACKET, RED, "Remembering %i new hits", new_hits);
-   
-   // log each hit time individually
-   while (new_hits-- > 0) {
-      if (++fc->hits_per_event[fc->current_event] <= 255) {
-         fc->hit_times[fc->current_event][fc->hits_per_event[fc->current_event]] = tv;
-      }
-   }
-}
-
 // we don't worry about clearing the data before a valid message, just up to the end
 static void clearBuffer(fasit_connection_t *fc, int end) {
    if (end >= fc->fasit_ilen) {
@@ -541,6 +518,11 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    fc->hit_sens = htons(fc->f2102_resp.body.hit_conf.sens);
    fc->hit_mode = fc->f2102_resp.body.hit_conf.mode;
    fc->hit_burst = htons(fc->f2102_resp.body.hit_conf.burst);
+
+   // remember fault status, but don't clear out existing faults unless there is a new one
+   if (htons(fc->f2102_resp.body.fault)) {
+      fc->last_fault = htons(fc->f2102_resp.body.fault);
+   }
 
    // check to see if we're waiting to send the information back
    if (fc->waiting_status_resp) {
