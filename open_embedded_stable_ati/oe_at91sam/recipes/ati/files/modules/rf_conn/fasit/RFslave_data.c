@@ -47,6 +47,8 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          case LBC_POWER_CONTROL:
          case LBC_QEXPOSE:
          case LBC_QCONCEAL:
+         case LBC_REPORT_REQ:
+         case LBC_EVENT_REPORT:
          case LBC_REQUEST_NEW:
             if (crc8(hdr) == 0) {
                DDCMSG(D_RF, tty ? cyan : blue, "%s VALID CRC", tty ? "TTY" : "SOCKET");
