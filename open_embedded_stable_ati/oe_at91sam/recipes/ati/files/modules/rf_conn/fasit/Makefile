@@ -17,11 +17,11 @@ MCFILES = serial.c timestamp.c htonll.c rf.c
 #default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm
 default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm RFslave.new RFslave.new.arm slaveboss.arm slavetest
 
-mcp : mcp.c minion.c $(HFILES) $(MCFILES)
-	gcc -lrt -std=gnu99 -o mcp mcp.c minion.c $(MCFILES)
+mcp : mcp.c minion_state.c minion.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o mcp mcp.c minion_state.c minion.c $(MCFILES)
 
-mcp.exe : mcp.c minion.c $(HFILES) $(MCFILES)
-	gcc -lrt -std=gnu99 -o mcp.exe mcp.c minion.c $(MCFILES)
+mcp.exe : mcp.c minion_state.c minion.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o mcp.exe mcp.c minion_state.c minion.c $(MCFILES)
 
 RFmaster : RFmaster.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o RFmaster RFmaster.c $(MCFILES)

@@ -18,9 +18,11 @@
 #include <sys/time.h>
 #include <termios.h> /* POSIX terminal control definitions */
 
+#include "fasit_c.h"
 
 // because the Minion ID's match the LB addressing
 #define MAX_NUM_Minions 2048
+#define BufSize 1024
 
 typedef unsigned char uint8;
 typedef char int8;
@@ -93,7 +95,7 @@ typedef struct minion_state {
     uint8			dev_type;   // FASIT device type
     uint16			state_timer;	// when we next need to process the state
     uint16			padding0;	//   extra space for now
-    state_u8_item_t		fault;	// maybe not really an item
+    state_u16_item_t		fault;	// maybe not really an item
 //  miles=1, NES=2, gps=4, the rest are reserved for now - but should maybe include movers and stuff	
     state_u8_item_t		status;	
     state_exp_item_t		exp;	// exposure state has more stuff
@@ -192,6 +194,22 @@ typedef struct minion {
 } minion_t;
 
 void *minion_thread(thread_data_t *);
+
+/* create the structure type to use for minion state timing */
+typedef struct minion_time {
+   struct timespec elapsed_time, delta_time;
+   struct timespec istart_time;
+   struct timeval timeout;
+} minion_time_t;
+
+/* create the structure type to use for minion state timing */
+typedef struct minion_bufs {
+    FASIT_header *header;
+    char buf[BufSize];
+    char hbuf[100];
+} minion_bufs_t;
+
+void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 
 //  colors for the DCMSG  
