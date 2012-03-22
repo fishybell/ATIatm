@@ -362,11 +362,11 @@ int send_EVENT_REPORT(fasit_connection_t *fc, int event) {
    // create message from parts of fc->last_status
    LB_event_report_t bdy;
    DDCMSG(D_RF|D_VERY,RED, "send_EVENT_REPORT(%08X,%i)", fc, event);
-   bdy.cmd = LBC_STATUS_RESP_LIFTER;
+   bdy.cmd = LBC_EVENT_REPORT;
    bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    bdy.event = event;
    bdy.hits = 0;
-   for (i = 0; i < fc->hits_per_event[event]; i++) { // find valid hits for this event
+   for (i = 0; i <= fc->hits_per_event[event]; i++) { // find valid hits for this event
       if (compTime(fc->event_starts[event], fc->hit_times[event][i]) <= 0 &&
           compTime(fc->event_ends[event], fc->hit_times[event][i]) >= 0) {
          // hit was between start and end
@@ -394,7 +394,11 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.react = fc->hit_react;
    s.sensitivity = fc->hit_react;
    s.timehits = fc->hit_burst;
-   s.fault = htons(fc->f2102_resp.body.fault);
+   s.fault = fc->last_fault;
+   DDCMSG(D_NEW,BLACK, "Fault encountered: %04X %02X", fc->last_fault, s.fault);
+   if (s.fault) {
+      fc->last_fault = 0; // clear out fault
+   }
 
    // check to see if we've never sent any status before
    if (!fc->sent_status) {
@@ -730,12 +734,18 @@ int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
 
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
    struct timespec *tv;
+   int uptime_sec;
+   int uptime_dsec;
    LB_qconceal_t *pkt = (LB_qconceal_t *)(fc->rf_ibuf + start);
    DDCMSG(D_RF|D_VERY,RED, "handle_QCONCEAL(%8p, %i, %i)", fc, start, end);
+   // pre-calculate uptime into seconds and deciseconds
+   uptime_sec = pkt->uptime / 10; // everything above 10, divided by 10
+   uptime_dsec = pkt->uptime % 10; // everything below 10
    // remember end time (not now, but the actual end time based on the "up" time)
    tv = &fc->event_ends[fc->current_event]; // for convenience sake, use a pointer
    *tv = fc->event_starts[fc->current_event]; // start with a copy
-   tv->tv_nsec += 100000000L * pkt->uptime; // convert deciseconds to nanoseconds
+   tv->tv_sec += uptime_sec;
+   tv->tv_nsec += 100000000L * uptime_dsec; // convert deciseconds to nanoseconds
    while (tv->tv_nsec > 1000000000L) { // carry over any seconds
       tv->tv_nsec -= 1000000000L;
       tv->tv_sec++;
@@ -786,6 +796,10 @@ int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end) {
    // change device ID to new address
    fc->id = pkt->new_addr;
    DDCMSG(D_RF, RED, "SLAVEBOSS Registered as %i for %08X", fc->id, fc);
+   // reset hit event log
+   for (fc->current_event = MAX_HIT_EVENTS - 1; fc->current_event >= 0; fc->current_event--) {
+      log_ResetHits(fc);
+   } // should end on fc->current_event of 0
    return doNothing;
 }
 
