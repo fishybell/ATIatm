@@ -301,5 +301,30 @@ enum {
 };
 */
 
+typedef enum fasit_target_type {
+   Type_Default,
+   Type_SIT,
+   Type_MIT,
+   Type_SAT,
+   Type_HSAT,
+   Type_MAT,
+   Type_BES,
+   Type_SES = 200,
+} target_type_t;
+
+typedef enum rf_target_type {
+   RF_Type_SIT_W_MFS,
+   RF_Type_SIT,
+   RF_Type_SAT,
+   RF_Type_HSAT,
+   RF_Type_SES,
+   RF_Type_BES,
+   RF_Type_MIT,
+   RF_Type_MAT,
+   RF_Type_Unknown,
+} rf_target_type_t;
+
+
+void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion);
 
 #endif
