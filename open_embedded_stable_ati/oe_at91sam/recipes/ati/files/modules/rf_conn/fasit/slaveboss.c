@@ -10,6 +10,31 @@ fasit_connection_t fconns[MAX_CONNECTIONS];
 
 #define MAX_EVENTS 16
 
+// global hit logging routines
+void log_ResetHits(fasit_connection_t *fc) {
+   int i;
+   DDCMSG(D_PACKET, RED, "Reset hits for %i", fc->current_event);
+   for (i = 0; i < 128; i++) {
+      D_memset(&fc->hit_times[fc->current_event][i], 0, sizeof(struct timespec));
+   }
+   fc->hits_per_event[fc->current_event] = 0;
+}
+
+void log_NewHits(fasit_connection_t *fc, int new_hits) {
+   // got new hits
+   struct timespec tv;
+   clock_gettime(CLOCK_MONOTONIC,&tv);
+   DDCMSG(D_PACKET, YELLOW, "Remembering %i new hits", new_hits);
+   
+   // log each hit time individually
+   while (new_hits-- > 0) {
+      if (++fc->hits_per_event[fc->current_event] <= 127) {
+         DCMSG(BLACK, "Setting %ld:%ld in fc->hit_times[%i][%i] (from fc->hits_per_event[%i])", tv.tv_sec, tv.tv_nsec, fc->current_event, fc->hits_per_event[fc->current_event], fc->current_event);
+         fc->hit_times[fc->current_event][fc->hits_per_event[fc->current_event]] = tv;
+      }
+   }
+}
+
 // kill switch to program
 static int close_nicely = 0;
 static void quitproc(int sig) {
