@@ -1,9 +1,6 @@
 #include "mcp.h"
 #include "rf.h"
 #include "fasit_c.h"
-#include "RFslave.h"
-
-#define BufSize 1024
 
 #define S_set(ITEM,D,ND,F,T) \
     { \
@@ -17,7 +14,6 @@
 #define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
 
 int resp_num,resp_seq;		// global for now.  not happy
-struct timespec istart_time;
 
 const int cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,1};
 
@@ -159,32 +155,45 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
     }
     DDCMSG(D_PACKET,RED,"2102 status response hdr->num=%d, hdr->seq=%d",
 	   htons(msg.response.resp_num),htonl(msg.response.resp_num));
-    // exposure
-    // instead of obfuscating the 0,45,and 90 values, just use them.
-
-    msg.body.exp = minion->S.exp.data;	// think we should be sending newdata in some cases
-
     // device type
-    msg.body.type = 1; // SIT. TODO -- SIT vs. SAT vs. HSAT
+    msg.body.type = minion->S.dev_type; // should be correct by the time it sends this
 
     //   DCMSG(YELLOW,"before  doHits(-1)   hits = %d",hits) ;    
     //    doHits(-1);  // request the hit count
     //   DCMSG(YELLOW,"retrieved hits with doHits(-1) and setting to %d",hits) ; 
 
+    // individual device type stuff
+    switch (msg.body.type) {
+        case Type_SIT:
+        case Type_SAT:
+        case Type_HSAT:
+            // exposure
+            // instead of obfuscating the 0,45,and 90 values, just use them.
+
+            msg.body.exp = minion->S.exp.data;
+            msg.body.speed = 0.0;
+            break;
+        case Type_MIT:
+        case Type_MAT:
+            msg.body.speed = minion->S.speed.data;
+            msg.body.exp = minion->S.exp.data;
+            msg.body.move = minion->S.move.data;
+            msg.body.pos = htons(minion->S.pos.data);
+            break;
+    }
+
+    // left to do:
+    msg.body.pstatus = 0; // always "shore" power
+    msg.body.fault = htons(minion->S.fault.data);
+
     // hit record
-    msg.body.hit = htons(minion->S.hit.newdata);
+    msg.body.hit = htons(minion->S.hit.newdata); // care must be taken that this is the correct value, as it is the most important value
     msg.body.hit_conf.on = minion->S.on.newdata;
     msg.body.hit_conf.react = minion->S.react.newdata;
     msg.body.hit_conf.tokill = htons(minion->S.tokill.newdata);
-
-    // use lookup table, as our sensitivity values don't match up to FASIT's
-    //    for (int i=15; i>=0; i--) { // count backwards from most sensitive to least
-    //	if (lastHitCal.sensitivity <= cal_table[i]) { // map our cal value to theirs
-    msg.body.hit_conf.sens = htons(minion->S.sens.newdata);	// htons(i); // found sensitivity value
+    msg.body.hit_conf.burst = htons(minion->S.burst.newdata);
+    msg.body.hit_conf.sens = htons(minion->S.sens.newdata);
     msg.body.hit_conf.mode = minion->S.mode.newdata;
-
-    //    msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
-    //    msg->body.hit_conf.mode = lastHitCal.type; // single, etc.
 
     DDCMSG(D_PACKET,BLUE,"sending a 2102 status response");
     DDCMSG(D_PACKET,BLUE,"M-Num | ICD-v | seq-# | rsrvd | length  R-num  R-seq          <--- Header\n %6d  %d.%d  %6d  %6d %7d %6d %7d "
@@ -535,7 +544,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 
 			minion->S.event.flags|=F_needs_report;
 			minion->S.event.data=minion->S.exp.event;
-			minion->S.event.timer = 50;	// lets try 5.0 seconds
+			minion->S.event.timer = 15;	// lets try 1.5 seconds
 			
 		    }
 
@@ -858,23 +867,19 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 
 
 void *minion_thread(thread_data_t *minion){
-    struct timespec elapsed_time, delta_time;
-    struct timeval timeout;
+    minion_time_t mt;
+    minion_bufs_t mb;
     int sock_ready,error;
-    long elapsed_tenths;
     int oldtimer;
 
     uint8 crc;
-    char buf[BufSize];
     char *tbuf;
     char mbuf[BufSize];
-    char hbuf[100];
     int i,msglen,result,seq,length;
     fd_set rcc_or_mcp;
 
     struct iovec iov[2];
 
-    FASIT_header *header;
     FASIT_header rhdr;
     FASIT_2111	 msg;
     FASIT_2100	 *message_2100;
@@ -925,7 +930,7 @@ void *minion_thread(thread_data_t *minion){
 
     minion->S.state_timer=900;	// every 10.0 seconds, worst case
     
-    clock_gettime(CLOCK_MONOTONIC_RAW,&istart_time);	// get the intial current time
+    clock_gettime(CLOCK_MONOTONIC_RAW,&mt.istart_time);	// get the intial current time
     minion->rcc_sock=-1;	// mark the socket so we know to open again
     while(1) {
 
@@ -941,8 +946,8 @@ void *minion_thread(thread_data_t *minion){
 
 		result=connect(minion->rcc_sock,(struct sockaddr *) &fasit_addr, sizeof(struct sockaddr_in));
 		if (result<0){
-		    strerror_r(errno,buf,BufSize);
-		    DCMSG(RED,"minion %d: fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),buf);
+		    strerror_r(errno,mb.buf,BufSize);
+		    DCMSG(RED,"minion %d: fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),mb.buf);
 		    DCMSG(RED,"minion %d:   waiting for a bit and then re-trying ", minion->mID);
 		    minion->rcc_sock=-1;	// make sure it is marked as closed
 		    sleep(2);		// adding a little extra wait
@@ -969,46 +974,46 @@ void *minion_thread(thread_data_t *minion){
 	 * stuff
 	 */
 	
-	timeout.tv_sec=minion->S.state_timer/10;
-	timeout.tv_usec=100000*(minion->S.state_timer%10);
+	mt.timeout.tv_sec=minion->S.state_timer/10;
+	mt.timeout.tv_usec=100000*(minion->S.state_timer%10);
 	
-	timestamp(&elapsed_time,&istart_time,&delta_time);
+	timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);
 	
 	DDCMSG(D_TIME,CYAN,"MINION %d: before Select... state_timer=%d (%d.%03d) at %ld.%03ldet",
-	       minion->mID,minion->S.state_timer,(int)timeout.tv_sec,(int)timeout.tv_usec,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000L);
+	       minion->mID,minion->S.state_timer,(int)mt.timeout.tv_sec,(int)mt.timeout.tv_usec,mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L);
 	
-	sock_ready=select(FD_SETSIZE,&rcc_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);	
-	// if we are running on linux, timeout wll have a remaining time left in it if one of the file descriptors was ready.
+	sock_ready=select(FD_SETSIZE,&rcc_or_mcp,(fd_set *) 0,(fd_set *) 0, &mt.timeout);	
+	// if we are running on linux, mt.timeout wll have a remaining time left in it if one of the file descriptors was ready.
 	// we are going to use that for now
 
 	oldtimer=minion->S.state_timer;		// copy our old time for debugging
-	minion->S.state_timer=(timeout.tv_sec*10)+(timeout.tv_usec/100000L);
+	minion->S.state_timer=(mt.timeout.tv_sec*10)+(mt.timeout.tv_usec/100000L);
 	
 	if (sock_ready<0){
 	    perror("NOTICE!  select error : ");
 	    exit(-1);
 	}
 
-	timestamp(&elapsed_time,&istart_time,&delta_time);
+	timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);
 	DDCMSG(D_TIME,CYAN,"MINION %d: After Select: sock_ready=%d FD_ISSET(mcp)=%d FD_ISSET(rcc)=%d oldtimer=%d state_timer=%d at %ld.%03ldet, delta=%ld.%03ld",
 	       minion->mID,sock_ready,FD_ISSET(minion->mcp_sock,&rcc_or_mcp),FD_ISSET(minion->rcc_sock,&rcc_or_mcp),oldtimer,minion->S.state_timer,
-	       elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000L,delta_time.tv_sec, delta_time.tv_nsec/100000L);
+	       mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L,mt.delta_time.tv_sec, mt.delta_time.tv_nsec/100000L);
 
 	
 	//check to see if the MCP has any commands for us
 	if (FD_ISSET(minion->mcp_sock,&rcc_or_mcp)){
-	    msglen=read(minion->mcp_sock, buf, 1023);
+	    msglen=read(minion->mcp_sock, mb.buf, 1023);
 	    if (msglen > 0) {
-		buf[msglen]=0;
+		mb.buf[msglen]=0;
 		if (verbose&D_PACKET){	// don't do the sprintf if we don't need to		
-		    sprintf(hbuf,"Minion %d: received %d from MCP (RF) ", minion->mID,msglen);
-		    DDCMSG_HEXB(D_PACKET,YELLOW,hbuf,buf,msglen);
+		    sprintf(mb.hbuf,"Minion %d: received %d from MCP (RF) ", minion->mID,msglen);
+		    DDCMSG_HEXB(D_PACKET,YELLOW,mb.hbuf,mb.buf,msglen);
 		}
 		// we have received a message from the mcp, process it
 		// it is either a command, or it is an RF response from our slave
-		//		process_MCP_cmds(&state,buf,msglen);
+		//		process_MCP_cmds(&state,mb.buf,msglen);
 
-		LB=(LB_packet_t *)buf;	// map the header in
+		LB=(LB_packet_t *)mb.buf;	// map the header in
 		crc= crc8(LB);
 		DDCMSG(D_RF,YELLOW,"MINION %d: LB packet (cmd=%2d addr=%d crc=%d)", minion->mID,LB->cmd,LB->addr,crc);
 		switch (LB->cmd){
@@ -1029,7 +1034,7 @@ void *minion_thread(thread_data_t *minion){
 		    case LBC_EVENT_REPORT:
 		    {
 			LB_event_report_t *L=(LB_event_report_t *)(LB);	// map our bitfields in
-			minion->S.hit.newdata=L->hits;	// who knows, may need to add it to hit.newdata
+			minion->S.hit.newdata+=L->hits;	// we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
 			DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'Event_report'. hits=%d  sending 2102 status",
 			       minion->mID,minion->RF_addr,L->hits);
 			sendStatus2102(0, NULL,minion);
@@ -1037,6 +1042,58 @@ void *minion_thread(thread_data_t *minion){
 		    }
 			break;
 
+		    case LBC_STATUS_NO_RESP:
+ // Do nothing on the "no response" -- TODO -- reset timeout timers
+			DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'NO_RESP'...not sending 2102 status",minion->mID,minion->RF_addr);
+         break;
+
+		    case LBC_STATUS_RESP_EXT:
+		    {
+			LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB);	// map our bitfields in
+			minion->S.hit.newdata+=L->hits;	// we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
+			minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
+			minion->S.speed.data = (float)(L->speed / 100.0); // convert back to correct float
+         minion->S.move.data = L->dir;
+         minion->S.react.newdata = L->react;
+         minion->S.tokill.newdata = L->tokill;
+         minion->S.mode.newdata = L->hitmode ? 2 : 1; // back to burst/single
+         minion->S.sens.newdata = L->sensitivity;
+         minion->S.pos.data = L->location;
+         minion->S.burst.newdata = L->timehits * 5; // convert back
+         minion->S.fault.data = L->fault;
+			DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_EXT'. hits=%d fault=%02X sending 2102 status",
+			       minion->mID,minion->RF_addr,L->hits,L->fault);
+			sendStatus2102(0, NULL,minion);
+			
+		    }
+			break;
+
+		    case LBC_STATUS_RESP_MOVER:
+		    {
+			LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB);	// map our bitfields in
+			minion->S.hit.newdata+=L->hits;	// we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
+			minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
+			minion->S.speed.data = (float)(L->speed / 100.0); // convert back to correct float
+         minion->S.move.data = L->dir;
+         minion->S.pos.data = L->location;
+			DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_MOVER'. hits=%d  sending 2102 status",
+			       minion->mID,minion->RF_addr,L->hits);
+			sendStatus2102(0, NULL,minion);
+			
+		    }
+			break;
+
+		    case LBC_STATUS_RESP_LIFTER:
+		    {
+			LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB);	// map our bitfields in
+			minion->S.hit.newdata+=L->hits;	// we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
+			minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
+			DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_LIFTER'. hits=%d  sending 2102 status",
+			       minion->mID,minion->RF_addr,L->hits);
+			sendStatus2102(0, NULL,minion);
+			
+		    }
+			break;
 
 
 			
@@ -1057,9 +1114,9 @@ void *minion_thread(thread_data_t *minion){
 		exit(-2);  /* this minion dies!  possibly it should do something else - but maybe it dies of happyness  */
 	    }
 	    
-	    timestamp(&elapsed_time,&istart_time,&delta_time);	
+	    timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);	
 	    DDCMSG(D_TIME,CYAN,"MINION %d: End of MCP Parse at %ld.%03ldet, delta=%ld.%03ld"
-		   ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000L,delta_time.tv_sec, delta_time.tv_nsec/1000000L);
+		   ,minion->mID,mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L,mt.delta_time.tv_sec, mt.delta_time.tv_nsec/1000000L);
 	}
 
 	/**********************************    end of reading and processing the mcp command  ***********************/
@@ -1067,43 +1124,43 @@ void *minion_thread(thread_data_t *minion){
 	/*************** check to see if there is something to read from the rcc   **************************/
 	if (FD_ISSET(minion->rcc_sock,&rcc_or_mcp)){
 	    // now read it using the new routine    
-	    result = read_FASIT_msg(minion,buf, BufSize);
+	    result = read_FASIT_msg(minion,mb.buf, BufSize);
 	    if (result>0){		
-		header = (FASIT_header*)(buf);	// find out how long of message we have
-		length=htons(header->length);	// set the length for the handle function
+		mb.header = (FASIT_header*)(mb.buf);	// find out how long of message we have
+		length=htons(mb.header->length);	// set the length for the handle function
 		if (result>length){
-			DDCMSG(D_PACKET,BLUE,"MINION %d: Multiple Packet  num=%d  result=%d seq=%d header->length=%d",
-			       minion->mID,htons(header->num),result,htonl(header->seq),length);
+			DDCMSG(D_PACKET,BLUE,"MINION %d: Multiple Packet  num=%d  result=%d seq=%d mb.header->length=%d",
+			       minion->mID,htons(mb.header->num),result,htonl(mb.header->seq),length);
 		} else {
-			DDCMSG(D_PACKET,BLUE,"MINION %d: num=%d  result=%d seq=%d header->length=%d",
-			       minion->mID,htons(header->num),result,htonl(header->seq),length);
+			DDCMSG(D_PACKET,BLUE,"MINION %d: num=%d  result=%d seq=%d mb.header->length=%d",
+			       minion->mID,htons(mb.header->num),result,htonl(mb.header->seq),length);
 		}
-		tbuf=buf;			// use our temp pointer so we can step ahead
+		tbuf=mb.buf;			// use our temp pointer so we can step ahead
 		// loop until result reaches 0
 		while((result>=length)&&(length>0)) {
-		    timestamp(&elapsed_time,&istart_time,&delta_time);	
+		    timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);	
 		    DDCMSG(D_TIME,CYAN,"MINION %d:  Packet %d recieved at %ld.%03ldet, delta=%ld.%03ld"
-			   ,minion->mID,htons(header->num),elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000L,delta_time.tv_sec, delta_time.tv_nsec/1000000L);
-		    handle_FASIT_msg(minion,tbuf,length,&elapsed_time);
+			   ,minion->mID,htons(mb.header->num),mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L,mt.delta_time.tv_sec, mt.delta_time.tv_nsec/1000000L);
+		    handle_FASIT_msg(minion,tbuf,length,&mt.elapsed_time);
 		    result-=length;			// reset the length to handle a possible next message in this packet
 		    tbuf+=length;			// step ahead to next message
-		    header = (FASIT_header*)(tbuf);	// find out how long of message we have
-		    length=htons(header->length);	// set the length for the handle function
+		    mb.header = (FASIT_header*)(tbuf);	// find out how long of message we have
+		    length=htons(mb.header->length);	// set the length for the handle function
 		    if (result){
 			DDCMSG(D_PACKET,BLUE,"MINION %d: Continue processing the rest of the BIG fasit packet num=%d  result=%d seq=%d  length=%d",
-			       minion->mID,htons(header->num),result,htonl(header->seq),length);
+			       minion->mID,htons(mb.header->num),result,htonl(mb.header->seq),length);
 		    }
 		}
 	    } else {
-		strerror_r(errno,buf,BufSize);
-		DDCMSG(D_PACKET,RED,"MINION %d: read_FASIT_msg returned %d and Error: %s", minion->mID,result,buf);
+		strerror_r(errno,mb.buf,BufSize);
+		DDCMSG(D_PACKET,RED,"MINION %d: read_FASIT_msg returned %d and Error: %s", minion->mID,result,mb.buf);
 		DDCMSG(D_PACKET,RED,"MINION %d: which means it likely has closed!", minion->mID);
 		minion->rcc_sock=-1;	// mark the socket so we know to open again
 
 	    }
-	    timestamp(&elapsed_time,&istart_time,&delta_time);	
+	    timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);	
 	    DDCMSG(D_TIME,CYAN,"MINION %d: End of RCC Parse at %ld.%03ldet, delta=%ld.%03ld"
-		   ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000L,delta_time.tv_sec, delta_time.tv_nsec/1000000L);
+		   ,minion->mID,mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L,mt.delta_time.tv_sec, mt.delta_time.tv_nsec/1000000L);
 	}
 	/**************   end of rcc command parsing   ****************/
 	/**  first we just update our counter, and if less then a tenth of a second passed,
@@ -1111,182 +1168,12 @@ void *minion_thread(thread_data_t *minion){
 	 **
 	 **/
 
-
-	/***   what we do is use the minion's state_timer to determine how long to wait
-	 ***   set up above in the select.
-	 ***      if the select times out, we are good.
-	 ***      if the select had a file descriptor ready, then we probably didn't wait long enough.
-	 ***      [[[[ FIX THAT ]]]]
-	 ***
-	 ***      otherwise, if we got here at least one of our timers has expired signifying that
-	 ***      some item[s] in the state need some action.
-	 ***/
-
-#if 1
-	timestamp(&elapsed_time,&istart_time,&delta_time);
-	DDCMSG(D_TIME,CYAN,"MINION %d: Begin timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
-	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-
-	elapsed_tenths = elapsed_time.tv_sec*10+(elapsed_time.tv_nsec/100000000L);
-
-	if (elapsed_tenths==0){
-	    // set the next timeout
-	    timeout.tv_sec=0;
-	    timeout.tv_usec=(100000000L-elapsed_time.tv_nsec)*1000;
-
-	} else {
-	    // set the next timeout
-	    timeout.tv_sec=0;
-	    timeout.tv_usec=100000;
-	}
-#endif
-
-	/**********    now update all the time related bits
-	 **
-	 **  we reached this point because either there was a RCC or MCP communication,
-	 **  or a timeout on that select which started at 100ms (one tenth of a second)
-	 **
-	 **  so we now run through the flags of all the state varibles,
-	 **  and update them if they were waiting on a timer
-	 **
-	 **  each state variable has a timer for physical reaction time simulation.
-	 **    each one of those is up to 64k (tenths of a second)
-	 **
-	 **  and the entire minion should have a timer to keep track of when the actual
-	 **  slave it is simulating last responded - or something
-	 **
-	 **  */
-
-
-
-	if (!minion->S.state_timer)  { // timer reached zero
-	//   We should only do the section if the next timer is really up, and
-	//   not just if another fd was ready about the same time
-	DCMSG(RED,"MINION %d: timer update.   exp.flags=0x%x   event.flags=0x%x",minion->mID,minion->S.exp.flags,minion->S.event.flags);
-	
-	// if there is an expose flag set, we then need to do something
-	if (minion->S.exp.flags!=F_exp_ok) {
-
-	    if (minion->S.exp.timer>elapsed_tenths){
-		minion->S.exp.timer-=elapsed_tenths;	// not timed out.  but decrement out timer
-		DCMSG(RED,"MINION %d: not timed out.   S.exp.timer=%d   S.event.timer=%d",minion->mID,minion->S.exp.timer,minion->S.event.timer);
-
-	    } else {	// timed out,  move to the next state, do what it should.
-		
-		switch (minion->S.exp.flags) {
-
-		    case F_exp_expose_A:
-			minion->S.exp.data=45;	// make the current positon in movement
-			minion->S.exp.flags=F_exp_expose_B;	// something has to happen
-			minion->S.exp.timer=5;	// it should happen in this many deciseconds
-			DDCMSG(D_TIME,MAGENTA,"exp_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
-			      ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
-			sendStatus2102(0,header,minion); // forces sending of a 2102
-
-			break;
-
-		    case F_exp_expose_B:
-
-			minion->S.exp.data=90;	// make the current positon in movement
-			minion->S.exp.flags=F_exp_expose_C;	// we have reached the exposed position, now wait for confirmation from the RF slave
-			minion->S.exp.timer=9000;	// lots of time to wait for a RF reply
-			DDCMSG(D_TIME,MAGENTA,"exp_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
-			      ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
-			sendStatus2102(0,header,minion); // forces sending of a 2102
-
-			break;
-
-		    case F_exp_expose_C:
-			// it timed out
-			break;
-
-		    case F_exp_conceal_A:
-			minion->S.exp.data=45;	// make the current positon in movement
-			minion->S.exp.flags=F_exp_conceal_B;	// something has to happen
-			minion->S.exp.timer=5;	// it should happen in this many deciseconds
-			DDCMSG(D_TIME,MAGENTA,"conceal_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
-			       ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
-			sendStatus2102(0,header,minion); // forces sending of a 2102
-
-			break;
-
-		    case F_exp_conceal_B:
-			minion->S.exp.data=0;	// make the current positon in movement
-			minion->S.exp.flags=F_exp_conceal_C;	// we have reached the exposed position, now wait for confirmation from the RF slave
-			minion->S.exp.timer=9000;	// lots of time to wait for a RF reply
-			DDCMSG(D_TIME,MAGENTA,"conceal_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
-			       ,elapsed_time.tv_sec, (int)(elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
-			sendStatus2102(0,header,minion); // forces sending of a 2102
-
-			break;
-
-		    case F_exp_conceal_C:
-
-			break;
-
-		}  // end of switch
-	    }   // else clause - exp flag
-	} // if clause - exp flag not set
-
-	// if there is an event flag set, we then need to do something
-	if (minion->S.event.flags) {
-	    DCMSG(RED,"MINION %d:----- event.flags=0x%x",minion->mID,minion->S.event.flags);
-
-	    if (minion->S.event.timer>elapsed_tenths){
-		minion->S.event.timer-=elapsed_tenths;	// not timed out.  but decrement out timer
-
-	    } else {	// timed out,  move to the next state, do what it should.
-		switch (minion->S.event.flags) {
-
-		    case F_needs_report:
-//		    build an LB packet  report_req packet
-		    {
-			LB_report_req_t *L=(LB_report_req_t *)buf;
-			
-			L->cmd=LBC_REPORT_REQ;
-			L->addr=minion->RF_addr;
-			L->event=minion->S.event.data;
-			
-		    // calculates the correct CRC and adds it to the end of the packet payload
-		    // also fills in the length field
-			set_crc8(L);
-
-			DCMSG(RED,"MINION %d:----- building a report request LB packet event.flags=0x%x",minion->mID,minion->S.event.flags);
-			
-		    // now send it to the MCP master
-			result=write(minion->mcp_sock,L,RF_size(L->cmd));
-		    //  sent LB
-			if (verbose&D_RF){	// don't do the sprintf if we don't need to
-			    sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",
-				    minion->mID,minion->RF_addr,L->cmd,RF_size(L->cmd));
-			    DDCMSG2_HEXB(D_RF,YELLOW,hbuf,L,RF_size(L->cmd));
-			    DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(L->cmd),minion->mcp_sock);
-			}
-
-			minion->S.event.flags=F_waiting_for_report;
-			minion->S.event.timer = 20;	// lets try 5.0 seconds
-		    }
-		    break;
-
-		}
-	    }
-	}
-	}
-
-	// run through all the timers and get the next time we need to process
-#define Set_Timer(T) { if ((T>0)&&(T<minion->S.state_timer)) minion->S.state_timer=T; }
-
-	
-	minion->S.state_timer = 900;	// put in a worst case starting value of 90 seconds
-	Set_Timer(minion->S.exp.timer);		// if arg is >0 and <timer, it is the new timer
-	Set_Timer(minion->S.event.timer);		// if arg is >0 and <timer, it is the new timer
-//	Set_Timer(minion->S.speed.timer);		// if arg is >0 and <timer, it is the new timer
-	
+    minion_state(minion, &mt, &mb);
 	
 #if 0
-	timestamp(&elapsed_time,&istart_time,&delta_time);
+	timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);
 	DDCMSG(D_TIME,CYAN,"MINION %d: End timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
-	       ,minion->mID,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+	       ,minion->mID,mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec,mt.delta_time.tv_sec, mt.delta_time.tv_nsec);
 #endif
     }  // while forever
 }  // end of minon thread
