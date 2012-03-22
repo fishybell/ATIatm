@@ -11,29 +11,6 @@
 #define FASIT_BUF_SIZE 4096
 #define RF_BUF_SIZE 1024
 
-typedef enum fasit_target_type {
-   Type_Default,
-   Type_SIT,
-   Type_MIT,
-   Type_SAT,
-   Type_HSAT,
-   Type_MAT,
-   Type_BES,
-   Type_SES = 200,
-} target_type_t;
-
-typedef enum rf_target_type {
-   RF_Type_SIT_W_MFS,
-   RF_Type_SIT,
-   RF_Type_SAT,
-   RF_Type_HSAT,
-   RF_Type_SES,
-   RF_Type_BES,
-   RF_Type_MIT,
-   RF_Type_MAT,
-   RF_Type_Unknown,
-} rf_target_type_t;
-
 typedef struct fasit_connection {
    int rf; // the file descriptor to talk low-bandwidth rf on
    int fasit; // the file descriptor to talk fasit on
@@ -69,7 +46,7 @@ typedef struct fasit_connection {
    int hit_phi;
 
    // for hit event logging
-   struct timespec hit_times[MAX_HIT_EVENTS][256]; // remember hits that happened at certain times (maximum of 255 hits per event, count as hit 1 is @ index 1, etc. to hit 255)
+   struct timespec hit_times[MAX_HIT_EVENTS][128]; // remember hits that happened at certain times (maximum of 127 hits per event, count as hit 1 is @ index 1, etc. to hit 127)
    struct timespec event_starts[MAX_HIT_EVENTS]; // rememeber start of events
    struct timespec event_ends[MAX_HIT_EVENTS]; // rememeber end of events
    int hits_per_event[MAX_HIT_EVENTS]; // number of hits for each event
@@ -85,6 +62,7 @@ typedef struct fasit_connection {
    FASIT_2112 f2112_resp;
    FASIT_2113 f2113_resp;
    LB_status_resp_ext_t last_status; 
+   int last_fault;
    int sent_status;
    int added_rf_to_epoll;
    int devid;
@@ -180,6 +158,10 @@ int fasit2rf(fasit_connection_t *fc, char *buf, int s); // mangle one or more fa
 #define rem_rfEpoll (1<<5)
 #define rem_fasitEpoll (1<<6)
 #define add_rfEpoll (1<<7)
+
+// global hit logging routines
+void log_ResetHits(fasit_connection_t *fc);
+void log_NewHits(fasit_connection_t *fc, int new_hits);
 
 // for some reason we have a ntohs/htons, but no ntohf/htonf
 float ntohf(float f);
