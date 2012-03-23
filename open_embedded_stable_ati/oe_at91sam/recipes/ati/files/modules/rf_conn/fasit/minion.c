@@ -25,6 +25,7 @@ extern struct sockaddr_in fasit_addr;
 // initialize our state to default values
 void initialize_state(minion_state_t *S){
 
+    S_set(rf_t,0,0,0,0);
     S_set(exp,0,0,0,0);
     S_set(asp,0,0,0,0);
     S_set(dir,0,0,0,0);
@@ -316,6 +317,18 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
     LB_qconceal_t	*LB_qcon;
     
 
+    // stop quick lookup of RF status on command from FASIT server
+    minion->S.rf_t.flags = F_rf_t_waiting_long;
+    minion->S.rf_t.timer = 3000; // 5 minutes in deciseconds
+    switch (minion->S.exp.flags) { /* look for lookup-later states */
+       case F_exp_expose_C:
+       case F_exp_expose_D:
+       case F_exp_conceal_C:
+          minion->S.exp.flags=0;
+          minion->S.exp.timer=0;
+          break;
+    }
+
     // map header and body for both message and response
     header = (FASIT_header*)(buf);
     DDCMSG(D_PACKET,BLUE,"MINION %d: Handle_FASIT_msg recieved fasit packet num=%d seq=%d length=%d packetlen=%d",
@@ -468,6 +481,10 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 				minion->mID,minion->RF_addr,LB_status_req->cmd,RF_size(LB_status_req->cmd),result);
 			DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_status_req,RF_size(LB_status_req->cmd));
 		    }
+
+         // I'm expecting a response within 2 seconds
+         minion->S.rf_t.flags=F_rf_t_waiting_short;
+         minion->S.rf_t.timer=20; // give it two seconds
 		    break;
 
 		case CID_Expose_Request:
@@ -1009,6 +1026,11 @@ void *minion_thread(thread_data_t *minion){
 		    sprintf(mb.hbuf,"Minion %d: received %d from MCP (RF) ", minion->mID,msglen);
 		    DDCMSG_HEXB(D_PACKET,YELLOW,mb.hbuf,mb.buf,msglen);
 		}
+
+      // we received something over RF, so we haven't timed out: reset the rf timer to look in 5 minutes -- TODO -- make this timeout smarter, or at the very least, user configurable
+      minion->S.rf_t.flags = F_rf_t_waiting_long;
+      minion->S.rf_t.timer = 3000; // 5 minutes in deciseconds
+
 		// we have received a message from the mcp, process it
 		// it is either a command, or it is an RF response from our slave
 		//		process_MCP_cmds(&state,mb.buf,msglen);
@@ -1043,8 +1065,13 @@ void *minion_thread(thread_data_t *minion){
 			break;
 
 		    case LBC_STATUS_NO_RESP:
- // Do nothing on the "no response" -- TODO -- reset timeout timers
+         // Do nothing on the "no response"
 			DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'NO_RESP'...not sending 2102 status",minion->mID,minion->RF_addr);
+         // reset lookup timer
+         if (minion->S.exp.flags == F_exp_expose_D) {
+            minion->S.exp.flags=F_exp_expose_C;	// we have reached the exposed position, now ask for an update
+            minion->S.exp.timer=15;	// 1.5 second later
+         }
          break;
 
 		    case LBC_STATUS_RESP_EXT:
@@ -1065,6 +1092,11 @@ void *minion_thread(thread_data_t *minion){
 			       minion->mID,minion->RF_addr,L->hits,L->fault);
 			sendStatus2102(0, NULL,minion);
 			
+         // reset lookup timer
+         if (minion->S.exp.flags == F_exp_expose_D) {
+            minion->S.exp.flags=F_exp_expose_C;	// we have reached the exposed position, now ask for an update
+            minion->S.exp.timer=15;	// 1.5 second later
+         }
 		    }
 			break;
 
@@ -1080,6 +1112,11 @@ void *minion_thread(thread_data_t *minion){
 			       minion->mID,minion->RF_addr,L->hits);
 			sendStatus2102(0, NULL,minion);
 			
+         // reset lookup timer
+         if (minion->S.exp.flags == F_exp_expose_D) {
+            minion->S.exp.flags=F_exp_expose_C;	// we have reached the exposed position, now ask for an update
+            minion->S.exp.timer=15;	// 1.5 second later
+         }
 		    }
 			break;
 
@@ -1092,6 +1129,11 @@ void *minion_thread(thread_data_t *minion){
 			       minion->mID,minion->RF_addr,L->hits);
 			sendStatus2102(0, NULL,minion);
 			
+         // reset lookup timer
+         if (minion->S.exp.flags == F_exp_expose_D) {
+            minion->S.exp.flags=F_exp_expose_C;	// we have reached the exposed position, now ask for an update
+            minion->S.exp.timer=15;	// 1.5 second later
+         }
 		    }
 			break;
 
