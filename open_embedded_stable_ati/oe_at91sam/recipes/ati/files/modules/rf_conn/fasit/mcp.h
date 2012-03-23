@@ -226,24 +226,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 
 //  colors for the DCMSG  
-#define black	0
-#define red	1
-#define green	2
-#define yellow	3
-#define blue	4
-#define magenta 5
-#define cyan	6
-#define gray	7
-
-//  these are the 'bold/bright' colors
-#define BLACK	8
-#define RED	9
-#define GREEN	10
-#define YELLOW	11
-#define BLUE	12
-#define MAGENTA 13
-#define CYAN	14
-#define GRAY	15
+#include "colors.h"
 
 #define C_DEBUG 1
 
