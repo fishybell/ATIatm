@@ -60,6 +60,14 @@ typedef struct state_exp_item {
     struct timespec elapsed_time;
 } state_exp_item_t ;
 
+typedef struct state_rf_timeout {
+    uint8	 data; // ignored
+    uint8	 newdata; // ignored
+    uint16	 flags;
+    uint16	 timer;
+    struct timespec elapsed_time;
+} state_rf_timeout_t ;
+
 typedef struct state_u8_item {
     uint8	 data;
     uint8	 newdata;
@@ -97,6 +105,7 @@ typedef struct minion_state {
     uint16			padding0;	//   extra space for now
     state_u16_item_t		fault;	// maybe not really an item
 //  miles=1, NES=2, gps=4, the rest are reserved for now - but should maybe include movers and stuff	
+    state_rf_timeout_t		rf_t;	// rf timeout timer
     state_u8_item_t		status;	
     state_exp_item_t		exp;	// exposure state has more stuff
     state_u8_item_t		event;	// used for timer events
@@ -141,6 +150,7 @@ typedef struct minion_state {
 #define F_exp_conceal_A	4
 #define F_exp_conceal_B	5
 #define F_exp_conceal_C	6
+#define F_exp_expose_D	7
 
 #define F_up2date		0	// RF and internal state match
 #define F_tell_RF		0x100	// RF needs update 
@@ -149,6 +159,9 @@ typedef struct minion_state {
 #define F_told_RCC		0x800	// We told FASIT our internal state, waiting on RF 
 #define F_needs_report		0x010	// there needs to be an event report
 #define F_waiting_for_report	0x020	// there needs to be an event report
+
+#define F_rf_t_waiting_short 1 /* the minion is currently waiting for a response from a TM */
+#define F_rf_t_waiting_long 2 /* the minion hasn't talked to the TM in a long time */
 
 
 uint64 htonll( uint64 id);
