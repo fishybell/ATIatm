@@ -3,7 +3,8 @@
 # procedure start the default programs
 def_progs() {
    # start the "early" programs
-   user_conn &
+# user_conn is now started by inittab: 03/26/12 randy
+#   user_conn &
    case $board in
       TTMT|MIT|MAT)
          bit_button -r MOVER &
@@ -196,4 +197,4 @@ if [ -z "$ip" -o "$ip" == "none" ] ; then
 fi
 
 # return the results
-echo "$ip $lport $cport"
+echo "$ip $lport $cport $comm $board"
