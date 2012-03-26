@@ -24,10 +24,22 @@ static int efd, nl_fd; // epoll file descriptor and netlink file descriptor
 static struct nl_handle *g_handle;
 static struct nl_handle *handlecreate_nl_handle(int client, int group);
 
+// global family id for ATI netlink family
+int family;
+
 // kill switch to program
 static int close_nicely = 0;
 static void quitproc() {
     close_nicely = 1;
+}
+
+static void stopMover() {
+    struct nl_msg *msg = nlmsg_alloc();
+    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_MOVE, 1);
+    nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
+    nl_send_auto_complete(g_handle, msg);
+    nlmsg_free(msg);
+    close_nicely = 0;
 }
 
 // utility function to properly configure a client TCP connection
@@ -507,9 +519,6 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
 
     return NL_OK;
 }
-
-// global family id for ATI netlink family
-int family;
 
 char* runCmd(char *cmd, int read, char *buffer, int buffer_max) {
    FILE *fp;
@@ -1761,7 +1770,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Change Mode\nFormat: O (0-3)mode_number\nMode request\nFormat: O\n");
                         break;
                     case 'P': case 'p':
-                        snprintf(wbuf, 1024, "Sleep command\nFormat: P (0|1|2)sleep_or_wake_or_request\n");
+                        snprintf(wbuf, 1024, "Sleep command\nFormat: P (0|1|2)sleep_or_wake_or_request_or_dock\n");
                         break;
                     case 'Q': case 'q':
                         snprintf(wbuf, 1024, "Types of accessories: MFS, MGL, SES, PHI, MSD, SMK, THM\nRequest accessory paramaters\nFormat: Q accessory_type\nChange accessory parameters\nFormat: Q accessory_type (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
@@ -1859,7 +1868,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                     nla_put(msg, BIT_A_MSG, sizeof(struct bit_event), &bit_c);
                     break;
                 case NL_C_SLEEP:
-                    if (sscanf(cmd+1, "%i", &arg1) == 1) {
+                    if (sscanf(cmd+1, "%i", &arg1) != 2) {
                         nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // sleep command
                     } else {
                         nla_put_u8(msg, GEN_INT8_A_MSG, SLEEP_REQUEST); // sleep status request
@@ -2166,6 +2175,7 @@ int main(int argc, char **argv) {
         } else if (pid < 0) {
             perror("fork");
         }
+        signal(SIGCHLD, stopMover);
     }
     // did the parent exit?
     if (close_nicely) {
@@ -2236,6 +2246,7 @@ int main(int argc, char **argv) {
                     if (rsize == 0 || telnet_client(g_handle, client_buf, client) != 0) {
 //printf("sk %i closing\n", client);
                         close_nicely = 1; // exit loop
+                        memset(client_buf, '\0', CLIENT_BUFFER);
                     }
                 }
             }
@@ -2246,12 +2257,7 @@ int main(int argc, char **argv) {
     free(client_buf); // free buffer
 
     // stop mover
-    struct nl_msg *msg = nlmsg_alloc();
-    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_MOVE, 1);
-    nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
-    nl_send_auto_complete(g_handle, msg);
-    nlmsg_free(msg);
-    
+    stopMover();
 
     // destroy netlink handle
     nl_handle_destroy(g_handle);
