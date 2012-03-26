@@ -61,6 +61,8 @@ typedef struct hit_sensor {
     int l_count;
     int blanking;
     int d_count;
+    int d1_count;
+    int d2_count;
     int disconnected;
     int invert;
     spinlock_t lock;
@@ -78,6 +80,8 @@ static hit_sensor_t sensors[] = {{
     0, // start not blanking
     0, // start connected 
     0, // start connected 
+    0, // start connected 
+    0, // start connected 
     0, // no inverting
     SPIN_LOCK_UNLOCKED,
     INPUT_HIT_SENSOR,
@@ -90,6 +94,8 @@ static hit_sensor_t sensors[] = {{
     15, // default sensitivity calibration setting
     -1, // invalid counting value
     0, // start not blanking
+    0, // start connected 
+    0, // start connected 
     0, // start connected 
     0, // start connected 
     0, // no inverting
@@ -198,6 +204,18 @@ static void hit_kyle(void) {
             sensors[line].disconnected = 1;
             if (disconnected_hit_sensor_callback != NULL) {
                disconnected_hit_sensor_callback(sensors[line].disconnected);
+            }
+         } else {
+            sensors[line].d1_count ++;
+            if ( sensors[line].d1_count > 10000) {
+               sensors[line].d1_count = 0;
+               sensors[line].d2_count ++;
+               if ( sensors[line].d2_count > 30) {
+                  sensors[line].d2_count = 0;
+                  if (disconnected_hit_sensor_callback != NULL) {
+                     disconnected_hit_sensor_callback(sensors[line].disconnected);
+                  }
+               }
             }
          }
       }
