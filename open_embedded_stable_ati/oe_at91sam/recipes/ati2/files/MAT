@@ -8,6 +8,7 @@ start () {
    matb=$(has_mat_battery)
    matm=$(has_mat_mover)
    matr=$(has_mat_reverse)
+   matd=$(has_dock)
    if [ "$matb" == "" ] ; then
       matb=48
    fi
@@ -17,11 +18,14 @@ start () {
    if [ "$matr" == "" ] ; then
       matr=0
    fi
+   if [ "$matd" == "" ] ; then
+      matd=0
+   fi
 
    # load modules
    load_modules "target_user_interface.ko mover=1" \
                 "target_battery.ko minvoltval=$matb shutdown_wait=5" \
-                "target_mover_generic.ko mover_type=$matm reverse=$matr" \
+                "target_mover_generic.ko mover_type=$matm reverse=$matr dock_loc=$matd" \
                 "target_generic_output.ko" \
                 "mover.ko"
 
