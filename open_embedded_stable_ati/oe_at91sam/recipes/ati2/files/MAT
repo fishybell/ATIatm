@@ -19,7 +19,8 @@ start () {
       matr=0
    fi
    if [ "$matd" == "" ] ; then
-      matd=0
+# Assume no dock
+      matd=2
    fi
 
    # load modules

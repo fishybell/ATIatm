@@ -8,6 +8,7 @@ start () {
    mitb=$(has_mit_battery)
    mitm=$(has_mit_mover)
    mitr=$(has_mit_reverse)
+   mitd=$(has_dock)
    if [ "$mitb" == "" ] ; then
       mitb=48
    fi
@@ -16,6 +17,10 @@ start () {
    fi
    if [ "$mitr" == "" ] ; then
       mitr=0
+   fi
+   if [ "$mitd" == "" ] ; then
+# Assume no dock
+      mitd=2
    fi
 
    # load modules
