@@ -349,6 +349,41 @@ void SIT_Client::sendStatus14112(int on) {
     FUNCTION_END("::sendStatus14112()");
 }
 
+// create and send a status messsage to the FASIT server
+void SIT_Client::sendStatus15112(int on) {
+    FUNCTION_START("::sendStatus15112()");
+
+    FASIT_header hdr;
+    FASIT_14112 msg;
+    defHeader(15112, &hdr); // sets the sequence number and other data
+    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_15112));
+
+    // set response
+    // fill out as response
+    msg.response.rnum = resp_num;
+    msg.response.rseq = resp_seq;
+    resp_num = resp_seq = 0; // the next one will be unsolicited
+
+    msg.body.on = on;
+    //      didMFS(&rmsg.body.on,&rmsg.body.mode,&rmsg.body.idelay,&rmsg.body.rdelay);
+
+    DCMSG(BLUE,"Prepared to send 15112 status packet:");
+    DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htonl(hdr.seq),htonl(hdr.rsrvd),htons(hdr.length));
+    DCMSG(BLUE,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htonl(msg.response.rseq));
+    DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n "\
+          "  ON  \n"\
+          "  %3d   ",
+          msg.body.on);
+
+    // send
+    queueMsg(&hdr, sizeof(FASIT_header));
+    queueMsg(&msg, sizeof(FASIT_15112));
+    finishMsg();
+
+
+    FUNCTION_END("::sendStatus15112()");
+}
+
 /***********************************************************
  *                  FASIT Message Handlers                  *
  ***********************************************************/
@@ -882,6 +917,59 @@ int SIT_Client::handle_14112(int start, int end) {
     return 0;
 }
 
+//
+//  Configure Thermals 
+//     We respond with a 15112 to indicate the updated status if we support Thermals,
+//     If we don't support Mozzle flash we are to repsond with a negative command acknowledgement
+//     (acknowledge response = 'F')   Not sure how to send that right now
+//
+int SIT_Client::handle_15110(int start, int end) {
+    FUNCTION_START("::handle_15110(int start, int end)");
+
+    // do handling of message
+    IMSG("Handling 15110 in SIT\n");
+
+    // map header and body for both message and response
+    FASIT_header rhdr;
+    FASIT_15112 rmsg;
+    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+    FASIT_15110 *msg = (FASIT_15110*)(rbuf + start + sizeof(FASIT_header));
+
+    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
+    DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nNA/On/Off \n%7d",
+          msg->on);
+
+    // check to see if we have the Night Effects Simulator
+    if (start_config&PD_NES){
+        doTherm(msg->on);
+
+        // then respond with a 13112 of it's status
+        defHeader(15112, &rhdr); // sets the sequence number and other data
+        rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_15112));
+
+        // set response
+        rmsg.response.rnum = htons(hdr->num);   //  pulls the message number from the header
+        rmsg.response.rseq = hdr->seq;      
+
+
+    } else {
+        send_2101_ACK(hdr,'F'); // no muzzle flash capability, so send a negative ack
+    }
+
+    FUNCTION_INT("::handle_15110(int start, int end)", 0) ;
+    return 0;
+}
+
+int SIT_Client::handle_15112(int start, int end) {
+    FUNCTION_START("::handle_15112(int start, int end)");
+
+    // do handling of message
+    IMSG("Handling 15112 in SIT\n");
+
+    FUNCTION_INT("::handle_15112(int start, int end)", 0);
+    return 0;
+}
+
 
 int SIT_Client::handle_14200(int start, int end) {
     FUNCTION_START("::handle_14200(int start, int end)");
@@ -1285,6 +1373,37 @@ void SIT_Client::didPHI(int exists,int on) {
     FUNCTION_END("::didPHI");
 }
 
+// change Thermal data
+void SIT_Client::doTherm(int on) {
+    FUNCTION_START("::doTherm(int on)");
+    // pass directly to kernel for actual action
+    if (hasPair()) {
+        nl_conn->doTherm(on);
+    }
+    FUNCTION_END("::doTherm(int on)");
+}
+
+
+void SIT_Client::didTherm(int exists,int on) {
+    FUNCTION_START("::didTherm(int exists,int on) ");
+    // send status message to FASIT server
+    DCOLOR(RED) ; // change color
+    if (exists) {
+        if (on == 2) {
+            sendStatus15112(2);
+        } else if (on == 1) {
+	        sendStatus15112(1);
+	    } else if (on == 0) {
+	        sendStatus15112(0);
+	    } else {
+//        send_2101_ACK(hdr,'F'); // probably not really right
+        }
+    }
+
+    // there needs to be some actual code here if it is going to function
+    FUNCTION_END("::didTherm");
+}
+
 void SIT_Client::doBlank(int blank) {
     FUNCTION_START("::doBlank(int blank)");
     lastHitCal.blank_time = blank;
@@ -1478,8 +1597,10 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
                     case ACC_NES_PHI:
                         sit_client->didPHI(acc_c->exists,acc_c->on_hit); // tell client
                         break;                      
-                    case ACC_SMOKE:
                     case ACC_THERMAL:
+                        sit_client->didTherm(acc_c->exists,acc_c->on_now); // tell client
+                        break;
+                    case ACC_SMOKE:
                     case ACC_SES:
                         DCMSG(RED,"Unsupported accesory message: %i\n", acc_c->acc_type)
                                 break;
@@ -1692,7 +1813,7 @@ void SIT_Conn::doMGL(int on) {
     FUNCTION_END("::doMGL(int on)");
 }
 
-// change MFS data
+// change PHI data
 void SIT_Conn::doPHI(int on) {
     FUNCTION_START("::doPHI(int on)");
 
@@ -1714,6 +1835,29 @@ void SIT_Conn::doPHI(int on) {
     queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // MFS is an accessory
 
     FUNCTION_END("::doPHI(int on)");
+}
+
+// change Thermal data
+void SIT_Conn::doTherm(int on) {
+    FUNCTION_START("::doTherm(int on)");
+
+    struct accessory_conf acc_c;
+
+    // Create attribute
+    memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out\
+    sit_client->getAccC(&acc_c);
+
+    acc_c.acc_type = ACC_THERMAL;
+    if (on == 1) {
+        acc_c.on_now = 1;   // 1 for activate soon
+    } else {
+        acc_c.on_now = 0;   // off
+    }
+    acc_c.ex_data1 = 1;     // we are only using one thermal at a time right now
+    // Queue command
+    queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // Thermal is an accessory
+
+    FUNCTION_END("::doTherm(int on)");
 }
 
 // retrieve gps dataprotected:
