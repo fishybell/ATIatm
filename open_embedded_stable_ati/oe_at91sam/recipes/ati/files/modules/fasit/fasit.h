@@ -311,6 +311,26 @@ typedef struct FASIT_14112 {
 } FASIT_14112;
 
 /********************************************/
+/* 15110 - Configure Thermals    */
+/********************************************/
+typedef struct FASIT_15110 {
+	__uint8_t  on;  // 0 = n/a, 1 = on, 2 = off
+    //__uint8_t  num;
+} FASIT_15110;
+
+/********************************************/
+/* 14112 - Thermal Status    */
+/********************************************/
+typedef struct FASIT_15112b { // body
+	__uint8_t  on;
+    //__uint8_t  num;
+} FASIT_15112b;
+typedef struct FASIT_15112 {
+	FASIT_RESPONSE response;
+	FASIT_15112b body;
+} FASIT_15112;
+
+/********************************************/
 /* 14200 - Configure Hit Blanking           */
 /********************************************/
 typedef struct FASIT_14200 {
