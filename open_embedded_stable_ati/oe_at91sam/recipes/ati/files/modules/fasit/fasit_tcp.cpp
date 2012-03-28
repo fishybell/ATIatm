@@ -133,21 +133,23 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0);
          HANDLE_FASIT (2005);
          HANDLE_FASIT (2006);
          HANDLE_FASIT (2100);
-	 HANDLE_FASIT (2101);
-	 HANDLE_FASIT (2102);
-	 HANDLE_FASIT (2110);
+	     HANDLE_FASIT (2101);
+	     HANDLE_FASIT (2102);
+	     HANDLE_FASIT (2110);
          HANDLE_FASIT (2111);
-	 HANDLE_FASIT (2112);
-	 HANDLE_FASIT (2113);
+	     HANDLE_FASIT (2112);
+	     HANDLE_FASIT (2113);
          HANDLE_FASIT (2114);
          HANDLE_FASIT (2115);
-	 HANDLE_FASIT (13110);
-	 HANDLE_FASIT (13112);
-	 HANDLE_FASIT (14110);
-	 HANDLE_FASIT (14112);
-	 HANDLE_FASIT (14200);
-	 HANDLE_FASIT (14400);
-	 HANDLE_FASIT (14401);
+	     HANDLE_FASIT (13110);
+	     HANDLE_FASIT (13112);
+	     HANDLE_FASIT (14110);
+	     HANDLE_FASIT (14112);
+	     HANDLE_FASIT (14200);
+	     HANDLE_FASIT (14400);
+	     HANDLE_FASIT (14401);
+         HANDLE_FASIT (15110);
+	     HANDLE_FASIT (15112);
          default:
             IMSG("message valid, but not handled: %i\n", mnum);
             break;
@@ -205,18 +207,20 @@ TMSG("too short: %i > (%i - %i)\n", *start, rsize, sizeof(FASIT_header));
          CHECK_LENGTH (2101);
          CHECK_LENGTH (2102);
          CHECK_LENGTH (2110);
-	 CHECK_LENGTH (2111);
+	     CHECK_LENGTH (2111);
          CHECK_LENGTH (2112);
          CHECK_LENGTH (2113);
-	 CHECK_LENGTH (2114);
-	 CHECK_LENGTH (2115);
-	 CHECK_LENGTH (13110);
-	 CHECK_LENGTH (13112);
-	 CHECK_LENGTH (14110);
-	 CHECK_LENGTH (14112);
-	 CHECK_LENGTH (14200);
-	 CHECK_LENGTH (14400);
-	 CHECK_LENGTH (14401);
+	     CHECK_LENGTH (2114);
+	     CHECK_LENGTH (2115);
+	     CHECK_LENGTH (13110);
+	     CHECK_LENGTH (13112);
+	     CHECK_LENGTH (14110);
+	     CHECK_LENGTH (14112);
+	     CHECK_LENGTH (14200);
+	     CHECK_LENGTH (14400);
+	     CHECK_LENGTH (14401);
+         CHECK_LENGTH (15110);
+	     CHECK_LENGTH (15112);
          default:      // not a valid number, not a valid header
             break;
       }
@@ -558,6 +562,40 @@ int FASIT_TCP::handle_14112(int start, int end) {
 	}
 
 	FUNCTION_INT("::handle_14112(int start, int end)", 0);
+	return 0;
+}
+
+int FASIT_TCP::handle_15110(int start, int end) {
+	FUNCTION_START("::handle_15110(int start, int end)");
+   // map header and message
+	FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+	FASIT_15110 *msg = (FASIT_15110*)(rbuf + start + sizeof(FASIT_header));
+
+   // send via client
+	if (hasPair()) {
+		pair()->queueMsg(hdr, sizeof(FASIT_header));
+		pair()->queueMsg(msg, sizeof(FASIT_15110));
+		pair()->finishMsg();
+	}
+
+	FUNCTION_INT("::handle_15110(int start, int end)", 0);
+	return 0;
+}
+
+int FASIT_TCP::handle_15112(int start, int end) {
+	FUNCTION_START("::handle_15112(int start, int end)");
+   // map header and message
+	FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+	FASIT_15112 *msg = (FASIT_15112*)(rbuf + start + sizeof(FASIT_header));
+
+   // send via client
+	if (hasPair()) {
+		pair()->queueMsg(hdr, sizeof(FASIT_header));
+		pair()->queueMsg(msg, sizeof(FASIT_15112));
+		pair()->finishMsg();
+	}
+
+	FUNCTION_INT("::handle_15112(int start, int end)", 0);
 	return 0;
 }
 
