@@ -49,6 +49,8 @@ public :
    void didMGL(int exists,int on);
    void doPHI(int on);
    void didPHI(int exists,int on);
+   void doTherm(int on);
+   void didTherm(int exists,int on);
    void doBlank(int blank);
    void doGPS(); // retrieve gps data
    void didGPS(struct gps_conf gpc_c); // current gps data
@@ -82,6 +84,8 @@ protected:
    int handle_14200(int start, int end);
    int handle_14400(int start, int end);
    int handle_14401(int start, int end);
+   int handle_15110(int start, int end);
+   int handle_15112(int start, int end);
    
 private:
    class SIT_Conn *nl_conn;
@@ -97,6 +101,7 @@ private:
    void sendStatus2112();
    void sendStatus13112(int on);
    void sendStatus14112(int on);
+   void sendStatus15112(int on);
 
    // remember the last command we received for responses back
    int resp_num;
@@ -150,6 +155,8 @@ public:
    void didMGL(int exists,int on);
    void doPHI(int on);
    void didPHI(int exists,int on);
+   void doTherm(int on);
+   void didTherm(int exists,int on);
    void doGPS(); // retrieve gps dataprotected:
 
 
