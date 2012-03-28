@@ -377,8 +377,16 @@ delay_printk("Mover: received value: %i\n", value);
 
         if (value != SLEEP_REQUEST) {
            // handle sleep/wake in hw driver
-           mover_sleep_set(value==SLEEP_COMMAND?1:0);
-           data = value==SLEEP_COMMAND?EVENT_SLEEP:EVENT_WAKE; // convert to event
+//           mover_sleep_set(value==SLEEP_COMMAND?1:0);
+           // handle sleep/wake/dock in hw driver
+           if(value == DOCK_COMMAND){
+              mover_sleep_set(value);
+              data = value==EVENT_DOCK; // convert to event
+           } else { 
+              mover_sleep_set(value==SLEEP_COMMAND?1:0);
+              data = value==SLEEP_COMMAND?EVENT_SLEEP:EVENT_WAKE; // convert to event
+           }
+//           data = value==SLEEP_COMMAND?EVENT_SLEEP:EVENT_WAKE; // convert to event
            queue_nl_multi(NL_C_EVENT, &data, sizeof(data)); // movers propogate message
            rc = HANDLE_SUCCESS_NO_REPLY;
         } else {
