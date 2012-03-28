@@ -36,6 +36,8 @@ static int has_ses = FALSE;					// has SES
 module_param(has_ses, bool, S_IRUGO);
 static int has_msdh = FALSE;				// has MSDH
 module_param(has_msdh, bool, S_IRUGO);
+static int has_thermal = FALSE;			// has X thermal generators
+module_param(has_thermal, int, S_IRUGO);
 static int has_thermalX = FALSE;			// has X thermal generators
 module_param(has_thermalX, int, S_IRUGO);
 static int has_smokeX = FALSE;				// has X smoke generators
@@ -191,8 +193,33 @@ struct generic_output output_table[] = {
         OUTPUT_MUZZLE_FLASH_ACTIVE_STATE,	// gpio active high/low
         RW_LOCK_UNLOCKED,		// lock
     },
+    // Thermals
+    {
+        ACC_THERMAL,			// type
+        1,						// number
+        0,						// exists
+        DISABLED,				// enabled
+        S_DISABLED,				// state
+        S_DISABLED,				// next_state
+        0,						// active_on
+        CONSTANT_ON,			// mode
+        0,						// initial delay
+        0,						// initial delay randomization
+        0,						// repeat delay
+        0,						// repeat delay randomization
+        0,						// on time
+        0,						// off time
+        0,						// repeat count
+        0,						// repeat at
+        0,						// on/off repeat count
+        0,						// on/off repeat at
+        TIMER_INITIALIZER(state_run, 0, 4), // state function, no expire, index 3
+        OUTPUT_THERMAL,			// gpio pin
+        OUTPUT_THERMAL_ACTIVE_STATE,	// gpio active high/low
+        RW_LOCK_UNLOCKED,		// lock
+    },
 };
-#define TABLE_SIZE 4 /* size of output_table */
+#define TABLE_SIZE 5 /* size of output_table */
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to store the burst count.
@@ -996,7 +1023,8 @@ delay_printk("Has MSDH\n");
                 break;
             case ACC_THERMAL:
                 // potentially multiple thermal generators
-                if (output_table[i].number <= has_thermalX) {
+                // temporarily changing has_thermalX to has_thermal
+                if (output_table[i].number <= has_thermalX && has_thermal) {
 delay_printk("Has Thermal %i\n", output_table[i].number);
                     output_table[i].exists = 1; // it exists
                 }
