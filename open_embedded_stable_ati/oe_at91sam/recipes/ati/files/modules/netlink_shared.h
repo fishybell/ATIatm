@@ -301,5 +301,6 @@ static nl_attr_size_t nl_attr_sizes[] = {
 #define SLEEP_COMMAND 0
 #define WAKE_COMMAND 1
 #define SLEEP_REQUEST 2
+#define DOCK_COMMAND 3
 
 #endif

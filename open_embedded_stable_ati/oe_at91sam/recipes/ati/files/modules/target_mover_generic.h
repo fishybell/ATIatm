@@ -21,6 +21,9 @@ extern int mover_sleep_get(void);
 // set the device to asleep or awake
 extern int mover_sleep_set(int);
 
+// set the device to asleep or awake
+extern void set_lifter_position(int);
+
 // register a callback for the lift event
 typedef void (*move_event_callback)(int); // called on finished, starting, and error (passing an EVENT_### value)
 extern void set_move_callback(move_event_callback handler, move_event_callback faulthandler);

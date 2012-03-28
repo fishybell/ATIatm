@@ -2751,8 +2751,8 @@ static void do_velocity(struct work_struct * work) {
     
     // only notify sysfs if we've changed velocity
     old_vel = atomic_read(&velocity_old);
-sendUserConnMsg( "--randy--do_velocity o=%i, v=%i", old_vel, vel);
-    if (1 || old_vel !=  vel) {
+//sendUserConnMsg( "--randy--do_velocity o=%i, v=%i", old_vel, vel);
+    if (abs(atomic_read(&velocity_old) - vel) > 0) {
         atomic_set(&velocity_old, vel); 
         target_sysfs_notify(&target_device_mover_generic, "velocity");
 #ifndef WOBBLE_DETECT

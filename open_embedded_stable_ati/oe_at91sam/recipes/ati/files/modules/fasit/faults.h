@@ -35,6 +35,7 @@ enum {
    ERR_bad_checksum,
    ERR_unsupported_command,
    ERR_invalid_exception,
+   ERR_stop_dock_limit=185,
    ERR_disconnected_SIT=186,
    ERR_connected_SIT=187,
    ERR_critical_battery=188,
