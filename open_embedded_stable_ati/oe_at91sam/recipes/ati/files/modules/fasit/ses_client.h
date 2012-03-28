@@ -84,6 +84,8 @@ protected:
    int handle_14200(int start, int end);
    int handle_14400(int start, int end);
    int handle_14401(int start, int end);
+   int handle_15110(int start, int end);
+   int handle_15112(int start, int end);
    
 private:
    class SES_Conn *nl_conn;
