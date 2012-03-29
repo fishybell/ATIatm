@@ -40,7 +40,7 @@ addr=1;
     high_dev=min(low_dev+31,high_dev);	// look for only devid's within 31 of low_dev, or < high_dev
     while (addr<max_addr){	// spin through our addresses
 	testid=addr_pool[addr].devid;
-	if ((testid>=low_dev)&&(testid<=high_dev)){	// we have match
+	if ((testid>=low_dev)&&(testid<=high_dev) && addr_pool[addr].inuse == 1){	// we have match and the inuse flag is set correctly
 	    bits^=BV(testid-low_dev);	// turn off the forget bit for this devid
 	}
 	DDCMSG(D_MEGA,BLUE,"SFB:  addr=%d testid=%x  bits=0x%8x",addr,testid,bits);
@@ -368,7 +368,8 @@ int main(int argc, char **argv) {
 			    // we already have this devID, so reconnect because the RFslave probably rebooted or something
 			    DCMSG(RED,"MCP: just send a new address assignmentto reconnect  the minon and RFslave  devid=%06x",LB_devreg->devid);
 
-			} else {
+         }
+//			} else { -- Now we always fork a new minion thread
 			    // we do not have this devID.  Look for the first free address to use
 			    addr_cnt=1;		//  step through to check to find unused
 			    while (addr_pool[addr_cnt].inuse) addr_cnt++;	// look for an unused address slot
@@ -446,6 +447,7 @@ int main(int argc, char **argv) {
 				    close(minions[mID].minion);
 				    minion_thread(&minions[mID]);
 				    DDCMSG(D_MINION,RED,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
+				    DDCMSG(D_NEW,BLACK,"MCP: minion_thread(...) returned...exiting child");
 
 				    break;	// if we come back , bail to another level or something more fatal
 				}
@@ -468,7 +470,7 @@ int main(int argc, char **argv) {
 			    /***   end of create a new minion 
 			     ****************************************************************************/
 			    } // else addr_cnt>2046   - not all used
-			} // if addr_cnt>2046  devid not found so we made a new minon
+			//} // if addr_cnt>2046  devid not found so we made a new minon
 
 		    // Create an LB ASSIGN ADDR packet to send back to the slaves
 		    // addr_cnt  should be the RF_addr slot  it already had
@@ -575,9 +577,16 @@ int main(int argc, char **argv) {
 			DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,RF_size(LB->cmd));
 		    }
 		    if (!msglen){
-			DCMSG(RED,"MCP:  attempted read from minion returned 0!\n");
+			DCMSG(RED,"MCP:  attempted read from minion returned 0! fd: %i\n", minion_fd);
 			sleep(1);
-		    } else {
+		    } else if (LB->cmd == LBC_ILLEGAL) {
+            // the cmd was invalid, this means reset forget bit for this minions address
+            addr_pool[minion->RF_addr].inuse = 0; // mark that we are no longer in use
+            DDCMSG(D_NEW, BLACK,"Forgetting minion %i:%i", minion->mID, minion->RF_addr);
+            epoll_ctl(fds, EPOLL_CTL_DEL, minion_fd, &ev); // remove from epoll
+            close(minion_fd); // close my end
+            memset(minion, 0, sizeof(thread_data_t));
+         } else {
 			// just display the packet for debugging
 			LB=(LB_packet_t *)buf;
 			// do the copy down here
