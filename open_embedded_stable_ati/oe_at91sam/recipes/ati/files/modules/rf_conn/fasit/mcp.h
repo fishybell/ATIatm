@@ -52,28 +52,28 @@ enum {
 };
 
 typedef struct state_exp_item {
-   uint8	 data;
-   uint8	 newdata;
-   uint16	 event;
-   uint16	 flags;
-   uint16	 timer;
+   uint8         data;
+   uint8         newdata;
+   uint16        event;
+   uint16        flags;
+   uint16        timer;
    struct timespec elapsed_time;
 } state_exp_item_t ;
 
 typedef struct state_rf_timeout {
-   uint8	 data; // ignored
-   uint8	 newdata; // ignored
-   uint16	 flags;
-   uint16	 timer;
+   uint8         data; // ignored
+   uint8         newdata; // ignored
+   uint16        flags;
+   uint16        timer;
    struct timespec elapsed_time;
 } state_rf_timeout_t ;
 
 typedef struct state_u8_item {
-   uint8	 data;
-   uint8	 newdata;
-   uint16	 _pad1;
-   uint16	 flags;
-   uint16	 timer;
+   uint8         data;
+   uint8         newdata;
+   uint16        _pad1;
+   uint16        flags;
+   uint16        timer;
 } state_u8_item_t;
 
 typedef struct state_s16_item {
@@ -99,109 +99,109 @@ typedef struct state_float_item {
 
 
 typedef struct minion_state {
-   uint32			cap;	// actual capability bitfield - u32 to keep alignment    
-   uint8			dev_type;   // FASIT device type
-   uint16			state_timer;	// when we next need to process the state
-   uint16			padding0;	//   extra space for now
-   state_u16_item_t		fault;	// maybe not really an item
-   //  miles=1, NES=2, gps=4, the rest are reserved for now - but should maybe include movers and stuff	
-   state_rf_timeout_t		rf_t;	// rf timeout timer
-   state_u8_item_t		status;	
-   state_exp_item_t		exp;	// exposure state has more stuff
-   state_u8_item_t		event;	// used for timer events
-   state_u8_item_t		asp;
-   state_u16_item_t		dir;
-   state_u8_item_t		move;
-   state_float_item_t		speed;
-   //					hit configuration (aka sensor)
-   state_u8_item_t		on;
-   state_u16_item_t		hit;
-   state_u8_item_t		react;
-   state_u16_item_t		tokill;
-   state_u16_item_t		sens;
-   state_u8_item_t		mode;
-   state_u16_item_t		burst;
+   uint32                       cap;    // actual capability bitfield - u32 to keep alignment    
+   uint8                        dev_type;   // FASIT device type
+   uint16                       state_timer;    // when we next need to process the state
+   uint16                       padding0;       //   extra space for now
+   state_u16_item_t             fault;  // maybe not really an item
+   //  miles=1, NES=2, gps=4, the rest are reserved for now - but should maybe include movers and stuff 
+   state_rf_timeout_t           rf_t;   // rf timeout timer
+   state_u8_item_t              status; 
+   state_exp_item_t             exp;    // exposure state has more stuff
+   state_u8_item_t              event;  // used for timer events
+   state_u8_item_t              asp;
+   state_u16_item_t             dir;
+   state_u8_item_t              move;
+   state_float_item_t           speed;
+   //                                   hit configuration (aka sensor)
+   state_u8_item_t              on;
+   state_u16_item_t             hit;
+   state_u8_item_t              react;
+   state_u16_item_t             tokill;
+   state_u16_item_t             sens;
+   state_u8_item_t              mode;
+   state_u16_item_t             burst;
    // MISC
-   state_u8_item_t		pos;
-   state_u8_item_t		type;
-   state_u8_item_t		hit_config;
-   state_u16_item_t		blanking;
+   state_u8_item_t              pos;
+   state_u8_item_t              type;
+   state_u8_item_t              hit_config;
+   state_u16_item_t             blanking;
    // MILES
-   state_u8_item_t		miles_code;
-   state_u8_item_t		miles_ammo;
-   state_u8_item_t		miles_player;
-   state_u8_item_t		miles_delay;
+   state_u8_item_t              miles_code;
+   state_u8_item_t              miles_ammo;
+   state_u8_item_t              miles_player;
+   state_u8_item_t              miles_delay;
    // MFS
-   state_u8_item_t		mfs_on;
-   state_u8_item_t		mfs_mode;
-   state_u8_item_t		mfs_idelay;
-   state_u8_item_t		mfs_rdelay;
+   state_u8_item_t              mfs_on;
+   state_u8_item_t              mfs_mode;
+   state_u8_item_t              mfs_idelay;
+   state_u8_item_t              mfs_rdelay;
    // MGS
-   state_u8_item_t		mgs_on;
+   state_u8_item_t              mgs_on;
    // PHI
-   state_u8_item_t		phi_on;
+   state_u8_item_t              phi_on;
 
 } minion_state_t;
 
 typedef struct slave_state {
-   uint32		cap;	// actual capability bitfield - u32 to keep alignment    
-   uint8		dev_type;   // FASIT device type
-   uint16		state_timer;	// when we next need to process the state
-   uint16		padding0;	//   extra space for now
-   uint8		status;	
-   uint8		exp;	// exposure state has more stuff
-   uint8		event;	// used for timer events
-   uint8		asp;
-   uint16		dir;
-   uint8		move;
-   float		speed;
-   //		hit configuration (aka sensor)
-   uint8		on;
-   uint16		hit;
-   uint8		react;
-   uint16		tokill;
-   uint16		sens;
-   uint8		mode;
-   uint16		burst;
-   uint16		timehits;
+   uint32               cap;    // actual capability bitfield - u32 to keep alignment    
+   uint8                dev_type;   // FASIT device type
+   uint16               state_timer;    // when we next need to process the state
+   uint16               padding0;       //   extra space for now
+   uint8                status; 
+   uint8                exp;    // exposure state has more stuff
+   uint8                event;  // used for timer events
+   uint8                asp;
+   uint16               dir;
+   uint8                move;
+   float                speed;
+   //           hit configuration (aka sensor)
+   uint8                on;
+   uint16               hit;
+   uint8                react;
+   uint16               tokill;
+   uint16               sens;
+   uint8                mode;
+   uint16               burst;
+   uint16               timehits;
    // MISC
-   uint8		pos;
-   uint8		type;
-   uint8		hit_config;
-   uint16		blanking;
+   uint8                pos;
+   uint8                type;
+   uint8                hit_config;
+   uint16               blanking;
    // MILES
-   uint8		miles_code;
-   uint8		miles_ammo;
-   uint8		miles_player;
-   uint8		miles_delay;
+   uint8                miles_code;
+   uint8                miles_ammo;
+   uint8                miles_player;
+   uint8                miles_delay;
    // MFS
-   uint8		mfs_on;
-   uint8		mfs_mode;
-   uint8		mfs_idelay;
-   uint8		mfs_rdelay;
+   uint8                mfs_on;
+   uint8                mfs_mode;
+   uint8                mfs_idelay;
+   uint8                mfs_rdelay;
    // MGS
-   uint8		mgs_on;
+   uint8                mgs_on;
    // PHI
-   uint8		phi_on;
+   uint8                phi_on;
 
 } slave_state_t;
 
-#define F_exp_ok	0
-#define F_exp_expose_A	1
-#define F_exp_expose_B	2
-#define F_exp_expose_C	3
-#define F_exp_conceal_A	4
-#define F_exp_conceal_B	5
-#define F_exp_conceal_C	6
-#define F_exp_expose_D	7
+#define F_exp_ok        0
+#define F_exp_expose_A  1
+#define F_exp_expose_B  2
+#define F_exp_expose_C  3
+#define F_exp_conceal_A 4
+#define F_exp_conceal_B 5
+#define F_exp_conceal_C 6
+#define F_exp_expose_D  7
 
-#define F_up2date		0	// RF and internal state match
-#define F_tell_RF		0x100	// RF needs update 
-#define F_told_RF		0x200	// RF updated, waiting for ack 
-#define F_tell_RCC		0x400	// internal state right, FASIT needs update
-#define F_told_RCC		0x800	// We told FASIT our internal state, waiting on RF 
-#define F_needs_report		0x010	// there needs to be an event report
-#define F_waiting_for_report	0x020	// there needs to be an event report
+#define F_up2date               0       // RF and internal state match
+#define F_tell_RF               0x100   // RF needs update 
+#define F_told_RF               0x200   // RF updated, waiting for ack 
+#define F_tell_RCC              0x400   // internal state right, FASIT needs update
+#define F_told_RCC              0x800   // We told FASIT our internal state, waiting on RF 
+#define F_needs_report          0x010   // there needs to be an event report
+#define F_waiting_for_report    0x020   // there needs to be an event report
 
 #define F_rf_t_waiting_short 1 /* the minion is currently waiting for a response from a TM */
 #define F_rf_t_waiting_long 2 /* the minion hasn't talked to the TM in a long time */
@@ -214,17 +214,17 @@ void timestamp(struct timespec *elapsed_time, struct timespec *istart_time, stru
 /* create thread argument struct for thr_func() */
 typedef struct _thread_data_t {
    /* don't mess with the order of mcp and minion */
-   int mcp_sock;	// socket to mcp
-   int minion;		// fd to minion
+   int mcp_sock;        // socket to mcp
+   int minion;          // fd to minion
    /*  okay for changes again */
    int status;
    int PID;
-   int mID;		// minion ID which matches the slave registration
-   int rcc_sock;	// socket to RCC
-   int seq;		// sequence number for the next packet this minion sends as a fasit message
-   int RF_addr;	// current RF address 
-   uint32 devid;	// mac address of this minion which we got back from the RF
-   minion_state_t S;	// the whol state of this minion
+   int mID;             // minion ID which matches the slave registration
+   int rcc_sock;        // socket to RCC
+   int seq;             // sequence number for the next packet this minion sends as a fasit message
+   int RF_addr; // current RF address 
+   uint32 devid;        // mac address of this minion which we got back from the RF
+   minion_state_t S;    // the whol state of this minion
 } thread_data_t;
 
 /* create simple struct to keep track of the address pool */
@@ -239,14 +239,14 @@ typedef struct addr_t {
 
 //   possible status for thread_data status that we need to deal with
 #define S_closed 0
-#define S_open	 1
-#define S_busy	 2
+#define S_open   1
+#define S_busy   2
 
 /*   create the structure type to use to store what the mcp knows about our minions */
 typedef struct minion {
    pthread_t thread;
    thread_data_t thr_data;
-   FILE	pipe;
+   FILE pipe;
 } minion_t;
 
 void *minion_thread(thread_data_t *);

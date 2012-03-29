@@ -1,7 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 
-int verbose;	// globals
+int verbose;    // globals
 
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
@@ -48,7 +48,7 @@ void DieWithError(char *errorMessage){
 void HandleRF(int MCPsock,int risock,int RFfd){
    struct timespec elapsed_time, start_time, istart_time,delta_time;
    queue_t *Rx,*Tx;
-   int seq=1;		// the packet sequence numbers
+   int seq=1;           // the packet sequence numbers
 
    char Rbuf[512];
    char buf[200];        /* text Buffer  */
@@ -58,7 +58,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
    int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
    fd_set rf_or_mcp;
    struct timeval timeout;
-   int maxcps=500,rfcount=0;		/*  characters per second that we can transmit without melting - 1000 is about 100% */
+   int maxcps=500,rfcount=0;            /*  characters per second that we can transmit without melting - 1000 is about 100% */
    double cps;
    uint8 crc;
    int slottime=0,total_slots;
@@ -74,16 +74,16 @@ void HandleRF(int MCPsock,int risock,int RFfd){
    Rptr=Rbuf;
    Rstart=Rptr;
 
-   Rx=queue_init(Rxsize);	// incoming packet buffer
-   Tx=queue_init(Txsize);	// outgoing Tx buffer
+   Rx=queue_init(Rxsize);       // incoming packet buffer
+   Tx=queue_init(Txsize);       // outgoing Tx buffer
 
    memset(Rstart,0,100);
 
-   remaining_time=100;		//  remaining time before we can transmit (in ms)
+   remaining_time=100;          //  remaining time before we can transmit (in ms)
 
    /**   loop until we lose connection  **/
-   clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
-   timestamp(&elapsed_time,&istart_time,&delta_time);	// make sure the delta_time gets set    
+   clock_gettime(CLOCK_MONOTONIC,&istart_time); // get the intial current time
+   timestamp(&elapsed_time,&istart_time,&delta_time);   // make sure the delta_time gets set    
    while(1) {
 
       timestamp(&elapsed_time,&istart_time,&delta_time);
@@ -96,12 +96,12 @@ void HandleRF(int MCPsock,int risock,int RFfd){
       /* then based on the source, send the message to the destination  */
       /* create a fd_set so we can monitor both the mcp and the connection to the RCC*/
       FD_ZERO(&rf_or_mcp);
-      FD_SET(MCPsock,&rf_or_mcp);		// we are interested hearing the mcp
-      FD_SET(risock,&rf_or_mcp);		// we are interested hearing the Radio Interface listen socket
+      FD_SET(MCPsock,&rf_or_mcp);               // we are interested hearing the mcp
+      FD_SET(risock,&rf_or_mcp);                // we are interested hearing the Radio Interface listen socket
       if (riclient > 0) {
          FD_SET(riclient,&rf_or_mcp); // only add riclient to select when it exists
       }
-      FD_SET(RFfd,&rf_or_mcp);		// we also want to hear from the RF world
+      FD_SET(RFfd,&rf_or_mcp);          // we also want to hear from the RF world
 
       /*   actually for now we will block until we have data - no need to timeout [yet?]
        *     I guess a timeout that will make sense later is if the radio is ready for data
@@ -178,54 +178,54 @@ void HandleRF(int MCPsock,int risock,int RFfd){
              ******                much simpler, much better, more goodness
              ******                we only have to keep track if there are any type #2's in the queue or not.
              ******  
-             ******		  
+             ******               
              ***************/
 
 
-            /******		 do enough parsing at this point to decide if the packet is type 1,2, or 3.
-             ******		 we also have fully parse and record the settings in LBC_REQUEST_NEW that are
-             ******		  meant for us
+            /******              do enough parsing at this point to decide if the packet is type 1,2, or 3.
+             ******              we also have fully parse and record the settings in LBC_REQUEST_NEW that are
+             ******               meant for us
              ******/
 
             DDCMSG(D_MEGA,YELLOW,"RFmaster:  ptype rx=%d before Rx to Tx.  Rx[%d] Tx[%d]",QueuePtype(Rx),Queue_Depth(Rx),Queue_Depth(Tx));
 
             // loop until we are out of complete packets, and place them into the Tx queue
-            burst=3;		// remembers if we upt a type2 into the burst
-            remaining_time =1000;	// reset our remaining_time before we are allowed to Tx again   time needs to be smarter
+            burst=3;            // remembers if we upt a type2 into the burst
+            remaining_time =1000;       // reset our remaining_time before we are allowed to Tx again   time needs to be smarter
 
-            while((ptype=QueuePtype(Rx))&&		/* we have a complete packet */
-                  burst &&				/* and burst is not 0 (0 forces us to send) */
-                  (Queue_Depth(Tx)<240)&&		/*  room for more */
-                  !((ptype==1)&&(burst==2))		/* and if we are NOT a REQUEST_NEW AND haven't got a type 2  yet */
-                 ){	
+            while((ptype=QueuePtype(Rx))&&              /* we have a complete packet */
+                  burst &&                              /* and burst is not 0 (0 forces us to send) */
+                  (Queue_Depth(Tx)<240)&&               /*  room for more */
+                  !((ptype==1)&&(burst==2))             /* and if we are NOT a REQUEST_NEW AND haven't got a type 2  yet */
+                 ){     
 
 
                DDCMSG(D_MEGA,CYAN,"RFmaster:  in loop.  Rx[%d] Tx[%d]",Queue_Depth(Rx),Queue_Depth(Tx));
-               if (ptype==1){	/*  parse it to get the slottime and devid range, and set burst to 0 */
-                  LB_new =(LB_request_new_t *) Rx->head;	// we need to parse out the slottime, high_dev and low_dev from this packet.
-                  slottime=LB_new->slottime*5;		// convert passed slottime back to milliseconds
+               if (ptype==1){   /*  parse it to get the slottime and devid range, and set burst to 0 */
+                  LB_new =(LB_request_new_t *) Rx->head;        // we need to parse out the slottime, high_dev and low_dev from this packet.
+                  slottime=LB_new->slottime*5;          // convert passed slottime back to milliseconds
                   low_dev=LB_new->low_dev;
-                  total_slots=34;		// total number of slots with end padding
+                  total_slots=34;               // total number of slots with end padding
                   burst=0;
-                  remaining_time =(total_slots)*slottime;	// set up the timer
+                  remaining_time =(total_slots)*slottime;       // set up the timer
                   DDCMSG(D_TIME,YELLOW,"RFmaster:  setting remaining_time to %d  total_slots=%d slottime=%d",
                          remaining_time,total_slots,slottime);
-                  ReQueue(Tx,Rx,RF_size(LB_new->cmd));	// move it to the Tx queue
+                  ReQueue(Tx,Rx,RF_size(LB_new->cmd));  // move it to the Tx queue
 
-                  //			DCMSG(YELLOW,"RFmaster: requeued into M1[%d:%d]:%d s%d  size=%d",
-                  //			      M1->head-M1->buf,M1->tail-M1->buf,Queue_Depth(M1),QueueSeq_peek(M1),size);
-                  //			sprintf(buf,"M1[%2d:%2d]  ",M1->head-M1->buf,M1->tail-M1->buf);
-                  //			DCMSG_HEXB(YELLOW,buf,M1->head,Queue_Depth(M1));
+                  //                    DCMSG(YELLOW,"RFmaster: requeued into M1[%d:%d]:%d s%d  size=%d",
+                  //                          M1->head-M1->buf,M1->tail-M1->buf,Queue_Depth(M1),QueueSeq_peek(M1),size);
+                  //                    sprintf(buf,"M1[%2d:%2d]  ",M1->head-M1->buf,M1->tail-M1->buf);
+                  //                    DCMSG_HEXB(YELLOW,buf,M1->head,Queue_Depth(M1));
                } else {
-                  LB=(LB_packet_t *)Rx->head;			
-                  ReQueue(Tx,Rx,RF_size(LB->cmd));	// move it to the Tx queue
+                  LB=(LB_packet_t *)Rx->head;                   
+                  ReQueue(Tx,Rx,RF_size(LB->cmd));      // move it to the Tx queue
                   if (ptype==2) {
                      burst=2;
-                     remaining_time +=slottime;	// add time for a response to this one
+                     remaining_time +=slottime; // add time for a response to this one
                      DDCMSG(D_TIME,YELLOW,"RFmaster:  incrementing remaining_time by slottime to %d  slottime=%d",
                             remaining_time,slottime);
 
-                  }			    
+                  }                         
                }
             }  // end of while loop to build the Tx packet
 
@@ -249,7 +249,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
                result=write(RFfd,Tx->head,Queue_Depth(Tx));
                if (result<0){
-                  strerror_r(errno,buf,200);		    
+                  strerror_r(errno,buf,200);                
                   DCMSG(RED,"RFmaster:  write Tx queue to RF error %s",buf);
                } else {
                   if (!result){
@@ -266,7 +266,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
             timestamp(&elapsed_time,&istart_time,&delta_time);
             DDCMSG(D_MEGA,CYAN,"RFmaster:  Just might have Tx'ed to RF   at %5ld.%09ld timestamp, delta=%5ld.%09ld"
                    ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-            /*****    this stuff below isn't really tested  *****/		
+            /*****    this stuff below isn't really tested  *****/              
             rfcount+=MsgSize;
             cps=(double) rfcount/(double)elapsed_time.tv_sec;
             DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
@@ -290,7 +290,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
          DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(RFfd)");
          /* Receive message, or continue to recieve message from RF */
 
-         //    MAKE SURE THE RFfd is non-blocking!!!	
+         //    MAKE SURE THE RFfd is non-blocking!!!    
          gathered = gather_rf(RFfd,Rptr,Rstart,300);
          if (gathered>0){  // increment our current pointer
             Rptr=gathered+Rstart;
@@ -306,7 +306,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
          if (gathered>=3){
             // we have a chance of a compelete packet
-            LB=(LB_packet_t *)Rstart;	// map the header in
+            LB=(LB_packet_t *)Rstart;   // map the header in
             size=RF_size(LB->cmd);
 
             /* Receive message, or continue to recieve message from RF */
@@ -332,13 +332,13 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                }
 
                if ((Rptr-Rstart) > size){
-                  Rstart+=size;	// step ahead to the next packet
+                  Rstart+=size; // step ahead to the next packet
                   DDCMSG(D_VERY,RED,"Stepping to next packet, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
                   sprintf(buf,"  Next 8 chars in Rbuf at Rstart  ");
                   DDCMSG_HEXB(D_VERY,RED,buf,Rstart,8);
 
                } else {
-                  Rptr=Rstart=Rbuf;	// reset to the beginning of the buffer
+                  Rptr=Rstart=Rbuf;     // reset to the beginning of the buffer
                   DDCMSG(D_VERY,RED,"Resetting to beginning of Rbuf, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
                }
 
@@ -371,7 +371,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
       if (FD_ISSET(risock,&rf_or_mcp)){
          DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(risock)");
          int newclient = -1;
-         struct sockaddr_in ClntAddr;	/* Client address */
+         struct sockaddr_in ClntAddr;   /* Client address */
          unsigned int clntLen;               /* Length of client address data structure */
          // close existing one
          if (riclient > 0) {
@@ -390,7 +390,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
       if (FD_ISSET(MCPsock,&rf_or_mcp)){
          DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(MCPsock)");
          /* Receive message from MCP and read it directly into the Rx buffer */
-         MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);	    
+         MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);            
          DDCMSG(D_PACKET,YELLOW,"RFmaster: read %d from MCP.",MsgSize);
 
          if (MsgSize<0){
@@ -403,7 +403,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
             free(Rx);
             free(Tx);
             close(MCPsock);    /* Close socket */    
-            return;			/* go back to the main loop waiting for MCP connection */
+            return;                     /* go back to the main loop waiting for MCP connection */
          }
 
          if (MsgSize){
@@ -417,7 +417,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
              ***************    
              ***************    */
 
-            Rx->tail+=MsgSize;	// add on the new length
+            Rx->tail+=MsgSize;  // add on the new length
             bytecount=Queue_Depth(Rx);
             DDCMSG(D_PACKET,YELLOW,"RFmaster: Rx[%d]",bytecount);
 
@@ -459,24 +459,24 @@ void print_help(int exval) {
  *************/
 
 int main(int argc, char **argv) {
-   int serversock;			/* Socket descriptor for server connection */
-   int risock;			/* Socket descriptor for radio interface connection */
-   int MCPsock;			/* Socket descriptor to use */
-   int RFfd;				/* File descriptor for RFmodem serial port */
-   struct sockaddr_in ServAddr;	/* Local address */
-   struct sockaddr_in RiAddr;	/* Radio Interface address */
-   struct sockaddr_in ClntAddr;	/* Client address */
-   unsigned short RFmasterport;	/* Server port */
-   unsigned short SRport;	/* SmartRange port */
+   int serversock;                      /* Socket descriptor for server connection */
+   int risock;                  /* Socket descriptor for radio interface connection */
+   int MCPsock;                 /* Socket descriptor to use */
+   int RFfd;                            /* File descriptor for RFmodem serial port */
+   struct sockaddr_in ServAddr; /* Local address */
+   struct sockaddr_in RiAddr;   /* Radio Interface address */
+   struct sockaddr_in ClntAddr; /* Client address */
+   unsigned short RFmasterport; /* Server port */
+   unsigned short SRport;       /* SmartRange port */
    unsigned int clntLen;               /* Length of client address data structure */
-   char ttyport[32];	/* default to ttyS0  */
+   char ttyport[32];    /* default to ttyS0  */
    int opt,xmit;
    int slottime,total_slots;
    int low_dev,high_dev;
 
    slottime=0;
    verbose=0;
-   xmit=0;		// used for testing
+   xmit=0;              // used for testing
    RFmasterport = defaultPORT;
    SRport = smartrangePORT;
    strcpy(ttyport,"/dev/ttyS0");
@@ -552,7 +552,7 @@ int main(int argc, char **argv) {
    }
 
    //  this section is just used for testing   
-   if (xmit){	
+   if (xmit){   
       LB_packet_t LB;
       LB_request_new_t *RQ;
       int result,size;

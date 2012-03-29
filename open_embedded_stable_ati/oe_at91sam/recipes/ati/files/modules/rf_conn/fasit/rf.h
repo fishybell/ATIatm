@@ -2,16 +2,16 @@
 #define _RF_H_
 
 //  these are the verbosity bits.   fix the print_verbosity in rf.c if you change any
-#define D_NONE		0
-#define D_PACKET	1
-#define D_RF		2
-#define D_CRC		4
-#define D_POLL		8
-#define D_TIME		0x10
-#define D_VERY		0x20
-#define D_NEW		0x40
-#define D_MEGA		0x80
-#define D_MINION	0x100
+#define D_NONE          0
+#define D_PACKET        1
+#define D_RF            2
+#define D_CRC           4
+#define D_POLL          8
+#define D_TIME          0x10
+#define D_VERY          0x20
+#define D_NEW           0x40
+#define D_MEGA          0x80
+#define D_MINION        0x100
 
 #include "mcp.h"
 
@@ -24,10 +24,10 @@
 
 
 typedef struct queue_tag {
-   char *tail;		//  end of queue - insertion point
-   char *head;		// start of queue - we remove fifo usually
-   int size;		// how big the buffer is
-   char buf[8];	// size here is a dummy
+   char *tail;          //  end of queue - insertion point
+   char *head;          // start of queue - we remove fifo usually
+   int size;            // how big the buffer is
+   char buf[8]; // size here is a dummy
 }  queue_t ;
 
 queue_t *queue_init( int size);
@@ -62,31 +62,31 @@ void print_verbosity_bits(void);
 //     that is probably bit-packed
 
 //  the command ID's
-#define LBC_ILLEGAL			0
-#define LBC_EXPOSE			1
-#define LBC_MOVE			2
-#define LBC_CONFIGURE_HIT		3
-#define LBC_GROUP_CONTROL		4
-#define LBC_AUDIO_CONTROL		5
-#define LBC_POWER_CONTROL		6
+#define LBC_ILLEGAL                     0
+#define LBC_EXPOSE                      1
+#define LBC_MOVE                        2
+#define LBC_CONFIGURE_HIT               3
+#define LBC_GROUP_CONTROL               4
+#define LBC_AUDIO_CONTROL               5
+#define LBC_POWER_CONTROL               6
 
-#define LBC_PYRO_FIRE			7
+#define LBC_PYRO_FIRE                   7
 
-#define LBC_STATUS_RESP_LIFTER		8
-#define LBC_STATUS_RESP_MOVER		9
-#define LBC_STATUS_RESP_EXT		10
-#define LBC_STATUS_NO_RESP		11
+#define LBC_STATUS_RESP_LIFTER          8
+#define LBC_STATUS_RESP_MOVER           9
+#define LBC_STATUS_RESP_EXT             10
+#define LBC_STATUS_NO_RESP              11
 
-#define LBC_QEXPOSE			16
-#define LBC_QCONCEAL			17
-#define LBC_STATUS_REQ			18
-#define LBC_REPORT_REQ			19
+#define LBC_QEXPOSE                     16
+#define LBC_QCONCEAL                    17
+#define LBC_STATUS_REQ                  18
+#define LBC_REPORT_REQ                  19
 
-#define LBC_EVENT_REPORT		20
+#define LBC_EVENT_REPORT                20
 
-#define LBC_DEVICE_REG			29
-#define LBC_REQUEST_NEW			30
-#define LBC_ASSIGN_ADDR			31
+#define LBC_DEVICE_REG                  29
+#define LBC_REQUEST_NEW                 30
+#define LBC_ASSIGN_ADDR                 31
 
 /********************************************/
 /* Low Bandwidth Message Header             */
@@ -176,11 +176,11 @@ typedef struct LB_request_new_t {
    //  10 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 padding0:3 __attribute__ ((packed));
-   uint32 low_dev:24 __attribute__ ((packed));		// lowest devID
+   uint32 low_dev:24 __attribute__ ((packed));          // lowest devID
 
-   uint32 forget_addr:32 __attribute__ ((packed));	// bitfield of which slaves should forget their current addresses
+   uint32 forget_addr:32 __attribute__ ((packed));      // bitfield of which slaves should forget their current addresses
 
-   uint32 slottime:8 __attribute__ ((packed));		// slottime (multiply by 5ms)
+   uint32 slottime:8 __attribute__ ((packed));          // slottime (multiply by 5ms)
    uint32 crc:8 __attribute__ ((packed));
    uint32 padding:16 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_request_new_t;
@@ -213,7 +213,7 @@ typedef struct LB_assign_addr_t {
    uint32 cmd:5 __attribute__ ((packed));
    uint32 reregister:1 __attribute__ ((packed));
    uint32 padding0:2 __attribute__ ((packed));
-   uint32 devid:24 __attribute__ ((packed));	    
+   uint32 devid:24 __attribute__ ((packed));        
 
    uint32 new_addr:11 __attribute__ ((packed));
    uint32 pad:5 __attribute__ ((packed));
@@ -248,9 +248,9 @@ typedef struct LB_expose {
 typedef struct LB_qconceal {
    // 5 bytes
    uint32 cmd:5 __attribute__ ((packed));
-   uint32 addr:11 __attribute__ ((packed));	// destination address (always from basestation)
-   uint32 event:5 __attribute__ ((packed));	// rolling event sequence number
-   uint32 uptime:11 __attribute__ ((packed));	// time target was up, in deciseconds ( max 204.7 seconds)
+   uint32 addr:11 __attribute__ ((packed));     // destination address (always from basestation)
+   uint32 event:5 __attribute__ ((packed));     // rolling event sequence number
+   uint32 uptime:11 __attribute__ ((packed));   // time target was up, in deciseconds ( max 204.7 seconds)
 
    uint32 crc:8 __attribute__ ((packed));
    uint32 padding:24 __attribute__ ((packed));

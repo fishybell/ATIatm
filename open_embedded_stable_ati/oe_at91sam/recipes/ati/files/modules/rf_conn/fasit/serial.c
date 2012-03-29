@@ -46,7 +46,7 @@ int open_port(char *sport, int hardflow){
       my_termios.c_cflag &= ~CBAUD;
       my_termios.c_cflag |= B19200 ;
       my_termios.c_iflag &= ~( BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF | IXANY);
-      my_termios.c_iflag |= (IGNBRK | IGNCR);	// some documentation says we want these on
+      my_termios.c_iflag |= (IGNBRK | IGNCR);   // some documentation says we want these on
 
       my_termios.c_oflag &= ~OPOST;
       my_termios.c_lflag &= ~(ECHO | ECHONL | ECHO | ECHOE | ICANON | ISIG | IEXTEN);
@@ -54,14 +54,14 @@ int open_port(char *sport, int hardflow){
       my_termios.c_cflag |= CS8;
 
       if (hardflow) {
-         my_termios.c_cflag |= CRTSCTS;	// turn  on hardware flow control  RTS CTS
+         my_termios.c_cflag |= CRTSCTS; // turn  on hardware flow control  RTS CTS
       } else {
-         my_termios.c_cflag &= ~CRTSCTS;	// turn off hardware flow control  RTS CTS
+         my_termios.c_cflag &= ~CRTSCTS;        // turn off hardware flow control  RTS CTS
       }
 
       my_termios.c_cc[VTIME] = 0;     /* inter-character timer unused */
       my_termios.c_cc[VMIN] = 1;      /* read a minimum of 1 character */
-      tcflush (fd, TCIFLUSH);		/* something from Nate's old code */
+      tcflush (fd, TCIFLUSH);           /* something from Nate's old code */
 
       tcsetattr( fd, TCSANOW, &my_termios );
       tcgetattr( fd, &new_termios );
@@ -71,11 +71,11 @@ int open_port(char *sport, int hardflow){
        *     */
 
       speed = cfgetospeed( &new_termios );
-      myspeed = cfgetospeed( &my_termios );	
+      myspeed = cfgetospeed( &my_termios );     
       if ( speed != myspeed ){
          DCMSG(RED,"open_port: tcsetattr: Unable to set baud to %d, currently %d \n",myspeed,speed);
       } else {
-         //	    DCMSG(GREEN,"open_port: open and ready at %d baud (B19200=%d)\n",speed,B19200);
+         //         DCMSG(GREEN,"open_port: open and ready at %d baud (B19200=%d)\n",speed,B19200);
       }
       DCMSG(GREEN,"open_port: serial port %s open and ready \n", sport);
    }

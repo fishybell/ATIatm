@@ -87,9 +87,9 @@ void DeQueue(queue_t *M,int count){
 //   and shift up the old queue for now
 // having bounds checking and stuff might be nice during debugging
 void ReQueue(queue_t *Mdst,queue_t *Msrc,int count){
-   memcpy(Mdst->tail,Msrc->head,count);	// copy count bytes
-   Mdst->tail+=count;				// increment the tail
-   DeQueue(Msrc,count);	// and remove from src queue 
+   memcpy(Mdst->tail,Msrc->head,count); // copy count bytes
+   Mdst->tail+=count;                           // increment the tail
+   DeQueue(Msrc,count); // and remove from src queue 
 }
 
 //  this is a macro
@@ -100,28 +100,28 @@ void ReQueue(queue_t *Mdst,queue_t *Msrc,int count){
 
 void print_verbosity(void){
    printf("  -v xx         set verbosity bits.   Examples:\n");
-   printf("  -v 1	    sets D_PACKET  for packet info\n");
-   printf("  -v 2	    sets D_RF    \n");
-   printf("  -v 4	    sets D_CRC   \n");
-   printf("  -v 8	    sets D_POLL  \n");
-   printf("  -v 10	    sets D_TIME  \n");
-   printf("  -v 20	    sets D_VERY  \n");
-   printf("  -v 40	    sets D_NEW  \n");
-   printf("  -v 80	    sets D_MEGA  \n");
-   printf("  -v 100	    sets D_MINION  \n");
-   printf("  -v 1FF	    sets all of the above  \n");
+   printf("  -v 1           sets D_PACKET  for packet info\n");
+   printf("  -v 2           sets D_RF    \n");
+   printf("  -v 4           sets D_CRC   \n");
+   printf("  -v 8           sets D_POLL  \n");
+   printf("  -v 10          sets D_TIME  \n");
+   printf("  -v 20          sets D_VERY  \n");
+   printf("  -v 40          sets D_NEW  \n");
+   printf("  -v 80          sets D_MEGA  \n");
+   printf("  -v 100         sets D_MINION  \n");
+   printf("  -v 1FF         sets all of the above  \n");
 }
 
 void print_verbosity_bits(void){
-   DDCMSG(D_PACKET	,black,"  D_PACKET");
-   DDCMSG(D_RF		,black,"  D_RF");
-   DDCMSG(D_CRC	,black,"  D_CRC");
-   DDCMSG(D_POLL	,black,"  D_POLL");
-   DDCMSG(D_TIME	,black,"  D_TIME");
-   DDCMSG(D_VERY	,black,"  D_VERY");
-   DDCMSG(D_NEW	,black,"  D_NEW");   
-   DDCMSG(D_MEGA	,black,"  D_MEGA");
-   DDCMSG(D_MINION	,black,"  D_MINION");
+   DDCMSG(D_PACKET      ,black,"  D_PACKET");
+   DDCMSG(D_RF          ,black,"  D_RF");
+   DDCMSG(D_CRC ,black,"  D_CRC");
+   DDCMSG(D_POLL        ,black,"  D_POLL");
+   DDCMSG(D_TIME        ,black,"  D_TIME");
+   DDCMSG(D_VERY        ,black,"  D_VERY");
+   DDCMSG(D_NEW ,black,"  D_NEW");   
+   DDCMSG(D_MEGA        ,black,"  D_MEGA");
+   DDCMSG(D_MINION      ,black,"  D_MINION");
 }
 
 
@@ -194,7 +194,7 @@ int gather_rf(int fd, char *tail, char *head,int max){
          }
       }
    } else {
-      tail+=ready;	// increment the position pointer
+      tail+=ready;      // increment the position pointer
       DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",ready,(int)(tail-head));
       return(tail-head);
    }
@@ -210,7 +210,7 @@ void DDpacket(uint8 *buf,int len){
 
    int i,plen,addr,devid,ptype,pnum,color;
 
-   buff=buf;	// copy ptr so we can mess with it
+   buff=buf;    // copy ptr so we can mess with it
    pnum=1;
    // while we have complete packets (and we don't go beyond the end)
    while(((buff-buf)<len)&&(ptype=Ptype(buff))) {
@@ -474,7 +474,7 @@ void set_crc8(void *buf) {
    static char hbuf[100];
    char *data = (char*)buf;
    LB_packet_t *LB=(LB_packet_t *)buf;
-   int size;		// was size = length-1;
+   int size;            // was size = length-1;
    unsigned char crc = 0; // initial value of 0
 
    size=RF_size(LB->cmd)-1;
@@ -487,12 +487,12 @@ void set_crc8(void *buf) {
       data++;
    }
 
-   *data++=crc;	// add on the CRC we just calculated
+   *data++=crc; // add on the CRC we just calculated
    // don't do this: it will mess up the crc we just calculated
-   //    *data++=length;	// add the length at the end
-   //    *data=0;		// tack a zero after that
+   //    *data++=length;        // add the length at the end
+   //    *data=0;               // tack a zero after that
 
-   if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
+   if (verbose&D_CRC){  // saves doing the sprintf's if not wanted
       sprintf(hbuf,"set_crc8: LB len=%d set crc=0x%x  ",RF_size(LB->cmd),crc);
       DDCMSG_HEXB(D_CRC,YELLOW,hbuf,buf,size+1);
    }
@@ -503,7 +503,7 @@ uint8 crc8(void *cbuf) {
    static char hbuf[100];
    char *data = (char*)cbuf;
    LB_packet_t *LB=(LB_packet_t *)cbuf;
-   int size;		// was size = length-1;
+   int size;            // was size = length-1;
    unsigned char crc = 0; // initial value of 0
 
    size=RF_size(LB->cmd);
@@ -517,7 +517,7 @@ uint8 crc8(void *cbuf) {
       data++;
    }
 
-   if (verbose&D_CRC){	// saves doing the sprintf's if not wanted
+   if (verbose&D_CRC){  // saves doing the sprintf's if not wanted
       if (crc) {
          sprintf(hbuf,"crc8: LB len=%d  BAD CRC=0x%x  ",RF_size(LB->cmd),crc);
          DDCMSG_HEXB(D_CRC,RED,hbuf,cbuf,size+1);
