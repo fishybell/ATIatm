@@ -951,7 +951,7 @@ void *minion_thread(thread_data_t *minion){
     minion->rcc_sock=-1;	// mark the socket so we know to open again
     while(1) {
 
-	if (minion->rcc_sock<0) {
+	if (minion->rcc_sock<0 && minion->status == S_open) {
     // now we must get a connection or new connection to the range control
     // computer (RCC) using fasit.
 
@@ -967,7 +967,7 @@ void *minion_thread(thread_data_t *minion){
 		    DCMSG(RED,"minion %d: fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),mb.buf);
 		    DCMSG(RED,"minion %d:   waiting for a bit and then re-trying ", minion->mID);
 		    minion->rcc_sock=-1;	// make sure it is marked as closed
-		    sleep(2);		// adding a little extra wait
+		    sleep(10);		// adding a little extra wait
 		}
 		
 	    } while (result<0);
@@ -983,7 +983,9 @@ void *minion_thread(thread_data_t *minion){
 	/* create a fd_set so we can monitor both the mcp and the connection to the RCC*/
 	FD_ZERO(&rcc_or_mcp);
 	FD_SET(minion->mcp_sock,&rcc_or_mcp);		// we are interested hearing the mcp
-	FD_SET(minion->rcc_sock,&rcc_or_mcp);		// we also want to hear from the RCC
+   if (minion->status == S_open) {
+      FD_SET(minion->rcc_sock,&rcc_or_mcp);		// we also want to hear from the RCC
+   }
 
 	/* block for up to state_timer deciseconds waiting for RCC or MCP 
 	 * and we may drop through much faster if we have a MCP or RCC communication
@@ -1028,6 +1030,7 @@ void *minion_thread(thread_data_t *minion){
 		}
 
       // we received something over RF, so we haven't timed out: reset the rf timer to look in 5 minutes -- TODO -- make this timeout smarter, or at the very least, user configurable
+      minion->status = S_open;
       minion->S.rf_t.flags = F_rf_t_waiting_long;
       minion->S.rf_t.timer = 3000; // 5 minutes in deciseconds
 
@@ -1164,7 +1167,7 @@ void *minion_thread(thread_data_t *minion){
 	/**********************************    end of reading and processing the mcp command  ***********************/
 	
 	/*************** check to see if there is something to read from the rcc   **************************/
-	if (FD_ISSET(minion->rcc_sock,&rcc_or_mcp)){
+	if (minion->status == S_open && FD_ISSET(minion->rcc_sock,&rcc_or_mcp)){
 	    // now read it using the new routine    
 	    result = read_FASIT_msg(minion,mb.buf, BufSize);
 	    if (result>0){		
