@@ -188,7 +188,7 @@ typedef struct _thread_data_t {
 typedef struct addr_t {
     uint32 devid;
     int mID;
-    uint32 inuse:1;
+    uint32 inuse:2;
     uint32 something_else:1;
     uint32 someother_thing:1;
     uint32 timer:24;
