@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
    DDCMSG(D_MEGA, BLACK,"RFSLAVE: RF socket fd: %i", rc.sock);
 
    // open tty and setup the serial device
-   rc.tty = open_port(ttyport,0);   // non-blocking
+   rc.tty = open_port(ttyport,1);   // with hardware flow
    if (rc.tty <= 0) {
       DieWithError("Is unhappy tty");
    }

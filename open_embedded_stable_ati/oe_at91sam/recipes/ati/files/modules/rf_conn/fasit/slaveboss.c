@@ -13,7 +13,7 @@ fasit_connection_t fconns[MAX_CONNECTIONS];
 // global hit logging routines
 void log_ResetHits(fasit_connection_t *fc) {
    int i;
-   DCMSG(BLACK, "Reset hits for %i", fc->current_event);
+   DDCMSG(D_PACKET, RED, "Reset hits for %i", fc->current_event);
    for (i = 0; i < 128; i++) {
       D_memset(&fc->hit_times[fc->current_event][i], 0, sizeof(struct timespec));
    }

@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
     
 //   Okay,   set up the RF modem link here
 
-   RFfd=open_port(ttyport); 
+   RFfd=open_port(ttyport,1); // ctsrts on
     
    HandleRF(RFfd);
    DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");

@@ -354,9 +354,6 @@ int send_2100_status_req(fasit_connection_t *fc) {
    D_memset(&bdy, 0, sizeof(FASIT_2100));
    bdy.cid = CID_Status_Request;
 
-   // remember that we're asking
-   fc->requesting_stat = 1; // we are looking
-
    // send
    queueMsg(fc, &hdr, sizeof(FASIT_header));
    queueMsg(fc, &bdy, sizeof(FASIT_2100));
@@ -452,18 +449,12 @@ int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int t
    bdy.mode = mode;
    bdy.burst = htons(burst);
 
-   // fix race condition with hit configuration by keeping track
-   if (fc->requesting_stat) { /* any non-zero value signifies we're doing something */
-      fc->requesting_stat = 2; // will need to look again after request gets back
-   }
-
    // remember for later
    fc->hit_on = on;
    DDCMSG(D_PACKET, RED, "Setting Hits to %i", hit);
    if (hit > fc->hit_hit) {
       log_NewHits(fc, hit - fc->hit_hit);
    } else if (hit == 0) {
-      // RACE CONDITION!!! When we set it here, we may have already asked for status, which will contain the old hit value...be careful by watching if we're asking for status
       log_ResetHits(fc);
    }
    fc->hit_hit = hit;
@@ -488,11 +479,9 @@ int handle_2101(fasit_connection_t *fc, int start, int end) {
 }
 
 int handle_2102(fasit_connection_t *fc, int start, int end) {
-   int add_ret = 0; // additional return value
    DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2102(%8p, %i, %i)", fc, start, end);
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2102_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2102));
-
    // remember target type
    switch (fc->f2102_resp.body.type) {
       case Type_SIT:
@@ -518,28 +507,11 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
          fc->target_type = RF_Type_SES;
          break;
    }
-   // check for unsolicited response: if we went down, move our event number
-   if (!fc->waiting_status_resp && fc->added_rf_to_epoll) {
-      // was unsolicited, now check target type is not an ses and for down and no fault
-      if (fc->target_type != RF_Type_SES &&
-          fc->f2102_resp.body.fault == 0 &&
-          fc->f2102_resp.body.exp == 0) {
-         fc->current_event++; // the mcp will move theirs as well and ask for the last one
-      }
-   }
-
-   // log hits? not if we reset them after requesting this value
-   if (fc->requesting_stat != 2) { // only ignore if we were reset at the wrong time
-      if (htons(fc->f2102_resp.body.hit) > fc->hit_hit) {
-         log_NewHits(fc, htons(fc->f2102_resp.body.hit) - fc->hit_hit);
-      }
-      fc->requesting_stat = 0; // no longer requesting status
-   } else {
-      fc->requesting_stat = 3; // request status again
-      add_ret = send_2100_status_req(fc);
-   }
    // remember hit sensing settings
    fc->hit_on = fc->f2102_resp.body.hit_conf.on;
+   if (htons(fc->f2102_resp.body.hit) > fc->hit_hit) {
+      log_NewHits(fc, htons(fc->f2102_resp.body.hit) - fc->hit_hit);
+   }
    fc->hit_hit = htons(fc->f2102_resp.body.hit);
    fc->hit_react = fc->f2102_resp.body.hit_conf.react;
    fc->hit_tokill = htons(fc->f2102_resp.body.hit_conf.tokill);
@@ -555,12 +527,12 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    // check to see if we're waiting to send the information back
    if (fc->waiting_status_resp) {
       fc->waiting_status_resp = 0; // not waiting anymore
-      return add_ret | send_STATUS_RESP(fc); // return appropriate information
+      return send_STATUS_RESP(fc); // return appropriate information
    } else if (!fc->added_rf_to_epoll) {
       fc->added_rf_to_epoll = 1;
-      return add_ret | add_rfEpoll; // the RF is ready to work now that I have a type
+      return add_rfEpoll; // the RF is ready to work now that I have a type
    } else {
-      return add_ret; // just remember the status for later
+      return doNothing; // just remember the status for later
    }
 }
 
