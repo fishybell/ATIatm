@@ -44,6 +44,7 @@ typedef struct fasit_connection {
    int hit_mode;
    int hit_burst;
    int hit_phi;
+   int requesting_stat; // are we currently looking for a status update? 0 = no, 1 = yes, 2 = we got a new hit configuration, but are still looking, 3 = got status request after hit configuration, but are asking again to see if there was any new hits
 
    // for hit event logging
    struct timespec hit_times[MAX_HIT_EVENTS][128]; // remember hits that happened at certain times (maximum of 127 hits per event, count as hit 1 is @ index 1, etc. to hit 127)
