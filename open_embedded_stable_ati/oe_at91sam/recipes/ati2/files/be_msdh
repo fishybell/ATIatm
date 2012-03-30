@@ -1,0 +1,4 @@
+echo -n "Is there a miles shootback device holder (0-no, 1-yes)?: "
+read msdh
+size=$(echo $msdh | wc -c)
+echo -n $msdh | /usr/bin/eeprom_rw write -addr 0x140 -size $size -blank 0x03
