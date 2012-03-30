@@ -81,6 +81,7 @@ int main(int argc, char **argv) {
 	}
     }
 
+    printf(" Verbosity = 0x%x\n",verbose);
     printf(" Watching comm port = <%s>\n",ttyport);
 
 
@@ -102,7 +103,7 @@ int main(int argc, char **argv) {
     
 //   Okay,   set up the RF modem link here
 
-   RFfd=open_port(ttyport, 0); // 0 for non-blocking
+   RFfd=open_port(ttyport, 1); // 1 for hardware flow control
    DCMSG(RED,"opened port %s for serial link to radio as fd %d.  ",ttyport,RFfd);
 
    Rptr=Rstart=Rbuf;
@@ -142,7 +143,8 @@ int main(int argc, char **argv) {
 	   sprintf(buf,"%4ld.%03ld  %2d    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,gathered);
 
 //	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
-	   printf("%s",buf);
+           printf("%s",buf);
+           printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
 	   if(gathered>1){
 	       for (int i=0; i<gathered-1; i++) printf("%02x.", Rstart[i]);
 	   }
@@ -152,8 +154,6 @@ int main(int argc, char **argv) {
 	   
 	   Rptr=Rstart=Rbuf;
        }
-
-
 
    }
 }

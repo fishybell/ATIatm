@@ -173,9 +173,12 @@ int RF_size(int cmd){
 
 int gather_rf(int fd, char *tail, char *head,int max){
    int ready;
-
+   int err;
+   
    /* read as much as we can or max from the non-blocking fd. */
    ready=read(fd,tail,max);
+   err=errno;
+   DDCMSG(D_MEGA,GREEN,"gather_rf:  new bytes=%2d  .%02x.%02x.%02x.%02x.    new total=%2d ",ready,tail[0],tail[1],tail[2],tail[3],(int)(tail-head));
 
    if (ready<=0) { /* parse the error message   */
       char buf[100];
@@ -194,9 +197,8 @@ int gather_rf(int fd, char *tail, char *head,int max){
          }
       }
    } else {
-      tail+=ready;      // increment the position pointer
       DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",ready,(int)(tail-head));
-      return(tail-head);
+      return(ready);
    }
 }
 
@@ -508,8 +510,8 @@ uint8 crc8(void *cbuf) {
 
    size=RF_size(LB->cmd);
 
-   sprintf(hbuf,"crc8: cmd=%d  length=%d\n",LB->cmd,size);
-   DCMSG_HEXB(YELLOW,hbuf,cbuf,size);
+//   sprintf(hbuf,"crc8: cmd=%d  length=%d\n",LB->cmd,size);
+//   DCMSG_HEXB(YELLOW,hbuf,cbuf,size);
 
 
    while (size--) {

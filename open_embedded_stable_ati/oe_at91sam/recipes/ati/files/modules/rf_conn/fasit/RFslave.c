@@ -82,11 +82,16 @@ void HandleSlaveRF(int RFfd){
 
       //    MAKE SURE THE RFfd is non-blocking!!!
 
-      gathered = gather_rf(RFfd,Rx->tail,Rx->head,300); // gathered actually returns Queue_Depth
-
-      if (gathered>0){  // increment the tail - later gather may take a queue as the argument
-         Rx->tail+=gathered;
+      DDCMSG(D_MEGA,GREEN,"RFslave: before gather_RF:[head:tail]:depth  Rx[%d:%d]:%d",
+             (int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx));
+      gathered = gather_rf(RFfd,Rx->tail,Rx->head,300); // gathered actually returns num chars read
+      if (gathered>0){
+         Rx->tail=Rx->tail+gathered;         
       }
+      
+      DDCMSG(D_MEGA,GREEN,"RFslave: after gather_RF:[head:tail]:depth  Rx[%d:%d]:%d   return val=%d",
+             (int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx),gathered);
+
       /* Receive message, or continue to recieve message from RF */
 
       resp_slot=0;
@@ -407,6 +412,7 @@ void HandleSlaveRF(int RFfd){
 void print_help(int exval) {
    printf("RFslave [-h] [-v verbosity] [-t serial_device] \n\n");
    printf("  -h            print this help and exit\n");
+   printf("  -f            turn on hardware flowcontrol \n");
    printf("  -t /dev/ttyS1 set serial port device\n");
    print_verbosity();    
    exit(exval);
@@ -431,21 +437,26 @@ int main(int argc, char **argv) {
    int serversock;                      /* Socket descriptor for server connection */
    int MCPsock;                 /* Socket descriptor to use */
    int RFfd;                            /* File descriptor for RFmodem serial port */
-   int opt;
+   int opt,hardflow;
    struct sockaddr_in ServAddr; /* Local address */
    struct sockaddr_in ClntAddr; /* Client address */
    //    unsigned short RFslaveport;    /* Server port */
    unsigned int clntLen;               /* Length of client address data structure */
    char ttyport[32];    /* default to ttyS0  */
 
+   hardflow=0;
    verbose=0;
    devtype=1;   // default to SIT with MFS
    strcpy(ttyport,"/dev/ttyS1");
 
-   while((opt = getopt(argc, argv, "hv:t:d:")) != -1) {
+   while((opt = getopt(argc, argv, "hfv:t:d:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
+            break;
+
+         case 'f':
+            hardflow=1;
             break;
 
          case 'v':
@@ -495,8 +506,8 @@ int main(int argc, char **argv) {
    //   Okay,   set up the RF modem link here
    print_verbosity_bits();
 
-   RFfd=open_port(ttyport,1);   // with hardware flow
-   DCMSG(RED,"opened port %s for serial link to radio as fd %d.  ",ttyport,RFfd);
+   RFfd=open_port(ttyport,hardflow);   // with hardware flow argument
+   DCMSG(RED,"opened port %s for serial link to radio as fd %d,  with hardwareflow=%d.  ",ttyport,RFfd,hardflow);
 
    HandleSlaveRF(RFfd);
    DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");
