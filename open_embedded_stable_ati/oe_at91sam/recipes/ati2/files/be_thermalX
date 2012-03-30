@@ -1,0 +1,4 @@
+echo -n "Number of thermals: "
+read thm
+size=$(echo $thm | wc -c)
+echo -n $thm | /usr/bin/eeprom_rw write -addr 0x3E8 -size $size -blank 0x03
