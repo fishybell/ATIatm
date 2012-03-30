@@ -20,6 +20,7 @@
  * Returns the file descriptor on success or -1 on error.
  */
 
+/** hard flow bit 1 is hardwareflow, and bit 2 is blocking  **/
 int open_port(char *sport, int hardflow){
    int fd,speed,myspeed; /* File descriptor for the port */
    struct termios my_termios;
@@ -27,9 +28,11 @@ int open_port(char *sport, int hardflow){
    char buf[200];
 
 
-   //     fd = open(sport, O_RDWR | O_NOCTTY);     blocking
-   fd = open(sport, O_RDWR | O_NOCTTY | O_NONBLOCK);
-
+   if (hardflow&2) {
+      fd = open(sport, O_RDWR | O_NOCTTY);     //blocking
+   } else {
+      fd = open(sport, O_RDWR | O_NOCTTY | O_NONBLOCK); //nonblocking
+   }
 
    if (fd == -1) {
       /*
@@ -45,16 +48,29 @@ int open_port(char *sport, int hardflow){
       tcgetattr( fd, &my_termios );
       my_termios.c_cflag &= ~CBAUD;
       my_termios.c_cflag |= B19200 ;
-      my_termios.c_iflag &= ~( BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF | IXANY);
-      my_termios.c_iflag |= (IGNBRK | IGNCR);   // some documentation says we want these on
 
+      if (hardflow&4) {
+         //   code that seems like it should be 'better', but was 'different'
+         my_termios.c_iflag &= ~( BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF | IXANY);
+         my_termios.c_iflag |= (IGNBRK | IGNCR);   // some documentation says we want these on
+         // the IGNCR (ignore carrage returns) is getting turned on
+         // the IGNBRK (ignore BREAK) is getting turned on
+         my_termios.c_lflag &= ~(ECHO | ECHONL | ECHOE | ICANON | ISIG | IEXTEN);
+
+      } else {
+         //   the old code.
+         my_termios.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+         // the IGNCR (ignore carrage returns) is getting turned off
+         // the IGNBRK (ignore BREAK) is getting turned off
+         my_termios.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+      }
+      
       my_termios.c_oflag &= ~OPOST;
-      my_termios.c_lflag &= ~(ECHO | ECHONL | ECHO | ECHOE | ICANON | ISIG | IEXTEN);
       my_termios.c_cflag &= ~(CSIZE | PARENB);
       my_termios.c_cflag |= CS8;
 
-      if (hardflow) {
-         my_termios.c_cflag |= CRTSCTS; // turn  on hardware flow control  RTS CTS
+      if (hardflow&1) {
+         my_termios.c_cflag |= CRTSCTS;         // turn  on hardware flow control  RTS CTS
       } else {
          my_termios.c_cflag &= ~CRTSCTS;        // turn off hardware flow control  RTS CTS
       }
@@ -65,17 +81,11 @@ int open_port(char *sport, int hardflow){
 
       tcsetattr( fd, TCSANOW, &my_termios );
       tcgetattr( fd, &new_termios );
-      /*  we did not make the fd non-blocking, because we use a select to test for data on multiple fd's and
-       *  we can have a timeout there if needed.
-       *     That seems easier than having it non-blocking and testing for readiness.
-       *     */
 
       speed = cfgetospeed( &new_termios );
       myspeed = cfgetospeed( &my_termios );     
       if ( speed != myspeed ){
          DCMSG(RED,"open_port: tcsetattr: Unable to set baud to %d, currently %d \n",myspeed,speed);
-      } else {
-         //         DCMSG(GREEN,"open_port: open and ready at %d baud (B19200=%d)\n",speed,B19200);
       }
       DCMSG(GREEN,"open_port: serial port %s open and ready \n", sport);
    }
