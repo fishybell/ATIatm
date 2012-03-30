@@ -449,14 +449,14 @@ int main(int argc, char **argv) {
    devtype=1;   // default to SIT with MFS
    strcpy(ttyport,"/dev/ttyS1");
 
-   while((opt = getopt(argc, argv, "hfv:t:d:")) != -1) {
+   while((opt = getopt(argc, argv, "hf:v:t:d:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
             break;
 
          case 'f':
-            hardflow=1;
+            hardflow=7 & atoi(optarg);            
             break;
 
          case 'v':
@@ -506,7 +506,7 @@ int main(int argc, char **argv) {
    //   Okay,   set up the RF modem link here
    print_verbosity_bits();
 
-   RFfd=open_port(ttyport,hardflow);   // with hardware flow argument
+   RFfd=open_port(ttyport,hardflow);   // with hardware flow argument and 
    DCMSG(RED,"opened port %s for serial link to radio as fd %d,  with hardwareflow=%d.  ",ttyport,RFfd,hardflow);
 
    HandleSlaveRF(RFfd);
