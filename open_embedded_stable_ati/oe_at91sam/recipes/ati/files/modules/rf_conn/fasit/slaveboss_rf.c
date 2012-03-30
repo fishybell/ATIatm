@@ -381,13 +381,27 @@ int send_EVENT_REPORT(fasit_connection_t *fc, int event) {
 }
 
 int send_STATUS_RESP(fasit_connection_t *fc) {
+   int last_hh = fc->hit_hit; // remember hit_hit value
+   int retval = doNothing, i;
+   // find out how many hits to send, and remove them from the event list -- TODO -- what happens if the RF master didn't receive?
+   fc->hit_hit = 0;
+   for (i = 0; i <= fc->hits_per_event[fc->current_event]; i++) { // find valid hits for this event
+      if (fc->hit_times[fc->current_event][i].tv_sec != 0) {
+         // hit was for a valid time
+         DDCMSG(D_RF|D_VERY, BLACK, "Counting new hit for status response: %i[%i]", fc->hit_hit, i);
+         fc->hit_hit++;
+         // invalidate this hit so we don't count it again
+         fc->hit_times[fc->current_event][i].tv_sec = 0;
+      }
+   }
+   
    // build up current response
    LB_status_resp_ext_t s;
    DDCMSG(D_RF|D_VERY,RED, "send_STATUS_RESP(%08X)", fc);
    D_memset(&s, 0, sizeof(LB_status_resp_ext_t));
-   s.hits = min(0,max(fc->hit_hit, 127)); // cap upper/lower bounds
+   s.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
    s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
-   s.speed = min(0,max(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
+   s.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
    s.dir = fc->f2102_resp.body.move & 0x3;
    s.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
    s.hitmode = fc->hit_mode;
@@ -395,7 +409,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.sensitivity = fc->hit_react;
    s.timehits = fc->hit_burst;
    s.fault = fc->last_fault;
-   DDCMSG(D_NEW,BLACK, "Fault encountered: %04X %02X", fc->last_fault, s.fault);
+   DDCMSG(D_RF|D_VERY,BLACK, "Fault encountered: %04X %02X", fc->last_fault, s.fault);
    if (s.fault) {
       fc->last_fault = 0; // clear out fault
    }
@@ -404,7 +418,8 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    if (!fc->sent_status) {
       // copy current status to last status and send it
       fc->last_status = s;
-      return send_STATUS_RESP_EXT(fc);
+      retval = send_STATUS_RESP_EXT(fc);
+      goto SR_end;
    }
 
    // determine changes send correct status response
@@ -416,25 +431,32 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
        s.hitmode != fc->last_status.hitmode) {
       // copy current status to last status and send it
       fc->last_status = s;
-      return send_STATUS_RESP_EXT(fc);
+      retval = send_STATUS_RESP_EXT(fc);
+      goto SR_end;
    } else if (s.location != fc->last_status.location ||
               s.dir != fc->last_status.dir ||
               s.speed != fc->last_status.speed ||
               s.expose != fc->last_status.expose ||
-              s.hits != fc->last_status.hits) {
+              s.hits > 0) {
       // copy current status to last status and send it
       fc->last_status = s;
       // send appropriate mover or lifter message
       if (fc->target_type == RF_Type_MIT || fc->target_type == RF_Type_MAT) {
-         return send_STATUS_RESP_MOVER(fc);
+         retval = send_STATUS_RESP_MOVER(fc);
+         goto SR_end;
       } else {
-         return send_STATUS_RESP_LIFTER(fc);
+         retval = send_STATUS_RESP_LIFTER(fc);
+         goto SR_end;
       }
    } else {
       // nothing changed, send that
-      return send_STATUS_NO_RESP(fc);
+      retval = send_STATUS_NO_RESP(fc);
+      goto SR_end;
    }
-   return doNothing; // shouldn't get here
+   // single spot to reset hit_hit
+   SR_end:
+   fc->hit_hit = last_hh;
+   return retval;
 }
 
 int send_STATUS_RESP_LIFTER(fasit_connection_t *fc) {
@@ -446,6 +468,8 @@ int send_STATUS_RESP_LIFTER(fasit_connection_t *fc) {
    bdy.hits = fc->last_status.hits;
    bdy.expose = fc->last_status.expose;
    fc->sent_status = 1; // have sent a status message before
+
+   DDCMSG(D_RF|D_VERY, BLACK, "send_STATUS_RESP_LIFTER hits: %i from %i", bdy.hits, fc->last_status.hits);
 
    // set crc and send
    set_crc8(&bdy);
@@ -466,6 +490,8 @@ int send_STATUS_RESP_MOVER(fasit_connection_t *fc) {
    bdy.location = fc->last_status.location;
    fc->sent_status = 1; // have sent a status message before
 
+   DDCMSG(D_RF|D_VERY, BLACK, "send_STATUS_RESP_MOVER hits: %i from %i", bdy.hits, fc->last_status.hits);
+
    // set crc and send
    set_crc8(&bdy);
    queueMsg(fc, &bdy, RF_size(LBC_STATUS_RESP_MOVER));
@@ -478,6 +504,10 @@ int send_STATUS_RESP_EXT(fasit_connection_t *fc) {
    fc->last_status.cmd = LBC_STATUS_RESP_EXT;
    fc->last_status.addr = fc->id & 0x7FF; // source address (always to basestation)
    fc->sent_status = 1; // have sent a status message before
+
+   DDCMSG(D_RF|D_VERY, BLACK, "send_STATUS_RESP_EXT hits: %i", fc->last_status.hits);
+
+   // set crc and send
    set_crc8(&fc->last_status);
    queueMsg(fc, &fc->last_status, RF_size(LBC_STATUS_RESP_EXT));
    return mark_rfWrite;
