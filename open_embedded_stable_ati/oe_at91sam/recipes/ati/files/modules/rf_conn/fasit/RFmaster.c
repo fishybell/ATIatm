@@ -3,6 +3,10 @@
 
 int verbose;    // globals
 
+// this makes the warning go away
+extern size_t strnlen (__const char *__string, size_t __maxlen)
+__THROW __attribute_pure__ __nonnull ((1));
+
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
 
@@ -53,7 +57,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
    char Rbuf[512];
    char buf[200];        /* text Buffer  */
    char  *Rptr,*Rstart;
-   int size,gathered,delta,remaining_time,bytecount;
+   int size,gathered,gotrf,delta,remaining_time,bytecount;
    int riclient=-1;    /* radio interface client socket */
    int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
    fd_set rf_or_mcp;
@@ -73,7 +77,8 @@ void HandleRF(int MCPsock,int risock,int RFfd){
    // initialize our gathering buffer
    Rptr=Rbuf;
    Rstart=Rptr;
-
+   gathered=0;
+   
    Rx=queue_init(Rxsize);       // incoming packet buffer
    Tx=queue_init(Txsize);       // outgoing Tx buffer
 
@@ -230,7 +235,6 @@ void HandleRF(int MCPsock,int risock,int RFfd){
             }  // end of while loop to build the Tx packet
 
 
-
             /***********    Send the RF burst
              ***********
              ***********/
@@ -290,21 +294,28 @@ void HandleRF(int MCPsock,int risock,int RFfd){
          DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(RFfd)");
          /* Receive message, or continue to recieve message from RF */
 
-         //    MAKE SURE THE RFfd is non-blocking!!!    
-         gathered = gather_rf(RFfd,Rptr,Rstart,300);
-         if (gathered>0){  // increment our current pointer
-            Rptr=gathered+Rstart;
+         gotrf = gather_rf(RFfd,Rptr,300);
+         if (gotrf>0){  // increment our current pointer
+            DDCMSG(D_VERY,GREEN,"RFmaster: gotrf=%d gathered =%2d, incrementing  Rptr=%2d (%p)  Rbuf=%p",
+                   gotrf,gathered,(int)(Rptr-Rbuf), Rptr, Rbuf);
+            Rptr+=gotrf;
+            gathered+=gotrf;
+            DDCMSG(D_VERY,GREEN,"RFmaster: gotrf=%d gathered =%2d  Rptr=%2d (%p) Rbuf=%p ",
+                   gotrf,gathered,(int)(Rptr-Rbuf), Rptr, Rbuf);
+         } else {
+            DDCMSG(D_VERY,RED,"RFmaster: gotrf=%d gathered =%2d  Rptr=%2d (%p) ",
+                   gotrf,gathered,(int)(Rptr-Rbuf), Rptr);
          }
          /* Receive message, or continue to recieve message from RF */
-         DDCMSG(D_VERY,GREEN,"RFmaster: gathered =%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
-                gathered,(int)(Rptr-Rbuf),(int)(Rstart-Rbuf),(int)(Rptr-Rstart));
+         DDCMSG(D_VERY,YELLOW,"RFmaster: gotrf=%d  gathered=%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
+                gotrf,gathered,(int)(Rptr-Rbuf),(int)(Rstart-Rbuf),(int)(Rptr-Rstart));
 
          // after gathering RF data, we're free, tell the Radio Interface client
          if (riclient > 0) {
             write(riclient, "F\r", 2);
          }
 
-         if (gathered>=3){
+         while (gathered>=3){
             // we have a chance of a compelete packet
             LB=(LB_packet_t *)Rstart;   // map the header in
             size=RF_size(LB->cmd);
@@ -327,23 +338,30 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                      sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
                      DDCMSG_HEXB(D_RF,RED,buf,Rstart,size);
                   }
-               } else {
-                  DDCMSG(D_RF,RED,"RF packet with BAD CRC ignored");
-               }
 
-               if ((Rptr-Rstart) > size){
-                  Rstart+=size; // step ahead to the next packet
-                  DDCMSG(D_VERY,RED,"Stepping to next packet, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
-                  sprintf(buf,"  Next 8 chars in Rbuf at Rstart  ");
-                  DDCMSG_HEXB(D_VERY,RED,buf,Rstart,8);
+                  if ((Rptr-Rstart) > size){
+                     Rstart+=size; // step ahead to the next packet
+                     gathered-=size;
+                     DDCMSG(D_VERY,RED,"Stepping to next packet, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
+                     sprintf(buf,"  Next 8 chars in Rbuf at Rstart  ");
+                     DDCMSG_HEXB(D_VERY,RED,buf,Rstart,8);
 
+                  } else {
+                     gathered=0;
+                     Rptr=Rstart=Rbuf;     // reset to the beginning of the buffer
+                     DDCMSG(D_VERY,RED,"Resetting to beginning of Rbuf, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
+                  }
+                  
                } else {
-                  Rptr=Rstart=Rbuf;     // reset to the beginning of the buffer
-                  DDCMSG(D_VERY,RED,"Resetting to beginning of Rbuf, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
+                  sprintf(buf,"  BAD CRC packet ignored, step ahead by 1 ");
+                  DDCMSG_HEXB(D_RF,RED,buf,Rstart,size);
+                  Rstart++; // step ahead to the next packet
+                  gathered--;
+
                }
 
             } else { // if (Rptr-Rstart) > size)
-               DDCMSG(D_VERY,RED,"we do not have a complete RF packet ");
+               DDCMSG(D_VERY,RED,"we do not have a complete RF packet, keep gathering ");
             }
          }  // if gathered >=3
       } // if this fd is ready
@@ -470,7 +488,7 @@ int main(int argc, char **argv) {
    unsigned short SRport;       /* SmartRange port */
    unsigned int clntLen;               /* Length of client address data structure */
    char ttyport[32];    /* default to ttyS0  */
-   int opt,xmit;
+   int opt,xmit,hardflow;
    int slottime,total_slots;
    int low_dev,high_dev;
 
@@ -480,12 +498,16 @@ int main(int argc, char **argv) {
    RFmasterport = defaultPORT;
    SRport = smartrangePORT;
    strcpy(ttyport,"/dev/ttyS0");
-
-
-   while((opt = getopt(argc, argv, "hv:t:p:s:x:l:d:D:")) != -1) {
+   hardflow=0;
+   
+   while((opt = getopt(argc, argv, "hv:f:t:p:s:x:l:d:D:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
+            break;
+
+         case 'f':
+            hardflow=7 & atoi(optarg);            
             break;
 
          case 'v':
@@ -541,10 +563,9 @@ int main(int argc, char **argv) {
    DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
    print_verbosity_bits();
 
-
    //   Okay,   set up the RF modem link here
 
-   RFfd=open_port(ttyport,1);   // with hardware flow
+   RFfd=open_port(ttyport,hardflow);   // with hardware flow
 
    if (RFfd<0) {
       DCMSG(RED,"RFmaster: comm port could not be opened. Shutting down");

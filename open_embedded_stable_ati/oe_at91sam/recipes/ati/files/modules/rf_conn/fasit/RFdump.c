@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
        printf("%02x\n", ((uint8 *)RQ)[3]);
 
        }
-       gathered = gather_rf(RFfd,Rptr,Rstart,300);
+       gathered = gather_rf(RFfd,Rptr,300);
 
        if (gathered>0) {
 	   timestamp(&elapsed_time,&istart_time,&delta_time);

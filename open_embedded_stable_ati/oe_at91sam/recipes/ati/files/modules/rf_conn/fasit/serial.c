@@ -26,12 +26,16 @@ int open_port(char *sport, int hardflow){
    struct termios my_termios;
    struct termios new_termios;
    char buf[200];
+   char sbuf[100];
 
+   sbuf[0]=0;
 
    if (hardflow&2) {
       fd = open(sport, O_RDWR | O_NOCTTY);     //blocking
+      strcat(sbuf,"Blocking ");
    } else {
       fd = open(sport, O_RDWR | O_NOCTTY | O_NONBLOCK); //nonblocking
+      strcat(sbuf,"Non-Blocking ");
    }
 
    if (fd == -1) {
@@ -56,13 +60,14 @@ int open_port(char *sport, int hardflow){
          // the IGNCR (ignore carrage returns) is getting turned on
          // the IGNBRK (ignore BREAK) is getting turned on
          my_termios.c_lflag &= ~(ECHO | ECHONL | ECHOE | ICANON | ISIG | IEXTEN);
-
+         strcat(sbuf,"IGNBRK IGNCR set ");
       } else {
          //   the old code.
          my_termios.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
          // the IGNCR (ignore carrage returns) is getting turned off
          // the IGNBRK (ignore BREAK) is getting turned off
          my_termios.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+         strcat(sbuf,"IGNBRK IGNCR cleared ");
       }
       
       my_termios.c_oflag &= ~OPOST;
@@ -71,8 +76,10 @@ int open_port(char *sport, int hardflow){
 
       if (hardflow&1) {
          my_termios.c_cflag |= CRTSCTS;         // turn  on hardware flow control  RTS CTS
+         strcat(sbuf,"CRTSCTS set ");
       } else {
          my_termios.c_cflag &= ~CRTSCTS;        // turn off hardware flow control  RTS CTS
+         strcat(sbuf,"CRTSCTS cleared ");
       }
 
       my_termios.c_cc[VTIME] = 0;     /* inter-character timer unused */
@@ -87,7 +94,7 @@ int open_port(char *sport, int hardflow){
       if ( speed != myspeed ){
          DCMSG(RED,"open_port: tcsetattr: Unable to set baud to %d, currently %d \n",myspeed,speed);
       }
-      DCMSG(GREEN,"open_port: serial port %s open and ready \n", sport);
+      DCMSG(GREEN,"open_port: serial port %s open and ready with %s \n", sport,sbuf);
    }
    return (fd);
 }

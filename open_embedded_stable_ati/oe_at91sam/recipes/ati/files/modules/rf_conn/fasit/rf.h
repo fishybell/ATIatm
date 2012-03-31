@@ -374,7 +374,7 @@ void set_crc8(void *buf);
 uint8 crc8(void *buf);
 int RF_size(int cmd);
 uint32 getDevID (void);
-int gather_rf(int fd, char *pos, char *start,int max);
+int gather_rf(int fd, char *pos, int max);
 void print_verbosity(void);
 void DDpacket(uint8 *buf,int len);
 

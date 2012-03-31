@@ -195,12 +195,12 @@ int main(int argc, char **argv) {
    result=connect(RF_sock,(struct sockaddr *) &RF_addr, sizeof(struct sockaddr_in));
    if (result<0){
       strerror_r(errno,buf,BufSize);
-      DCMSG(RED,"MCP RF Master server not found! connect(...,%s:%d,...) error : %s  ", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port),buf);
+      DCMSG(RED,"MCP RF Master server not found! connect(%s:%d) error: %s  ", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port),buf);
       exit(-1);
    }
 
    // we now have a socket to the RF Master.
-   DCMSG(RED,"MCP has a socket to the RF Master server at(...,%s:%d,...) ", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port));
+   DCMSG(RED,"MCP has a socket to the RF Master server at %s:%d ", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port));
 
    /****************************************************************
     ******

@@ -84,7 +84,7 @@ void HandleSlaveRF(int RFfd){
 
       DDCMSG(D_MEGA,GREEN,"RFslave: before gather_RF:[head:tail]:depth  Rx[%d:%d]:%d",
              (int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx));
-      gathered = gather_rf(RFfd,Rx->tail,Rx->head,300); // gathered actually returns num chars read
+      gathered = gather_rf(RFfd,Rx->tail,300); // gathered actually returns num chars read
       if (gathered>0){
          Rx->tail=Rx->tail+gathered;         
       }

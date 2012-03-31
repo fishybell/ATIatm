@@ -171,14 +171,14 @@ int RF_size(int cmd){
 //   and in fact, there needs to be more error checking, and throwing away of bad checksum packets
 //   not sure how to re-sync after a garbage packet - probably have to zero it out one byte at a time.
 
-int gather_rf(int fd, char *tail, char *head,int max){
+int gather_rf(int fd, char *tail,int max){
    int ready;
    int err;
    
    /* read as much as we can or max from the non-blocking fd. */
    ready=read(fd,tail,max);
    err=errno;
-   DDCMSG(D_MEGA,GREEN,"gather_rf:  new bytes=%2d  .%02x.%02x.%02x.%02x.    new total=%2d ",ready,tail[0],tail[1],tail[2],tail[3],(int)(tail-head));
+   DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d  .%02x.%02x.%02x.%02x.  tail=%p ",ready,tail[0],tail[1],tail[2],tail[3],tail);
 
    if (ready<=0) { /* parse the error message   */
       char buf[100];
@@ -187,7 +187,6 @@ int gather_rf(int fd, char *tail, char *head,int max){
          DCMSG(RED,"gather_rf:  read returned 0 bytes");
          sleep(1);
       } else {
-
          strerror_r(errno,buf,100);
          DCMSG(RED,"gather_rf:  read returned error %s \n",buf);
 
@@ -197,7 +196,7 @@ int gather_rf(int fd, char *tail, char *head,int max){
          }
       }
    } else {
-      DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d new total=%2d ",ready,(int)(tail-head));
+      DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d ",ready);
       return(ready);
    }
 }
