@@ -892,7 +892,7 @@ void *minion_thread(thread_data_t *minion){
     uint8 crc;
     char *tbuf;
     char mbuf[BufSize];
-    int i,msglen,result,seq,length;
+    int i,msglen,result,seq,length,yes=1;
     fd_set rcc_or_mcp;
 
     struct iovec iov[2];
@@ -967,9 +967,11 @@ void *minion_thread(thread_data_t *minion){
 		    DCMSG(RED,"minion %d: fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),mb.buf);
 		    DCMSG(RED,"minion %d:   waiting for a bit and then re-trying ", minion->mID);
 		    minion->rcc_sock=-1;	// make sure it is marked as closed
-		    sleep(2);		// adding a little extra wait
+		    sleep(10);		// adding a little extra wait
 		}
 		
+      setsockopt(minion->rcc_sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
+
 	    } while (result<0);
 // actually we really shouldn't stay in the above loop if disconnected, we need to keep updating minion states
 //	    and communicating with the RF slaves.
