@@ -83,7 +83,13 @@ int open_port(char *sport, int hardflow){
       }
 
       my_termios.c_cc[VTIME] = 0;     /* inter-character timer unused */
-      my_termios.c_cc[VMIN] = 1;      /* read a minimum of 1 character */
+
+      // if we want it to be non-blocking, set vmin to 0 or else it blocks
+      if (hardflow&2) { 
+         my_termios.c_cc[VMIN] = 1;      /* read a minimum of 1 character */
+      } else {
+         my_termios.c_cc[VMIN] = 0;      /* NON-BLOCKING!   needs to be zero */
+      }         
       tcflush (fd, TCIFLUSH);           /* something from Nate's old code */
 
       tcsetattr( fd, TCSANOW, &my_termios );
