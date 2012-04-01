@@ -664,6 +664,9 @@ int main(int argc, char **argv) {
       if ((MCPsock = accept(serversock, (struct sockaddr *) &ClntAddr,  &clntLen)) < 0)
          DieWithError("accept() failed");
 
+         int yes = 1;
+         setsockopt(MCPsock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
+
       /* MCPsock is connected to a Master Control Program! */
 
       DCMSG(BLUE,"Good connection to MCP <%s>  (or telnet or somebody)", inet_ntoa(ClntAddr.sin_addr));
