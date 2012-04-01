@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
     int serversock;			/* Socket descriptor for server connection */
     int MCPsock;			/* Socket descriptor to use */
     int RFfd;				/* File descriptor for RFmodem serial port */
-    int opt,xmit;
+    int opt,xmit,hardflow;
     struct sockaddr_in ServAddr;	/* Local address */
     struct sockaddr_in ClntAddr;	/* Client address */
 //    unsigned short RFslaveport;	/* Server port */
@@ -48,13 +48,18 @@ int main(int argc, char **argv) {
 
     xmit=0;
     verbose=0;
+    hardflow=0;
     strcpy(ttyport,"/dev/ttyS1");
     
-    while((opt = getopt(argc, argv, "hv:t:x:")) != -1) {
+    while((opt = getopt(argc, argv, "hv:f:t:x:")) != -1) {
 	switch(opt) {
 	    case 'h':
 		print_help(0);
 		break;
+
+            case 'f':
+               hardflow=7 & atoi(optarg);            
+               break;
 
 	    case 'v':
 		verbose = strtoul(optarg,NULL,16);
@@ -103,7 +108,7 @@ int main(int argc, char **argv) {
     
 //   Okay,   set up the RF modem link here
 
-   RFfd=open_port(ttyport, 1); // 1 for hardware flow control
+   RFfd=open_port(ttyport, hardflow); // 1 for hardware flow control
    DCMSG(RED,"opened port %s for serial link to radio as fd %d.  ",ttyport,RFfd);
 
    Rptr=Rstart=Rbuf;

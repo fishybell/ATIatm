@@ -20,7 +20,7 @@
  * Returns the file descriptor on success or -1 on error.
  */
 
-/** hard flow bit 1 is hardwareflow, and bit 2 is blocking  **/
+/** hard flow bit 1 is hardwareflow, and bit 2 is blocking  bit 4 is IGNBRK **/
 int open_port(char *sport, int hardflow){
    int fd,speed,myspeed; /* File descriptor for the port */
    struct termios my_termios;

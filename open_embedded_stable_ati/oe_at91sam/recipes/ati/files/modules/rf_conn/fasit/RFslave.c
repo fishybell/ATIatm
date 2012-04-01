@@ -169,7 +169,7 @@ void HandleSlaveRF(int RFfd){
                         // create a RESPONSE packet
                         rLB.cmd=LBC_DEVICE_REG;
                         LB_devreg =(LB_device_reg_t *)(&rLB);   // map our bitfields in
-                        LB_devreg->dev_type=devtype;            // use the option we were invoked with
+                        LB_devreg->dev_type=devtype;            // use the option we were invoked with                        
                         LB_devreg->devid=DevID;                 // Actual 3 significant bytes of MAC address
 
                         DDCMSG(D_NEW,RED,"Recieved 'request new devices'   responding...  BV(%x-%x=%d)=%d AND forget bit=%d and RF_addr=%d",
@@ -456,7 +456,7 @@ int main(int argc, char **argv) {
             break;
 
          case 'f':
-            hardflow=7 & atoi(optarg);            
+            hardflow=7 & atoi(optarg);
             break;
 
          case 'v':
@@ -479,13 +479,11 @@ int main(int argc, char **argv) {
          case '?':
             fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
             print_help(1);
-
             break;
       }
    }
 
    printf(" Watching comm port = <%s>\n",ttyport);
-
 
    // turn power to low for the radio A/B pin
    RFfd=open("/sys/class/gpio/export",O_WRONLY,"w");
@@ -506,12 +504,11 @@ int main(int argc, char **argv) {
    //   Okay,   set up the RF modem link here
    print_verbosity_bits();
 
+   hardflow=(hardflow | 2);    // make sure we are useing BLOCKING IO
    RFfd=open_port(ttyport,hardflow);   // with hardware flow argument and 
-   DCMSG(RED,"opened port %s for serial link to radio as fd %d,  with hardwareflow=%d.  ",ttyport,RFfd,hardflow);
+   DCMSG(RED,"opened port %s for serial link to radio as fd %d,  with hardwareflow=%d. (must be BLOCKING) ",ttyport,RFfd,hardflow);
 
    HandleSlaveRF(RFfd);
    DCMSG(BLUE,"Connection to MCP closed.   listening for a new MCPs");
 
-
 }
-

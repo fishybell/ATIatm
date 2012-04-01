@@ -73,14 +73,14 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 	if (!minion->S.state_timer)  { // timer reached zero
 	//   We should only do the section if the next timer is really up, and
 	//   not just if another fd was ready about the same time
-	DCMSG(RED,"MINION %d: timer update.   rf_t.flags/timer=0x%x/%i   exp.flags/timer=0x%x/%i   event.flags/timer=0x%x/%i",minion->mID,minion->S.rf_t.flags,minion->S.rf_t.timer,minion->S.exp.flags,minion->S.exp.timer,minion->S.event.flags,minion->S.event.timer);
+	DDCMSG(D_MSTATE,RED,"MINION %d: timer update.   rf_t.flags/timer=0x%x/%i   exp.flags/timer=0x%x/%i   event.flags/timer=0x%x/%i",minion->mID,minion->S.rf_t.flags,minion->S.rf_t.timer,minion->S.exp.flags,minion->S.exp.timer,minion->S.event.flags,minion->S.event.timer);
 	
 	// if there is an rf timer flag set, we then need to do something
 	if (minion->S.rf_t.flags) {
 
 	    if (minion->S.rf_t.timer>elapsed_tenths){
 		minion->S.rf_t.timer-=elapsed_tenths;	// not timed out.  but decrement out timer
-		DCMSG(RED,"MINION %d: not timed out.   S.rf_t.timer=%d   S.rf_t.timer=%d",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
+		DDCMSG(D_MSTATE,RED,"MINION %d: not timed out.   S.rf_t.timer=%d   S.rf_t.timer=%d",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
 
 	    } else {	// timed out,  move to the next state, do what it should.
 		
@@ -128,7 +128,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
 	    if (minion->S.exp.timer>elapsed_tenths){
 		minion->S.exp.timer-=elapsed_tenths;	// not timed out.  but decrement out timer
-		DCMSG(RED,"MINION %d: not timed out.   S.exp.timer=%d   S.exp.timer=%d",minion->mID,minion->S.exp.timer,minion->S.exp.timer);
+		DDCMSG(D_MSTATE,RED,"MINION %d: not timed out.   S.exp.timer=%d   S.exp.timer=%d",minion->mID,minion->S.exp.timer,minion->S.exp.timer);
 
 	    } else {	// timed out,  move to the next state, do what it should.
 		
@@ -246,7 +246,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
 	// if there is an event flag set, we then need to do something
 	if (minion->S.event.flags) {
-	    DCMSG(RED,"MINION %d:----- event.flags=0x%x event.timer=%i",minion->mID,minion->S.event.flags, minion->S.event.timer);
+	    DDCMSG(D_MSTATE,RED,"MINION %d:----- event.flags=0x%x event.timer=%i",minion->mID,minion->S.event.flags, minion->S.event.timer);
 
 	    if (minion->S.event.timer>elapsed_tenths){
 		minion->S.event.timer-=elapsed_tenths;	// not timed out.  but decrement out timer
@@ -267,7 +267,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 		    // also fills in the length field
 			set_crc8(L);
 
-			DCMSG(RED,"MINION %d:----- building a report request LB packet event.flags=0x%x",minion->mID,minion->S.event.flags);
+			DDCMSG(D_MSTATE,RED,"MINION %d:----- building a report request LB packet event.flags=0x%x",minion->mID,minion->S.event.flags);
 			
 		    // now send it to the MCP master
 			result=write(minion->mcp_sock,L,RF_size(L->cmd));

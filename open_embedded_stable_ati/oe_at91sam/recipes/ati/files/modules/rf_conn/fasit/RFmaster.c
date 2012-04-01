@@ -576,8 +576,9 @@ int main(int argc, char **argv) {
    if (xmit){   
       LB_packet_t LB;
       LB_request_new_t *RQ;
-      int result,size;
+      int result,size,more;
       char buf[200];
+      char rbuf[300];
 
       total_slots=high_dev-low_dev+2;
       if (!slottime || (high_dev<low_dev)){
@@ -593,6 +594,7 @@ int main(int argc, char **argv) {
          exit(-1);
       }
 
+
       RQ=(LB_request_new_t *)&LB;
 
       RQ->cmd=LBC_REQUEST_NEW;
@@ -603,8 +605,12 @@ int main(int argc, char **argv) {
       size = RF_size(RQ->cmd);
       set_crc8(RQ);
 
+
       while(1){
-         usleep(total_slots*slottime*1000);
+
+         usleep(xmit*1000);
+         DCMSG(YELLOW,"top usleep for %d ms",xmit);
+         
          // now send it to the RF master
          result=write(RFfd,RQ,size);
          if (result==size) {
@@ -614,6 +620,50 @@ int main(int argc, char **argv) {
             sprintf(buf,"Xmit test  ->RF  [%d!=%d]  ",size,result);
             DCMSG_HEXB(RED,buf,RQ,size);
          }
+      
+         
+         usleep((1+total_slots)*slottime*1000);
+         DCMSG(YELLOW,"usleep for %d ms",total_slots*slottime);
+         
+         result = gather_rf(RFfd,rbuf,275);
+
+         if (result>0) {
+            sprintf(buf,"Rcved [%2d]  ",result);
+//            timestamp(&elapsed_time,&istart_time,&delta_time);
+//            sprintf(buf,"%4ld.%03ld  %2d    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,gathered);
+//	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
+            printf("%s",buf);
+            printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
+            if(result>1){
+               for (int i=0; i<result-1; i++) printf("%02x.", rbuf[i]);
+            }
+            printf("%02x\n", rbuf[result-1]);
+            DDpacket(rbuf,result);
+         } else {
+            printf("Rcved [%2d] \n",result);
+         }
+
+//         usleep(total_slots*slottime*1000);
+         DCMSG(YELLOW,"x2 usleep for 0 ms"/*,total_slots*slottime*/);
+
+         result = gather_rf(RFfd,rbuf,275);
+
+         if (result>0) {
+            sprintf(buf,"x2 Rcved [%2d]  ",result);
+//            timestamp(&elapsed_time,&istart_time,&delta_time);
+//            sprintf(buf,"%4ld.%03ld  %2d    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,gathered);
+//	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
+            printf("%s",buf);
+            printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
+            if(result>1){
+               for (int i=0; i<result-1; i++) printf("%02x.", rbuf[i]);
+            }
+            printf("%02x\n", rbuf[result-1]);
+            DDpacket(rbuf,result);
+         } else {
+            printf("x2 Rcved [%2d] \n",result);
+         }
+
       }
    }  // if xmit testing section over.
 

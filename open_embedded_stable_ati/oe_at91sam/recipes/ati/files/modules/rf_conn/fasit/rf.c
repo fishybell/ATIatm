@@ -109,6 +109,7 @@ void print_verbosity(void){
    printf("  -v 40          sets D_NEW  \n");
    printf("  -v 80          sets D_MEGA  \n");
    printf("  -v 100         sets D_MINION  \n");
+   printf("  -v 200         sets D_MSTATE  \n");
    printf("  -v 1FF         sets all of the above  \n");
 }
 
@@ -178,14 +179,14 @@ int gather_rf(int fd, char *tail,int max){
    /* read as much as we can or max from the non-blocking fd. */
    ready=read(fd,tail,max);
    err=errno;
-   DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d  .%02x.%02x.%02x.%02x.  tail=%p ",ready,tail[0],tail[1],tail[2],tail[3],tail);
+   DDCMSG(D_VERY,GREEN,"gather_rf:  errno=%d new bytes=%2d  .%02x.%02x.%02x.%02x.  tail=%p ",errno,ready,tail[0],tail[1],tail[2],tail[3],tail);
 
    if (ready<=0) { /* parse the error message   */
       char buf[100];
 
       if (ready==0) {
          DCMSG(RED,"gather_rf:  read returned 0 bytes");
-         sleep(1);
+//         sleep(1);
       } else {
          strerror_r(errno,buf,100);
          DCMSG(RED,"gather_rf:  read returned error %s \n",buf);

@@ -12,6 +12,7 @@
 #define D_NEW           0x40
 #define D_MEGA          0x80
 #define D_MINION        0x100
+#define D_MSTATE        0x200
 
 #include "mcp.h"
 

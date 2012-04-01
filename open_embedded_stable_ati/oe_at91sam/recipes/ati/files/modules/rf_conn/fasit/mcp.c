@@ -570,7 +570,7 @@ int main(int argc, char **argv) {
                msglen=read(minion_fd, buf, 1023);
                LB=(LB_packet_t *)buf;
                if (verbose&D_RF){       // don't do the sprintf if we don't need to
-                  sprintf(hbuf,"MCP: read Minion %d's LB packet. address=%d  cmd=%d  length=%d msglen=%d   -}"
+                  sprintf(hbuf,"MCP:    read Minion %2d's LB packet. address=%2d  cmd=%2d  length=%2d msglen=%2d  -}"
                           ,mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
                   DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,RF_size(LB->cmd));
                }
@@ -588,7 +588,7 @@ int main(int argc, char **argv) {
                      exit(-1);
                   }
                   if (verbose&D_RF){    // don't do the sprintf if we don't need to
-                     sprintf(hbuf,"MCP: passing Minion %d's LB packet to RF_addr=%d cmd=%d length=%d result=%d  -}"
+                     sprintf(hbuf,"MCP: passing Minion %2d's LB packet to RF_addr=%2d cmd=%2d length=%2d result=%2d  -}"
                              ,mID,LB->addr,LB->cmd,RF_size(LB->cmd),result);
                      DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,RF_size(LB->cmd));
                   }
