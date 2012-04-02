@@ -196,7 +196,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
             // loop until we are out of complete packets, and place them into the Tx queue
             burst=3;            // remembers if we upt a type2 into the burst
-            remaining_time =1000;       // reset our remaining_time before we are allowed to Tx again   time needs to be smarter
+            remaining_time = 50;       // reset our remaining_time before we are allowed to Tx again   time needs to be smarter
 
             while((ptype=QueuePtype(Rx))&&              /* we have a complete packet */
                   burst &&                              /* and burst is not 0 (0 forces us to send) */
@@ -418,8 +418,10 @@ void HandleRF(int MCPsock,int risock,int RFfd){
             riclient = -1;
          }
          if ((newclient = accept(risock, (struct sockaddr *) &ClntAddr,  &clntLen)) > 0) {
+            int yes=1;
             // replace existing riclient with new one
             riclient = newclient;
+            setsockopt(riclient, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
          }// if error, ignore
       }
 
