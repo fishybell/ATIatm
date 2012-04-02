@@ -414,14 +414,14 @@ void OpenRadio(char *tty, int *fd) {
    int times=0;
    uint8 test_int = 0x55; // will not be this value if read correctly (max of 7 if working)
    // open port
-   *fd = open_port(tty, 0); // bit 1 for hardware flow control, bit 2 for blocking, bit 3 for IGNBRK | IGNCR
+   *fd = open_port(tty, 2); // bit 1 for hardware flow control, bit 2(on) for blocking, bit 3 for IGNBRK | IGNCR
 
    // set into programming mode
    while (++times <= 3) {
       DDCMSG(D_RADIO, BLACK, "Entering programming mode (%i)", times);
       //writeRadioNow(*fd, "+", 1);
       writeRadio(*fd, "+", 1, R_NOECHO);
-      sleep(1);
+      sleep(1); // would usleep(990) be better? would usleep(1010) be better? sometimes it fails to enter programming mode, and I can only theorize it is this line
    }
 
    // verify we're in programming mode by reading a memory address
