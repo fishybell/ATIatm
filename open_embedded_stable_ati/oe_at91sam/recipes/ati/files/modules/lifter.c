@@ -433,15 +433,9 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
             // find out which of multiple accessories to configure
             switch (acc_c->acc_type) {
                 case ACC_MILES_SDH :
-                    delay_printk("-----Configure ACC_MILES_SDH: delay: %i, data1: %i, data2: %i, data3: %i\n", acc_c->start_delay, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
-                    if (generic_output_exists(acc_c->acc_type)) {
-                    	num = acc_c->ex_data1;
-                    	num2 = acc_c->ex_data2;
-                    	num3 = acc_c->ex_data3;
-                    }
-                	break;
                 case ACC_SES :
                 case ACC_NES_MFS :
+                case ACC_THERMAL :
                 case ACC_NES_PHI :
                 case ACC_NES_MGL :
                     for (i=generic_output_exists(acc_c->acc_type); i > 0; i--) { // do I have one?
@@ -449,7 +443,6 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
                         num = i; // use this one
                     }
                     break;
-                case ACC_THERMAL :
                 case ACC_SMOKE :
                     if (generic_output_exists(acc_c->acc_type) >= acc_c->ex_data1) { // do I have this one? (ex_data1 is thermal #)
                         delay_printk("Lifter: Using Multiple Accessory %i:%i\n", acc_c->acc_type, acc_c->ex_data1);
@@ -488,7 +481,6 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
                         break;
                     case ACC_MILES_SDH:
                         // TODO -- what to do with MILES data?
-                        delay_printk("Lifter: Couldn't do s*** with MILES data: %i %i %i\n", acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
                         break;
                 }
 
@@ -500,7 +492,6 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
                 }
                 generic_output_set_active_on(acc_c->acc_type, num, a_mode);
                 generic_output_set_mode(acc_c->acc_type, num, mode);
-                delay_printk("----Set initial_delay: type: %i, num: %i, start delay: %i\n", acc_c->acc_type, num, acc_c->start_delay);
                 generic_output_set_initial_delay(acc_c->acc_type, num, acc_c->start_delay*500); // convert to milliseconds
                 generic_output_set_repeat_delay(acc_c->acc_type, num, acc_c->repeat_delay*500); // convert to milliseconds 
                 if (acc_c->repeat >= 63) { // 6 bits, so shouldn't be bigger
@@ -571,7 +562,6 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
                     case ACC_SMOKE:
                     case ACC_THERMAL:
                         acc_c->ex_data1 = num;
-                        delay_printk("Lifter: Couldn't fill in s*** for Thermal data %i\n", num);
                         break;
                     case ACC_NES_MFS:
                         // burst or single mode?
@@ -599,7 +589,7 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
                         break;
                     case ACC_MILES_SDH:
                         // TODO -- what to do with MILES data?
-                        delay_printk("Lifter: Couldn't fill in s*** for MILES data %i %i %i %i\n", num, num2, num3, acc_c->start_delay);
+                        delay_printk("Lifter: Couldn't fill in s*** for MILES data %i %i %i\n", num, num2, num3);
                         acc_c->ex_data1 = num;
                         acc_c->ex_data2 = num2;
                         acc_c->ex_data3 = num3;
