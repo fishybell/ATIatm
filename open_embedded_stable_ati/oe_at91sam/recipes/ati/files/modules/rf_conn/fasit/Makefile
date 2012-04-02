@@ -9,7 +9,7 @@ OE = /usr/local/var/oe
 SYSROOT=$(OE)/tmp/staging/armv5te-angstrom-linux-gnueabi
 XGCC = $(OE)/tmp/cross/armv5te/bin/arm-angstrom-linux-gnueabi-gcc
 
-HFILES = mcp.h fasit_c.h rf.h
+HFILES = mcp.h fasit_c.h rf.h colors.h
 MCFILES = serial.c timestamp.c htonll.c rf.c
 
 
