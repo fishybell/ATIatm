@@ -26,7 +26,7 @@ start () {
    load_modules "target_user_interface.ko mover=0" \
                 "target_battery.ko minvoltval=$satb shutdown_wait=10" \
                 "target_hit_poll.ko line=0" \
-                "target_generic_output.ko has_thermal=$therm has_thermalX=$thermx has_msdh=$msdh" \
+                "target_generic_output.ko" \
                 "target_lifter_armor.ko" \
                 "lifter.ko"
 
