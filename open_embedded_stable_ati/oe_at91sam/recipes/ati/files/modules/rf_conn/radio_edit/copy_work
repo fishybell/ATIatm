@@ -22,6 +22,7 @@ set pass "shoot"
 set host sam$num
 set arch ".arm"
 set dir "/home/root"
+set dir "/usr/bin"
 if {[string match -nocase dx* $num]} {
    puts -nonewline stdout "\nDX Password: "
    system "stty -echo"
