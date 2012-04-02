@@ -120,8 +120,14 @@ void HandleRF(int MCPsock,int risock,int RFfd){
       DDCMSG(D_TIME,YELLOW,"before select remaining_time=%d  Rx[%d] Tx[%d]"
              ,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
 
-      timeout.tv_sec=remaining_time/1000;
-      timeout.tv_usec=(remaining_time%1000)*1000;
+      // check that we're waiting at least 350 -- TODO -- make configurable via command line
+      if (remaining_time < 350) {
+         timeout.tv_sec=0;
+         timeout.tv_usec=350000;
+      } else {
+         timeout.tv_sec=remaining_time/1000;
+         timeout.tv_usec=(remaining_time%1000)*1000;
+      }
       sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
       DDCMSG(D_TIME,YELLOW,"select returned, sock_ready=%d",sock_ready);
       if (sock_ready<0){
