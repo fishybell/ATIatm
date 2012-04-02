@@ -218,8 +218,33 @@ struct generic_output output_table[] = {
         OUTPUT_THERMAL_ACTIVE_STATE,	// gpio active high/low
         RW_LOCK_UNLOCKED,		// lock
     },
+    // MSDH
+    {
+        ACC_MILES_SDH,			// type
+        1,						// number
+        0,						// exists
+        DISABLED,				// enabled
+        S_DISABLED,				// state
+        S_DISABLED,				// next_state
+        0,						// active_on
+        CONSTANT_ON,			// mode
+        0,						// initial delay
+        0,						// initial delay randomization
+        0,						// repeat delay
+        0,						// repeat delay randomization
+        0,						// on time
+        0,						// off time
+        0,						// repeat count
+        0,						// repeat at
+        0,						// on/off repeat count
+        0,						// on/off repeat at
+        TIMER_INITIALIZER(state_run, 0, 5), // state function, no expire, index 3
+        OUTPUT_MILES_SHOOTBACK,			// gpio pin
+        OUTPUT_MILES_SHOOTBACK_ACTIVE_STATE,	// gpio active high/low
+        RW_LOCK_UNLOCKED,		// lock
+    },
 };
-#define TABLE_SIZE 5 /* size of output_table */
+#define TABLE_SIZE 6 /* size of output_table */
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to store the burst count.
@@ -1015,9 +1040,9 @@ delay_printk("Has SES\n");
                 }
                 break;
             case ACC_MILES_SDH:
-                // only one moon glow light
+                // only one miles shootback device holder
                 if (has_msdh && output_table[i].number == 1) {
-delay_printk("Has MSDH\n");
+delay_printk("----------Has MSDH\n");
                     output_table[i].exists = 1; // it exists
                 }
                 break;

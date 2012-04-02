@@ -796,6 +796,33 @@ int SIT_Client::handle_2114(int start, int end) {
     // do handling of message
     IMSG("Handling 2114 in SIT\n");
 
+    // map header and body for both message and response
+    FASIT_header rhdr;
+    FASIT_2115 rmsg;
+    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+    FASIT_2114 *msg = (FASIT_2114*)(rbuf + start + sizeof(FASIT_header));
+
+    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
+    DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nCode | Ammo | Player | Delay \n%5d %5d %7d %7d",
+          msg->code, msg->ammo, msg->player, msg->delay);
+
+    // check to see if we have the Night Effects Simulator
+    if (start_config&PD_NES){
+        doMSDH(msg->code, msg->ammo, msg->player, msg->delay);
+
+        // then respond with a 2115 of it's status
+        defHeader(2115, &rhdr); // sets the sequence number and other data
+        rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2115));
+
+        // set response
+        rmsg.response.rnum = htons(hdr->num);   //  pulls the message number from the header
+        rmsg.response.rseq = hdr->seq;      
+
+
+    } else {
+        send_2101_ACK(hdr,'F'); // no muzzle flash capability, so send a negative ack
+    }
+
     FUNCTION_INT("::handle_2114(int start, int end)", 0);
     return 0;
 }
@@ -1271,7 +1298,7 @@ void SIT_Client::doMSDH(int code, int ammo, int player, int delay) {
 // current MSDH data
 void SIT_Client::didMSDH(int code, int ammo, int player, int delay) {
     FUNCTION_START("::didMSDH(int code, int ammo, int player, int delay)");
-
+    DCMSG(magenta,"---didMSDH, code: %i, ammo: %i, player: %i, delay: %i ", code, ammo, player, delay) ;
     FASIT_header hdr;
     FASIT_2115 msg;
     defHeader(2115, &hdr); // sets the sequence number and other data
@@ -1285,6 +1312,14 @@ void SIT_Client::didMSDH(int code, int ammo, int player, int delay) {
     msg.body.ammo = ammo & 0xFF;
     msg.body.player = htons(player & 0xFFFF);
     msg.body.delay = delay & 0xFF;
+
+    DCMSG(BLUE,"Prepared to send 2115 status packet:");
+    DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htonl(hdr.seq),htonl(hdr.rsrvd),htons(hdr.length));
+    DCMSG(BLUE,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htonl(msg.response.rseq));
+    DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n "\
+          "  Code | Ammo | Player | Delay  \n"\
+          "  %5d %5d %7d %7d   ",
+          msg.body.code, msg.body.ammo, msg.body.player, msg.body.delay);
 
     // send
     queueMsg(&hdr, sizeof(FASIT_header));
@@ -1606,6 +1641,7 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
                                 break;
                     case ACC_MILES_SDH:
                         // MILES data : ex_data1 = Player ID, ex_data2 = MILES Code, ex_data3 = Ammo type, start_delay = Fire Delay
+                        DCMSG(RED,"Case: ACC_MILES_SDH: exists: %i, data1: %i, data2: %i, data3: %i\n", acc_c->exists, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3)
                         sit_client->didMSDH(acc_c->ex_data2, acc_c->ex_data3, acc_c->ex_data1, acc_c->start_delay/2);
                         break;
                 }
@@ -1737,16 +1773,22 @@ void SIT_Conn::doHits(int num) {
 // change MSDH data
 void SIT_Conn::doMSDH(int code, int ammo, int player, int delay) {
     FUNCTION_START("::doMSDH(int code, int ammo, int player, int delay)");
-
+    DCMSG(RED,"----SIT_Conn::doMSDH: code: %i, ammo: %i, player: %i, delay: %i", code, ammo, player, delay);
     // Create attribute
     struct accessory_conf acc_c;
     memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out
     acc_c.acc_type = ACC_MILES_SDH;
-    acc_c.on_exp = 1; // turn on when fully exposed
+    //acc_c.on_exp = 1; // turn on when fully exposed
     acc_c.ex_data2 = code;
     acc_c.ex_data3 = ammo;
     acc_c.ex_data1 = player;
     acc_c.start_delay = 2 * delay;
+    // Turn off if delay is over 100
+    if (delay <= 100) {
+       acc_c.on_now = 1;
+    } else {
+       acc_c.on_now = 0;
+    }
 
     // Queue command
     queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // MSDH is an accessory
