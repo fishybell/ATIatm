@@ -96,10 +96,15 @@ foreach host $hosts {
     eval spawn scp [glob files/be_* ] [glob files/is_* ] [glob files/has_* ] files/TTMT files/BASE files/EIM files/HHC [glob files/load_*] files/unload files/SES files/SIT files/SAT files/MIT files/MAT files/start files/stop files/restart root@$host:/usr/bin
     eval $dossh
 
+    # copy rf_conn and radio_edit directories
+    cd ../sysvinit/sysvinit
+    eval spawn scp inittab root@$host:/etc
+    eval $dossh
+
     # ssh over, start, exit ssh
     spawn ssh root@$host /usr/bin/start
     eval $dossh
 
-    cd ../../..
+    cd ../../../..
 }
 
