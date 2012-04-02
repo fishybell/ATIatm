@@ -1298,7 +1298,6 @@ void SIT_Client::doMSDH(int code, int ammo, int player, int delay) {
 // current MSDH data
 void SIT_Client::didMSDH(int code, int ammo, int player, int delay) {
     FUNCTION_START("::didMSDH(int code, int ammo, int player, int delay)");
-    DCMSG(magenta,"---didMSDH, code: %i, ammo: %i, player: %i, delay: %i ", code, ammo, player, delay) ;
     FASIT_header hdr;
     FASIT_2115 msg;
     defHeader(2115, &hdr); // sets the sequence number and other data
@@ -1773,7 +1772,6 @@ void SIT_Conn::doHits(int num) {
 // change MSDH data
 void SIT_Conn::doMSDH(int code, int ammo, int player, int delay) {
     FUNCTION_START("::doMSDH(int code, int ammo, int player, int delay)");
-    DCMSG(RED,"----SIT_Conn::doMSDH: code: %i, ammo: %i, player: %i, delay: %i", code, ammo, player, delay);
     // Create attribute
     struct accessory_conf acc_c;
     memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out
@@ -1785,9 +1783,10 @@ void SIT_Conn::doMSDH(int code, int ammo, int player, int delay) {
     acc_c.start_delay = 2 * delay;
     // Turn off if delay is over 100
     if (delay <= 100) {
-       acc_c.on_now = 1;
+       acc_c.on_exp = 2;
+       acc_c.on_kill = 2;  //deactivate on kill
     } else {
-       acc_c.on_now = 0;
+       acc_c.on_exp = 0;
     }
 
     // Queue command
