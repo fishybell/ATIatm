@@ -15,7 +15,7 @@
 
 extern int verbose;
 extern struct sockaddr_in fasit_addr;
-
+extern int close_nicely;
 
 void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 

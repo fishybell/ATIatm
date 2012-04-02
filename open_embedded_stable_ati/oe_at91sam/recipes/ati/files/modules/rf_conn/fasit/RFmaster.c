@@ -1,3 +1,4 @@
+#include <signal.h>
 #include "mcp.h"
 #include "rf.h"
 
@@ -15,6 +16,23 @@ __THROW __attribute_pure__ __nonnull ((1));
 
 // size of client buffer
 #define CLIENT_BUFFER 1024
+
+// kill switch to program
+static int close_nicely = 0;
+static void quitproc(int sig) {
+   switch (sig) {
+      case SIGINT:
+         DCMSG(red,"Caught signal: SIGINT\n");
+         break;
+      case SIGQUIT:
+         DCMSG(red,"Caught signal: SIGQUIT\n");
+         break;
+      default:
+         DCMSG(red,"Caught signal: %i\n", sig);
+         break;
+   }
+   close_nicely = 1;
+}
 
 void DieWithError(char *errorMessage){
    char buf[200];
@@ -89,7 +107,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
    /**   loop until we lose connection  **/
    clock_gettime(CLOCK_MONOTONIC,&istart_time); // get the intial current time
    timestamp(&elapsed_time,&istart_time,&delta_time);   // make sure the delta_time gets set    
-   while(1) {
+   while(!close_nicely) {
 
       timestamp(&elapsed_time,&istart_time,&delta_time);
       DDCMSG(D_TIME,CYAN,"Top of loop    %5ld.%09ld timestamp, delta=%5ld.%09ld"
@@ -129,6 +147,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
          timeout.tv_usec=(remaining_time%1000)*1000;
       }
       sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
+      if (close_nicely) {break;}
       DDCMSG(D_TIME,YELLOW,"select returned, sock_ready=%d",sock_ready);
       if (sock_ready<0){
          strerror_r(errno,buf,200);
@@ -486,6 +505,12 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
       }  // end of MCP_sock
    } // end while 1
+   close(MCPsock);
+   close(risock);
+   if (riclient > 0) {
+      close(riclient);
+   }
+   close(RFfd);
 }  // end of handle_RF
 
 
@@ -542,6 +567,10 @@ int main(int argc, char **argv) {
    strcpy(ttyport,"/dev/ttyS0");
    hardflow=0;
    
+   // install signal handlers
+   signal(SIGINT, quitproc);
+   signal(SIGQUIT, quitproc);
+
    while((opt = getopt(argc, argv, "hv:r:f:t:p:s:x:l:d:D:")) != -1) {
       switch(opt) {
          case 'h':
@@ -762,7 +791,7 @@ int main(int argc, char **argv) {
    if (listen(risock, 2) < 0)
       DieWithError("listen(risock) failed");
 
-   for (;;) {
+   while (!close_nicely) {
 
       /* Wait for a client to connect */
       if ((MCPsock = accept(serversock, (struct sockaddr *) &ClntAddr,  &clntLen)) < 0)
@@ -778,5 +807,6 @@ int main(int argc, char **argv) {
       DCMSG(RED,"Connection to MCP closed.   listening for a new MCP");
 
    }
-   /* NOT REACHED */
+   DCMSG(BLACK,"RFmaster says goodbye...");
+   close(serversock);
 }

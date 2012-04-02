@@ -20,6 +20,7 @@ const int cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,
 // globals that get inherited from the parent (MCP)
 extern int verbose;
 extern struct sockaddr_in fasit_addr;
+extern int close_nicely;
 
 
 // initialize our state to default values
@@ -948,7 +949,7 @@ void *minion_thread(thread_data_t *minion){
     
     clock_gettime(CLOCK_MONOTONIC_RAW,&mt.istart_time);	// get the intial current time
     minion->rcc_sock=-1;	// mark the socket so we know to open again
-    while(1) {
+    while(!close_nicely) {
 
 	if (minion->rcc_sock<0) {
     // now we must get a connection or new connection to the range control
@@ -962,14 +963,15 @@ void *minion_thread(thread_data_t *minion){
 
 		result=connect(minion->rcc_sock,(struct sockaddr *) &fasit_addr, sizeof(struct sockaddr_in));
 		if (result<0){
+          close(minion->rcc_sock);
 		    strerror_r(errno,mb.buf,BufSize);
 		    DCMSG(RED,"Minion %d: fasit server not found! connect(...,%s:%d,...) error : %s  ", minion->mID,inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port),mb.buf);
 		    DCMSG(RED,"Minion %d:   waiting for a bit and then re-trying ", minion->mID);
 		    minion->rcc_sock=-1;	// make sure it is marked as closed
 		    sleep(10);		// adding a little extra wait
-		}
-		
-      setsockopt(minion->rcc_sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
+		} else {
+         setsockopt(minion->rcc_sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
+      }
 
 	    } while (result<0);
 // actually we really shouldn't stay in the above loop if disconnected, we need to keep updating minion states
@@ -1219,6 +1221,8 @@ void *minion_thread(thread_data_t *minion){
 	       ,minion->mID,mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec,mt.delta_time.tv_sec, mt.delta_time.tv_nsec);
 #endif
     }  // while forever
+   if (minion->rcc_sock > 0) { close(minion->rcc_sock); }
+   if (minion->mcp_sock > 0) { close(minion->mcp_sock); }
 }  // end of minon thread
 
 

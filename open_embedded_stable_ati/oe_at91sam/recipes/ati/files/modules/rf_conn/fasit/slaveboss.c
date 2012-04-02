@@ -167,6 +167,11 @@ int main(int argc, char **argv) {
    struct epoll_event ev, events[MAX_EVENTS]; // temporary event, main event list
    int fasitsock, rfsock, efd, nfds; // file descriptors for sockets
    int flen = sizeof(faddr);
+
+   // install signal handlers
+   signal(SIGINT, quitproc);
+   signal(SIGQUIT, quitproc);
+
    // initialize fasit/rf connection array
    D_memset(fconns, 0, sizeof(fconns));
 
@@ -412,6 +417,7 @@ int main(int argc, char **argv) {
       }
    }
 
+   DCMSG(BLACK,"slaveboss says goodbye...");
    // close listeners and clients
    close(fasitsock);
    close(rfclient);

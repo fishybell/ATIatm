@@ -1,3 +1,4 @@
+#include <signal.h>
 #include "mcp.h"
 #include "fasit_c.h"
 #include "rf.h"
@@ -21,6 +22,23 @@ void print_help(int exval) {
    printf("  -D 0x30       Highest devID to find\n");
    print_verbosity();
    exit(exval);
+}
+
+// kill switch to program
+int close_nicely = 0;
+static void quitproc(int sig) {
+   switch (sig) {
+      case SIGINT:
+         DCMSG(red,"Caught signal: SIGINT\n");
+         break;
+      case SIGQUIT:
+         DCMSG(red,"Caught signal: SIGQUIT\n");
+         break;
+      default:
+         DCMSG(red,"Caught signal: %i\n", sig);
+         break;
+   }
+   close_nicely = 1;
 }
 
 
@@ -73,6 +91,10 @@ int main(int argc, char **argv) {
    LB_request_new_t *LB_new;
    LB_device_reg_t *LB_devreg;
    LB_assign_addr_t *LB_addr;
+
+   // install signal handlers
+   signal(SIGINT, quitproc);
+   signal(SIGQUIT, quitproc);
 
 
    // process the arguments
@@ -226,13 +248,14 @@ int main(int argc, char **argv) {
    timeout = 3; // quick the first time
 
    // loop until we lose connection to the rfmaster.
-   while(1) {
+   while(!close_nicely) {
 
       // wait for data from either the RFmaster or from a minion
       DDCMSG(D_POLL,RED,"MCP: epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
 
       ready_fd_count = epoll_wait(fds, events, MAX_NUM_Minions, timeout);
       DDCMSG(D_POLL,RED,"MCP: epoll_wait over   ready_fd_count = %d",ready_fd_count);
+      if (close_nicely) {break;}
 
       if (timeout<3000) timeout = 10000;
 
@@ -599,5 +622,6 @@ int main(int argc, char **argv) {
          } //  for all the ready fd's
       }  // else we did not time out
    } //while forever loop
+   DCMSG(BLACK,"mcp says goodbye...");
 } // end of main
 

@@ -143,6 +143,10 @@ int main(int argc, char **argv) {
    struct termios newtio; // the new state of the serial device
    rf_connection_t rc;
 
+   // install signal handlers
+   signal(SIGINT, quitproc);
+   signal(SIGQUIT, quitproc);
+
    // initialize connection structure
    D_memset(&rc, 0, sizeof(rc));
    rc.timeslot_length = 100; // start with 100 millisecond timeslots
@@ -322,6 +326,8 @@ int main(int argc, char **argv) {
          }
       }
    }
+
+   DCMSG(BLACK,"RFslave.new says goodbye...");
 
    // close tty and socket
    close(rc.tty);
