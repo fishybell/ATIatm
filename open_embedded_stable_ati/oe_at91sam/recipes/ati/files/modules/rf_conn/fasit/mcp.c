@@ -350,12 +350,14 @@ int main(int argc, char **argv) {
                   sprintf(hbuf,"MCP: read of LB packet from RFmaster address=%d  cmd=%d  msglen=%d",LB->addr,LB->cmd,msglen);
                   DDCMSG2_HEXB(D_RF,YELLOW,hbuf,buf,msglen);
                }
+               if (verbose&D_PARSE){       // don't do the debug print if we don't need to
+                  DDpacket(buf,msglen);
+               }
                //      process recieved LB packets 
                //  mcp only handles registration and addressing packets,
                //  mcp also has to pass new_address LB packets on to the minion so it can figure out it's own RF_address
                //  mcp passes all other LB packets on to the minions they are destined for
 
-               DDpacket(buf,msglen);
 
                if  (LB->cmd==LBC_DEVICE_REG){
                   LB_devreg =(LB_device_reg_t *)(LB);   // change our pointer to the correct packet type

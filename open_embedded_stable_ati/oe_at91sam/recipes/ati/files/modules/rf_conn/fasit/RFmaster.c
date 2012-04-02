@@ -349,7 +349,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
             write(riclient, "F\r", 2);
          }
 
-         while (gathered>=3){
+         if (gathered>=3){
             // we have a chance of a compelete packet
             LB=(LB_packet_t *)Rstart;   // map the header in
             size=RF_size(LB->cmd);
@@ -635,8 +635,10 @@ int main(int argc, char **argv) {
 
    if (rtime<350) rtime = 350;  // enforce a minimum rtime  - also the default if no -r option
    if (rtime>35000) rtime = 35000;  // enforce a maximum rtime
+   hardflow|=2; // force BLOCKING for the time being
    
    DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);
+   DCMSG(YELLOW,"RFmaster: hardflow is set to 0x%x", hardflow);
    DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
    DCMSG(YELLOW,"RFmaster: listen for SmartRange on TCP/IP port %d",SRport);
    DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);

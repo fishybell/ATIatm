@@ -184,7 +184,7 @@ int gather_rf(int fd, char *tail,int max){
    /* read as much as we can or max from the non-blocking fd. */
    ready=read(fd,tail,max);
    err=errno;
-   DDCMSG(D_VERY,GREEN,"gather_rf:  errno=%d new bytes=%2d  .%02x.%02x.%02x.%02x.  tail=%p ",errno,ready,tail[0],tail[1],tail[2],tail[3],tail);
+   DDCMSG(D_VERY,GREEN,"gather_rf:  errno=%d new bytes=%2d  .%02x.%02x.%02x.%02x.  tail=%p ",errno,ready,(uint8)tail[0],(uint8)tail[1],(uint8)tail[2],(uint8)tail[3],tail);
 
    if (ready<=0) { /* parse the error message   */
       char buf[100];
@@ -310,15 +310,21 @@ void DDpacket(uint8 *buf,int len){
             break;
 
          case LBC_STATUS_RESP_LIFTER:
+         {
+            LB_status_resp_lifter_t *L=(LB_status_resp_lifter_t *)LB;
             strcpy(cmdname,"Status_Resp_Lifter");
-            sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
+            sprintf(hbuf,"RFaddr=%3d hits=%2d exp=%d",L->addr,L->hits,L->expose);
             color=MAGENTA;
+         }
             break;
 
          case LBC_STATUS_RESP_MOVER:
+         {
+            LB_status_resp_mover_t *L=(LB_status_resp_mover_t *)LB;
             strcpy(cmdname,"Status_Resp_Mover");
-            sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
+            sprintf(hbuf,"RFaddr=%3d hits=%2d exp=%d speed=%d dir=%d loc=%d",L->addr,L->hits,L->expose,L->speed,L->dir,L->location);
             color=MAGENTA;
+         }
             break;
 
          case LBC_STATUS_RESP_EXT:
@@ -342,7 +348,7 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_qconceal_t *L=(LB_qconceal_t *)LB;
             strcpy(cmdname,"Qconceal");
-            sprintf(hbuf,"RFaddr=%3d event=%2d uptime=%d dsec .....",L->addr,L->event,L->uptime);
+            sprintf(hbuf,"RFaddr=%3d event=%2d uptime=%d dsec",L->addr,L->event,L->uptime);
          }
          break;
 
@@ -378,8 +384,6 @@ void DDpacket(uint8 *buf,int len){
    printf("\x1B[30;0m");
 
 }
-
-
 
 
 #define false 0
