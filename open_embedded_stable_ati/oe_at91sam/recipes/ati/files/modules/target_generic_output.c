@@ -1042,7 +1042,7 @@ delay_printk("Has SES\n");
             case ACC_MILES_SDH:
                 // only one miles shootback device holder
                 if (has_msdh && output_table[i].number == 1) {
-delay_printk("----------Has MSDH\n");
+delay_printk("Has MSDH\n");
                     output_table[i].exists = 1; // it exists
                 }
                 break;
