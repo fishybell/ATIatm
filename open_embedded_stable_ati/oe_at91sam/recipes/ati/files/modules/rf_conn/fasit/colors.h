@@ -1,7 +1,7 @@
 #ifndef __COLORS_H__
 #define __COLORS_H__
 
-#define BRYNN 0
+#define BRYNN 1
 
 // correct colors:
 #if BRYNN

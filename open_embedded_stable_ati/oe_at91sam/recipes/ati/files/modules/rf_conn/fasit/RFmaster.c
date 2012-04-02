@@ -1,7 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 
-int verbose;    // globals
+int verbose,rtime;    // globals
 
 // this makes the warning go away
 extern size_t strnlen (__const char *__string, size_t __maxlen)
@@ -120,10 +120,10 @@ void HandleRF(int MCPsock,int risock,int RFfd){
       DDCMSG(D_TIME,YELLOW,"before select remaining_time=%d  Rx[%d] Tx[%d]"
              ,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
 
-      // check that we're waiting at least 350 -- TODO -- make configurable via command line
-      if (remaining_time < 350) {
-         timeout.tv_sec=0;
-         timeout.tv_usec=350000;
+      // check that we're waiting at least rtime   configurable via command line with the option -r
+      if (remaining_time < rtime) {
+         timeout.tv_sec=rtime/1000;
+         timeout.tv_usec=(rtime%1000)*1000;
       } else {
          timeout.tv_sec=remaining_time/1000;
          timeout.tv_usec=(remaining_time%1000)*1000;
@@ -533,6 +533,7 @@ int main(int argc, char **argv) {
    int slottime,total_slots;
    int low_dev,high_dev;
 
+   rtime=0;
    slottime=0;
    verbose=0;
    xmit=0;              // used for testing
@@ -541,7 +542,7 @@ int main(int argc, char **argv) {
    strcpy(ttyport,"/dev/ttyS0");
    hardflow=0;
    
-   while((opt = getopt(argc, argv, "hv:f:t:p:s:x:l:d:D:")) != -1) {
+   while((opt = getopt(argc, argv, "hv:r:f:t:p:s:x:l:d:D:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
@@ -549,6 +550,10 @@ int main(int argc, char **argv) {
 
          case 'f':
             hardflow=7 & atoi(optarg);            
+            break;
+
+         case 'r':
+            rtime = atoi(optarg);            
             break;
 
          case 'v':
@@ -598,6 +603,10 @@ int main(int argc, char **argv) {
             break;
       }
    }
+
+   if (rtime<350) rtime = 350;  // enforce a minimum rtime  - also the default if no -r option
+   if (rtime>35000) rtime = 35000;  // enforce a maximum rtime
+   
    DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);
    DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
    DCMSG(YELLOW,"RFmaster: listen for SmartRange on TCP/IP port %d",SRport);
