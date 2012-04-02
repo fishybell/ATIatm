@@ -129,7 +129,8 @@
 // MILE TRANSMITTER
 //---------------------------------------------------------------------------
 #define OUTPUT_MILES_SHOOTBACK_ACTIVE_STATE		ACTIVE_LOW
-#define	OUTPUT_MILES_SHOOTBACK 					AT91_PIN_PC10
+#define	OUTPUT_MILES_SHOOTBACK 					AT91_PIN_PC2 
+// was PC10
 
 //---------------------------------------------------------------------------
 // MOVER
