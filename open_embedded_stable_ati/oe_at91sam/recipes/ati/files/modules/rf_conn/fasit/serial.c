@@ -56,18 +56,17 @@ int open_port(char *sport, int hardflow){
       if (hardflow&4) {
          //   code that seems like it should be 'better', but was 'different'
          my_termios.c_iflag &= ~( BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF | IXANY);
-         my_termios.c_iflag |= (IGNBRK | IGNCR);   // some documentation says we want these on
-         // the IGNCR (ignore carrage returns) is getting turned on
+         my_termios.c_iflag |= (IGNBRK );   // some documentation says we want this
          // the IGNBRK (ignore BREAK) is getting turned on
          my_termios.c_lflag &= ~(ECHO | ECHONL | ECHOE | ICANON | ISIG | IEXTEN);
-         strcat(sbuf,"IGNBRK IGNCR set ");
+         strcat(sbuf,"IGNBRK set ");
       } else {
          //   the old code.
          my_termios.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
          // the IGNCR (ignore carrage returns) is getting turned off
          // the IGNBRK (ignore BREAK) is getting turned off
          my_termios.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
-         strcat(sbuf,"IGNBRK IGNCR cleared ");
+         strcat(sbuf,"IGNBRK cleared ");
       }
       
       my_termios.c_oflag &= ~OPOST;

@@ -13,6 +13,8 @@
 #define D_MEGA          0x80
 #define D_MINION        0x100
 #define D_MSTATE        0x200
+#define D_QUEUE         0x400
+#define D_PARSE         0x800
 
 #include "mcp.h"
 

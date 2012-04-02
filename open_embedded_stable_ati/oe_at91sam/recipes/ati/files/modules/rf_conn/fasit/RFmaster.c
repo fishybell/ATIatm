@@ -92,10 +92,10 @@ void HandleRF(int MCPsock,int risock,int RFfd){
    while(1) {
 
       timestamp(&elapsed_time,&istart_time,&delta_time);
-      DDCMSG(D_TIME,CYAN,"RFmaster:  Top of loop    %5ld.%09ld timestamp, delta=%5ld.%09ld"
+      DDCMSG(D_TIME,CYAN,"Top of loop    %5ld.%09ld timestamp, delta=%5ld.%09ld"
              ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
       delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000000);
-      DDCMSG(D_TIME,CYAN,"RFmaster:  delta=%2dms",delta);
+      DDCMSG(D_TIME,CYAN,"delta=%2dms",delta);
 
       /*   do a select to see if we have a message from either the RF or the MCP  */
       /* then based on the source, send the message to the destination  */
@@ -117,13 +117,13 @@ void HandleRF(int MCPsock,int risock,int RFfd){
        */
 
 
-      DDCMSG(D_TIME,YELLOW,"RFmaster:  before select remaining_time=%d  Rx[%d] Tx[%d]"
+      DDCMSG(D_TIME,YELLOW,"before select remaining_time=%d  Rx[%d] Tx[%d]"
              ,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
 
       timeout.tv_sec=remaining_time/1000;
       timeout.tv_usec=(remaining_time%1000)*1000;
       sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
-      DDCMSG(D_TIME,YELLOW,"RFmaster:  select returned, sock_ready=%d",sock_ready);
+      DDCMSG(D_TIME,YELLOW,"select returned, sock_ready=%d",sock_ready);
       if (sock_ready<0){
          strerror_r(errno,buf,200);
          DCMSG(RED,"RFmaster select error: %s", buf);
@@ -140,12 +140,12 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
          // get the actual current time.
          timestamp(&elapsed_time,&istart_time,&delta_time);
-         DDCMSG(D_TIME,CYAN,"RFmaster:  select timed out at %5ld.%09ld timestamp, delta=%5ld.%09ld"
+         DDCMSG(D_TIME,CYAN,"select timed out at %5ld.%09ld timestamp, delta=%5ld.%09ld"
                 ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
          delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000000);
-         DDCMSG(D_TIME,CYAN,"RFmaster:  delta=%2dms",delta);
+         DDCMSG(D_TIME,CYAN,"delta=%2dms",delta);
 
-         DDCMSG(D_TIME,YELLOW,"RFmaster:  select timed out  delta=%d remaining_time=%d  Rx[%d] Tx[%d]"
+         DDCMSG(D_TIME,YELLOW,"select timed out  delta=%d remaining_time=%d  Rx[%d] Tx[%d]"
                 ,delta,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
 
          if (delta>remaining_time-1) {
@@ -192,7 +192,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
              ******               meant for us
              ******/
 
-            DDCMSG(D_MEGA,YELLOW,"RFmaster:  ptype rx=%d before Rx to Tx.  Rx[%d] Tx[%d]",QueuePtype(Rx),Queue_Depth(Rx),Queue_Depth(Tx));
+            DDCMSG(D_MEGA,YELLOW,"ptype rx=%d before Rx to Tx.  Rx[%d] Tx[%d]",QueuePtype(Rx),Queue_Depth(Rx),Queue_Depth(Tx));
 
             // loop until we are out of complete packets, and place them into the Tx queue
             burst=3;            // remembers if we upt a type2 into the burst
@@ -205,7 +205,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                  ){     
 
 
-               DDCMSG(D_MEGA,CYAN,"RFmaster:  in loop.  Rx[%d] Tx[%d]",Queue_Depth(Rx),Queue_Depth(Tx));
+               DDCMSG(D_MEGA,CYAN,"in loop.  Rx[%d] Tx[%d]",Queue_Depth(Rx),Queue_Depth(Tx));
                if (ptype==1){   /*  parse it to get the slottime and devid range, and set burst to 0 */
                   LB_new =(LB_request_new_t *) Rx->head;        // we need to parse out the slottime, high_dev and low_dev from this packet.
                   slottime=LB_new->slottime*5;          // convert passed slottime back to milliseconds
@@ -213,11 +213,11 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                   total_slots=34;               // total number of slots with end padding
                   burst=0;
                   remaining_time =(total_slots)*slottime;       // set up the timer
-                  DDCMSG(D_TIME,YELLOW,"RFmaster:  setting remaining_time to %d  total_slots=%d slottime=%d",
+                  DDCMSG(D_TIME,YELLOW,"setting remaining_time to %d  total_slots=%d slottime=%d",
                          remaining_time,total_slots,slottime);
                   ReQueue(Tx,Rx,RF_size(LB_new->cmd));  // move it to the Tx queue
 
-                  //                    DCMSG(YELLOW,"RFmaster: requeued into M1[%d:%d]:%d s%d  size=%d",
+                  //                    DCMSG(YELLOW,"requeued into M1[%d:%d]:%d s%d  size=%d",
                   //                          M1->head-M1->buf,M1->tail-M1->buf,Queue_Depth(M1),QueueSeq_peek(M1),size);
                   //                    sprintf(buf,"M1[%2d:%2d]  ",M1->head-M1->buf,M1->tail-M1->buf);
                   //                    DCMSG_HEXB(YELLOW,buf,M1->head,Queue_Depth(M1));
@@ -227,7 +227,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                   if (ptype==2) {
                      burst=2;
                      remaining_time +=slottime; // add time for a response to this one
-                     DDCMSG(D_TIME,YELLOW,"RFmaster:  incrementing remaining_time by slottime to %d  slottime=%d",
+                     DDCMSG(D_TIME,YELLOW,"incrementing remaining_time by slottime to %d  slottime=%d",
                             remaining_time,slottime);
 
                   }                         
@@ -239,7 +239,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
              ***********
              ***********/
 
-            DDCMSG(D_MEGA,CYAN,"RFmaster:  before Tx to RF.  Tx[%d]",Queue_Depth(Tx));
+            DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%d]",Queue_Depth(Tx));
 
             if (Queue_Depth(Tx)){  // if we have something to Tx, Tx it.
 
@@ -254,21 +254,30 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                result=write(RFfd,Tx->head,Queue_Depth(Tx));
                if (result<0){
                   strerror_r(errno,buf,200);                
-                  DCMSG(RED,"RFmaster:  write Tx queue to RF error %s",buf);
+                  DCMSG(RED,"write Tx queue to RF error %s",buf);
                } else {
                   if (!result){
-                     DCMSG(RED,"RFmaster:  write Tx queue to RF returned 0");
+                     DCMSG(RED,"write Tx queue to RF returned 0");
                   }
                   if (verbose&D_RF){
-                     sprintf(buf,"MCP-> RF  [%2d]  ",result);
-                     DDCMSG_HEXB(D_RF,BLUE,buf,Tx->head,result);
+                        timestamp(&elapsed_time,&istart_time,&delta_time);
+                        sprintf(buf,"[%03d] %4ld.%03ld  ->RF [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,result);
+                        printf("%s",buf);
+                        printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                        if(result>1){
+                           for (int i=0; i<result-1; i++) printf("%02x.", (uint8) Tx->head[i]);
+                        }
+                        printf("%02x\n", (uint8) Tx->head[result-1]);
+                  }  
+                  if (verbose&D_PARSE){
+                     DDpacket(Tx->head,result);
                   }
                }
                DeQueue(Tx,Queue_Depth(Tx));
 
             }
             timestamp(&elapsed_time,&istart_time,&delta_time);
-            DDCMSG(D_MEGA,CYAN,"RFmaster:  Just might have Tx'ed to RF   at %5ld.%09ld timestamp, delta=%5ld.%09ld"
+            DDCMSG(D_MEGA,CYAN,"Just might have Tx'ed to RF   at %5ld.%09ld timestamp, delta=%5ld.%09ld"
                    ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
             /*****    this stuff below isn't really tested  *****/              
             rfcount+=MsgSize;
@@ -296,18 +305,18 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
          gotrf = gather_rf(RFfd,Rptr,300);
          if (gotrf>0){  // increment our current pointer
-            DDCMSG(D_VERY,GREEN,"RFmaster: gotrf=%d gathered =%2d, incrementing  Rptr=%2d (%p)  Rbuf=%p",
+            DDCMSG(D_VERY,GREEN,"gotrf=%d gathered =%2d, incrementing  Rptr=%2d (%p)  Rbuf=%p",
                    gotrf,gathered,(int)(Rptr-Rbuf), Rptr, Rbuf);
             Rptr+=gotrf;
             gathered+=gotrf;
-            DDCMSG(D_VERY,GREEN,"RFmaster: gotrf=%d gathered =%2d  Rptr=%2d (%p) Rbuf=%p ",
+            DDCMSG(D_VERY,GREEN,"gotrf=%d gathered =%2d  Rptr=%2d (%p) Rbuf=%p ",
                    gotrf,gathered,(int)(Rptr-Rbuf), Rptr, Rbuf);
          } else {
-            DDCMSG(D_VERY,RED,"RFmaster: gotrf=%d gathered =%2d  Rptr=%2d (%p) ",
+            DDCMSG(D_VERY,RED,"gotrf=%d gathered =%2d  Rptr=%2d (%p) ",
                    gotrf,gathered,(int)(Rptr-Rbuf), Rptr);
          }
          /* Receive message, or continue to recieve message from RF */
-         DDCMSG(D_VERY,YELLOW,"RFmaster: gotrf=%d  gathered=%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
+         DDCMSG(D_VERY,YELLOW,"gotrf=%d  gathered=%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
                 gotrf,gathered,(int)(Rptr-Rbuf),(int)(Rstart-Rbuf),(int)(Rptr-Rstart));
 
          // after gathering RF data, we're free, tell the Radio Interface client
@@ -321,7 +330,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
             size=RF_size(LB->cmd);
 
             /* Receive message, or continue to recieve message from RF */
-            DDCMSG(D_VERY,GREEN,"RFmaster: cmd=%d addr=%d RF_size =%2d  Rptr-Rstart=%2d  ",
+            DDCMSG(D_VERY,GREEN,"cmd=%d addr=%d RF_size =%2d  Rptr-Rstart=%2d  ",
                    LB->cmd,LB->addr,size,(int)(Rptr-Rstart));
 
             if ((Rptr-Rstart) >= size){
@@ -332,8 +341,20 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                if (!crc) {
                   result=write(MCPsock,Rstart,size);
                   if (result==size) {
-                     sprintf(buf,"RF ->MCP  [%2d]  ",size);
-                     DDCMSG_HEXB(D_RF,GREEN,buf,Rstart,size);
+                     if (verbose&D_RF){
+                        timestamp(&elapsed_time,&istart_time,&delta_time);
+                        sprintf(buf,"[%03d] %4ld.%03ld ->MCP [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,result);
+                        printf("%s",buf);
+                        printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                        if(result>1){
+                           for (int i=0; i<result-1; i++) printf("%02x.", (uint8) Rstart[i]);
+                        }
+                        printf("%02x\n", (uint8) Rstart[result-1]);
+                     }  
+                     if (verbose&D_PARSE){
+                        DDpacket(Rstart,result);
+                     }
+                     
                   } else {
                      sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
                      DDCMSG_HEXB(D_RF,RED,buf,Rstart,size);
@@ -406,18 +427,30 @@ void HandleRF(int MCPsock,int risock,int RFfd){
        ***************/
       DDCMSG(D_MEGA,BLACK,"RFmaster checking FD_ISSET(MCPsock)");
       if (FD_ISSET(MCPsock,&rf_or_mcp)){
+         int err;
          DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(MCPsock)");
          /* Receive message from MCP and read it directly into the Rx buffer */
-         MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);            
-         DDCMSG(D_PACKET,YELLOW,"RFmaster: read %d from MCP.",MsgSize);
+         MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);
+         err=errno;
+
+         if (verbose&D_PACKET){
+            timestamp(&elapsed_time,&istart_time,&delta_time);
+            sprintf(buf,"[%03d] %4ld.%03ld MCP-> [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,MsgSize);
+            printf("%s",buf);
+            printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
+            if(MsgSize>1){
+               for (int i=0; i<MsgSize-1; i++) printf("%02x.", (uint8) Rx->tail[i]);
+            }
+            printf("%02x\n", (uint8) Rx->tail[MsgSize-1]);
+         }
 
          if (MsgSize<0){
-            strerror_r(errno,buf,200);
-            DCMSG(RED,"RFmaster: read from MCP fd=%d failed  %s ",MCPsock,buf);
+            strerror_r(err,buf,200);
+            DCMSG(RED,"read from MCP fd=%d failed  %s ",MCPsock,buf);
             sleep(1);
          }
          if (!MsgSize){
-            DCMSG(RED,"RFmaster: read from MCP returned 0 - MCP closed");
+            DCMSG(RED,"read from MCP returned 0 - MCP closed");
             free(Rx);
             free(Tx);
             close(MCPsock);    /* Close socket */    
@@ -437,7 +470,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
             Rx->tail+=MsgSize;  // add on the new length
             bytecount=Queue_Depth(Rx);
-            DDCMSG(D_PACKET,YELLOW,"RFmaster: Rx[%d]",bytecount);
+            DDCMSG(D_QUEUE,YELLOW,"Rx[%d]",bytecount);
 
             // we don't need to parse or anything....
 
@@ -638,7 +671,9 @@ int main(int argc, char **argv) {
                for (int i=0; i<result-1; i++) printf("%02x.", rbuf[i]);
             }
             printf("%02x\n", rbuf[result-1]);
-            DDpacket(rbuf,result);
+            if (verbose&D_PARSE){
+               DDpacket(rbuf,result);
+            }
          } else {
             printf("Rcved [%2d] \n",result);
          }
@@ -659,7 +694,9 @@ int main(int argc, char **argv) {
                for (int i=0; i<result-1; i++) printf("%02x.", rbuf[i]);
             }
             printf("%02x\n", rbuf[result-1]);
-            DDpacket(rbuf,result);
+            if (verbose&D_PARSE){
+               DDpacket(rbuf,result);
+            }
          } else {
             printf("x2 Rcved [%2d] \n",result);
          }

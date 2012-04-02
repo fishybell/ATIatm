@@ -262,6 +262,7 @@ void DDpacket(uint8 *buf,int len){
             LB_event_report_t *L=(LB_event_report_t *)LB;
             strcpy(cmdname,"Event_Report");
             sprintf(hbuf,"RFaddr=%3d   event=%2d hit_count=%d",L->addr,L->event,L->hits);
+            color=MAGENTA;
          }
          break;
 
