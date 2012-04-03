@@ -1,6 +1,7 @@
 #include "mcp.h"
 #include "rf.h"
 #include "fasit_c.h"
+#include "RFslave.h"
 
 #define S_set(ITEM,D,ND,F,T) \
     { \
