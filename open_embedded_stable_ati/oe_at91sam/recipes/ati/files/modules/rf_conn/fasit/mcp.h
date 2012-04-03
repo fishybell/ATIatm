@@ -152,9 +152,11 @@ typedef struct slave_state {
    uint8                exp;    // exposure state has more stuff
    uint8                event;  // used for timer events
    uint8                asp;
-   uint16               dir;
+   uint8                dir;   
+   uint16               location;
    uint8                move;
    float                speed;
+   float                start_time;
    //           hit configuration (aka sensor)
    uint8                on;
    uint16               hit;
@@ -276,7 +278,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 #define DDCMSG(DBG,SC, FMT, ...) { if (((DBG)&verbose)==(DBG)) { fprintf(stdout, "\x1B[3%d;%dm[%03x] " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1,(DBG), ##__VA_ARGS__ ); fflush(stdout);}}
 #define DCMSG(SC, FMT, ...) { if (C_DEBUG) { fprintf(stdout, "\x1B[3%d;%dm      " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
 #define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm      " FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
-#define DCOLOR(SC) { if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm      ",SC&7,(SC>>3)&1); fflush(stdout);}}
+#define DCOLOR(SC) { if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm",SC&7,(SC>>3)&1); fflush(stdout);}}
 
 //  here are two usage examples of DCMSG
 //DCMSG(RED,"example of DCMSG macro  with arguments  enum = %d  biff=0x%x",ghdr->cmd,biff) ;

@@ -280,8 +280,11 @@ void DDpacket(uint8 *buf,int len){
          break;
 
          case LBC_MOVE:
+         {
+            LB_move_t *L=(LB_move_t *)LB;
             strcpy(cmdname,"Move");
-            sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
+            sprintf(hbuf,"RFaddr=%3d dir=%d speed=%d",L->addr,L->direction,L->speed);
+         }
             break;
 
          case LBC_CONFIGURE_HIT:
