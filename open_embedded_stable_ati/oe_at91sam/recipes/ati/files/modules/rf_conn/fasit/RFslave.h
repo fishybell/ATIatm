@@ -27,9 +27,9 @@ typedef struct rf_connection {
    int sock_ilen; // length of incoming rf sock buffer
 
    // delay
-   struct timespec time_start; // the time when we last received a message
-   struct timespec timeout_start; // the beginning of the timeslot when we must send the message
-   struct timespec timeout_end; // the ending of the timeslot when we must send the message
+   long time_start; // the time when we last received a message
+   long timeout_start; // the beginning of the timeslot when we must send the message
+   long timeout_end; // the ending of the timeslot when we must send the message
 
    // timeslot stuff
    int timeslot_length; // the amount of time each timeslot is, as determined by the RFmaster
@@ -86,6 +86,9 @@ int sock2tty(rf_connection_t *rc); // transfer socket data to the tty and set up
 // file descriptor helper functions
 void setnonblocking(int fd, int sock_stuff); // sock_stuff set to 1 the first time on a socket
 void setblocking(int fd);
+
+// get the current time as milliseconds
+long getTime();
 
 // for some reason we have a ntohs/htons, but no ntohf/htonf
 float ntohf(float f);

@@ -78,104 +78,76 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
 
 // returns the timeout value to pass to epoll
 int getTimeout(rf_connection_t *rc) {
-   int ret;
-   struct timespec tv;
+   long tv;
 
    // do infinite timeout if the values are the same
-   if (rc->timeout_start.tv_sec == rc->time_start.tv_sec &&
-       rc->timeout_start.tv_nsec == rc->time_start.tv_nsec) {
+   if (rc->timeout_start == rc->time_start) {
       return INFINITE;
    }
 
    // get current time
-   clock_gettime(CLOCK_MONOTONIC,&tv);
+   tv = getTime();
 
-   DDCMSG(D_TIME, RED, "Now: %5ld.%09ld, Then:  %5ld.%09ld=>   SomeOther:  %5ld.%09ld",
-     tv.tv_sec, tv.tv_nsec, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec, rc->timeout_end.tv_sec, rc->timeout_end.tv_nsec);
-   // subtract seconds straight out
-   tv.tv_sec = rc->timeout_start.tv_sec - tv.tv_sec;
+   DDCMSG(D_TIME, RED, "Now: %9ld, Then:  %9ld=>   SomeOther:  %9ld",
+     tv, rc->timeout_start, rc->timeout_end);
 
    // check to see if we're past our allowed timeslot
-   if (tv.tv_sec > rc->timeout_end.tv_sec ||
-      (tv.tv_sec == rc->timeout_end.tv_sec &&
-       tv.tv_nsec > rc->timeout_start.tv_nsec)) {
-      DDCMSG(D_TIME, RED, "Waited too long, infinite timeout now");
+   if (tv > rc->timeout_end) {
+      DDCMSG(D_TIME, YELLOW, "Waited too long, infinite timeout now");
       // flush output tty buffer because we missed our timeslot
       rc->tty_olen = 0;
       return INFINITE;
    }
 
-   // subtract microseconds, possibly "carrying the one"
-   if (rc->timeout_start.tv_nsec < tv.tv_nsec) {
-      // we need to carry.tv_nsec -= 1000000000l;
-      if (tv.tv_sec >= 0) {
-         tv.tv_sec--;
-      } else {
-         tv.tv_sec++;
-      }
-   }
+   // subtract milliseconds straight out to get remaining time
+   tv = rc->timeout_start - tv;
 
-   // subtract the miscroseconds
-   tv.tv_nsec = rc->timeout_start.tv_nsec - tv.tv_nsec;
-
-   // convert to milliseconds
-   ret = (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000l);
-   DDCMSG(D_TIME, RED, "Later: %5ld.%09ld => %i", tv.tv_sec, tv.tv_nsec, ret);
+   DDCMSG(D_TIME, RED, "Later: %9ld", tv);
 
    // timeout early so we wait just the right amount of time later with waitRest()
-   if (ret <= 5) {
+   if (tv <= 10) {
+      DDCMSG(D_TIME, GRAY, "Returning 0 from getTimeout()...waiting");
+      waitRest(rc);
       return 0; // timeout is 0, which for epoll is return immediately
    } else {
-      return max(1, ret - 5); // timeout is positive, it will wait this amount of time
+      DDCMSG(D_TIME, GRAY, "Returning %i from getTimeout()");
+      return max(1, tv - 5); // timeout is positive, it will wait this amount of time
    }
 }
 
 // set the timeout for X milliseconds after the start time
 void doTimeAfter(rf_connection_t *rc, int msecs) {
-   DDCMSG(D_TIME, RED, "Add to timeout %i, %5ld.%09ld", msecs, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec);
+   DDCMSG(D_TIME, RED, "Add to timeout %i, %9ld", msecs, rc->timeout_start);
    // set infinite wait by making the start and end time the same
    if (msecs == INFINITE) {
-      rc->timeout_start.tv_sec = rc->time_start.tv_sec;
-      rc->timeout_start.tv_nsec = rc->time_start.tv_nsec;
+      DDCMSG(D_TIME, CYAN, "Reset timeout_start to %i @ %i", rc->time_start, __LINE__);
+      rc->timeout_start = rc->time_start;
       return;
    }
 
    // calculate the lower end time
-   rc->timeout_start.tv_sec = rc->time_start.tv_sec + (msecs / 1000); // add the right amount of seconds
-   rc->timeout_start.tv_nsec = rc->time_start.tv_nsec + ((msecs - ((msecs/1000)*1000)) * 1000000l); // convoluted math makes it so we don't have an overrun on the tv_nsec size
-   if (rc->timeout_start.tv_nsec >= 1000000000l) { // should be off by only one second, so don't loop
-      // did this push us to the next second (or more) ?
-      rc->timeout_start.tv_sec++;
-      rc->timeout_start.tv_nsec -= 1000000000l;
-   }
+   rc->timeout_start += msecs;
 
    // calculate the upper end time
    msecs += ((2*rc->timeslot_length)/3); // end time is start time plus 2/3 the timeslot length (to allow for transmission time)
-   rc->timeout_end.tv_sec = rc->time_start.tv_sec + (msecs / 1000); // add the right amount of seconds
-   rc->timeout_end.tv_nsec = rc->time_start.tv_nsec + ((msecs - ((msecs/1000)*1000)) * 1000000l); // convoluted math makes it so we don't have an overrun on the tv_nsec size
-   if (rc->timeout_end.tv_nsec >= 1000000000l) { // should be off by only one second, so don't loop
-      // did this push us to the next second (or more) ?
-      rc->timeout_end.tv_sec++;
-      rc->timeout_end.tv_nsec -= 1000000000l;
-   }
+   rc->timeout_end += msecs;
 
-   DDCMSG(D_TIME, RED, "Timeout changed to %5ld.%09ld => %5ld.%09ld", rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec, rc->timeout_end.tv_sec, rc->timeout_end.tv_nsec);
+   DDCMSG(D_TIME, RED, "Timeout changed to %9ld => %9ld", rc->timeout_start, rc->timeout_end);
 }
 
 // wait until the timeout time arrives (the epoll timeout will get us close)
 void waitRest(rf_connection_t *rc) {
-   struct timespec tv;
+   long tv;
 
    // wait until we arrive at the valid time (please only do this for periods under 5 milliseconds
    do {
       // get current time
-      clock_gettime(CLOCK_MONOTONIC,&tv);
-      DDCMSG(D_TIME, RED, "Looking if %5ld.%09ld > %5ld.%09ld", tv.tv_sec, tv.tv_nsec, rc->timeout_start.tv_sec, rc->timeout_start.tv_nsec);
-   } while (tv.tv_sec < rc->timeout_start.tv_sec || /* old seconds are greater OR ...*/
-           (tv.tv_sec == rc->timeout_start.tv_sec && /* ... [seconds are equal AND ... */
-            tv.tv_nsec < rc->timeout_start.tv_nsec)); /* ... old microseconds are greater] */
+      tv = getTime();
+      //DDCMSG(D_TIME, RED, "Looking if %9ld > %9ld", tv, rc->timeout_start);
+   } while ((tv + 2) < rc->timeout_start); // add on a couple of milliseconds for radio readiness
    
    // reset timer now
+   DDCMSG(D_TIME, CYAN, "Reset all to %i @ %i", tv, __LINE__);
    rc->timeout_start = tv;
    rc->timeout_end = tv;
    rc->time_start = tv;
@@ -226,8 +198,11 @@ int rcWrite(rf_connection_t *rc, int tty) {
    DDCMSG(D_RF, tty ? cyan : blue, "%s WRITE", tty ? "TTY" : "SOCKET");
 
    // reset times
-   rc->time_start = rc->timeout_end; // reset to latest time
-   rc->timeout_start = rc->timeout_end; // reset to latest time
+   if (tty) {
+      DDCMSG(D_TIME, CYAN, "Reset time_start & timeout_start to %i @ %i", rc->timeout_end, __LINE__);
+      rc->time_start = rc->timeout_end; // reset to latest time
+      rc->timeout_start = rc->timeout_end; // reset to latest time
+   }
 
    // have something to write?
    if ((tty ? rc->tty_olen : rc->sock_olen) <= 0) {
@@ -477,7 +452,7 @@ int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
    DDCMSG(D_RF, CYAN, "t2s_handle_REQUEST_NEW(%8p, %i, %i)", rc, start, end);
 
    // remember last low/high devid
-   DDCMSG(D_TIME, BLACK, "Setting low/high to %i/%i", pkt->low_dev, pkt->low_dev+31);
+   DDCMSG(D_TIME, BLACK, "Setting low/high to %X/%X", pkt->low_dev, pkt->low_dev+31);
    rc->devid_last_low = pkt->low_dev;
    rc->devid_last_high = pkt->low_dev+31;
 
@@ -504,6 +479,11 @@ int t2s_handle_ASSIGN_ADDR(rf_connection_t *rc, int start, int end) {
 int tty2sock(rf_connection_t *rc) {
    int start, end, mnum, retval = doNothing; // start doing nothing
    int added_to_buf = 0;
+
+   // grab now time
+   long nowt;
+   nowt = getTime();
+
 
    // read all available valid messages up until I have to do something on return
    debugRF(cyan, rc->tty_ibuf, rc->tty_ilen);
@@ -533,12 +513,6 @@ int tty2sock(rf_connection_t *rc) {
          // copy the found message to the socket "out" buffer
          addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
          added_to_buf = 1;
-
-         // change the start time to now
-         clock_gettime(CLOCK_MONOTONIC,&rc->time_start);
-         rc->timeout_start = rc->time_start; // reset the start time as well
-         rc->timeout_end = rc->time_start; // reset the end time as well
-         DDCMSG(D_PACKET, RED, "Clock changed to %5ld.%09ld", rc->time_start.tv_sec, rc->time_start.tv_nsec);
       }
 
       // clear out the found message
@@ -547,6 +521,13 @@ int tty2sock(rf_connection_t *rc) {
    
    // if we put anything in the socket "out" buffer...
    if (added_to_buf) {
+      // change the start time to now time (which happened at the start of the read)
+      DDCMSG(D_TIME, CYAN, "Reset all to %i @ %i", nowt, __LINE__);
+      rc->time_start = nowt;
+      rc->timeout_start = nowt; // reset start time as well
+      rc->timeout_end = nowt; // reset end time as well
+      DDCMSG(D_TIME, BLACK, "Clock changed to %9ld", rc->time_start);
+
       // the socket needs to write it out now and whatever the t2s_* handler said to do
       retval |= mark_sockWrite; 
    }
@@ -668,7 +649,7 @@ int sock2tty(rf_connection_t *rc) {
    }
 
    // find which timeslot I'm in (the mcp should always leave us with exactly one of these tests as true)
-   DDCMSG(D_TIME, BLACK, "Finding timeslot uinsg rc->id_index (%i) or rc->devid_last_high (%i)", rc->id_index, rc->devid_last_high);
+   DDCMSG(D_TIME, BLACK, "Finding timeslot uinsg rc->id_index (%X) or rc->devid_last_high (%X)", rc->id_index, rc->devid_last_high);
    if (rc->id_index >= 0) {
       // timeslot is decided by which address I am in the chain
       int i;
@@ -686,11 +667,11 @@ int sock2tty(rf_connection_t *rc) {
       rc->id_index = -1;
    } else if (rc->devid_last_high >= 0) {
       int i;
-      DDCMSG(D_TIME, BLACK, "Finding timeslot using rc->devid_last_high %i", rc->devid_last_high);
+      DDCMSG(D_TIME, BLACK, "Finding timeslot using rc->devid_last_high %X", rc->devid_last_high);
       ts = 0xffff; // start off as a really big number
       // timeslot is decided by which devid I am in the range, find lowest devid
       for (i = 0; i < min(rc->devid_index+1, MAX_IDS); i++) {
-         DDCMSG(D_TIME, BLACK, "Looking %i-%i < %i for index %i", rc->devids[i], rc->devid_last_low, ts, i);
+         DDCMSG(D_TIME, BLACK, "Looking %X-%X < %X for index %i", rc->devids[i], rc->devid_last_low, ts, i);
          if ((rc->devids[i] - rc->devid_last_low) < ts) {
             ts = rc->devids[i] - rc->devid_last_low; // exact match would be 0 slot, then 1, etc.
             DDCMSG(D_VERY, BLACK, "Found new low: %i", ts);
@@ -709,10 +690,10 @@ int sock2tty(rf_connection_t *rc) {
 
    // label to jump to when I found my timeslot
    found_ts:
-   DDCMSG(D_TIME, BLACK, "Found timeout slot: %i", ts);
+   DDCMSG(D_TIME, BLACK, "Found timeout slot: %i (%i)", ts, rc->timeslot_length);
 
    // change timeout
-   doTimeAfter(rc, rc->timeslot_length * (ts + 1)); // timeslot length * timeslot I'm in, minimum of timeslot_length
+   doTimeAfter(rc, rc->timeslot_length * ts); // timeslot length * timeslot I'm in, minimum of timeslot_length
 
    return (retval | doNothing); // the timeout will determine when we can write, right now do nothing or whatever retval was
 }

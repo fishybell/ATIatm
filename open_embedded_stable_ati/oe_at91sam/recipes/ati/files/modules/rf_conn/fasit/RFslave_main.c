@@ -28,6 +28,15 @@ static void quitproc(int sig) {
    close_nicely = 1;
 }
 
+long getTime() {
+   struct timespec tv;
+   while (clock_gettime(CLOCK_MONOTONIC,&tv) != 0) {
+      usleep(1);
+   }
+//   DDCMSG(D_TIME, GRAY, "CURRENT TIME: %d from %5d.%03ld", (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000l), tv.tv_sec, tv.tv_nsec / 1000000l);
+   return (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000l);
+}
+
 void print_help(int exval) { printf("slaveboss [-h] [-v num] [-f port] [-r port] [-n num]\n\n");
    printf("  -h            print this help and exit\n");
    printf("  -i 127.0.0.1  set RF ip address\n");
@@ -239,7 +248,7 @@ int main(int argc, char **argv) {
    }
 
    // finish initialization of connection structure
-   clock_gettime(CLOCK_MONOTONIC,&rc.time_start);
+   rc.time_start = getTime();
    doTimeAfter(&rc, INFINITE);
 
    // main loop
@@ -251,20 +260,18 @@ int main(int argc, char **argv) {
 
       // timeout?
       if (nfds == 0) {
-         handleRet(mark_ttyWrite, &rc, efd); // we want the tty to be available for writing...
          // timed out, either wait for a while, or do everything now
-         if (getTimeout(&rc) >= 10) { // long timeout (10 milliseconds) still exists
+         timeout = getTimeout(&rc);
+         if (timeout >= 10) { // long timeout (10 milliseconds) still exists
             DDCMSG(D_MEGA, YELLOW, "Epoll timed out, going back...");
          
             continue; // ...so come back and wait the rest of the time right before tty writing
-         } else if (timeout == 0) { // no timeout exists
+         } else { // no significant timeout exists
             // reset timer now
+            handleRet(mark_ttyWrite, &rc, efd); // we want the tty to be available for writing...
             rc.time_start = rc.timeout_end; // reset to latest time
             rc.timeout_start = rc.timeout_end; // reset to latest time
             continue; // ...so come back and wait the rest of the time right before tty writing
-         } else { // short timeout, so wait rest now
-            waitRest(&rc);
-            continue; // timeout will now be 0
          }
       }
       
