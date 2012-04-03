@@ -641,7 +641,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                minion->S.speed.timer=10; // will reach speed in this many deciseconds
                // minion->S.move.timer=10; TODO -- do we need this?
 
-               LB_move->speed = ((int)(message_2100->speed * 100)) & 0x7ff;
+               LB_move->speed = ((int)(max(0.0,min(message_2100->speed, 20.0)) * 100)) & 0x7ff;
                DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: speed after: %i",minion->mID, LB_move->speed);
                if (message_2100->move == 2) {
                   DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: direction 0",minion->mID);
