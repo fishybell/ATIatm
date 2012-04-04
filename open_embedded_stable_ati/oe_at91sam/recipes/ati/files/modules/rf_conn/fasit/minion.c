@@ -41,7 +41,7 @@ void initialize_state(minion_state_t *S){
    S_set(mode,0,0,0,0);
    S_set(burst,0,0,0,0);
 
-   S_set(pos,0,0,0,0);
+//   S_set(pos,0,0,0,0);
    S_set(type,0,0,0,0);
    S_set(hit_config,0,0,0,0);
    S_set(blanking,0,0,0,0);
@@ -181,7 +181,10 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
          msg.body.speed = minion->S.speed.data;
          msg.body.exp = minion->S.exp.data;
          msg.body.move = minion->S.move.data;
-         msg.body.pos = htons(minion->S.pos.data);
+         msg.body.pos = htons(minion->S.position.data);
+         DDCMSG(D_PACKET,BLUE,"Minion %d: building 2102 status.   S.position.data=%d msg.body.pos=%d  htons(...)=%d ",
+                minion->mID,minion->S.position.data,msg.body.pos,htons(msg.body.pos));
+
          break;
    }
 
@@ -204,7 +207,7 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
    DDCMSG(D_PARSE,BLUE,\
           "PSTAT | Fault | Expos | Aspct |  Dir | Move |  Speed  | POS | Type | Hits | On/Off | React | ToKill | Sens | Mode | Burst\n"\
           "       %3d    %3d     %3d     %3d     %3d    %3d    %6.2f    %3d   %3d    %3d      %3d     %3d      %3d     %3d    %3d    %3d ",
-          msg.body.pstatus,msg.body.fault,msg.body.exp,msg.body.asp,msg.body.dir,msg.body.move,msg.body.speed,msg.body.pos,msg.body.type,htons(msg.body.hit),
+          msg.body.pstatus,msg.body.fault,msg.body.exp,msg.body.asp,msg.body.dir,msg.body.move,msg.body.speed,htons(msg.body.pos),msg.body.type,htons(msg.body.hit),
           msg.body.hit_conf.on,msg.body.hit_conf.react,htons(msg.body.hit_conf.tokill),htons(msg.body.hit_conf.sens),msg.body.hit_conf.mode,htons(msg.body.hit_conf.burst));
 
    write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2102));
@@ -917,10 +920,10 @@ void *minion_thread(thread_data_t *minion){
     *** so when we are spawned, those state fields are already filled in 
     ***/
 
-   minion->S.cap|=PD_NES;       // add the NES capability
+//   minion->S.cap|=PD_NES;       // add the NES capability   this should be percolating through by itself now 
 
    DCMSG(BLUE,"Minion %d: state is initialized as devid 0x%06X", minion->mID,minion->devid);
-   DCMSG(BLUE,"Minion %d: RF_addr = %d", minion->mID,minion->RF_addr);
+   DCMSG(BLUE,"Minion %d: RF_addr = %d capabilities=%d  device_type=%d", minion->mID,minion->RF_addr,minion->S.cap,minion->S.dev_type);
 
    if (minion->S.cap&PD_NES) {
       DCMSG(BLUE,"Minion %d: has Night Effects Simulator (NES) capability", minion->mID);
@@ -1061,7 +1064,7 @@ void *minion_thread(thread_data_t *minion){
                {
                   LB_event_report_t *L=(LB_event_report_t *)(LB);       // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
-                  DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'Event_report'. hits=%d  sending 2102 status",
+                  DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'Event_report'. hits=%d  sending 2102 status",
                          minion->mID,minion->RF_addr,L->hits);
                   sendStatus2102(0, NULL,minion);
 
@@ -1070,7 +1073,7 @@ void *minion_thread(thread_data_t *minion){
 
                case LBC_STATUS_NO_RESP:
                   // Do nothing on the "no response"
-                  DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'NO_RESP'...not sending 2102 status",minion->mID,minion->RF_addr);
+                  DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'NO_RESP'...not sending 2102 status",minion->mID,minion->RF_addr);
                   // reset lookup timer
                   if (minion->S.exp.flags == F_exp_expose_D) {
                      minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
@@ -1089,11 +1092,11 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.tokill.newdata = L->tokill;
                   minion->S.mode.newdata = L->hitmode ? 2 : 1; // back to burst/single
                   minion->S.sens.newdata = L->sensitivity;
-                  minion->S.pos.data = L->location;
+                  minion->S.position.data = L->location;
                   minion->S.burst.newdata = L->timehits * 5; // convert back
                   minion->S.fault.data = L->fault;
-                  DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_EXT'. hits=%d fault=%02X sending 2102 status",
-                         minion->mID,minion->RF_addr,L->hits,L->fault);
+                  DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_EXT'. hits=%d location=%d fault=%02X sending 2102 status",
+                         minion->mID,minion->RF_addr,L->hits,L->location,L->fault);
                   sendStatus2102(0, NULL,minion);
 
                   // reset lookup timer
@@ -1106,14 +1109,14 @@ void *minion_thread(thread_data_t *minion){
 
                case LBC_STATUS_RESP_MOVER:
                {
-                  LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB); // map our bitfields in
+                  LB_status_resp_mover_t *L=(LB_status_resp_mover_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
                   minion->S.speed.data = (float)(L->speed / 100.0); // convert back to correct float
                   minion->S.move.data = L->dir;
-                  minion->S.pos.data = L->location;
-                  DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_MOVER'. hits=%d  sending 2102 status",
-                         minion->mID,minion->RF_addr,L->hits);
+                  minion->S.position.data = L->location;
+                  DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_MOVER'. hits=%d speed=%d dir=%d location=%d  sending 2102 status",
+                         minion->mID,minion->RF_addr,L->hits,L->speed,L->dir,L->location);
                   sendStatus2102(0, NULL,minion);
 
                   // reset lookup timer
@@ -1129,8 +1132,8 @@ void *minion_thread(thread_data_t *minion){
                   LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
-                  DDCMSG(D_NEW,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_LIFTER'. hits=%d  sending 2102 status",
-                         minion->mID,minion->RF_addr,L->hits);
+                  DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_LIFTER'. hits=%d  exp=%d sending 2102 status",
+                         minion->mID,minion->RF_addr,L->hits,L->expose);
                   sendStatus2102(0, NULL,minion);
 
                   // reset lookup timer

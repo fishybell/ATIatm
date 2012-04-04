@@ -154,7 +154,6 @@ int RF_size(int cmd){
       case  LBC_EXPOSE:
       case  LBC_AUDIO_CONTROL:
       case  LBC_CONFIGURE_HIT:
-      case  LBC_DEVICE_REG:
          return (6);
 
       case  LBC_ASSIGN_ADDR:
@@ -168,6 +167,9 @@ int RF_size(int cmd){
 
       case  LBC_STATUS_RESP_EXT:
          return (11);
+
+      case  LBC_DEVICE_REG:
+         return (13);
 
       default:
          return (1);

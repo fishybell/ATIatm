@@ -285,7 +285,6 @@ int main(int argc, char **argv) {
             timeout=slottime*40;        // idle time to wait for next go around
          }
 
-
          DDCMSG(D_NEW,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
          /***  we need to use the range we were invoked with
           ***  we need to handle a range greater than 32
@@ -316,15 +315,15 @@ int main(int argc, char **argv) {
             // if we have data from RF, it is a LB packet we need to decode and pass on,
             // or one of our 'special packets' that means something else - irregardless we have to
             // have a case statement to process it properly
-            ////////////////////////////////////////////////////////////////////////////////////////////
-            DDCMSG(D_POLL,RED,"MCP: ready_fd_count %d  events[ready_fd=%d].data.fd=%d  RF_sock=%d",
-                   ready_fd_count,ready_fd,events[ready_fd].data.fd,RF_sock);
-            //   major slow debug line          usleep(100000);
-            if (RF_sock==events[ready_fd].data.fd){
 
+            //  only in the RF_sock case is the event[].data.fd actually an fd and not a ptr
+            if (RF_sock==events[ready_fd].data.fd){
+               DDCMSG(D_POLL,RED,"MCP: RF_sock(%d)==events[ready_fd=%d].data.fd=%d   MCP socket is ready",
+                      RF_sock,ready_fd,events[ready_fd].data.fd);
+               
                msglen=read(RF_sock, buf, 1023);    
                if (msglen<0) {
-                  strerror_r(errno,buf,BufSize);                            
+                  strerror_r(errno,buf,BufSize);
                   DCMSG(RED,"MCP: RF_sock error %s  fd=%d\n",buf,RF_sock);
                   exit(-1);
                }
@@ -391,13 +390,14 @@ int main(int argc, char **argv) {
 
                   if (addr_cnt<max_addr) {
                      // we already have this devID, so reconnect because the RFslave probably rebooted or something
-                     DCMSG(RED,"MCP: just send a new address assignmentto reconnect  the minon and RFslave  devid=%06x",LB_devreg->devid);
+                     DCMSG(RED,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
 
                   } else {
                      // we do not have this devID.  Look for the first free address to use
                      addr_cnt=1;                //  step through to check to find unused
                      while (addr_pool[addr_cnt].inuse) addr_cnt++;      // look for an unused address slot
-                     DDCMSG(D_NEW,YELLOW,"MCP: check for unused addr addr_cnt=%d ",addr_cnt);
+                     DDCMSG(D_NEW,YELLOW,"MCP: check for unused addr addr_cnt=%d devtype=%d devid=0x%06x",
+                            addr_cnt,LB_devreg->dev_type,LB_devreg->devid);
 
                      if (addr_cnt>2046){
                         DCMSG(RED,"MCP: all RF addresses in use  devtype=%d devid=0x%06x"
@@ -478,7 +478,7 @@ int main(int argc, char **argv) {
                         // add the minion to the set of file descriptors
                         // that are monitored by epoll
                         ev.events = EPOLLIN;
-                        ev.data.fd = minions[mID].minion;
+//                        ev.data.fd = minions[mID].minion;     // since fd is a union with ptr, this is a failure!
                         ev.data.ptr = (void *) &minions[mID]; 
 
                         if (epoll_ctl(fds, EPOLL_CTL_ADD, minions[mID].minion, &ev) < 0) {
@@ -580,12 +580,12 @@ int main(int argc, char **argv) {
                 ***   and we need to deal with special cases like the minion dieing.
                 ***   */
 
-               //                   minion_fd=events[ready_fd].data.fd; // don't know what this is , but it aint right
+               //                   
                minion=(thread_data_t *)events[ready_fd].data.ptr;
                minion_fd=minion->minion;                    
                mID=minion->mID;
-               DDCMSG(D_POLL,RED,"MCP: events[ready_fd=%d].data.fd=%d ==minion->minion=%d for minion %d ready  [RF_addr=%d]  -}",
-                      ready_fd,events[ready_fd].data.fd,minion_fd,mID,minion->RF_addr);             
+               DDCMSG(D_POLL,RED,"MCP: events[ready_fd=%d] minion->minion=%d for minion %d ready  [RF_addr=%d]  -}",
+                      ready_fd,minion_fd,mID,minion->RF_addr);             
 
                DDCMSG(D_POLL,BLUE,"MCP: fd %d for minion %d ready  [RF_addr=%d]  -}",minion_fd,mID,minion->RF_addr);
                if(minion_fd>2048){

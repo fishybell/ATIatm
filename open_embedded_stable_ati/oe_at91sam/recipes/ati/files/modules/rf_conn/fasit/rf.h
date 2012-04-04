@@ -25,6 +25,8 @@
 //   used to get a bit position mask
 #define BV(BIT) (1<<(BIT))
 
+// so I can print fixed point a little easier
+#define DOTD(T) (T)/1000,(T)%1000
 
 typedef struct queue_tag {
    char *tail;          //  end of queue - insertion point
@@ -193,15 +195,26 @@ typedef struct LB_request_new_t {
 // since this packet happens so seldom I see no good reason to try and
 // bit pack smaller than this
 typedef struct LB_device_reg_t {
-   //  6 bytes < 8 bytes
-   //   if it grows to 8 bytes we cannot respond in chunks of 32
-   //    (maybe!)  I was afraid of ever-running the 256 byte radio buffer,
-   //     but it might not work that way.
-   uint32 cmd:5 __attribute__ ((packed));
-   uint32 pad:3 __attribute__ ((packed));
+   // 13 bytes
+   uint32 cmd:5 __attribute__ ((packed));   
    uint32 devid:24 __attribute__ ((packed));
-
+   uint32 pad:3 __attribute__ ((packed));
+   
    uint32 dev_type:8 __attribute__ ((packed));
+   uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
+   uint32 expose:1 __attribute__ ((packed));
+
+   uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
+   uint32 dir:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
+   uint32 react:3 __attribute__ ((packed));
+   uint32 location:11 __attribute__ ((packed)); // meters from home
+   uint32 hitmode:1 __attribute__ ((packed));
+   uint32 tokill:4 __attribute__ ((packed));
+
+   uint32 sensitivity:4 __attribute__ ((packed));
+   uint32 timehits:4 __attribute__ ((packed));
+   uint32 fault:8 __attribute__ ((packed));
+
    uint32 crc:8 __attribute__ ((packed));
    uint32 padding:16 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_device_reg_t;

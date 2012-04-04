@@ -113,6 +113,7 @@ typedef struct minion_state {
    state_u16_item_t             dir;
    state_u8_item_t              move;
    state_float_item_t           speed;
+   state_u16_item_t             position;       // MIT/MAT rail position
    //                                   hit configuration (aka sensor)
    state_u8_item_t              on;
    state_u16_item_t             hit;
@@ -122,7 +123,7 @@ typedef struct minion_state {
    state_u8_item_t              mode;
    state_u16_item_t             burst;
    // MISC
-   state_u8_item_t              pos;
+
    state_u8_item_t              type;
    state_u8_item_t              hit_config;
    state_u16_item_t             blanking;
@@ -153,10 +154,10 @@ typedef struct slave_state {
    uint8                event;  // used for timer events
    uint8                asp;
    uint8                dir;   
-   uint16               location;
+   uint16               position;       // MIT/MAT rail position
    uint8                move;
-   float                speed;
-   float                start_time;
+   uint16               speed;
+   uint32               start_time;
    //           hit configuration (aka sensor)
    uint8                on;
    uint16               hit;
@@ -167,7 +168,7 @@ typedef struct slave_state {
    uint16               burst;
    uint16               timehits;
    // MISC
-   uint8                pos;
+//   uint8                pos;
    uint8                type;
    uint8                hit_config;
    uint16               blanking;

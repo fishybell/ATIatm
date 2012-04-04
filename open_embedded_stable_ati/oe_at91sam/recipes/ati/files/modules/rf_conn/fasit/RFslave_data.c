@@ -110,7 +110,7 @@ int getTimeout(rf_connection_t *rc) {
       waitRest(rc);
       return 0; // timeout is 0, which for epoll is return immediately
    } else {
-      DDCMSG(D_TIME, GRAY, "Returning %i from getTimeout()");
+      DDCMSG(D_TIME, GRAY, "Returning %ld from getTimeout()",max(1, tv - 5));
       return max(1, tv - 5); // timeout is positive, it will wait this amount of time
    }
 }
@@ -120,7 +120,7 @@ void doTimeAfter(rf_connection_t *rc, int msecs) {
    DDCMSG(D_TIME, RED, "Add to timeout %i, %9ld", msecs, rc->timeout_start);
    // set infinite wait by making the start and end time the same
    if (msecs == INFINITE) {
-      DDCMSG(D_TIME, CYAN, "Reset timeout_start to %i @ %i", rc->time_start, __LINE__);
+      DDCMSG(D_TIME, CYAN, "Reset timeout_start to %ld @ %i", rc->time_start, __LINE__);
       rc->timeout_start = rc->time_start;
       return;
    }
@@ -147,7 +147,7 @@ void waitRest(rf_connection_t *rc) {
    } while ((tv + 2) < rc->timeout_start); // add on a couple of milliseconds for radio readiness
    
    // reset timer now
-   DDCMSG(D_TIME, CYAN, "Reset all to %i @ %i", tv, __LINE__);
+   DDCMSG(D_TIME, CYAN, "Reset all to %ld @ %i", tv, __LINE__);
    rc->timeout_start = tv;
    rc->timeout_end = tv;
    rc->time_start = tv;
@@ -199,7 +199,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
 
    // reset times
    if (tty) {
-      DDCMSG(D_TIME, CYAN, "Reset time_start & timeout_start to %i @ %i", rc->timeout_end, __LINE__);
+      DDCMSG(D_TIME, CYAN, "Reset time_start & timeout_start to %ld @ %i", rc->timeout_end, __LINE__);
       rc->time_start = rc->timeout_end; // reset to latest time
       rc->timeout_start = rc->timeout_end; // reset to latest time
    }
@@ -522,7 +522,7 @@ int tty2sock(rf_connection_t *rc) {
    // if we put anything in the socket "out" buffer...
    if (added_to_buf) {
       // change the start time to now time (which happened at the start of the read)
-      DDCMSG(D_TIME, CYAN, "Reset all to %i @ %i", nowt, __LINE__);
+      DDCMSG(D_TIME, CYAN, "Reset all to %ld @ %i", nowt, __LINE__);
       rc->time_start = nowt;
       rc->timeout_start = nowt; // reset start time as well
       rc->timeout_end = nowt; // reset end time as well

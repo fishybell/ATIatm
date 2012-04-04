@@ -6,6 +6,7 @@ int verbose,devtype;
 // tcp port we'll listen to for new connections
 #define defaultPORT 4004
 
+
 // size of client buffer
 #define CLIENT_BUFFER 1024
 
@@ -15,6 +16,73 @@ void DieWithError(char *errorMessage){
    DCMSG(RED,"RFslave %s %s \n", errorMessage,buf);
    exit(1);
 }
+
+
+int build_LBC_Resp(int devtype,int RF_addr,slave_state_t *S,LB_packet_t *LB){
+   DDCMSG(D_RF,BLUE,"Build an apropriate LBC status resp");
+
+   // lets fake a status so we can send back and see the RFmaster handle it right.
+   switch(devtype){
+      case RF_Type_SIT_W_MFS:
+      case RF_Type_SIT:
+      {
+         // create a RESPONSE packet
+         LB_status_resp_lifter_t *L =(LB_status_resp_lifter_t *)LB;      // map our bitfields in
+
+         L->cmd=LBC_STATUS_RESP_LIFTER;
+         L->addr=RF_addr;
+         L->hits=0;                        // send 0 because the report is where hits are sent
+         L->expose=S->exp;          // use our current state
+         set_crc8(LB); // calculates the correct CRC and adds it to the end of the packet payload
+         DDCMSG(D_RF,BLUE,"building a LBC_STATUS_RESP_LIFTER  hits=%d expose=%d ",L->hits,L->expose);
+
+         if (S->exp) {
+            DDCMSG(D_RF,GREEN,"EXPOSED    event=%d",S->event);
+         } else {
+            DDCMSG(D_RF,YELLOW,"CONCEALED  event=%d",S->event);
+         }
+         return(RF_size(L->cmd));
+      }
+         break;
+
+      case RF_Type_MIT:
+      case RF_Type_MAT:
+      {                              
+         // create a RESPONSE packet
+         LB_status_resp_mover_t *L=(LB_status_resp_mover_t *)LB;     // map our bitfields in
+         L->cmd=LBC_STATUS_RESP_MOVER;
+         L->addr=RF_addr;                
+         L->hits=0;                // send 0 because the report is where hits are sent
+         L->expose=S->exp;          // use our current state
+         L->speed=S->speed;         //  speed is  11 bits
+         L->dir=S->dir;             // use our current state
+         L->location=S->position;   // use our current state
+
+         set_crc8(LB); // calculates the correct CRC and adds it to the end of the packet payload
+         DDCMSG(D_RF,BLUE,"Build a LBC_STATUS_RESP_MOVER  hits=%d expose=%d speed=%d dir=%d position/location=%d",
+                L->hits,L->expose,L->speed,L->dir,L->location);
+
+         if (S->exp) {
+            DDCMSG(D_RF,GREEN,"EXPOSED    event=%d",S->event);
+         } else {
+            DDCMSG(D_RF,YELLOW,"CONCEALED  event=%d",S->event);
+         }
+         return(RF_size(L->cmd));      
+      }
+      break;
+
+      case RF_Type_SAT:
+      case RF_Type_HSAT:
+      case RF_Type_SES:
+      case RF_Type_BES:
+      case RF_Type_Unknown:
+         DDCMSG(0xfff,RED,"NOT building status request for some other device type! ");
+         return(0);
+         break;
+   }
+}
+
+
 
 /*************
  *************  HandleRF
@@ -44,7 +112,7 @@ void HandleSlaveRF(int RFfd){
    char *Rptr, *Rstart;    
    int gathered,resp;
    uint8 crc;
-   float RxTime;
+   int RxTime;
    
    slave_state_t S;     // lets keep track of all the things we are pretending
 
@@ -54,8 +122,8 @@ void HandleSlaveRF(int RFfd){
 
    fd_set rf_or_mcp;
    struct timeval timeout;
-   LB_packet_t *LB,rLB;
-   int len,addr,cmd,RF_addr,size;
+   LB_packet_t *LB,rLB,LBuf;
+   int len,addr,RF_addr,size;
 
    uint32 DevID;
    LB_request_new_t *LB_new;
@@ -64,6 +132,9 @@ void HandleSlaveRF(int RFfd){
    LB_status_resp_lifter_t *LB_resp;
    LB_expose_t *LB_exp;
 
+   struct iovec iov[10];        // up to ten packets at once
+
+   
    RF_addr=2047;        //  means it is unassigned.  we will always respond to the request_new in our temp slot
 
    DevID=getDevID();
@@ -75,8 +146,10 @@ void HandleSlaveRF(int RFfd){
 
    /**   loop until we lose connection  **/
    clock_gettime(CLOCK_MONOTONIC,&istart_time); // get the intial current time
-   RxTime=0.0;
+   RxTime=0;
 
+   S.position=55;     // pretend we start in the middle of the track.
+   
    while(1) {
       timestamp(&elapsed_time,&istart_time,&delta_time);
       DDCMSG(D_TIME,CYAN,"top of main loop at %5ld.%09ld timestamp, delta=%5ld.%09ld"
@@ -84,19 +157,19 @@ void HandleSlaveRF(int RFfd){
 
       //    MAKE SURE THE RFfd is non-blocking!!!
 
-      DDCMSG(D_MEGA,GREEN,"before gather_RF:[head:tail]:depth  Rx[%d:%d]:%d",
-             (int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx));
+      DDCMSG(D_MEGA,GREEN,"before gather_RF:[head:tail]:depth  Rx[%d:%d]:%d       [%p:%p]:%p",
+             (int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx),Rx->head,Rx->tail,Rx->buf);
       gathered = gather_rf(RFfd,Rx->tail,300); // gathered actually returns num chars read
       if (gathered>0){
          Rx->tail=Rx->tail+gathered;
          timestamp(&elapsed_time,&istart_time,&delta_time);
-         RxTime=(float)elapsed_time.tv_sec+(((float)elapsed_time.tv_nsec)/1000000.0);
+         RxTime=1000*elapsed_time.tv_sec+((elapsed_time.tv_nsec)/1000000.0);
          if (verbose&D_PACKET){
-            sprintf(buf,"[%03d] %8.3f  ->RF [%2d] ",D_PACKET,RxTime,gathered);
+            sprintf(buf,"[%03d] %3d.%03d  ->RF [%2d] ",D_PACKET,DOTD(RxTime),gathered);
             printf("%s",buf);
          }
       }
-      
+
       DDCMSG(D_MEGA,GREEN,"after gather_RF:[head:tail]:depth  Rx[%d:%d]:%d   return val=%d",
              (int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx),gathered);
 
@@ -113,8 +186,8 @@ void HandleSlaveRF(int RFfd){
          LB=(LB_packet_t *)Rx->head;    // map the header in
          size=RF_size(LB->cmd);
 
-         DDCMSG(D_MEGA,GREEN,"while(gathered[%d]>=3) cmd=%d size=%d into Rx[%d:%d]:%d"
-                ,gathered,LB->cmd,size,(int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx));
+         DDCMSG(D_MEGA,GREEN,"while(gathered[%d]>=3) cmd=%d size=%d into Rx[%d:%d]:%d       [%p:%p]:%p"
+                ,gathered,LB->cmd,size,(int)(Rx->head-Rx->buf),(int)(Rx->tail-Rx->buf),Queue_Depth(Rx),Rx->head,Rx->tail,Rx->buf);
 
          // we have a chance of a compelete packet
          if (Queue_Depth(Rx) >= size){
@@ -122,7 +195,7 @@ void HandleSlaveRF(int RFfd){
             // we could check the CRC and dump it here
             crc=crc8(LB);
             if (verbose&D_RF){  // don't do the sprintf if we don't need to
-               sprintf(buf,"[RFaddr=%2d]: pseq=%4d   %2d byte RFpacket Cmd=%2d"
+               sprintf(buf,"[RFaddr=%2d]: pseq=%2d  %2d byte RFpacket Cmd=%2d"
                        ,RF_addr,pcount++,RF_size(LB->cmd),LB->cmd);
                DCMSG_HEXB(GREEN,buf,Rx->head,size);
             }
@@ -169,16 +242,26 @@ void HandleSlaveRF(int RFfd){
                      }
 
                      // now we must respond if 'resp' is true
-
                      if (resp){
                         my_slot=DevID-low_dev+1;        // the slot we should respond in
                         total_slots=34;                 // total number of slots with end padding
 
                         // create a RESPONSE packet
-                        rLB.cmd=LBC_DEVICE_REG;
                         LB_devreg =(LB_device_reg_t *)(&rLB);   // map our bitfields in
+                        LB_devreg->devid=DevID;
+                        LB_devreg->cmd=LBC_DEVICE_REG;
                         LB_devreg->dev_type=devtype;            // use the option we were invoked with                        
-                        LB_devreg->devid=DevID;                 // Actual 3 significant bytes of MAC address
+                        LB_devreg->hits=0;
+                        LB_devreg->expose=0;
+                        LB_devreg->speed=0;
+                        LB_devreg->dir=0;
+                        LB_devreg->react=0;
+                        LB_devreg->location=55;
+                        LB_devreg->hitmode=0;
+                        LB_devreg->tokill=0;
+                        LB_devreg->sensitivity=0;
+                        LB_devreg->timehits=0;
+                        LB_devreg->fault=0;
 
                         DDCMSG(D_NEW,RED,"Rxed 'request new devices'  responding...  BV(%x-%x=%d)=%d AND forget bit=%d and RF_addr=%d",
                                DevID,low_dev,DevID-low_dev,BV(DevID-low_dev),LB_new->forget_addr&BV(DevID-low_dev), RF_addr);   // we must forget our address
@@ -197,7 +280,7 @@ void HandleSlaveRF(int RFfd){
 
                         result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
                         if (verbose&D_RF){      // don't do the sprintf if we don't need to
-                           sprintf(hbuf,"new device response to RFmaster devid=0x%06X len=%2d wrote %d\n"
+                           sprintf(hbuf,"new device response to RFmaster devid=0x%06X len=%2d wrote %d (maybe including a LBC_resp)\n"
                                    ,LB_devreg->devid,RF_size(LB_devreg->cmd),result);
                            DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
                         }
@@ -225,7 +308,7 @@ void HandleSlaveRF(int RFfd){
                   case LBC_EXPOSE:
                      if (LB->addr==RF_addr){
                         LB_expose_t *L=(LB_expose_t *)(LB);     // map our bitfields in
-                        DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd = EXPOSE (%d)",RF_addr,cmd);
+                        DDCMSG(D_RF,BLUE,"Rxed cmd = EXPOSE (%d)",LB->cmd);
                         DDCMSG(D_VERY,BLUE,"Expose: event exp hitmode tokill react mfs thermal\n"
                                "        %3d   %3d     %3d   %3d  %3d   %3d",
                                L->event,L->expose,L->hitmode,L->tokill,L->react,L->mfs,L->thermal);
@@ -248,7 +331,7 @@ void HandleSlaveRF(int RFfd){
                      if (LB->addr==RF_addr){
                         LB_qconceal_t *L=(LB_qconceal_t *)(LB); // map our bitfields in
 
-                        DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd = QCONCEAL (%d)",RF_addr,cmd);
+                        DDCMSG(D_RF,BLUE,"Rxed cmd = QCONCEAL (%d)",LB->cmd);
                         DDCMSG(D_VERY,BLUE,"Qconceal: current (new) event  uptime\n"
                                "         %3d (%2d)             %3d    ",S.event,L->event,L->uptime);
                         if (S.event!=L->event) {
@@ -264,7 +347,7 @@ void HandleSlaveRF(int RFfd){
                      if (LB->addr==RF_addr){
                         LB_configure_t *L=(LB_configure_t *)(LB);       // map our bitfields in
 
-                        DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd = CONFIGURE_HIT (%d)",RF_addr,cmd);
+                        DDCMSG(D_RF,BLUE,"Rxed cmd = CONFIGURE_HIT (%d)",LB->cmd);
                         DDCMSG(D_VERY,BLUE,
                                "CONFIGURE_HIT: hitmode  tokill  react  sesitivity  timehits  hitcountset \n"
                                "                 %3d      %3d    %3d       %3d        %3d        %3d",
@@ -280,12 +363,15 @@ void HandleSlaveRF(int RFfd){
                   case LBC_MOVE:
                      if (LB->addr==RF_addr){
                         LB_move_t *L=(LB_move_t *)(LB);     // map our bitfields in
-                        DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd = MOVE (%d)  dir=%d speed=%d",
-                               RF_addr,cmd,L->direction,L->speed);
                         S.dir= L->direction;
-                        S.speed= L->speed;
+                        if (L->speed>2046){
+                           S.speed= 0;          // 2047 means emergency stop
+                        } else {
+                           S.speed= L->speed;
+                        }
                         S.start_time=RxTime;
-                        
+                        DDCMSG(D_RF,BLUE,"Rxed cmd = MOVE (%d)  dir=%d speed=%d  set start_time=%3d.%03d",
+                               L->cmd,L->direction,L->speed,DOTD(S.start_time));
                      }
                      break;
 
@@ -315,7 +401,7 @@ void HandleSlaveRF(int RFfd){
 
                         // build a event report to respond to the report request
                         set_crc8(&rLB); // calculates the correct CRC and adds it to the end of the packet payload
-                        DDCMSG(D_RF,BLUE,"Recieved 'Report Request'.  resp_slot=%d respond with a LBC_EVENT_REPORT, event=%d hits=%d",resp_slot,L->event,L->hits);
+                        DDCMSG(D_RF,BLUE,"Rxed 'Report Request'.  resp_slot=%d respond with a LBC_EVENT_REPORT, event=%d hits=%d",resp_slot,L->event,L->hits);
 
                         if (S.exp) {
                            DDCMSG(D_RF,GREEN,"EXPOSED    event=%d",S.event);
@@ -344,112 +430,51 @@ void HandleSlaveRF(int RFfd){
                         DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
 
                      } else {
-                        DDCMSG(D_RF,BLUE,"Dest addr=%d Rfaddr=%d doesn't match current address, cmd = %d",LB->addr,RF_addr,LB->cmd);
+                        DDCMSG(D_RF,BLUE,"Rxed  Dest addr=%d doesn't match  Rfaddr=%d cmd = %d  ignored",LB->addr,RF_addr,LB->cmd);
                      }
 
                      break;
 
                   case LBC_STATUS_REQ:
                      if (LB->addr==RF_addr){
-                        DDCMSG(D_RF,BLUE,"Dest addr %d matches current address, cmd= %d",RF_addr,cmd);
+                        DDCMSG(D_RF,BLUE,"Rxed cmd= %d  Status_Request",LB->cmd);
 
-                        // lets fake a status so we can send back and see the RFmaster handle it right.
-                        switch(devtype){
 
-                           case RF_Type_SIT_W_MFS:
-                           case RF_Type_SIT:
 
-                              // create a RESPONSE packet
-                              LB_resp =(LB_status_resp_lifter_t *)(&rLB);     // map our bitfields in
-                              LB_resp->cmd=LBC_STATUS_RESP_LIFTER;
-                              LB_resp->addr=RF_addr;                      
-                              LB_resp->hits=0;                        // send 0 because the report is where hits are sent
-                              LB_resp->expose=S.exp;          // use our current state
-                              set_crc8(&rLB); // calculates the correct CRC and adds it to the end of the packet payload
-                              DDCMSG(D_RF,BLUE,"Rxed 'Status request'. resp_slot=%d respond with a LBC_STATUS_RESP_LIFTER   ",resp_slot);
+                        
+                        DDCMSG(D_RF,RED,"calc position... old_pos=%d RxTime=%d.%03d Start=%d.%03d  t=%d.%03d  speed=%d m/s=%d position change=%d ",
+                               S.position,DOTD(RxTime),DOTD(S.start_time),DOTD(RxTime-S.start_time),S.speed,(int)S.speed*1000/2237,
+                               ((RxTime-S.start_time)/1000)*((S.dir*2)-1)*((int)S.speed*1000/2237));
 
-                              if (S.exp) {
-                                 DDCMSG(D_RF,GREEN,"EXPOSED    event=%d",S.event);
-                              } else {
-                                 DDCMSG(D_RF,YELLOW,"CONCEALED  event=%d",S.event);
-                              }
+                        S.position+=((RxTime-S.start_time)/1000)*((S.dir*2)-1)*((int)S.speed*1000/2237);        //mph converted to mm/s
 
+                        S.start_time=RxTime;      // update the time so if asked again we don't stack
+
+
+                        size= build_LBC_Resp(devtype,RF_addr,&S,&LBuf);
+
+                        if (size) {
                               // now send it to the RF master
-                              // after waiting for our timeslot:
-                              // this is only for the dumb test.
+                              // after waiting for our timeslot:// this is only for the dumb test.
                               // Nates slave boss will need to be less dumb about this -
                               // it will have to queue packets to send and later do them at the right time.
                               // because this code will barf on more than one resp to it
                               usleep(slottime*(resp_slot+1)*1000);    // plus 1 is the holdoff
                               DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
 
-                              result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
+                              result=write(RFfd,&LBuf,size);
                               if (verbose&D_RF){      // don't do the sprintf if we don't need to
-                                 sprintf(hbuf,"new device response to RFmaster devid=0x%06X len=%2d wrote %d\n"
-                                         ,LB_devreg->devid,RF_size(LB_devreg->cmd),result);
-                                 DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
+                                 sprintf(hbuf,"LBC_status_resp_xxx  sent [%2d=%d] "
+                                         ,size,result);
+                                 DCMSG_HEXB(BLUE,hbuf,&LBuf,size);
                               }
 
                               // finish waiting for the slots before proceding
                               usleep(slottime*(total_slots-(resp_slot+1))*1000);
                               DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
-
-                              break;
-
-                           case RF_Type_MIT:
-                           case RF_Type_MAT:
-                           {                              
-                              // create a RESPONSE packet
-                              LB_status_resp_mover_t *L=(LB_status_resp_mover_t *)&rLB;     // map our bitfields in
-                              L->cmd=LBC_STATUS_RESP_MOVER;
-                              L->addr=RF_addr;                
-                              L->hits=0;                // send 0 because the report is where hits are sent
-                              L->expose=S.exp;          // use our current state
-                              L->speed=S.speed;         // convert floating speed to 11 bits
-                              L->dir=S.dir;             // use our current state
-                              S.location+=(RxTime-S.start_time)*((S.dir*2)-1)*(S.speed/2.236936);        //mph converted to m/s
-                              L->location=S.location;   // use our current state
-                              S.start_time=RxTime;      // update the time so if asked again we don't stack
-                              
                               set_crc8(&rLB); // calculates the correct CRC and adds it to the end of the packet payload
-                              DDCMSG(D_RF,BLUE,"Rxed 'Status request'. resp_slot=%d respond with a LBC_STATUS_RESP_MOVER   ",resp_slot);
-
-                              if (S.exp) {
-                                 DDCMSG(D_RF,GREEN,"EXPOSED    event=%d",S.event);
-                              } else {
-                                 DDCMSG(D_RF,YELLOW,"CONCEALED  event=%d",S.event);
-                              }
-
-                              // now send it to the RF master
-                              // after waiting for our timeslot:
-                              // this is only for the dumb test.
-                              // Nates slave boss will need to be less dumb about this -
-                              // it will have to queue packets to send and later do them at the right time.
-                              // because this code will barf on more than one resp to it
-                              usleep(slottime*(resp_slot+1)*1000);    // plus 1 is the holdoff
-                              DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
-
-                              result=write(RFfd,&rLB,RF_size(LB_devreg->cmd));
-                              if (verbose&D_RF){      // don't do the sprintf if we don't need to
-                                 sprintf(hbuf,"new device response to RFmaster devid=0x%06X len=%2d wrote %d\n"
-                                         ,LB_devreg->devid,RF_size(LB_devreg->cmd),result);
-                                 DCMSG_HEXB(BLUE,hbuf,&rLB,RF_size(LB_devreg->cmd));
-                              }
-
-                              // finish waiting for the slots before proceding
-                              usleep(slottime*(total_slots-(resp_slot+1))*1000);
-                              DDCMSG(D_TIME,CYAN,"msleep for %d",slottime*(high_dev-low_dev+2));
-                           }
-                              break;
-                              
-                           case RF_Type_SAT:
-                           case RF_Type_HSAT:
-                           case RF_Type_SES:
-                           case RF_Type_BES:
-                           case RF_Type_Unknown:
-                              DDCMSG(0xfff,RED,"Rxed 'Status request' for us in resp_slot %d    But we don't have any code to respond yet! ",resp_slot);
-
-                              break;
+                              DDCMSG(D_RF,BLUE,"Rxed 'Status request'. resp_slot=%d respond with a LBC_STATUS_RESP_MOVER   ",
+                                     resp_slot);
                         }
                      }
                      break;
