@@ -87,10 +87,26 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             switch (minion->S.rf_t.flags) {
                case F_rf_t_waiting_short:
                   // break connection to FASIT server
+                  close(minion->rcc_sock); // close FASIT
+                  DCMSG(BLACK,"\n\n-----------------------------------\nDisconnected minion %i:%i:%i\n-----------------------------------\n\n", minion->mID, minion->rcc_sock, minion->mcp_sock);
+                  minion->rcc_sock = -1;
                   // set "forget" flag for this minion
                   // clear waiting flags
                   minion->S.rf_t.flags = 0;
                   minion->S.rf_t.timer = 0;
+                  minion->status = S_closed;
+                  LB_buf.cmd = LBC_ILLEGAL; // send an illegal packet, which makes mcp forget me
+                  // now send it to the MCP master
+                  result=write(minion->mcp_sock,&LB_buf,RF_size(LB_buf.cmd));
+                  //  sent LB
+                  if (verbose&D_RF){	// don't do the sprintf if we don't need to
+                     sprintf(mb->hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d result=%d",
+                     minion->mID,minion->RF_addr,LB_buf.cmd,RF_size(LB_buf.cmd),result);
+                     DDCMSG2_HEXB(D_RF,YELLOW,mb->hbuf,&LB_buf,RF_size(LB_buf.cmd));
+                  }
+                  close(minion->mcp_sock); // close mcp
+                  exit(0); // exit the forked minion
+
                   break;
 
                case F_rf_t_waiting_long:
