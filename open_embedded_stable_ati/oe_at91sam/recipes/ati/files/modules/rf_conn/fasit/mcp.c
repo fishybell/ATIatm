@@ -51,7 +51,7 @@ static void quitproc(int sig) {
  **  */
 uint32 set_forget_bits(int low_dev,int high_dev,addr_t *addr_pool,int max_addr){
    int addr,testid;
-   uint32 bits=0xffffffff;              // forget them all by default
+   uint32 bits=0xffffffff;              // them all by default
 
    addr=1;
    DDCMSG(D_MEGA,RED,"SFB:------------------------ max_addr=%d",max_addr);
@@ -93,8 +93,8 @@ int main(int argc, char **argv) {
    LB_assign_addr_t *LB_addr;
 
    // install signal handlers
-   signal(SIGINT, quitproc);
-   signal(SIGQUIT, quitproc);
+   //signal(SIGINT, quitproc);
+   //signal(SIGQUIT, quitproc);
 
 
    // process the arguments
@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
 
    // zero the address pool
    for(i=0; i<2048; i++) {
-      addr_pool[i].devid=0;
+      addr_pool[i].devid=0xffffffff; // invalid devid
       addr_pool[i].inuse=0;
       addr_pool[i].mID=0;
    }
@@ -382,7 +382,7 @@ int main(int argc, char **argv) {
                   DDCMSG(D_NEW,RED,"MCP:     ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) && (!addr_pool[%d].inuse=%d)",
                          addr_cnt,max_addr,addr_cnt,addr_pool[addr_cnt].devid, LB_devreg->devid, addr_cnt,addr_pool[addr_cnt].inuse);
 
-                  while ((addr_cnt<max_addr)&&(addr_pool[addr_cnt].devid!=LB_devreg->devid)) {
+                  while ((addr_cnt<max_addr)&&(addr_pool[addr_cnt].devid!=LB_devreg->devid)&&!addr_pool[addr_cnt].inuse) {
                      DDCMSG(D_NEW,RED,"MCP: ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) ... (addr_pool[%d].inuse=%d)",
                             addr_cnt,max_addr,addr_cnt,addr_pool[addr_cnt].devid, LB_devreg->devid, addr_cnt,addr_pool[addr_cnt].inuse);
                      addr_cnt++;
@@ -479,14 +479,16 @@ int main(int argc, char **argv) {
                         if (child) {
                            /* This is the parent. */
                            DDCMSG(D_MINION,RED,"MCP forked minion %d", mID);
+                           DDCMSG(D_NEW, BLACK, "-------------------------------\nMinion %i:%i\n-------------------------------", mID, addr_cnt);
                            close(minions[mID].mcp_sock);
 
                         } else {
                            /* This is the child. */
                            close(minions[mID].minion);
                            minion_thread(&minions[mID]);
-                           DDCMSG(D_MINION,RED,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
+                           DDCMSG(D_NEW,BLACK,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
 
+                           exit(0);
                            break;       // if we come back , bail to another level or something more fatal
                         }
 
@@ -617,6 +619,14 @@ int main(int argc, char **argv) {
                if (!msglen){
                   DCMSG(RED,"MCP:  attempted read from minion returned 0!\n");
                   sleep(1);
+               } else if (LB->cmd==LBC_ILLEGAL){
+                  DDCMSG(D_NEW,BLACK,"Dead minion %i:%i, closing it down", minion->mID, minion->RF_addr);
+                  // minion is dead, reset forget bit for it
+                  addr_pool[minion->RF_addr].inuse=0;
+                  addr_pool[minion->RF_addr].devid=0xffffffff; // invalid devid
+                  addr_pool[minion->RF_addr].mID=0;
+                  // close connection
+                  close(minion_fd);
                } else {
                   // just display the packet for debugging
                   LB=(LB_packet_t *)buf;
