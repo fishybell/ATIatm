@@ -693,7 +693,7 @@ int sock2tty(rf_connection_t *rc) {
    DDCMSG(D_TIME, BLACK, "Found timeout slot: %i (%i)", ts, rc->timeslot_length);
 
    // change timeout
-   doTimeAfter(rc, rc->timeslot_length * ts); // timeslot length * timeslot I'm in, minimum of timeslot_length
+   doTimeAfter(rc, rc->timeslot_length * (ts+1)); // timeslot length * timeslot I'm in, minimum of timeslot_length
 
    return (retval | doNothing); // the timeout will determine when we can write, right now do nothing or whatever retval was
 }
