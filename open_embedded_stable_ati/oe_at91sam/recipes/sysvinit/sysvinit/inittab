@@ -18,6 +18,7 @@ si::sysinit:/etc/init.d/rcS
 # Runlevel 1 is single-user.
 # Runlevels 2-5 are multi-user.
 # Runlevel 6 is reboot.
+ucn:2345:respawn:/usr/bin/user_conn
 
 l0:0:wait:/etc/init.d/rc 0
 l1:1:wait:/etc/init.d/rc 1
@@ -29,4 +30,3 @@ l6:6:wait:/etc/init.d/rc 6
 # Normally not reached, but fallthrough in case of emergency.
 z6:6:respawn:/sbin/sulogin
 S:2345:respawn:/sbin/getty 115200 ttyS0
-ucn:2345:respawn:/usr/bin/user_conn
