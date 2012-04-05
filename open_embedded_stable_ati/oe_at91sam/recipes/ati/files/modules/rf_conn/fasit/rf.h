@@ -306,9 +306,9 @@ typedef struct LB_move {
    // 2 * 32 bytes = 2 long - padding = 5 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
-   uint32 direction:1 __attribute__ ((packed));
+   uint32 pad:3 __attribute__ ((packed));
+   uint32 dir:2 __attribute__ ((packed));       // switched it to two bits - and re-arranged so it is slightly more readable in hex
    uint32 speed:11 __attribute__ ((packed));
-   uint32 pad:4 __attribute__ ((packed));
 
    uint32 crc:8 __attribute__ ((packed));
    uint32 padding:24 __attribute__ ((packed));

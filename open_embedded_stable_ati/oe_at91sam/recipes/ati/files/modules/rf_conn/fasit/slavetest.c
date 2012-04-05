@@ -98,7 +98,7 @@ char *do_MOVE(int a, int *num) {
    LB_move_t *pkt = malloc(sizeof(LB_move_t));
    pkt->cmd = num[0];
    pkt->addr = num[1];
-   pkt->direction = num[2];
+   pkt->dir = num[2];
    pkt->speed = num[3];
    set_crc8(pkt);
    return (char*)pkt;

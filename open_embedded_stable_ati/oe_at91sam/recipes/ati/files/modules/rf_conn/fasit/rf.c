@@ -78,6 +78,7 @@ int Ptype(char *buf){
 
 // remove count bytes from the head of the queue and normalize the queue
 void DeQueue(queue_t *M,int count){
+   DDCMSG(D_RF,BLUE,"DeQueue called with depth=%d count=%d",Queue_Depth(M),count);
    memmove(M->buf,M->head+count,Queue_Depth(M));
    M->tail-=count;
    M->head=M->buf;
@@ -286,7 +287,7 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_move_t *L=(LB_move_t *)LB;
             strcpy(cmdname,"Move");
-            sprintf(hbuf,"RFaddr=%3d dir=%d speed=%d",L->addr,L->direction,L->speed);
+            sprintf(hbuf,"RFaddr=%3d dir=%d speed=%d",L->addr,L->dir,L->speed);
          }
             break;
 

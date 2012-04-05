@@ -588,15 +588,14 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
    // convert speed
    float speed = pkt->speed / 100.0;
    DDCMSG(D_RF|D_VERY,RED, "handle_MOVE(%8p, %i, %i)", fc, start, end);
-   DDCMSG(D_RF, BLUE, "handle_MOVE(%f, %i)", speed, pkt->direction ? 1 : 2);
+   DDCMSG(D_RF, BLUE, "handle_MOVE(%f, %i)", speed, pkt->dir);
    if (pkt->speed == 2047) {
       // send e-stop message
       return send_2100_estop(fc);
    }
 
    // send movement message
-   return send_2100_movement(fc, pkt->direction ? 1: 2, /* forward / reverse */
-                             speed); /* converted speed value */ 
+   return send_2100_movement(fc, pkt->dir,speed); /* converted speed value */ 
 }
 
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {

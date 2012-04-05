@@ -458,6 +458,21 @@ int main(int argc, char **argv) {
                               break;
                         }
 
+                        ////////  iniiialize the rest of the minion state from what was reported in the registration packet
+
+                        minions[mID].S.hit.data = LB_devreg->hits;
+                        minions[mID].S.exp.data = LB_devreg->expose;
+                        minions[mID].S.speed.data = LB_devreg->speed*100.0;
+                        minions[mID].S.dir.data = LB_devreg->dir;
+                        minions[mID].S.react.data = LB_devreg->react;
+                        minions[mID].S.position.data = LB_devreg->location;
+                        minions[mID].S.mode.data = LB_devreg->hitmode;
+//                      minions[mID].S.timehits = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
+
+//                        minions[mID].S.fault = LB_devreg->fault;
+
+                        // maybe there should also be stuff for MFS (NES?) MGS MILES and GPS in the device_reg packet
+
                         /*   fork a minion */    
                         if ((child = fork()) == -1) perror("fork");
 

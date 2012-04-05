@@ -123,7 +123,7 @@ void HandleSlaveRF(int RFfd){
    fd_set rf_or_mcp;
    struct timeval timeout;
    LB_packet_t *LB,rLB,LBuf;
-   int len,addr,RF_addr,size;
+   int len,addr,RF_addr,size,resp_size;
 
    uint32 DevID;
    LB_request_new_t *LB_new;
@@ -363,7 +363,7 @@ void HandleSlaveRF(int RFfd){
                   case LBC_MOVE:
                      if (LB->addr==RF_addr){
                         LB_move_t *L=(LB_move_t *)(LB);     // map our bitfields in
-                        S.dir= L->direction;
+                        S.dir= L->dir;
                         if (L->speed>2046){
                            S.speed= 0;          // 2047 means emergency stop
                         } else {
@@ -371,7 +371,7 @@ void HandleSlaveRF(int RFfd){
                         }
                         S.start_time=RxTime;
                         DDCMSG(D_RF,BLUE,"Rxed cmd = MOVE (%d)  dir=%d speed=%d  set start_time=%3d.%03d",
-                               L->cmd,L->direction,L->speed,DOTD(S.start_time));
+                               L->cmd,L->dir,L->speed,DOTD(S.start_time));
                      }
                      break;
 
@@ -437,36 +437,30 @@ void HandleSlaveRF(int RFfd){
 
                   case LBC_STATUS_REQ:
                      if (LB->addr==RF_addr){
-                        DDCMSG(D_RF,BLUE,"Rxed cmd= %d  Status_Request",LB->cmd);
-
-
-
+                        DDCMSG(D_RF,BLUE,"Rxed cmd= %d  Status_Request  position=%d",LB->cmd,S.position);
                         
-                        DDCMSG(D_RF,RED,"calc position... old_pos=%d RxTime=%d.%03d Start=%d.%03d  t=%d.%03d  speed=%d m/s=%d position change=%d ",
-                               S.position,DOTD(RxTime),DOTD(S.start_time),DOTD(RxTime-S.start_time),S.speed,(int)S.speed*1000/2237,
-                               ((RxTime-S.start_time)/1000)*((S.dir*2)-1)*((int)S.speed*1000/2237));
-
-                        S.position+=((RxTime-S.start_time)/1000)*((S.dir*2)-1)*((int)S.speed*1000/2237);        //mph converted to mm/s
+                        if (S.dir==1&&S.position<2045) S.position+=2;
+                        if (S.dir==2&&S.position>1) S.position-=2;
+                        DDCMSG(D_RF,RED,"fake  position    new position=%d ",S.position);
 
                         S.start_time=RxTime;      // update the time so if asked again we don't stack
+                        resp_size= build_LBC_Resp(devtype,RF_addr,&S,&LBuf);
 
-
-                        size= build_LBC_Resp(devtype,RF_addr,&S,&LBuf);
-
-                        if (size) {
+                        if (resp_size) {
                               // now send it to the RF master
                               // after waiting for our timeslot:// this is only for the dumb test.
                               // Nates slave boss will need to be less dumb about this -
                               // it will have to queue packets to send and later do them at the right time.
                               // because this code will barf on more than one resp to it
                               usleep(slottime*(resp_slot+1)*1000);    // plus 1 is the holdoff
-                              DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",slottime*(my_slot+1),slottime,my_slot);
+                              DDCMSG(D_TIME,CYAN,"msleep for %d.   slottimme=%d my_slot=%d",
+                                     slottime*(my_slot+1),slottime,my_slot);
 
-                              result=write(RFfd,&LBuf,size);
+                              result=write(RFfd,&LBuf,resp_size);
                               if (verbose&D_RF){      // don't do the sprintf if we don't need to
                                  sprintf(hbuf,"LBC_status_resp_xxx  sent [%2d=%d] "
-                                         ,size,result);
-                                 DCMSG_HEXB(BLUE,hbuf,&LBuf,size);
+                                         ,resp_size,result);
+                                 DCMSG_HEXB(BLUE,hbuf,&LBuf,resp_size);
                               }
 
                               // finish waiting for the slots before proceding
@@ -488,10 +482,10 @@ void HandleSlaveRF(int RFfd){
 
                      break;
                }  // switch LB cmd
+               DDCMSG(D_MEGA,YELLOW," incrementing resp_slot",resp_slot);
                DeQueue(Rx,size);        // delete just the packet we used
                gathered-=size;
                resp_slot++;     // keep count of our resonse slot
-               DDCMSG(D_MEGA,YELLOW," incrementing resp_slot",resp_slot);
 
 
             } else { // if our address matched and the CRC was good

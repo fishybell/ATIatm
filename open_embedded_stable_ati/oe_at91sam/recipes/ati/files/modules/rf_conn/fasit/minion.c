@@ -648,14 +648,14 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                LB_move->speed = ((int)(max(0.0,min(htonf(message_2100->speed), 20.0)) * 100)) & 0x7ff;
                DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: speed after: %i",minion->mID, LB_move->speed);
                if (message_2100->move == 2) {
-                  DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: direction 0",minion->mID);
-                  LB_move->direction = 0;
+                  DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: direction 2",minion->mID);
+                  LB_move->dir = 2;
                } else if (message_2100->move ==1) {
                   DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: direction 1",minion->mID);
-                  LB_move->direction = 1;
+                  LB_move->dir = 1;
                } else {
-                  DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: direction 0:2",minion->mID);
-                  LB_move->direction = 0;
+                  DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: direction 0",minion->mID);
+                  LB_move->dir = 0;
                   LB_move->speed = 0;
                }
                if (message_2100->cid == CID_Stop) {

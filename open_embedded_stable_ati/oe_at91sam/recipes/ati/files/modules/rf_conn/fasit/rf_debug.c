@@ -13,7 +13,7 @@ void debug_EXPOSE(int color, LB_packet_t *pkt) {
 
 void debug_MOVE(int color, LB_packet_t *pkt) {
    LB_move_t *p = (LB_move_t*)pkt;
-   DCMSG(color, "LBC_MOVE: cmd: %i, addr: %i, direction: %i, speed: %i, crc: %02X", p->cmd, p->addr, p->direction, p->speed, p->crc);
+   DCMSG(color, "LBC_MOVE: cmd: %i, addr: %i, dir: %i, speed: %i, crc: %02X", p->cmd, p->addr, p->dir, p->speed, p->crc);
 }
 
 void debug_CONFIGURE_HIT(int color, LB_packet_t *pkt) {
