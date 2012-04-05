@@ -681,6 +681,9 @@ int SIT_Client::handle_2100(int start, int end) {
             // send 2113 GPS Location
             break;
 
+         case CID_Stop:
+            doStop();
+            break;
         case CID_Shutdown:
             DCMSG(RED,"CID_Shutdown...shutting down") ; 
             doShutdown();
@@ -1762,7 +1765,7 @@ void SIT_Conn::doHits(int num) {
     } else {
         if (num >= HIT_REQ) {
             num = HIT_REQ-1;
-        }
+        }		
         queueMsgU8(NL_C_HITS, num); // reset to num
     }
 
