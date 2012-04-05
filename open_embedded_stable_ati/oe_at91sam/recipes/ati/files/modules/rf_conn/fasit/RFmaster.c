@@ -272,7 +272,8 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                if (riclient > 0) {
                   char ri_buf[128];
                   DDCMSG(D_TIME, YELLOW, "Remaining time: %d %d", remaining_time, slottime);
-                  snprintf(ri_buf, 128, "B %i\r", (5 * (Queue_Depth(Tx)) / 3) + 37 + remaining_time); // number of bytes * baud rate = milliseconds (9600 baud / 2 for overhead => 600 bytes a second => 5/3 second for 1000 bytes) + transmit delays
+                  snprintf(ri_buf, 128, "B %i\n", (5 * (Queue_Depth(Tx)) / 3) + 37 + remaining_time); // number of bytes * baud rate = milliseconds (9600 baud / 2 for overhead => 600 bytes a second => 5/3 second for 1000 bytes) + transmit delays
+                  DDCMSG(D_NEW, BLACK, "writing riclient %s", ri_buf);
                   result=write(riclient, ri_buf, strnlen(ri_buf, 128));
                }
 
@@ -322,7 +323,8 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
          // while gathering RF data, we're busy, tell the Radio Interface client
          if (riclient > 0) {
-            write(riclient, "B\r", 2);
+            DDCMSG(D_NEW, BLACK, "writing riclient B\\n");
+            write(riclient, "B\n", 2);
          }
 
          DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(RFfd)");
@@ -346,7 +348,8 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
          // after gathering RF data, we're free, tell the Radio Interface client
          if (riclient > 0) {
-            write(riclient, "F\r", 2);
+            DDCMSG(D_NEW, BLACK, "writing riclient F\\n");
+            write(riclient, "F\n", 2);
          }
 
          if (gathered>=3){
@@ -415,30 +418,31 @@ void HandleRF(int MCPsock,int risock,int RFfd){
       // read range interface client
       DDCMSG(D_MEGA,BLACK,"RFmaster checking FD_ISSET(riclient)");
       if (riclient > 0 && FD_ISSET(riclient,&rf_or_mcp)){
-         DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(riclient)");
+         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(riclient)");
          int size;
          char buf[128];
          int err;
          size=read(riclient,buf,128);
          err = errno;
-         if (size <= 0) {
-            DDCMSG(D_PACKET, YELLOW, "Range Interface dead");
+         if (size <= 0 && err != EAGAIN) {
+            DDCMSG(D_NEW, YELLOW, "Range Interface dead");
             close(riclient);
             riclient = -1;
          } else {
-            DDCMSG(D_PACKET, YELLOW, "Read from Range Interface %i bytes: %s", size,buf);
+            DDCMSG(D_NEW, YELLOW, "Read from Range Interface %i bytes: %s", size,buf);
          }
       }
 
       // accept range interface client
       DDCMSG(D_MEGA,BLACK,"RFmaster checking FD_ISSET(risock)");
       if (FD_ISSET(risock,&rf_or_mcp)){
-         DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(risock)");
+         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(risock)");
          int newclient = -1;
          struct sockaddr_in ClntAddr;   /* Client address */
          unsigned int clntLen;               /* Length of client address data structure */
          // close existing one
          if (riclient > 0) {
+            DDCMSG(D_NEW, BLACK, "closing old, but working ri_client %i", riclient);
             close(riclient);
             riclient = -1;
          }
@@ -446,6 +450,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
             int yes=1;
             // replace existing riclient with new one
             riclient = newclient;
+            DDCMSG(D_NEW, BLACK, "new working riclient %i from %s", riclient, inet_ntoa(ClntAddr.sin_addr));
             setsockopt(riclient, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
          }// if error, ignore
       }
