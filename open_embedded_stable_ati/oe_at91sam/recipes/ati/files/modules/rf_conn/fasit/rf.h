@@ -197,8 +197,8 @@ typedef struct LB_request_new_t {
 typedef struct LB_device_reg_t {
    // 13 bytes
    uint32 cmd:5 __attribute__ ((packed));   
-   uint32 devid:24 __attribute__ ((packed));
    uint32 pad:3 __attribute__ ((packed));
+   uint32 devid:24 __attribute__ ((packed));
    
    uint32 dev_type:8 __attribute__ ((packed));
    uint32 hits:7 __attribute__ ((packed)); // up to 127 hits

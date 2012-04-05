@@ -246,7 +246,8 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_device_reg_t *L=(LB_device_reg_t *)LB;
             strcpy(cmdname,"Device_Reg");
-            sprintf(hbuf,"devid=%3x devtype=%x",L->devid,L->dev_type);
+            sprintf(hbuf,"devid=%3x devtype=%x hits=%2d exp=%d speed=%d dir=%d loc=%d",
+                    L->devid,L->dev_type,L->hits,L->expose,L->speed,L->dir,L->location);
             color=MAGENTA;
          }
          break;
