@@ -78,7 +78,6 @@ int Ptype(char *buf){
 
 // remove count bytes from the head of the queue and normalize the queue
 void DeQueue(queue_t *M,int count){
-   DDCMSG(D_RF,BLUE,"DeQueue called with depth=%d count=%d",Queue_Depth(M),count);
    memmove(M->buf,M->head+count,Queue_Depth(M));
    M->tail-=count;
    M->head=M->buf;

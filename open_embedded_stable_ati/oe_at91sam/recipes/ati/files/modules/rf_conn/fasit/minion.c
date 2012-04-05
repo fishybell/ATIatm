@@ -1089,7 +1089,10 @@ void *minion_thread(thread_data_t *minion){
                {
                   LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
+                  minion->S.exp.flags=F_exp_ok;
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
+                  minion->S.exp.timer=0;
+                  
                   minion->S.speed.data = (float)(L->speed / 100.0); // convert back to correct float
                   minion->S.move.data = L->dir;
                   minion->S.react.newdata = L->react;
@@ -1103,11 +1106,6 @@ void *minion_thread(thread_data_t *minion){
                          minion->mID,minion->RF_addr,L->hits,L->location,L->fault);
                   sendStatus2102(0, NULL,minion);
 
-                  // reset lookup timer
-                  if (minion->S.exp.flags == F_exp_expose_D) {
-                     minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
-                     minion->S.exp.timer=15;    // 1.5 second later
-                  }
                }
                break;
 
@@ -1115,7 +1113,10 @@ void *minion_thread(thread_data_t *minion){
                {
                   LB_status_resp_mover_t *L=(LB_status_resp_mover_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
+                  minion->S.exp.flags=F_exp_ok;
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
+                  minion->S.exp.timer=0;
+
                   minion->S.speed.data = (float)(L->speed / 100.0); // convert back to correct float
                   minion->S.move.data = L->dir;
                   minion->S.position.data = L->location;
@@ -1123,11 +1124,6 @@ void *minion_thread(thread_data_t *minion){
                          minion->mID,minion->RF_addr,L->hits,L->speed,L->dir,L->location);
                   sendStatus2102(0, NULL,minion);
 
-                  // reset lookup timer
-                  if (minion->S.exp.flags == F_exp_expose_D) {
-                     minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
-                     minion->S.exp.timer=15;    // 1.5 second later
-                  }
                }
                break;
 
@@ -1135,16 +1131,23 @@ void *minion_thread(thread_data_t *minion){
                {
                   LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
+                  minion->S.exp.flags=F_exp_ok;
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
+                  minion->S.exp.timer=0;
+
+
                   DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_LIFTER'. hits=%d  exp=%d sending 2102 status",
                          minion->mID,minion->RF_addr,L->hits,L->expose);
                   sendStatus2102(0, NULL,minion);
 
+                  //  exp state reset above
+#if 0
                   // reset lookup timer
                   if (minion->S.exp.flags == F_exp_expose_D) {
                      minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
                      minion->S.exp.timer=15;    // 1.5 second later
                   }
+#endif
                }
                break;
 

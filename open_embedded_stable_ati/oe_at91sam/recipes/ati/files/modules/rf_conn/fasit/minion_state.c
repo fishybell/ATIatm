@@ -68,8 +68,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
     **
     **  */
 
-
-
    if (!minion->S.state_timer)  { // timer reached zero
       //   We should only do the section if the next timer is really up, and
       //   not just if another fd was ready about the same time
@@ -153,19 +151,36 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                case F_exp_expose_A:
                   minion->S.exp.data=45;  // make the current positon in movement
                   minion->S.exp.flags=F_exp_expose_B;     // something has to happen
-                  minion->S.exp.timer=5;  // it should happen in this many deciseconds
-                  DDCMSG(D_TIME,MAGENTA,"exp_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+                  minion->S.exp.timer=100;  // it should happen in this many deciseconds
+                  DDCMSG(D_MSTATE,MAGENTA,"exp_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
+                  LB_status_req  =(LB_status_req_t *)&LB_buf; // make a pointer to our buffer so we can use the bits right
+                  LB_status_req->cmd=LBC_STATUS_REQ;
+                  LB_status_req->addr=minion->RF_addr;
+                  // calculates the correct CRC and adds it to the end of the packet payload
+                  // also fills in the length field
+                  set_crc8(LB_status_req);
+
+                  // now send it to the MCP master
+                  result=write(minion->mcp_sock,LB_status_req,RF_size(LB_status_req->cmd));
+                  //  sent LB
+                  if (verbose&D_RF){  // don't do the sprintf if we don't need to
+                     sprintf(mb->hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d result=%d",
+                             minion->mID,minion->RF_addr,LB_status_req->cmd,RF_size(LB_status_req->cmd),result);
+                     DDCMSG2_HEXB(D_RF,YELLOW,mb->hbuf,LB_status_req,RF_size(LB_status_req->cmd));
+                  }
+                  
                   break;
 
                case F_exp_expose_B:
+                  DDCMSG(D_MSTATE,RED,"\nexp_B    some kind of error - there was not a LBC status response quick enough\n");
 
                   minion->S.exp.data=90;  // make the current positon in movement
                   minion->S.exp.flags=F_exp_expose_C;     // we have reached the exposed position, now ask for an update
                   minion->S.exp.timer=15; // 1.5 second later
-                  DDCMSG(D_TIME,MAGENTA,"exp_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+                  DDCMSG(D_MSTATE,MAGENTA,"exp_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
@@ -208,18 +223,36 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                case F_exp_conceal_A:
                   minion->S.exp.data=45;  // make the current positon in movement
                   minion->S.exp.flags=F_exp_conceal_B;    // something has to happen
-                  minion->S.exp.timer=5;  // it should happen in this many deciseconds
-                  DDCMSG(D_TIME,MAGENTA,"conceal_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+                  minion->S.exp.timer=50;  // it should happen in this many deciseconds
+                  DDCMSG(D_MSTATE,MAGENTA,"conceal_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+                  LB_status_req  =(LB_status_req_t *)&LB_buf; // make a pointer to our buffer so we can use the bits right
+                  LB_status_req->cmd=LBC_STATUS_REQ;
+                  LB_status_req->addr=minion->RF_addr;
+                  // calculates the correct CRC and adds it to the end of the packet payload
+                  // also fills in the length field
+                  set_crc8(LB_status_req);
+
+                  // now send it to the MCP master
+                  result=write(minion->mcp_sock,LB_status_req,RF_size(LB_status_req->cmd));
+                  //  sent LB
+                  if (verbose&D_RF){  // don't do the sprintf if we don't need to
+                     sprintf(mb->hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d result=%d",
+                             minion->mID,minion->RF_addr,LB_status_req->cmd,RF_size(LB_status_req->cmd),result);
+                     DDCMSG2_HEXB(D_RF,YELLOW,mb->hbuf,LB_status_req,RF_size(LB_status_req->cmd));
+                  }
+
 
                   break;
 
                case F_exp_conceal_B:
+                  DDCMSG(D_MSTATE,RED,"\nconceal_B    some kind of error - there was not a LBC status response quick enough\n");
+                  
                   minion->S.exp.data=0;   // make the current positon in movement
                   minion->S.exp.flags=F_exp_conceal_C;    // we have reached the concealed position, ask for status update again in one second
                   minion->S.exp.timer=15; // 1.5 second later
-                  DDCMSG(D_TIME,MAGENTA,"conceal_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+                  DDCMSG(D_MSTATE,MAGENTA,"conceal_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
@@ -295,27 +328,24 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                             DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(L->cmd),minion->mcp_sock);
                         }
 
-         minion->S.event.flags = 0;
-         minion->S.event.timer = 0;
-         // TODO -- what do we do when we don't receive a report?
+                        minion->S.event.flags = 0;
+                        minion->S.event.timer = 0;
+                        // TODO -- what do we do when we don't receive a report?
                         //minion->S.event.flags=F_waiting_for_report;
                         //minion->S.event.timer = 20;   // lets try 5.0 seconds
                     }
                     break;
-
                 }
             }
         }
-        }
+   }
 
         // run through all the timers and get the next time we need to process
 #define Set_Timer(T) { if ((T>0)&&(T<minion->S.state_timer)) minion->S.state_timer=T; }
+   minion->S.state_timer = 900;    // put in a worst case starting value of 90 seconds
+   Set_Timer(minion->S.exp.timer);         // if arg is >0 and <timer, it is the new timer
+   Set_Timer(minion->S.event.timer);               // if arg is >0 and <timer, it is the new timer
+   Set_Timer(minion->S.rf_t.timer);                // if arg is >0 and <timer, it is the new timer
+   //      Set_Timer(minion->S.speed.timer);               // if arg is >0 and <timer, it is the new timer
 
-        
-        minion->S.state_timer = 900;    // put in a worst case starting value of 90 seconds
-        Set_Timer(minion->S.exp.timer);         // if arg is >0 and <timer, it is the new timer
-        Set_Timer(minion->S.event.timer);               // if arg is >0 and <timer, it is the new timer
-        Set_Timer(minion->S.rf_t.timer);                // if arg is >0 and <timer, it is the new timer
-//      Set_Timer(minion->S.speed.timer);               // if arg is >0 and <timer, it is the new timer
-        
 }
