@@ -1083,6 +1083,8 @@ void *minion_thread(thread_data_t *minion){
                      minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
                      minion->S.exp.timer=15;    // 1.5 second later
                   }
+                  minion->S.exp.data=minion->S.exp.newdata; // grab from "future" state
+                  sendStatus2102(0, NULL,minion);
                   break;
 
                case LBC_STATUS_RESP_EXT:
