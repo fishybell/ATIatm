@@ -252,11 +252,11 @@ void HandleSlaveRF(int RFfd){
                         LB_devreg->cmd=LBC_DEVICE_REG;
                         LB_devreg->dev_type=devtype;            // use the option we were invoked with                        
                         LB_devreg->hits=0;
-                        LB_devreg->expose=0;
-                        LB_devreg->speed=0;
-                        LB_devreg->dir=0;
+                        LB_devreg->expose=S.exp;
+                        LB_devreg->speed=S.speed;
+                        LB_devreg->dir=S.dir;
                         LB_devreg->react=0;
-                        LB_devreg->location=55;
+                        LB_devreg->location=S.position;
                         LB_devreg->hitmode=0;
                         LB_devreg->tokill=0;
                         LB_devreg->sensitivity=0;

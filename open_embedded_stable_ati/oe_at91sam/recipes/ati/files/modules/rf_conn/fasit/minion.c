@@ -27,21 +27,25 @@ extern int close_nicely;
 // initialize our state to default values
 void initialize_state(minion_state_t *S){
 
+////  these initial settings are passed up by the device registration packet
+// but there should still be the timers and stuff zero'ed   
+//   S_set(exp,0,0,0,0);
+//   S_set(dir,0,0,0,0);
+//   S_set(move,0,0,0,0);
+//   S_set(speed,0,0,0,0);
+//   S_set(hit,0,0,0,0);
+//   S_set(react,0,0,0,0);
+//   S_set(mode,0,0,0,0);
+//   S_set(position,0,0,0,0);
+
    S_set(rf_t,0,0,0,0);
-   S_set(exp,0,0,0,0);
+   
    S_set(asp,0,0,0,0);
-   S_set(dir,0,0,0,0);
-   S_set(move,0,0,0,0);
-   S_set(speed,0,0,0,0);
    S_set(on,0,0,0,0);
-   S_set(hit,0,0,0,0);
-   S_set(react,0,0,0,0);
    S_set(tokill,0,0,0,0);
    S_set(sens,0,0,0,0);
-   S_set(mode,0,0,0,0);
    S_set(burst,0,0,0,0);
 
-//   S_set(pos,0,0,0,0);
    S_set(type,0,0,0,0);
    S_set(hit_config,0,0,0,0);
    S_set(blanking,0,0,0,0);
@@ -178,13 +182,12 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
          break;
       case Type_MIT:
       case Type_MAT:
-         msg.body.speed = minion->S.speed.data;
+         msg.body.speed = htonf(minion->S.speed.data);
          msg.body.exp = minion->S.exp.data;
          msg.body.move = minion->S.move.data;
          msg.body.pos = htons(minion->S.position.data);
          DDCMSG(D_PACKET,BLUE,"Minion %d: building 2102 status.   S.position.data=%d msg.body.pos=%d  htons(...)=%d ",
                 minion->mID,minion->S.position.data,msg.body.pos,htons(msg.body.pos));
-
          break;
    }
 
@@ -913,13 +916,14 @@ void *minion_thread(thread_data_t *minion){
    LB_expose_t *LB_exp;
 
 
-   initialize_state( &minion->S);
+
 
    /*** actually, the capabilities and the devid's will come from the MCP -
     ***   it gets them when it sends out the request new devices over the RF
     *** so when we are spawned, those state fields are already filled in 
     ***/
-
+   // now the mcp has already initialized a bunch of state...  initialize_state just has to init other things
+   initialize_state( &minion->S);
 //   minion->S.cap|=PD_NES;       // add the NES capability   this should be percolating through by itself now 
 
    DCMSG(BLUE,"Minion %d: state is initialized as devid 0x%06X", minion->mID,minion->devid);
