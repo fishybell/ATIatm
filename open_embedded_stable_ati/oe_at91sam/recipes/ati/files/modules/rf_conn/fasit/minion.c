@@ -307,6 +307,7 @@ int psend_mcp(thread_data_t *minion,void *Lc){
       sprintf(hbuf,"Minion %d: psend LB packet to MCP sock=%d   RF address=%4d cmd=%2d msglen=%d result=%d",
               minion->mID,minion->mcp_sock,minion->RF_addr,L->cmd,RF_size(L->cmd),result);
       DDCMSG2_HEXB(D_RF,YELLOW,hbuf,L,RF_size(L->cmd));
+      DDpacket(Lc,RF_size(L->cmd));
    }
    return result;
 }
@@ -651,8 +652,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                //                               minion->S.exp.data=0;                   // cheat and set the current state to 45
                minion->S.speed.newdata=message_2100->speed;     // set newdata to be the future state
                minion->S.move.newdata=message_2100->move;       // set newdata to be the future state
-               minion->S.speed.timer=10; // will reach speed in this many deciseconds
-               // minion->S.move.timer=10; TODO -- do we need this?
+               minion->S.move.flags=1;
+               minion->S.move.timer=10;
 
                LB_move->speed = ((int)(max(0.0,min(htonf(message_2100->speed), 20.0)) * 100)) & 0x7ff;
                DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: speed after: %i",minion->mID, LB_move->speed);
