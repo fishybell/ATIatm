@@ -26,7 +26,7 @@
 //#define WOBBLE_DETECT
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
-#define DEBUG_PID
+//#define DEBUG_PID
 
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
@@ -2861,7 +2861,7 @@ static void pid_step(int delta_t) {
       input_speed /= 2;
     }
 //    input_speed = percent_from_speed(abs(current_speed10()));
-   sendUserConnMsg( "%i,%i,%i,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), new_speed, input_speed, delta_t);
+   //sendUserConnMsg( "%i,%i,%i,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), new_speed, input_speed, delta_t);
 
     // We have just a few microseconds to complete operations, so die if we can't lock
     if (!spin_trylock(&pid_lock)) {
