@@ -736,8 +736,21 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     break;
             }
             /* if we changed hits to kill see if we need to do kill */
-            if (htk > 0 && htk != atomic_read(&hits_to_kill)){
-               do_kill_internal();
+            if (htk > 0 && htk != atomic_read(&hits_to_kill)) {
+               int rc = 0;
+               static hit_item_t *this;
+               spin_lock(hit_lock);
+               this = hit_chain;
+               while (this != NULL) {
+                   rc++; // count hit (doesn't matter which line)
+                   this = this->next; // next link in chain
+               }
+               spin_unlock(hit_lock);
+
+               // only kill if we actually received the correct number of hits
+               if (rc >= atomic_read(&hits_to_kill)) {
+                  do_kill_internal();
+               }
             }
         }
     }
