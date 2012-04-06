@@ -23,7 +23,7 @@ int psend_mcp(thread_data_t *minion,void *Lc);
 void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
    long elapsed_tenths;
-   int result;
+   int result,force_stat_req=0;
    LB_packet_t         LB_buf;
    LB_status_req_t     *LB_status_req;
    /***   what we do is use the minion's state_timer to determine how long to wait
@@ -86,12 +86,13 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
          } else {    // timed out,  move to the next state, do what it should.
 
-#if 1            
-            DDCMSG(D_MSTATE,RED,"*&#$*&#$\n*&#$*&#$\nMINION %d: Would time out  and disconnect.   S.rf_t.timer=%d   S.rf_t.timer=%d",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
-#else
-            
             switch (minion->S.rf_t.flags) {
                case F_rf_t_waiting_short:
+
+#if 0
+                  DDCMSG(D_MSTATE,RED,"*&#$*&#$\n*&#$*&#$\nMINION %d: Would time out  and disconnect.   S.rf_t.timer=%d   S.rf_t.timer=%d",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
+#else
+
                   // break connection to FASIT server
                   close(minion->rcc_sock); // close FASIT
                   DCMSG(BLACK,"\n\n-----------------------------------\nDisconnected minion %i:%i:%i\n-----------------------------------\n\n",
@@ -108,29 +109,22 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   result= psend_mcp(minion,&LB_buf);
                   close(minion->mcp_sock); // close mcp
                   exit(0); // exit the forked minion
-
+#endif
                   break;
 
                case F_rf_t_waiting_long:
                   // ask for a status
-                  LB_status_req  =(LB_status_req_t *)&LB_buf; // make a pointer to our buffer so we can use the bits right
-                  LB_status_req->cmd=LBC_STATUS_REQ;
-                  LB_status_req->addr=minion->RF_addr;
 
                   minion->S.status.flags=F_told_RCC;
                   minion->S.status.timer=20;
 
-                  // now do the crc and send it to the MCP master
-                  DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_status_req cmd=%d", minion->mID,LB_status_req->cmd);
-                  result= psend_mcp(minion,&LB_buf);
-                  
+                  force_stat_req=1;     // so we don't send repeated status_req
+
                   // I'm expecting a response within 3 seconds
                   minion->S.rf_t.flags=F_rf_t_waiting_short;
                   minion->S.rf_t.timer=30; // give it three seconds
                   break;
             }  // end of switch
-
-#endif            
          }   // else clause - rf_t flag
       } // if clause - rf_t flag not set
 
@@ -157,14 +151,8 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
-                  LB_status_req  =(LB_status_req_t *)&LB_buf; // make a pointer to our buffer so we can use the bits right
-                  LB_status_req->cmd=LBC_STATUS_REQ;
-                  LB_status_req->addr=minion->RF_addr;
-
-                  // now send it to the MCP master
-                  DDCMSG(D_PACKET,BLUE,"Minion %d: @2 LB_status_req cmd=%d", minion->mID,LB_status_req->cmd);
-                  result= psend_mcp(minion,&LB_buf);
-
+                  force_stat_req=1;
+                  
                  // I'm expecting a response within 3 seconds
                   minion->S.rf_t.flags=F_rf_t_waiting_short;
                   minion->S.rf_t.timer=30; // give it three seconds
@@ -185,17 +173,11 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   break;
 
                case F_exp_expose_C:
-                  //                  also build an LB packet  to send
-                  LB_status_req  =(LB_status_req_t *)&LB_buf; // make a pointer to our buffer so we can use the bits right
-                  LB_status_req->cmd=LBC_STATUS_REQ;
-                  LB_status_req->addr=minion->RF_addr;
 
+                  force_stat_req=1;
+                  
                   minion->S.status.flags=F_told_RCC;
                   minion->S.status.timer=20;
-
-                  // now send it to the MCP master
-                  DDCMSG(D_PACKET,BLUE,"Minion %d: @9 LB_status_req cmd=%d", minion->mID,LB_status_req->cmd);
-                  result= psend_mcp(minion,&LB_buf);
 
                   // I'm expecting a response within 3 seconds
                   minion->S.rf_t.flags=F_rf_t_waiting_short;
@@ -218,14 +200,8 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   DDCMSG(D_MSTATE,MAGENTA,"conceal_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
-                  LB_status_req  =(LB_status_req_t *)&LB_buf; // make a pointer to our buffer so we can use the bits right
-                  LB_status_req->cmd=LBC_STATUS_REQ;
-                  LB_status_req->addr=minion->RF_addr;
 
-                  // now send it to the MCP master
-                  DDCMSG(D_PACKET,BLUE,"Minion %d: @3 LB_status_req cmd=%d", minion->mID,LB_status_req->cmd);
-                  result= psend_mcp(minion,&LB_buf);
-
+                  force_stat_req=1;
                   break;
 
 #if 0    // again, this is superflous     
@@ -242,17 +218,12 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   break;
 
                case F_exp_conceal_C:
-                  //                  also build an LB packet  to send
-                  LB_status_req  =(LB_status_req_t *)&LB_buf; // make a pointer to our buffer so we can use the bits right
-                  LB_status_req->cmd=LBC_STATUS_REQ;
-                  LB_status_req->addr=minion->RF_addr;
 
                   minion->S.status.flags=F_told_RCC;
                   minion->S.status.timer=20;
 
-                  // now send it to the MCP master
-                  DDCMSG(D_PACKET,BLUE,"Minion %d: @4 LB_status_req cmd=%d", minion->mID,LB_status_req->cmd);
-                  result= psend_mcp(minion,&LB_buf);
+                  force_stat_req=1;
+                  
                   // I'm expecting a response within 3 seconds
                   minion->S.rf_t.flags=F_rf_t_waiting_short;
                   minion->S.rf_t.timer=30; // give it three seconds
@@ -322,13 +293,8 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE,GREEN,"**********\n---MINION %d:  send a lbc status_req   move.flags=0x%x move.timer=%i move.data=%d",
                 minion->mID,minion->S.move.flags, minion->S.move.timer, minion->S.move.data);
 
-         // send out a request for actual position
-         LB_status_req_t *L=(LB_status_req_t *)&LB_buf;
-         L->cmd=LBC_STATUS_REQ;          // start filling in the packet
-         L->addr=minion->RF_addr;
-         DDCMSG(D_MSTATE,GREEN,"Minion %d: @5    build and send L LBC_STATUS_REQ", minion->mID);
-         result= psend_mcp(minion,&LB_buf);
-
+         force_stat_req=1;         // send out a request for actual position
+         
          // try to calculate how long it will take to go 2 meters.
          minion->S.move.timer=minion->S.speed.data/.5;  // it should happen in this many deciseconds
          DDCMSG(D_PACKET,GREEN,"Minion %d:  \n\n**********\n    setting move timer=%d", minion->mID,minion->S.move.timer);
@@ -347,20 +313,8 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             switch (minion->S.event.flags) {
 
                case F_needs_report:
-//                  build an LB packet  report_req packet
-               {
-                  LB_report_req_t *L=(LB_report_req_t *)mb->buf;
 
-                  L->cmd=LBC_REPORT_REQ;
-                  L->addr=minion->RF_addr;
-                  L->event=minion->S.event.data;
-
-                  DDCMSG(D_MSTATE,RED,"MINION %d:----- building a report request LB packet event.flags=0x%x",minion->mID,minion->S.event.flags);
-
-                    // now send it to the MCP master
-                  DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_report_req cmd=%d", minion->mID,L->cmd);
-                  result= psend_mcp(minion,L);
-
+                  force_stat_req=1;
                   minion->S.event.flags = 0;
                   minion->S.event.timer = 0;
                         // TODO -- what do we do when we don't receive a report?
@@ -373,6 +327,16 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          }
       } //end of if(...flags)
 
+
+      if (force_stat_req){
+         // send out a request for actual position
+         LB_status_req_t *L=(LB_status_req_t *)&LB_buf;
+         L->cmd=LBC_STATUS_REQ;          // start filling in the packet
+         L->addr=minion->RF_addr;
+         DDCMSG(D_MSTATE,GREEN,"Minion %d:   build and send L LBC_STATUS_REQ", minion->mID);
+         result= psend_mcp(minion,&LB_buf);
+         force_stat_req=0;
+      }
    }
 
         // run through all the timers and get the next time we need to process

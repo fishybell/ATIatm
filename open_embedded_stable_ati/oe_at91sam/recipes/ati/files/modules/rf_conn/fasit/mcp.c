@@ -397,7 +397,7 @@ int main(int argc, char **argv) {
                      minions[mID].S.hit.data = LB_devreg->hits;
                      minions[mID].S.exp.data = LB_devreg->expose;
                      minions[mID].S.speed.data = LB_devreg->speed*100.0;
-                     minions[mID].S.dir.data = LB_devreg->dir;
+                     minions[mID].S.move.data = LB_devreg->move;
                      minions[mID].S.react.data = LB_devreg->react;
                      minions[mID].S.position.data = LB_devreg->location;
                      minions[mID].S.mode.data = LB_devreg->hitmode;
