@@ -422,9 +422,9 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    }
 
    DCMSG(BLACK, "\n============================\nNew values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\nOld values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\nf2102 vals: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\n",
-      s.hits, s.expose, s.speed, s.dir, s.react, s.location, s.hitmode, s.tokill, s.sensitivity, s.timehits, s.fault,
-      fc->last_status.hits, fc->last_status.expose, fc->last_status.speed, fc->last_status.dir, fc->last_status.react, fc->last_status.location, fc->last_status.hitmode, fc->last_status.tokill, fc->last_status.sensitivity, fc->last_status.timehits, fc->last_status.fault,
-      htons(fc->f2102_resp.body.hit), fc->f2102_resp.body.exp, htonf(fc->f2102_resp.body.speed), htons(fc->f2102_resp.body.dir), fc->f2102_resp.body.hit_conf.react, htons(fc->f2102_resp.body.pos), fc->f2102_resp.body.hit_conf.mode, htons(fc->f2102_resp.body.hit_conf.tokill), htons(fc->f2102_resp.body.hit_conf.sens), htons(fc->f2102_resp.body.hit_conf.burst), htons(fc->f2102_resp.body.fault));
+      s.hits, s.expose, s.speed, s.move, s.react, s.location, s.hitmode, s.tokill, s.sensitivity, s.timehits, s.fault,
+      fc->last_status.hits, fc->last_status.expose, fc->last_status.speed, fc->last_status.move, fc->last_status.react, fc->last_status.location, fc->last_status.hitmode, fc->last_status.tokill, fc->last_status.sensitivity, fc->last_status.timehits, fc->last_status.fault,
+      htons(fc->f2102_resp.body.hit), fc->f2102_resp.body.exp, htonf(fc->f2102_resp.body.speed), htons(fc->f2102_resp.body.move), fc->f2102_resp.body.hit_conf.react, htons(fc->f2102_resp.body.pos), fc->f2102_resp.body.hit_conf.mode, htons(fc->f2102_resp.body.hit_conf.tokill), htons(fc->f2102_resp.body.hit_conf.sens), htons(fc->f2102_resp.body.hit_conf.burst), htons(fc->f2102_resp.body.fault));
 
    // determine changes send correct status response
    if (s.fault != fc->last_status.fault ||
@@ -812,7 +812,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
       bdy.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
    }
    bdy.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
-   bdy.dir = fc->f2102_resp.body.move & 0x3;
+   bdy.move = fc->f2102_resp.body.move & 0x3;
    bdy.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
    bdy.hitmode = fc->hit_mode;
    bdy.react = fc->hit_react;
@@ -825,7 +825,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    fc->last_status.hits = bdy.hits;
    fc->last_status.expose = bdy.expose;
    fc->last_status.speed = bdy.speed;
-   fc->last_status.dir = bdy.dir;
+   fc->last_status.move = bdy.move;
    fc->last_status.location = bdy.location;
    fc->last_status.hitmode = bdy.hitmode;
    fc->last_status.react = bdy.react;
