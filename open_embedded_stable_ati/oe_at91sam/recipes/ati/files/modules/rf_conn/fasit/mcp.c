@@ -376,21 +376,21 @@ int main(int argc, char **argv) {
                    ****************************************************************************/
 
                   /////////   CHECK if we already have a minion with this devID
-                  DDCMSG(D_NEW,RED,"MCP: CHECK for minion with this devID   max_addr=%d  devID=%06x",max_addr,LB_devreg->devid);
+                  DDCMSG(D_NEW,GRAY,"MCP: CHECK for minion with this devID   max_addr=%d  devID=%06x",max_addr,LB_devreg->devid);
 
                   addr_cnt=1;           //  step through to check if we already had this one
-                  DDCMSG(D_NEW,RED,"MCP:     ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) && (!addr_pool[%d].inuse=%d)",
+                  DDCMSG(D_NEW,GRAY,"MCP:     ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) && (addr_pool[%d].inuse=%d)",
                          addr_cnt,max_addr,addr_cnt,addr_pool[addr_cnt].devid, LB_devreg->devid, addr_cnt,addr_pool[addr_cnt].inuse);
 
-                  while ((addr_cnt<max_addr)&&(addr_pool[addr_cnt].devid!=LB_devreg->devid)&&!addr_pool[addr_cnt].inuse) {
-                     DDCMSG(D_NEW,RED,"MCP: ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) ... (addr_pool[%d].inuse=%d)",
+                  while ((addr_cnt<max_addr)&&(addr_pool[addr_cnt].devid!=LB_devreg->devid)&&addr_pool[addr_cnt].inuse) {
+                     DDCMSG(D_NEW,GRAY,"MCP: ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) ... (addr_pool[%d].inuse=%d)",
                             addr_cnt,max_addr,addr_cnt,addr_pool[addr_cnt].devid, LB_devreg->devid, addr_cnt,addr_pool[addr_cnt].inuse);
                      addr_cnt++;
                   }
 
                   if (addr_cnt<max_addr) {
                      // we already have this devID, so reconnect because the RFslave probably rebooted or something
-                     DCMSG(RED,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
+                     DCMSG(GRAY,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
 
                      ////////  iniiialize the rest of the minion state from what was reported in the registration packet
                      mID = addr_pool[addr_cnt].mID;
