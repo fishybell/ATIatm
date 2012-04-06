@@ -55,12 +55,12 @@ int build_LBC_Resp(int devtype,int RF_addr,slave_state_t *S,LB_packet_t *LB){
          L->hits=0;                // send 0 because the report is where hits are sent
          L->expose=S->exp;          // use our current state
          L->speed=S->speed;         //  speed is  11 bits
-         L->dir=S->dir;             // use our current state
+         L->move=S->move;             // use our current state
          L->location=S->position;   // use our current state
 
          set_crc8(LB); // calculates the correct CRC and adds it to the end of the packet payload
-         DDCMSG(D_RF,BLUE,"Build a LBC_STATUS_RESP_MOVER  hits=%d expose=%d speed=%d dir=%d position/location=%d",
-                L->hits,L->expose,L->speed,L->dir,L->location);
+         DDCMSG(D_RF,BLUE,"Build a LBC_STATUS_RESP_MOVER  hits=%d expose=%d speed=%d move=%d position/location=%d",
+                L->hits,L->expose,L->speed,L->move,L->location);
 
          if (S->exp) {
             DDCMSG(D_RF,GREEN,"EXPOSED    event=%d",S->event);
@@ -254,7 +254,7 @@ void HandleSlaveRF(int RFfd){
                         LB_devreg->hits=0;
                         LB_devreg->expose=S.exp;
                         LB_devreg->speed=S.speed;
-                        LB_devreg->dir=S.dir;
+                        LB_devreg->move=S.move;
                         LB_devreg->react=0;
                         LB_devreg->location=S.position;
                         LB_devreg->hitmode=0;
@@ -363,15 +363,15 @@ void HandleSlaveRF(int RFfd){
                   case LBC_MOVE:
                      if (LB->addr==RF_addr){
                         LB_move_t *L=(LB_move_t *)(LB);     // map our bitfields in
-                        S.dir= L->dir;
+                        S.move= L->move;
                         if (L->speed>2046){
                            S.speed= 0;          // 2047 means emergency stop
                         } else {
                            S.speed= L->speed;
                         }
                         S.start_time=RxTime;
-                        DDCMSG(D_RF,BLUE,"Rxed cmd = MOVE (%d)  dir=%d speed=%d  set start_time=%3d.%03d",
-                               L->cmd,L->dir,L->speed,DOTD(S.start_time));
+                        DDCMSG(D_RF,BLUE,"Rxed cmd = MOVE (%d)  move=%d speed=%d  set start_time=%3d.%03d",
+                               L->cmd,L->move,L->speed,DOTD(S.start_time));
                      }
                      break;
 
@@ -439,8 +439,8 @@ void HandleSlaveRF(int RFfd){
                      if (LB->addr==RF_addr){
                         DDCMSG(D_RF,BLUE,"Rxed cmd= %d  Status_Request  position=%d",LB->cmd,S.position);
                         
-                        if (S.dir==1&&S.position<2045) S.position+=2;
-                        if (S.dir==2&&S.position>1) S.position-=2;
+                        if (S.move==1&&S.position<2045) S.position+=2;
+                        if (S.move==2&&S.position>1) S.position-=2;
                         DDCMSG(D_RF,RED,"fake  position    new position=%d ",S.position);
 
                         S.start_time=RxTime;      // update the time so if asked again we don't stack

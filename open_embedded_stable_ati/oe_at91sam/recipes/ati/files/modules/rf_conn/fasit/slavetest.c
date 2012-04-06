@@ -98,7 +98,7 @@ char *do_MOVE(int a, int *num) {
    LB_move_t *pkt = malloc(sizeof(LB_move_t));
    pkt->cmd = num[0];
    pkt->addr = num[1];
-   pkt->dir = num[2];
+   pkt->move = num[2];
    pkt->speed = num[3];
    set_crc8(pkt);
    return (char*)pkt;
@@ -182,7 +182,7 @@ char *do_STATUS_RESP_MOVER(int a, int *num) {
    pkt->hits = num[2];
    pkt->expose = num[3];
    pkt->speed = num[4];
-   pkt->dir = num[5];
+   pkt->move = num[5];
    pkt->location = num[6];
    set_crc8(pkt);
    return (char*)pkt;
@@ -196,7 +196,7 @@ char *do_STATUS_RESP_EXT(int a, int *num) {
    pkt->hits = num[2];
    pkt->expose = num[3];
    pkt->speed = num[4];
-   pkt->dir = num[5];
+   pkt->move = num[5];
    pkt->react = num[6];
    pkt->location = num[7];
    pkt->hitmode = num[8];

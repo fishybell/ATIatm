@@ -136,7 +136,7 @@ typedef struct LB_status_resp_mover_t {
    uint32 pad:8 __attribute__ ((packed));
 
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
-   uint32 dir:2 __attribute__ ((packed)); // 0 = stop, 1 = away from home, 2 = towards home
+   uint32 move:2 __attribute__ ((packed)); // 0 = stop, 1 = away from home, 2 = towards home
    uint32 location:11 __attribute__ ((packed)); // meters from home
    uint32 crc:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_status_resp_mover_t;
@@ -152,7 +152,7 @@ typedef struct LB_status_resp_ext_t {
    uint32 pad:8 __attribute__ ((packed));
 
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
-   uint32 dir:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
+   uint32 move:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
    uint32 react:3 __attribute__ ((packed));
    uint32 location:11 __attribute__ ((packed)); // meters from home
    uint32 hitmode:1 __attribute__ ((packed));
@@ -205,7 +205,7 @@ typedef struct LB_device_reg_t {
    uint32 expose:1 __attribute__ ((packed));
 
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
-   uint32 dir:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
+   uint32 move:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
    uint32 react:3 __attribute__ ((packed));
    uint32 location:11 __attribute__ ((packed)); // meters from home
    uint32 hitmode:1 __attribute__ ((packed));
@@ -307,7 +307,7 @@ typedef struct LB_move {
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
    uint32 pad:3 __attribute__ ((packed));
-   uint32 dir:2 __attribute__ ((packed));       // switched it to two bits - and re-arranged so it is slightly more readable in hex
+   uint32 move:2 __attribute__ ((packed));       // switched it to two bits - and re-arranged so it is slightly more readable in hex
    uint32 speed:11 __attribute__ ((packed));
 
    uint32 crc:8 __attribute__ ((packed));

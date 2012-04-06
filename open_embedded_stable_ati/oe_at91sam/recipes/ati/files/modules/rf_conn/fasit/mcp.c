@@ -463,7 +463,7 @@ int main(int argc, char **argv) {
                         minions[mID].S.hit.data = LB_devreg->hits;
                         minions[mID].S.exp.data = LB_devreg->expose;
                         minions[mID].S.speed.data = LB_devreg->speed*100.0;
-                        minions[mID].S.dir.data = LB_devreg->dir;
+                        minions[mID].S.move.data = LB_devreg->move;
                         minions[mID].S.react.data = LB_devreg->react;
                         minions[mID].S.position.data = LB_devreg->location;
                         minions[mID].S.mode.data = LB_devreg->hitmode;
@@ -612,9 +612,9 @@ int main(int argc, char **argv) {
                msglen=read(minion_fd, buf, 1023);
                LB=(LB_packet_t *)buf;
                if (verbose&D_RF){       // don't do the sprintf if we don't need to
-                  sprintf(hbuf,"MCP:    read Minion %2d's LB packet. address=%2d  cmd=%2d  length=%2d msglen=%2d  -}"
+                  sprintf(hbuf,"MCP:    read Minion %2d's LB packet(s). address=%2d  cmd=%2d  length=%2d msglen=%2d  -}"
                           ,mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
-                  DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,RF_size(LB->cmd));
+                  DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,msglen);
                }
                if (!msglen){
                   DCMSG(RED,"MCP:  attempted read from minion returned 0!\n");
@@ -631,16 +631,16 @@ int main(int argc, char **argv) {
                   // just display the packet for debugging
                   LB=(LB_packet_t *)buf;
                   // do the copy down here
-                  result=write(RF_sock,LB,RF_size(LB->cmd));
+                  result=write(RF_sock,LB,msglen);
                   if (result<0) {
                      strerror_r(errno,buf,BufSize);                         
                      DCMSG(RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
                      exit(-1);
                   }
                   if (verbose&D_RF){    // don't do the sprintf if we don't need to
-                     sprintf(hbuf,"MCP: passing Minion %2d's LB packet to RF_addr=%2d cmd=%2d length=%2d result=%2d  -}"
-                             ,mID,LB->addr,LB->cmd,RF_size(LB->cmd),result);
-                     DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,RF_size(LB->cmd));
+                     sprintf(hbuf,"MCP: passing Minion %2d's LB packet(s) to RF_addr=%2d cmd=%2d length=%2d result=%2d  -}"
+                             ,mID,LB->addr,LB->cmd,msglen,result);
+                     DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,result);
                   }
                }
 

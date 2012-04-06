@@ -402,7 +402,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
    s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
    s.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
-   s.dir = fc->f2102_resp.body.move & 0x3;
+   s.move = fc->f2102_resp.body.move & 0x3;
    s.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
    s.hitmode = fc->hit_mode;
    s.react = fc->hit_react;
@@ -434,7 +434,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
       retval = send_STATUS_RESP_EXT(fc);
       goto SR_end;
    } else if (s.location != fc->last_status.location ||
-              s.dir != fc->last_status.dir ||
+              s.move != fc->last_status.move ||
               s.speed != fc->last_status.speed ||
               s.expose != fc->last_status.expose ||
               s.hits > 0) {
@@ -486,7 +486,7 @@ int send_STATUS_RESP_MOVER(fasit_connection_t *fc) {
    bdy.hits = fc->last_status.hits;
    bdy.expose = fc->last_status.expose;
    bdy.speed = fc->last_status.speed;
-   bdy.dir = fc->last_status.dir;
+   bdy.move = fc->last_status.move;
    bdy.location = fc->last_status.location;
    fc->sent_status = 1; // have sent a status message before
 
@@ -588,14 +588,14 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
    // convert speed
    float speed = pkt->speed / 100.0;
    DDCMSG(D_RF|D_VERY,RED, "handle_MOVE(%8p, %i, %i)", fc, start, end);
-   DDCMSG(D_RF, BLUE, "handle_MOVE(%f, %i)", speed, pkt->dir);
+   DDCMSG(D_RF, BLUE, "handle_MOVE(%f, %i)", speed, pkt->move);
    if (pkt->speed == 2047) {
       // send e-stop message
       return send_2100_estop(fc);
    }
 
    // send movement message
-   return send_2100_movement(fc, pkt->dir,speed); /* converted speed value */ 
+   return send_2100_movement(fc, pkt->move,speed); /* converted speed value */ 
 }
 
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {

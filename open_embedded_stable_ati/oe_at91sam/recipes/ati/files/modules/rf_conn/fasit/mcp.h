@@ -107,15 +107,15 @@ typedef struct minion_state {
    //  miles=1, NES=2, gps=4, the rest are reserved for now - but should maybe include movers and stuff 
    state_rf_timeout_t           rf_t;   // rf timeout timer
    state_u8_item_t              status; 
-   state_exp_item_t             exp;    // exposure state has more stuff
-   state_u8_item_t              event;  // used for timer events
-   state_u8_item_t              asp;
-   state_u16_item_t             dir;
-   state_u8_item_t              move;
-   state_float_item_t           speed;
-   state_u16_item_t             position;       // MIT/MAT rail position
+   state_exp_item_t             exp;            // exposure state has more stuff
+   state_u8_item_t              event;          // used for timer events
+   state_u8_item_t              asp;            //  FUTURE FASIT aspect of target
+   state_u16_item_t             dir;            //  FUTURE FASIT 0-359 degree angle of target (dir??)
+   state_u8_item_t              move;           //  movement direction  0=stopped, 1=forward (away from home), 2=reverse (to home)
+   state_float_item_t           speed;          //  speed in 0 to 20 MPH     at some level 20.47 means emergency stop
+   state_u16_item_t             position;       // MIT/MAT rail position  in meters from home
    //                                   hit configuration (aka sensor)
-   state_u8_item_t              on;
+   state_u8_item_t              on;             // 4 states of on
    state_u16_item_t             hit;
    state_u8_item_t              react;
    state_u16_item_t             tokill;
@@ -150,14 +150,14 @@ typedef struct slave_state {
    uint16               state_timer;    // when we next need to process the state
    uint16               padding0;       //   extra space for now
    uint8                status; 
-   uint8                exp;    // exposure state has more stuff
-   uint8                event;  // used for timer events
-   uint8                asp;
-   uint8                dir;   
+   uint8                exp;            // exposure state
+   uint8                event;          // used for timer events
+   uint8                asp;            //  FUTURE FASIT aspect of target
+   uint8                dir;            //  FUTURE FASIT 0-359 degree angle of target (dir??)
    uint16               position;       // MIT/MAT rail position
-   uint8                move;
-   uint16               speed;
-   uint32               start_time;
+   uint8                move;           //  MIT/MAT movement direction  0=stopped, 1=forward (away from home), 2=reverse (to home)
+   uint16               speed;          //  speed in 0 to 20 MPH   integer (11 bits) 0-2047 it is the floating speed *100     2047 means emergency stop
+   uint32               start_time;     // might not be used anymore
    //           hit configuration (aka sensor)
    uint8                on;
    uint16               hit;

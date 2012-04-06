@@ -253,9 +253,9 @@ void sendStatus2112(int force, FASIT_header *hdr,thread_data_t *minion) {
    DDCMSG(D_PARSE,BLUE,\
           "   ON | Mode  | idelay| rdelay\n"\
           "  %3d    %3d     %3d     %3d   ",
-          msg.body.on,msg.body.mode,msg.body.idelay,msg.body.rdelay)
+          msg.body.on,msg.body.mode,msg.body.idelay,msg.body.rdelay);
 
-         write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2112));
+   write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2112));
 
 }
 
@@ -292,6 +292,24 @@ int send_2101_ACK(FASIT_header *hdr,int response,thread_data_t *minion) {
    write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&rmsg,sizeof(FASIT_2101));
    return 0;
 }
+                  // now send it to the MCP master
+int psend_mcp(thread_data_t *minion,void *Lc){
+   int result;
+   char hbuf[100];
+   LB_packet_t *L=(LB_packet_t *)Lc;    // so we can call it with different types and not puke.
+
+   // calculates the correct CRC and adds it to the end of the packet payload
+   set_crc8(L);
+
+   result=write(minion->mcp_sock,L,RF_size(L->cmd));
+   //  sent LB
+   if (verbose&D_RF){       // don't do the sprintf if we don't need to
+      sprintf(hbuf,"Minion %d: psend LB packet to MCP sock=%d   RF address=%4d cmd=%2d msglen=%d result=%d",
+              minion->mID,minion->mcp_sock,minion->RF_addr,L->cmd,RF_size(L->cmd),result);
+      DDCMSG2_HEXB(D_RF,YELLOW,hbuf,L,RF_size(L->cmd));
+   }
+   return result;
+}
 
 /********
  ********
@@ -302,7 +320,7 @@ int send_2101_ACK(FASIT_header *hdr,int response,thread_data_t *minion) {
 
 int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct timespec *elapsed_time){
 
-   int result;
+   int result,psize;
    char hbuf[100];
 
    FASIT_header *header;
@@ -312,6 +330,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
    FASIT_2110    *message_2110;
    FASIT_13110   *message_13110;
 
+   char qbuf[32],rbuf[32];      // more packet buffers
+   
    LB_packet_t          LB_buf;
    LB_device_reg_t      *LB_devreg;
    LB_status_req_t      *LB_status_req;
@@ -386,7 +406,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
       case 2100:
          message_2100 = (FASIT_2100*)(buf + sizeof(FASIT_header));
 
-         DDCMSG(D_PACKET,BLUE,"Minion %d: fasit packet 2100, CID=%d", minion->mID,message_2100->cid);
+         DDCMSG(D_PACKET,BLUE,"Minion %d: fasit packet 2100, CID=%d\n\n***************\n\n", minion->mID,message_2100->cid);
 
          // Just parse out the command for now and print a pretty message
          switch (message_2100->cid) {
@@ -476,19 +496,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 
                minion->S.status.flags=F_told_RCC;
                minion->S.status.timer=20;
-               // calculates the correct CRC and adds it to the end of the packet payload
-               // also fills in the length field
-               set_crc8(LB_status_req);
-
                // now send it to the MCP master
-               result=write(minion->mcp_sock,LB_status_req,RF_size(LB_status_req->cmd));
-               //  sent LB
-               if (verbose&D_RF){       // don't do the sprintf if we don't need to
-                  sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d result=%d",
-                          minion->mID,minion->RF_addr,LB_status_req->cmd,RF_size(LB_status_req->cmd),result);
-                  DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_status_req,RF_size(LB_status_req->cmd));
-               }
+               DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_status_req cmd=%d", minion->mID,LB_status_req->cmd);
 
+               psend_mcp(minion,LB_status_req);
+               
                // I'm expecting a response within 2 seconds
                minion->S.rf_t.flags=F_rf_t_waiting_short;
                minion->S.rf_t.timer=20; // give it two seconds
@@ -497,27 +509,19 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
             case CID_Expose_Request:
                DDCMSG(D_PACKET,BLACK,"Minion %d: CID_Expose_Request  send 'S'uccess ack.   message_2100->exp=%d",minion->mID,message_2100->exp);
                //                   also build an LB packet  to send
-               DDCMSG(D_PACKET,BLACK,"Minion %d: decide if we are going up or going down(exp=%d)",minion->mID,message_2100->exp);
                if (message_2100->exp==90){
-                  DDCMSG(D_PACKET,BLUE,"Minion %d: decide if we are going up or going down(exp=%d)",minion->mID,message_2100->exp);
-
-                  LB_exp =(LB_expose_t *)&LB_buf;       // make a pointer to our buffer so we can use the bits right
-
+                  DDCMSG(D_PACKET,BLUE,"Minion %d:  going up (exp=%d)",minion->mID,message_2100->exp);
+                  LB_exp =(LB_expose_t *)qbuf;       // make a pointer to our buffer so we can use the bits right
                   DDCMSG(D_PACKET,BLACK,"Minion %d: we seem to work here******************* &LB_buf=%p",minion->mID,&LB_buf);
-
                   LB_exp->cmd=LBC_EXPOSE;
                   LB_exp->addr=minion->RF_addr;
-
                   //                            minion->S.exp.data=0;                   // cheat and set the current state to 45
                   minion->S.exp.newdata=message_2100->exp;      // set newdata to be the future state
                   LB_exp->expose=1;
                   minion->S.exp.flags=F_exp_expose_A;   // start (faking FASIT) moving to expose
-
                   minion->S.exp.timer=5;
-
                   minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec;
                   minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
-
                   LB_exp->event=++minion->S.exp.event;  // fill in the event
 
                   //  really need to fill in with the right stuff
@@ -526,13 +530,13 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                   LB_exp->react=0;
                   LB_exp->mfs=0;
                   LB_exp->thermal=0;
-                  // calculates the correct CRC and adds it to the end of the packet payload
-                  // also fills in the length field
-                  set_crc8(LB_exp);
-                  // now send it to the MCP master
-
+                  DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_exp cmd=%d", minion->mID,LB_exp->cmd);
+                  psend_mcp(minion,LB_exp);
+                  
                } else {
                   int uptime;
+                  DDCMSG(D_PACKET,BLACK,"Minion %d: going down(exp=%d)",minion->mID,message_2100->exp);
+
                   // we must assume that it is a 'conceal' that followed the last expose.
                   //        so now the event is over and we need to send the qconceal command
                   //        and the termination of the event time and stuff
@@ -552,35 +556,37 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                   minion->S.exp.timer=5;
 
                   DDCMSG(D_VERY,BLACK,"Minion %d: &LB_buf=%p",minion->mID,&LB_buf);                     
-                  LB_qcon =(LB_qconceal_t *)&LB_buf;    // make a pointer to our buffer so we can use the bits right
+                  LB_qcon =(LB_qconceal_t *)qbuf;    // make a pointer to our buffer so we can use the bits right
                   DDCMSG(D_VERY,BLACK,"Minion %d: map packet in",minion->mID);
 
                   LB_qcon->cmd=LBC_QCONCEAL;
                   LB_qcon->addr=minion->RF_addr;
                   LB_qcon->event=minion->S.exp.event;
                   LB_qcon->uptime=uptime;
-                  set_crc8(LB_qcon);
-                  DDCMSG(D_VERY,BLUE,"Minion %d: called set_crc8",minion->mID);
-
+                  
+                  DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_qcon cmd=%d", minion->mID,LB_qcon->cmd);
+                  psend_mcp(minion,LB_qcon);
+                  
                   // we also need a report for this event from the target, so we will have to send a request_rep packet soon.
-                  // but we don't want to send it right yet.
-                  //  sending the request report would need to happen not much later than the next expose command - at the latest
+                  // just go ahead and send the report request now, too
+                  //                  build an LB packet  report_req packet
+                  {
+                     LB_report_req_t *L=(LB_report_req_t *) rbuf;
 
-                  minion->S.event.flags|=F_needs_report;
-                  minion->S.event.data=minion->S.exp.event;
-                  minion->S.event.timer = 15;   // lets try 1.5 seconds
+                     L->cmd=LBC_REPORT_REQ;
+                     L->addr=minion->RF_addr;
+                     L->event=minion->S.exp.event;
 
+                     DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_report_req cmd=%d", minion->mID,L->cmd);
+                     psend_mcp(minion,L);
+
+                     minion->S.event.flags = 0;
+                     minion->S.event.timer = 0;
+                        // TODO -- what do we do when we don't receive a report?
+                        //minion->S.event.flags=F_waiting_for_report;
+                        //minion->S.event.timer = 20;   // lets try 5.0 seconds
+                  }
                }
-
-               DDCMSG(D_PACKET,BLUE,"Minion %d: send LB up to MCP   ---- or hang on write",minion->mID);
-
-               result=write(minion->mcp_sock,&LB_buf,RF_size(LB_buf.cmd));
-               if (verbose&D_RF){       // don't do the sprintf if we don't need to
-                  sprintf(hbuf,"Minion %d:m LB packet to MCP address=%4d cmd=%2d msglen=%d result=%d",
-                          minion->mID,minion->RF_addr,LB_buf.cmd,RF_size(LB_buf.cmd),result);
-                  DDCMSG2_HEXB(D_RF,YELLOW,hbuf,&LB_buf,RF_size(LB_buf.cmd));
-               }
-               //  sent LB
 
                // send 2101 ack  (2102's will be generated at start and stop of actuator)
                send_2101_ACK(header,'S',minion);    // TRACR Cert complains if these are not there
@@ -652,30 +658,23 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: speed after: %i",minion->mID, LB_move->speed);
                if (message_2100->move == 2) {
                   DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: direction 2",minion->mID);
-                  LB_move->dir = 2;
+                  LB_move->move = 2;
                } else if (message_2100->move ==1) {
                   DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: direction 1",minion->mID);
-                  LB_move->dir = 1;
+                  LB_move->move = 1;
                } else {
                   DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: direction 0",minion->mID);
-                  LB_move->dir = 0;
+                  LB_move->move = 0;
                   LB_move->speed = 0;
                }
                if (message_2100->cid == CID_Stop) {
                   DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: E-Stop",minion->mID);
                   LB_move->speed = 2047; // emergency stop speed
                }
-               // calculates the correct CRC and adds it to the end of the packet payload
-               // also fills in the length field
-               set_crc8(LB_move);
+
                // now send it to the MCP master
-               result=write(minion->mcp_sock,LB_move,RF_size(LB_move->cmd));
-               if (verbose&D_RF){       // don't do the sprintf if we don't need to
-                  sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",minion->mID,minion->RF_addr,LB_move->cmd,RF_size(LB_move->cmd));
-                  DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_move,RF_size(LB_move->cmd));
-                  DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_move->cmd),minion->mcp_sock);
-               }
-               //  sent LB
+               DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_move cmd=%d", minion->mID,LB_move->cmd);
+               psend_mcp(minion,LB_move);
 
                // send 2101 ack  (2102's will be generated at start and stop of actuator)
                send_2101_ACK(header,'S',minion);    // TRACR Cert complains if these are not there
@@ -719,16 +718,10 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                   LB_configure->hitcountset = 0; // no change
                }
 
-               // calculates the correct CRC and adds it to the end of the packet payload
-               // also fills in the length field
-               set_crc8(LB_configure);
                // now send it to the MCP master
-               result=write(minion->mcp_sock,LB_configure,RF_size(LB_configure->cmd));
-               if (verbose&D_RF){       // don't do the sprintf if we don't need to
-                  sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",minion->mID,minion->RF_addr,LB_configure->cmd,RF_size(LB_configure->cmd));
-                  DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_configure,RF_size(LB_configure->cmd));
-                  DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_configure->cmd),minion->mcp_sock);
-               }  
+               DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_configure cmd=%d", minion->mID,LB_configure->cmd);
+               psend_mcp(minion,LB_configure);
+
                //      actually Riptide says that the FASIT spec is wrong and should not send an ACK here
                //                               send_2101_ACK(header,'S',minion); // FASIT Cert seems to complain about this ACK
 
@@ -817,16 +810,10 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                      break;
                }
 
-               // calculates the correct CRC and adds it to the end of the packet payload
-               // also fills in the length field
-               set_crc8(LB_power);
                // now send it to the MCP master
-               result=write(minion->mcp_sock,LB_power,RF_size(LB_power->cmd));
-               if (verbose&D_RF){       // don't do the sprintf if we don't need to
-                  sprintf(hbuf,"Minion %d: LB packet to MCP address=%4d cmd=%2d msglen=%d",minion->mID,minion->RF_addr,LB_power->cmd,RF_size(LB_power->cmd));
-                  DDCMSG2_HEXB(D_RF,YELLOW,hbuf,LB_power,RF_size(LB_power->cmd));
-                  DDCMSG(D_RF,YELLOW,"  Sent %d bytes to MCP fd=%d\n",RF_size(LB_power->cmd),minion->mcp_sock);
-               }
+               DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_power cmd=%d", minion->mID,LB_power->cmd);
+               psend_mcp(minion,LB_power);
+
                //  sent LB
 
                // send 2101 ack  (2102's will be generated at start and stop of actuator)
@@ -1083,8 +1070,6 @@ void *minion_thread(thread_data_t *minion){
                      minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
                      minion->S.exp.timer=15;    // 1.5 second later
                   }
-                  minion->S.exp.data=minion->S.exp.newdata; // grab from "future" state
-                  sendStatus2102(0, NULL,minion);
                   break;
 
                case LBC_STATUS_RESP_EXT:
@@ -1096,7 +1081,7 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.exp.timer=0;
                   
                   minion->S.speed.data = (float)(L->speed / 100.0); // convert back to correct float
-                  minion->S.move.data = L->dir;
+                  minion->S.move.data = L->move;
                   minion->S.react.newdata = L->react;
                   minion->S.tokill.newdata = L->tokill;
                   minion->S.mode.newdata = L->hitmode ? 2 : 1; // back to burst/single
@@ -1107,7 +1092,12 @@ void *minion_thread(thread_data_t *minion){
                   DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_EXT'. hits=%d location=%d fault=%02X sending 2102 status",
                          minion->mID,minion->RF_addr,L->hits,L->location,L->fault);
                   sendStatus2102(0, NULL,minion);
+               }
 
+                  // reset lookup timer
+               if (minion->S.exp.flags == F_exp_expose_D) {
+                  minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
+                  minion->S.exp.timer=15;    // 1.5 second later
                }
                break;
 
@@ -1120,12 +1110,17 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.exp.timer=0;
 
                   minion->S.speed.data = (float)(L->speed / 100.0); // convert back to correct float
-                  minion->S.move.data = L->dir;
+                  minion->S.move.data = L->move;
                   minion->S.position.data = L->location;
-                  DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_MOVER'. hits=%d speed=%d dir=%d location=%d  sending 2102 status",
-                         minion->mID,minion->RF_addr,L->hits,L->speed,L->dir,L->location);
+                  DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_MOVER'. hits=%d speed=%d move=%d location=%d  sending 2102 status",
+                         minion->mID,minion->RF_addr,L->hits,L->speed,L->move,L->location);
                   sendStatus2102(0, NULL,minion);
-
+                  
+                  // reset lookup timer
+                  if (minion->S.exp.flags == F_exp_expose_D) {
+                     minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
+                     minion->S.exp.timer=15;    // 1.5 second later
+                  }
                }
                break;
 
@@ -1137,22 +1132,18 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
                   minion->S.exp.timer=0;
 
-
                   DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_LIFTER'. hits=%d  exp=%d sending 2102 status",
                          minion->mID,minion->RF_addr,L->hits,L->expose);
                   sendStatus2102(0, NULL,minion);
 
                   //  exp state reset above
-#if 0
                   // reset lookup timer
                   if (minion->S.exp.flags == F_exp_expose_D) {
                      minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
                      minion->S.exp.timer=15;    // 1.5 second later
                   }
-#endif
                }
                break;
-
 
 
                default:
@@ -1236,7 +1227,7 @@ void *minion_thread(thread_data_t *minion){
    }  // while forever
    if (minion->rcc_sock > 0) { close(minion->rcc_sock); }
    if (minion->mcp_sock > 0) { close(minion->mcp_sock); }
-}  // end of minon thread
+}  // end of minion thread
 
 
 

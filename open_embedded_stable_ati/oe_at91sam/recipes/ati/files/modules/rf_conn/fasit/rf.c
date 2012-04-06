@@ -246,8 +246,8 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_device_reg_t *L=(LB_device_reg_t *)LB;
             strcpy(cmdname,"Device_Reg");
-            sprintf(hbuf,"devid=%3x devtype=%x hits=%2d exp=%d speed=%d dir=%d loc=%d",
-                    L->devid,L->dev_type,L->hits,L->expose,L->speed,L->dir,L->location);
+            sprintf(hbuf,"devid=%3x devtype=%x hits=%2d exp=%d speed=%d move=%d loc=%d",
+                    L->devid,L->dev_type,L->hits,L->expose,L->speed,L->move,L->location);
             color=MAGENTA;
          }
          break;
@@ -286,7 +286,7 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_move_t *L=(LB_move_t *)LB;
             strcpy(cmdname,"Move");
-            sprintf(hbuf,"RFaddr=%3d dir=%d speed=%d",L->addr,L->dir,L->speed);
+            sprintf(hbuf,"RFaddr=%3d move=%d speed=%d",L->addr,L->move,L->speed);
          }
             break;
 
@@ -328,7 +328,7 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_status_resp_mover_t *L=(LB_status_resp_mover_t *)LB;
             strcpy(cmdname,"Status_Resp_Mover");
-            sprintf(hbuf,"RFaddr=%3d hits=%2d exp=%d speed=%d dir=%d loc=%d",L->addr,L->hits,L->expose,L->speed,L->dir,L->location);
+            sprintf(hbuf,"RFaddr=%3d hits=%2d exp=%d speed=%d move=%d loc=%d",L->addr,L->hits,L->expose,L->speed,L->move,L->location);
             color=MAGENTA;
          }
             break;

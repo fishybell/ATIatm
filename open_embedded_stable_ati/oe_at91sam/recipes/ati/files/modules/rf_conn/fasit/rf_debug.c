@@ -13,7 +13,7 @@ void debug_EXPOSE(int color, LB_packet_t *pkt) {
 
 void debug_MOVE(int color, LB_packet_t *pkt) {
    LB_move_t *p = (LB_move_t*)pkt;
-   DCMSG(color, "LBC_MOVE: cmd: %i, addr: %i, dir: %i, speed: %i, crc: %02X", p->cmd, p->addr, p->dir, p->speed, p->crc);
+   DCMSG(color, "LBC_MOVE: cmd: %i, addr: %i, move: %i, speed: %i, crc: %02X", p->cmd, p->addr, p->move, p->speed, p->crc);
 }
 
 void debug_CONFIGURE_HIT(int color, LB_packet_t *pkt) {
@@ -49,12 +49,12 @@ void debug_STATUS_RESP_LIFTER(int color, LB_packet_t *pkt) {
 
 void debug_STATUS_RESP_MOVER(int color, LB_packet_t *pkt) {
    LB_status_resp_mover_t *p = (LB_status_resp_mover_t*)pkt;
-   DCMSG(color, "LBC_STATUS_RESP_MOVER: cmd: %i, addr: %i, hits: %i, expose: %i, speed: %i, dir: %i, location: %i, crc: %02X", p->cmd, p->addr, p->hits, p->expose, p->speed, p->dir, p->location, p->crc);
+   DCMSG(color, "LBC_STATUS_RESP_MOVER: cmd: %i, addr: %i, hits: %i, expose: %i, speed: %i, move: %i, location: %i, crc: %02X", p->cmd, p->addr, p->hits, p->expose, p->speed, p->move, p->location, p->crc);
 }
 
 void debug_STATUS_RESP_EXT(int color, LB_packet_t *pkt) {
    LB_status_resp_ext_t *p = (LB_status_resp_ext_t*)pkt;
-   DCMSG(color, "LBC_STATUS_RESP_EXT: cmd: %i, addr: %i, hits: %i, expose: %i, speed: %i, dir: %i, react: %i, location: %i, hitmode: %i, tokill: %i, sensitivity: %i, timehits: %i, fault: %i, crc: %02X", p->cmd, p->addr, p->hits, p->expose, p->speed, p->dir, p->react, p->location, p->hitmode, p->tokill, p->sensitivity, p->timehits, p->fault, p->crc);
+   DCMSG(color, "LBC_STATUS_RESP_EXT: cmd: %i, addr: %i, hits: %i, expose: %i, speed: %i, move: %i, react: %i, location: %i, hitmode: %i, tokill: %i, sensitivity: %i, timehits: %i, fault: %i, crc: %02X", p->cmd, p->addr, p->hits, p->expose, p->speed, p->move, p->react, p->location, p->hitmode, p->tokill, p->sensitivity, p->timehits, p->fault, p->crc);
 }
 
 void debug_STATUS_NO_RESP(int color, LB_packet_t *pkt) {
