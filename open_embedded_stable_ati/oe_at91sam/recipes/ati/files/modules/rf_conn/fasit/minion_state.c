@@ -91,7 +91,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             switch (minion->S.rf_t.flags) {
                case F_rf_t_waiting_short:
 
-#if 0
+#if 1
                   DDCMSG(D_MSTATE,RED,"*&#$*&#$\n*&#$*&#$\nMINION %d: Would time out  and disconnect.   S.rf_t.timer=%d   S.rf_t.timer=%d",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
 #else
 
