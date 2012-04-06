@@ -279,7 +279,7 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
 }
 
 // macro used in rf2fasit
-#define HANDLE_RF(RF_NUM) case LBC_ ## RF_NUM : retval = handle_ ## RF_NUM (fc, start, end) ; break;
+#define HANDLE_RF(RF_NUM) case LBC_ ## RF_NUM : retval |= handle_ ## RF_NUM (fc, start, end) ; break;
 
 // mangle an rf message into 1 or more fasit messages, and potentially respond with rf message
 int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
@@ -293,7 +293,7 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
   
    // read all available valid messages
    debugRF(RED, fc->rf_ibuf, fc->rf_ilen);
-   while (retval == doNothing && (mnum = validMessage(fc, &start, &end)) != -1) {
+   while ((mnum = validMessage(fc, &start, &end)) != -1) {
       if (!packetForMe(fc, start)) {
          DDCMSG(D_RF,RED,"Ignored RF message %d",mnum);
       } else {
@@ -331,6 +331,7 @@ int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
    DDCMSG(D_RF|D_VERY,RED, "handle_STATUS_REQ(%8p, %i, %i)", fc, start, end);
    // wait 'til we have the most up-to-date information to send
    fc->waiting_status_resp = 1;
+   DCMSG(BLACK, "#######################################\nWaiting: %i, Epoll: %i\n#######################################", fc->waiting_status_resp, fc->added_rf_to_epoll);
    return send_2100_status_req(fc); // gather latest information
 }
 
@@ -400,7 +401,12 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    DDCMSG(D_RF|D_VERY,RED, "send_STATUS_RESP(%08X)", fc);
    D_memset(&s, 0, sizeof(LB_status_resp_ext_t));
    s.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
-   s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
+   if (fc->f2102_resp.body.exp == 45) {
+      DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+      s.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
+   } else {
+      s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
+   }
    s.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
    s.move = fc->f2102_resp.body.move & 0x3;
    s.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
@@ -409,18 +415,16 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.sensitivity = fc->hit_react;
    s.timehits = fc->hit_burst;
    s.fault = fc->last_fault;
+   s.tokill = fc->hit_tokill;
    DDCMSG(D_RF|D_VERY,BLACK, "Fault encountered: %04X %02X", fc->last_fault, s.fault);
    if (s.fault) {
       fc->last_fault = 0; // clear out fault
    }
 
-   // check to see if we've never sent any status before
-   if (!fc->sent_status) {
-      // copy current status to last status and send it
-      fc->last_status = s;
-      retval = send_STATUS_RESP_EXT(fc);
-      goto SR_end;
-   }
+   DCMSG(BLACK, "\n============================\nNew values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\nOld values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\nf2102 vals: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\n",
+      s.hits, s.expose, s.speed, s.dir, s.react, s.location, s.hitmode, s.tokill, s.sensitivity, s.timehits, s.fault,
+      fc->last_status.hits, fc->last_status.expose, fc->last_status.speed, fc->last_status.dir, fc->last_status.react, fc->last_status.location, fc->last_status.hitmode, fc->last_status.tokill, fc->last_status.sensitivity, fc->last_status.timehits, fc->last_status.fault,
+      htons(fc->f2102_resp.body.hit), fc->f2102_resp.body.exp, htonf(fc->f2102_resp.body.speed), htons(fc->f2102_resp.body.dir), fc->f2102_resp.body.hit_conf.react, htons(fc->f2102_resp.body.pos), fc->f2102_resp.body.hit_conf.mode, htons(fc->f2102_resp.body.hit_conf.tokill), htons(fc->f2102_resp.body.hit_conf.sens), htons(fc->f2102_resp.body.hit_conf.burst), htons(fc->f2102_resp.body.fault));
 
    // determine changes send correct status response
    if (s.fault != fc->last_status.fault ||
@@ -433,11 +437,15 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
       fc->last_status = s;
       retval = send_STATUS_RESP_EXT(fc);
       goto SR_end;
+#if 0
    } else if (s.location != fc->last_status.location ||
               s.move != fc->last_status.move ||
               s.speed != fc->last_status.speed ||
               s.expose != fc->last_status.expose ||
               s.hits > 0) {
+#else
+   } else {
+#endif
       // copy current status to last status and send it
       fc->last_status = s;
       // send appropriate mover or lifter message
@@ -448,10 +456,12 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
          retval = send_STATUS_RESP_LIFTER(fc);
          goto SR_end;
       }
+#if 0
    } else {
       // nothing changed, send that
       retval = send_STATUS_NO_RESP(fc);
       goto SR_end;
+#endif
    }
    // single spot to reset hit_hit
    SR_end:
@@ -467,7 +477,6 @@ int send_STATUS_RESP_LIFTER(fasit_connection_t *fc) {
    bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    bdy.hits = fc->last_status.hits;
    bdy.expose = fc->last_status.expose;
-   fc->sent_status = 1; // have sent a status message before
 
    DDCMSG(D_RF|D_VERY, BLACK, "send_STATUS_RESP_LIFTER hits: %i from %i", bdy.hits, fc->last_status.hits);
 
@@ -488,7 +497,6 @@ int send_STATUS_RESP_MOVER(fasit_connection_t *fc) {
    bdy.speed = fc->last_status.speed;
    bdy.move = fc->last_status.move;
    bdy.location = fc->last_status.location;
-   fc->sent_status = 1; // have sent a status message before
 
    DDCMSG(D_RF|D_VERY, BLACK, "send_STATUS_RESP_MOVER hits: %i from %i", bdy.hits, fc->last_status.hits);
 
@@ -503,7 +511,6 @@ int send_STATUS_RESP_EXT(fasit_connection_t *fc) {
    // finish filling in message and send
    fc->last_status.cmd = LBC_STATUS_RESP_EXT;
    fc->last_status.addr = fc->id & 0x7FF; // source address (always to basestation)
-   fc->sent_status = 1; // have sent a status message before
 
    DDCMSG(D_RF|D_VERY, BLACK, "send_STATUS_RESP_EXT hits: %i", fc->last_status.hits);
 
@@ -566,6 +573,8 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
    // change event
    fc->current_event = pkt->event;
    clock_gettime(CLOCK_MONOTONIC,&fc->event_starts[fc->current_event]);
+   fc->future_exp = pkt->expose ? 90 : 0;
+   DCMSG(BLACK, "||||||||||||||||\nSETTING FUTURE: %i\n||||||||||||||||", fc->future_exp);
 
    // send configure hit sensing
    retval |= send_2100_conf_hit(fc, 4, /* blank on conceal */
@@ -794,6 +803,37 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    bdy.devid = fc->devid;
    DDCMSG(D_RF|D_MEGA, BLACK, "Going to pass devid: %02X:%02X:%02X:%02X", (bdy.devid & 0xff000000) >> 24, (bdy.devid & 0xff0000) >> 16, (bdy.devid & 0xff00) >> 8, bdy.devid & 0xff);
 
+   // status block
+   bdy.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
+   if (fc->f2102_resp.body.exp == 45) {
+      DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+      bdy.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
+   } else {
+      bdy.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
+   }
+   bdy.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
+   bdy.dir = fc->f2102_resp.body.move & 0x3;
+   bdy.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
+   bdy.hitmode = fc->hit_mode;
+   bdy.react = fc->hit_react;
+   bdy.sensitivity = fc->hit_react;
+   bdy.timehits = fc->hit_burst;
+   bdy.fault = fc->last_fault;
+   bdy.tokill = fc->hit_tokill;
+   
+   // copy this info to last sent status
+   fc->last_status.hits = bdy.hits;
+   fc->last_status.expose = bdy.expose;
+   fc->last_status.speed = bdy.speed;
+   fc->last_status.dir = bdy.dir;
+   fc->last_status.location = bdy.location;
+   fc->last_status.hitmode = bdy.hitmode;
+   fc->last_status.react = bdy.react;
+   fc->last_status.sensitivity = bdy.sensitivity;
+   fc->last_status.timehits = bdy.timehits;
+   fc->last_status.fault = bdy.fault;
+   fc->last_status.tokill = bdy.tokill;
+
    // put in the crc and send
    set_crc8(&bdy);
    queueMsg(fc, &bdy, RF_size(LBC_DEVICE_REG));
@@ -828,7 +868,8 @@ int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end) {
    // reset hit event log
    for (fc->current_event = MAX_HIT_EVENTS - 1; fc->current_event >= 0; fc->current_event--) {
       log_ResetHits(fc);
-   } // should end on fc->current_event of 0
+   } // should end on fc->current_event of -1
+   fc->current_event = 0; // ... make it a 0 again
    return doNothing;
 }
 
