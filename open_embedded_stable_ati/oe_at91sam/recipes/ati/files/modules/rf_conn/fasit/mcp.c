@@ -392,6 +392,19 @@ int main(int argc, char **argv) {
                      // we already have this devID, so reconnect because the RFslave probably rebooted or something
                      DCMSG(RED,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
 
+                     ////////  iniiialize the rest of the minion state from what was reported in the registration packet
+                     mID = addr_pool[addr_cnt].mID;
+                     minions[mID].S.hit.data = LB_devreg->hits;
+                     minions[mID].S.exp.data = LB_devreg->expose;
+                     minions[mID].S.speed.data = LB_devreg->speed*100.0;
+                     minions[mID].S.dir.data = LB_devreg->dir;
+                     minions[mID].S.react.data = LB_devreg->react;
+                     minions[mID].S.position.data = LB_devreg->location;
+                     minions[mID].S.mode.data = LB_devreg->hitmode;
+                     minions[mID].S.burst.newdata = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
+
+                     minions[mID].S.fault.data = LB_devreg->fault;
+
                   } else {
                      // we do not have this devID.  Look for the first free address to use
                      addr_cnt=1;                //  step through to check to find unused
@@ -467,9 +480,9 @@ int main(int argc, char **argv) {
                         minions[mID].S.react.data = LB_devreg->react;
                         minions[mID].S.position.data = LB_devreg->location;
                         minions[mID].S.mode.data = LB_devreg->hitmode;
-//                      minions[mID].S.timehits = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
+                        minions[mID].S.burst.newdata = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
 
-//                        minions[mID].S.fault = LB_devreg->fault;
+                        minions[mID].S.fault.data = LB_devreg->fault;
 
                         // maybe there should also be stuff for MFS (NES?) MGS MILES and GPS in the device_reg packet
 
