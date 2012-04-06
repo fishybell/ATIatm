@@ -77,6 +77,8 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
       DDCMSG(D_MSTATE,RED,"MINION %d: timer update.   rf_t.flags/timer=0x%x/%i   exp.flags/timer=0x%x/%i   event.flags/timer=0x%x/%i",
              minion->mID,minion->S.rf_t.flags,minion->S.rf_t.timer,minion->S.exp.flags,minion->S.exp.timer,minion->S.event.flags,minion->S.event.timer);
 
+
+      
       // if there is an rf timer flag set, we then need to do something
       if (minion->S.rf_t.flags) { 
 
@@ -116,13 +118,13 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   // ask for a status
 
                   minion->S.status.flags=F_told_RCC;
-                  minion->S.status.timer=20;
+                  minion->S.status.timer=50;
 
                   force_stat_req=1;     // so we don't send repeated status_req
 
                   // I'm expecting a response within 3 seconds
                   minion->S.rf_t.flags=F_rf_t_waiting_short;
-                  minion->S.rf_t.timer=30; // give it three seconds
+                  minion->S.rf_t.timer=50; // give it three seconds
                   break;
             }  // end of switch
          }   // else clause - rf_t flag
@@ -155,7 +157,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   
                  // I'm expecting a response within 3 seconds
                   minion->S.rf_t.flags=F_rf_t_waiting_short;
-                  minion->S.rf_t.timer=30; // give it three seconds
+                  minion->S.rf_t.timer=51; // give it three seconds
                   
                   break;
 
@@ -202,6 +204,10 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
                   force_stat_req=1;
+                  // I'm expecting a response within 3 seconds
+                  minion->S.rf_t.flags=F_rf_t_waiting_short;
+                  minion->S.rf_t.timer=52; // give it three seconds
+
                   break;
 
 #if 0    // again, this is superflous     
@@ -315,13 +321,24 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                case F_needs_report:
 
                   force_stat_req=1;
-                  minion->S.event.flags = 0;
-                  minion->S.event.timer = 0;
-                        // TODO -- what do we do when we don't receive a report?
-                        //minion->S.event.flags=F_waiting_for_report;
-                        //minion->S.event.timer = 20;   // lets try 5.0 seconds
-               }
-               break;
+//                  minion->S.event.flags = 0;
+//                  minion->S.event.timer = 0;
+                  // TODO -- what do we do when we don't receive a report?
+                  minion->S.event.flags=F_waiting_for_report;
+                  minion->S.event.timer = 100;   // lets try 5.0 seconds
+
+                  break;
+
+               case F_waiting_for_report:
+
+                  force_stat_req=1;
+//                  minion->S.event.flags = 0;
+//                  minion->S.event.timer = 0;
+                  // TODO -- what do we do when we don't receive a report?
+                  minion->S.event.flags=F_waiting_for_report;
+                  minion->S.event.timer = 150;   // lets try 5.0 seconds
+
+                  break;
 
             }
          }
@@ -336,6 +353,8 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE,GREEN,"Minion %d:   build and send L LBC_STATUS_REQ", minion->mID);
          result= psend_mcp(minion,&LB_buf);
          force_stat_req=0;
+         minion->S.event.flags=F_waiting_for_report;
+         minion->S.event.timer = 55;   // lets try 5.0 seconds         
       }
    }
 
@@ -346,4 +365,8 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
    Set_Timer(minion->S.event.timer);               // if arg is >0 and <timer, it is the new timer
    Set_Timer(minion->S.rf_t.timer);                // if arg is >0 and <timer, it is the new timer
    Set_Timer(minion->S.move.timer);               // if arg is >0 and <timer, it is the new timer
+
+   DDCMSG(D_MSTATE,GRAY,"\nMinion %d:   Set_Timer=%d   exp=%d event=%d rf_t=%d move=%d",
+          minion->mID,minion->S.state_timer,minion->S.exp.timer,minion->S.event.timer,minion->S.rf_t.timer,minion->S.move.timer);
+
 }
