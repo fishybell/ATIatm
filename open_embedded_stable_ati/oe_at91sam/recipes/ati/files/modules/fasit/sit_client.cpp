@@ -563,6 +563,7 @@ int SIT_Client::handle_2100(int start, int end) {
           msg->cid,msg->exp,msg->asp,msg->dir,msg->move,msg->speed,msg->on,htons(msg->hit),msg->react,htons(msg->tokill),htons(msg->sens),msg->mode,htons(msg->burst));
 
     // do the event that was requested
+    int send2102 = 0;
     switch (msg->cid) {
         case CID_No_Event:
             DCMSG(RED,"CID_No_Event  send 'S'uccess ack") ; 
@@ -656,6 +657,15 @@ int SIT_Client::handle_2100(int start, int end) {
                 // remember told value for later
                 fake_sens = htons(msg->sens);
             }
+            if (hits == htons(msg->hit) && hits != -1) {
+                send2102 = 1;
+                //sendStatus2102(0);  // sends a 2102 only if we changed the the hit calibration
+                DCMSG(RED,"We will send 2102 status in response to the config hit sensor command: %i %i", hits, htons(msg->hit)); 
+            } else {
+                doHits(htons(msg->hit));    // set hit count to something other than zero
+                DCMSG(RED,"after doHits(%d) ",htons(msg->hit)) ;
+            }
+
             if (htons(msg->tokill))  lastHitCal.hits_to_kill = htons(msg->tokill); 
             lastHitCal.after_kill = msg->react;    // 0 for stay down
             lastHitCal.type = msg->mode;           // mechanical sensor
@@ -663,15 +673,9 @@ int SIT_Client::handle_2100(int start, int end) {
             doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
             DCMSG(RED,"calling doHitCal after setting values") ;        
             // send 2102 status or change the hit count (which will send the 2102 later)
-            if (hits == htons(msg->hit)) {
+            if (send2102) {
                 sendStatus2102(1);  // sends a 2102 as we won't if we didn't change the the hit count
-                //sendStatus2102(0);  // sends a 2102 only if we changed the the hit calibration
-                DCMSG(RED,"We will send 2102 status in response to the config hit sensor command"); 
-            } else {
-                doHits(htons(msg->hit));    // set hit count to something other than zero
-                DCMSG(RED,"after doHits(%d) ",htons(msg->hit)) ;
             }
-
             break;
 
         case CID_GPS_Location_Request:
