@@ -246,7 +246,7 @@ typedef struct LB_expose {
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
 
    uint32 event:5 __attribute__ ((packed));
-   uint32 expose:1 __attribute__ ((packed));
+   uint32 expose:1 __attribute__ ((packed)); // wait...the expose command always does expose...we now use this bit to say "yes, we're doing an expose" vs. "no, just change the 'event' number we're on, the hit sensing, etc."
    uint32 hitmode:1 __attribute__ ((packed));
    uint32 tokill:4 __attribute__ ((packed));
    uint32 react:3 __attribute__ ((packed));
