@@ -19,7 +19,7 @@
 #define TIMEOUT_IN_SECONDS		3
 #define BOB_TIMEOUT_IN_MILLISECONDS		1000
 #define SENSOR_TIMEOUT_LEAVE_IN_MILLISECONDS		250
-#define SENSOR_TIMEOUT_ARRIVE_IN_MILLISECONDS	2000
+#define SENSOR_TIMEOUT_ARRIVE_IN_MILLISECONDS	5000 /* with the new current limiters, cold move times are measured in the multiples of seconds */
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
