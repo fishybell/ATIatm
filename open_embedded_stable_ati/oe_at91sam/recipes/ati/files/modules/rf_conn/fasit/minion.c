@@ -312,22 +312,19 @@ int psend_mcp(thread_data_t *minion,void *Lc){
    return result;
 }
 
-void do_exp_state(thread_data_t *minion, struct timespec *elapsed_time) {
-   ++minion->S.exp.event;
-   minion->S.exp.flags=F_exp_expose_A;   // start (faking FASIT) moving to expose
-   minion->S.exp.timer=5;
-   minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec;
-   minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
-}
-
-void send_LB_exp(thread_data_t *minion, char *qbuf, struct timespec *elapsed_time) {
+void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expose) {
+   char qbuf[32];      // more packet buffers
    LB_expose_t *LB_exp;
    LB_exp =(LB_expose_t *)qbuf;       // make a pointer to our buffer so we can use the bits right
    LB_exp->cmd=LBC_EXPOSE;
    LB_exp->addr=minion->RF_addr;
-   LB_exp->expose=1;
-   do_exp_state(minion, elapsed_time); // will move event number and set state
-   LB_exp->event=minion->S.exp.event;  // fill in the event
+   LB_exp->expose=expose;
+   // change state
+   LB_exp->event=++minion->S.exp.event;  // fill in the event
+   minion->S.exp.flags=F_exp_expose_A;   // start (faking FASIT) moving to expose
+   minion->S.exp.timer=5;
+   minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec;
+   minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
    //  really need to fill in with the right stuff
    LB_exp->hitmode=0;
    LB_exp->tokill=0;
@@ -542,7 +539,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                if (message_2100->exp==90){
                   DDCMSG(D_PACKET,BLUE,"Minion %d:  going up (exp=%d)",minion->mID,message_2100->exp);
                   DDCMSG(D_PACKET,BLACK,"Minion %d: we seem to work here******************* &LB_buf=%p",minion->mID,&LB_buf);
-                  send_LB_exp(minion, qbuf, elapsed_time);
+                  send_LB_exp(minion, elapsed_time, 1); // do an expose, don't just change states and send "event" message
                } else {
                   int uptime;
                   DDCMSG(D_PACKET,BLACK,"Minion %d: going down(exp=%d)",minion->mID,message_2100->exp);
@@ -1089,7 +1086,7 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.exp.flags=F_exp_ok;
                   if (minion->S.exp.data == 0 && L->expose) {
                      // random movement from down to up, should send "up" command to start event
-                     do_exp_state(minion, &mt.elapsed_time);
+                     send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
                   }
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
                   minion->S.exp.timer=0;
@@ -1122,7 +1119,7 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.exp.flags=F_exp_ok;
                   if (minion->S.exp.data == 0 && L->expose) {
                      // random movement from down to up, should send "up" command to start event
-                     do_exp_state(minion, &mt.elapsed_time);
+                     send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
                   }
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
                   minion->S.exp.timer=0;
@@ -1149,7 +1146,7 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.exp.flags=F_exp_ok;
                   if (minion->S.exp.data == 0 && L->expose) {
                      // random movement from down to up, should send "up" command to start event
-                     do_exp_state(minion, &mt.elapsed_time);
+                     send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
                   }
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
                   minion->S.exp.timer=0;
