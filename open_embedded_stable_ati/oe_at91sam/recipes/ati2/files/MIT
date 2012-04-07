@@ -26,7 +26,7 @@ start () {
    # load modules
    load_modules "target_user_interface.ko mover=1" \
                 "target_battery.ko minvoltval=$mitb shutdown_wait=3" \
-                "target_mover_generic.ko mover_type=$mitm reverse=$mitr" \
+                "target_mover_generic.ko mover_type=$mitm reverse=$mitr dock_loc=$mitd" \
                 "target_generic_output.ko" \
                 "mover.ko"
 
