@@ -94,7 +94,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 #if 1
                   DDCMSG(D_MSTATE,RED,"*&#$*&#$\n*&#$*&#$\nMINION %d: Would time out  and disconnect.   S.rf_t.timer=%d   S.rf_t.timer=%d",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
 #else
-
                   // break connection to FASIT server
                   close(minion->rcc_sock); // close FASIT
                   DCMSG(BLACK,"\n\n-----------------------------------\nDisconnected minion %i:%i:%i\n-----------------------------------\n\n",
@@ -345,7 +344,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
       } //end of if(...flags)
 
 
-      if (force_stat_req){
+      if (0/*force_stat_req*/){         //  don't send status requests at all, for now 
          // send out a request for actual position
          LB_status_req_t *L=(LB_status_req_t *)&LB_buf;
          L->cmd=LBC_STATUS_REQ;          // start filling in the packet

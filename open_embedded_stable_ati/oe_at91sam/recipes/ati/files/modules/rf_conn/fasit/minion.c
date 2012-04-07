@@ -515,11 +515,13 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                   sendStatus2112(0,header,minion); // send of a 2112 (0 means unsolicited, 1 copys mnum and seq to resp_mnum and resp_seq)
                }
 
+
+//               this might be the one place that LBC_status_req is still needed or should happen outside RFmaster.
+#if 0
                //                   also build an LB packet  to send
                LB_status_req  =(LB_status_req_t *)&LB_buf;      // make a pointer to our buffer so we can use the bits right
                LB_status_req->cmd=LBC_STATUS_REQ;
                LB_status_req->addr=minion->RF_addr;
-
 
                minion->S.status.flags=F_told_RCC;
                minion->S.status.timer=20;
@@ -531,6 +533,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                // I'm expecting a response within 2 seconds
                minion->S.rf_t.flags=F_rf_t_waiting_short;
                minion->S.rf_t.timer=20; // give it two seconds
+#endif
                break;
 
             case CID_Expose_Request:
