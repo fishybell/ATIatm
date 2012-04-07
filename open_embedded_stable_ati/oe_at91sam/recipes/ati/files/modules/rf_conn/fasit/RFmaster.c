@@ -226,7 +226,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
             while((ptype=QueuePtype(Rx))&&              /* we have a complete packet */
                   burst &&                              /* and burst is not 0 (0 forces us to send) */
                   (Queue_Depth(Tx)<240)&&               /*  room for more */
-                  !((ptype==1)&&(burst==2))             /* and if we are NOT a REQUEST_NEW AND haven't got a type 2  yet */
+                  !((ptype==1)&&(burst==2))                           /* and if we are NOT a REQUEST_NEW.   requests get bursted like everything else */
                  ){     
 
 
@@ -242,10 +242,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                          remaining_time,total_slots,slottime);
                   ReQueue(Tx,Rx,RF_size(LB_new->cmd));  // move it to the Tx queue
 
-                  //                    DCMSG(YELLOW,"requeued into M1[%d:%d]:%d s%d  size=%d",
-                  //                          M1->head-M1->buf,M1->tail-M1->buf,Queue_Depth(M1),QueueSeq_peek(M1),size);
-                  //                    sprintf(buf,"M1[%2d:%2d]  ",M1->head-M1->buf,M1->tail-M1->buf);
-                  //                    DCMSG_HEXB(YELLOW,buf,M1->head,Queue_Depth(M1));
+
                } else {
                   LB=(LB_packet_t *)Rx->head;                   
                   ReQueue(Tx,Rx,RF_size(LB->cmd));      // move it to the Tx queue
@@ -509,7 +506,12 @@ void HandleRF(int MCPsock,int risock,int RFfd){
          }  // if msgsize was positive
 
       }  // end of MCP_sock
-   } // end while 1
+
+
+
+      
+   } // end while !close_nicely
+   
    close(MCPsock);
    close(risock);
    if (riclient > 0) {

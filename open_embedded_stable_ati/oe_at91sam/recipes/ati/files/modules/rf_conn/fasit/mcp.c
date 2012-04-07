@@ -257,7 +257,6 @@ int main(int argc, char **argv) {
       DDCMSG(D_POLL,RED,"MCP: epoll_wait over   ready_fd_count = %d",ready_fd_count);
       if (close_nicely) {break;}
 
-      if (timeout<3000) timeout = 10000;
 
       //  if we have no minions, or we have been idle long enough - so we
       //      build a LB packet "request new devices"
@@ -282,7 +281,7 @@ int main(int argc, char **argv) {
          if (hunt_rotate) {
             timeout=hunttime*1000;      // idle time to wait for next go around
          } else {
-            timeout=slottime*40;        // idle time to wait for next go around
+            timeout=slottime*34;        // idle time to wait for next go around
          }
 
          DDCMSG(D_NEW,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
