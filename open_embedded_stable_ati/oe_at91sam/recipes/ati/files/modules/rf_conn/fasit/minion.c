@@ -312,6 +312,32 @@ int psend_mcp(thread_data_t *minion,void *Lc){
    return result;
 }
 
+void do_exp_state(thread_data_t *minion, struct timespec *elapsed_time) {
+   ++minion->S.exp.event;
+   minion->S.exp.flags=F_exp_expose_A;   // start (faking FASIT) moving to expose
+   minion->S.exp.timer=5;
+   minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec;
+   minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
+}
+
+void send_LB_exp(thread_data_t *minion, char *qbuf, struct timespec *elapsed_time) {
+   LB_expose_t *LB_exp;
+   LB_exp =(LB_expose_t *)qbuf;       // make a pointer to our buffer so we can use the bits right
+   LB_exp->cmd=LBC_EXPOSE;
+   LB_exp->addr=minion->RF_addr;
+   LB_exp->expose=1;
+   do_exp_state(minion, elapsed_time); // will move event number and set state
+   LB_exp->event=minion->S.exp.event;  // fill in the event
+   //  really need to fill in with the right stuff
+   LB_exp->hitmode=0;
+   LB_exp->tokill=0;
+   LB_exp->react=0;
+   LB_exp->mfs=0;
+   LB_exp->thermal=0;
+   DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_exp cmd=%d", minion->mID,LB_exp->cmd);
+   psend_mcp(minion,LB_exp);
+}
+
 /********
  ********
  ********       moved the message handling to this function so multiple packets can be handled cleanly
@@ -336,7 +362,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
    LB_packet_t          LB_buf;
    LB_device_reg_t      *LB_devreg;
    LB_status_req_t      *LB_status_req;
-   LB_expose_t          *LB_exp;
+//   LB_expose_t          *LB_exp;
    LB_move_t            *LB_move;
    LB_configure_t       *LB_configure;
    LB_power_control_t   *LB_power;
@@ -512,28 +538,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                //                   also build an LB packet  to send
                if (message_2100->exp==90){
                   DDCMSG(D_PACKET,BLUE,"Minion %d:  going up (exp=%d)",minion->mID,message_2100->exp);
-                  LB_exp =(LB_expose_t *)qbuf;       // make a pointer to our buffer so we can use the bits right
                   DDCMSG(D_PACKET,BLACK,"Minion %d: we seem to work here******************* &LB_buf=%p",minion->mID,&LB_buf);
-                  LB_exp->cmd=LBC_EXPOSE;
-                  LB_exp->addr=minion->RF_addr;
-                  //                            minion->S.exp.data=0;                   // cheat and set the current state to 45
-                  minion->S.exp.newdata=message_2100->exp;      // set newdata to be the future state
-                  LB_exp->expose=1;
-                  minion->S.exp.flags=F_exp_expose_A;   // start (faking FASIT) moving to expose
-                  minion->S.exp.timer=5;
-                  minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec;
-                  minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
-                  LB_exp->event=++minion->S.exp.event;  // fill in the event
-
-                  //  really need to fill in with the right stuff
-                  LB_exp->hitmode=0;
-                  LB_exp->tokill=0;
-                  LB_exp->react=0;
-                  LB_exp->mfs=0;
-                  LB_exp->thermal=0;
-                  DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_exp cmd=%d", minion->mID,LB_exp->cmd);
-                  psend_mcp(minion,LB_exp);
-                  
+                  send_LB_exp(minion, qbuf, elapsed_time);
                } else {
                   int uptime;
                   DDCMSG(D_PACKET,BLACK,"Minion %d: going down(exp=%d)",minion->mID,message_2100->exp);
@@ -1078,6 +1084,10 @@ void *minion_thread(thread_data_t *minion){
                   LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
                   minion->S.exp.flags=F_exp_ok;
+                  if (minion->S.exp.data == 0 && L->expose) {
+                     // random movement from down to up, should send "up" command to start event
+                     do_exp_state(minion, &mt.elapsed_time);
+                  }
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
                   minion->S.exp.timer=0;
                   
@@ -1107,6 +1117,10 @@ void *minion_thread(thread_data_t *minion){
                   LB_status_resp_mover_t *L=(LB_status_resp_mover_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
                   minion->S.exp.flags=F_exp_ok;
+                  if (minion->S.exp.data == 0 && L->expose) {
+                     // random movement from down to up, should send "up" command to start event
+                     do_exp_state(minion, &mt.elapsed_time);
+                  }
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
                   minion->S.exp.timer=0;
 
@@ -1130,6 +1144,10 @@ void *minion_thread(thread_data_t *minion){
                   LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
                   minion->S.exp.flags=F_exp_ok;
+                  if (minion->S.exp.data == 0 && L->expose) {
+                     // random movement from down to up, should send "up" command to start event
+                     do_exp_state(minion, &mt.elapsed_time);
+                  }
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
                   minion->S.exp.timer=0;
 
