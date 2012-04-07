@@ -603,6 +603,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     int kparam9, kparam10, kparam11, kparam12, kexists;
     int tparam1, tparam2, tparam3, tparam4, tparam5, tparam6, tparam7, tparam8;
     int tparam9, tparam10, tparam11, tparam12, texists;
+    int yparam1, yparam2, yparam3, yparam4, yparam5, yparam6, yparam7, yparam8;
+    int yparam9, yparam10, yparam11, yparam12, yexists;
     int eparam1, eparam2, jparam1, jparam2;
     char eparam3[5];
 	int farg1;
@@ -1639,6 +1641,122 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "I X %s\n", serial_holder); 
                      }
                      break;
+                  case 'Y': case 'y':	   // MSDH defaults
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &yexists, &yparam1, &yparam2, &yparam3, &yparam4, &yparam5, &yparam6, &yparam7, &yparam8, &yparam9, &yparam10, &yparam11, &yparam12) == 13) {        // write
+                        char msdExist[5], ybuf1[5], ybuf2[5], ybuf3[5], ybuf4[5];  
+                        char ybuf5[5], ybuf6[5], ybuf7[5], ybuf8[5];    
+                        char ybuf9[5], ybuf10[5], ybuf11[5], ybuf12[5]; 
+                        // exists
+                        snprintf(msdExist, 5, "%i", yexists);                     
+                        // activate
+                        snprintf(ybuf1, 5, "%i", yparam1);
+                        // activate on what kind of exposure
+                        snprintf(ybuf2, 5, "%i", yparam2);
+                        // activate on hit
+                        snprintf(ybuf3, 5, "%i", yparam3);
+                        // activate on kill
+                        snprintf(ybuf4, 5, "%i", yparam4);
+                        // milliseconds on time
+                        snprintf(ybuf5, 5, "%i", yparam5);
+                        // milliseconds off time
+                        snprintf(ybuf6, 5, "%i", yparam6);
+                        // start delay
+                        snprintf(ybuf7, 5, "%i", yparam7);
+                        // repeat delay
+                        snprintf(ybuf8, 5, "%i", yparam8);
+                        // repeat count
+                        snprintf(ybuf9, 5, "%i", yparam9);
+                        // ex1
+                        snprintf(ybuf10, 5, "%i", yparam10);
+                        // ex2
+                        snprintf(ybuf11, 5, "%i", yparam11);
+                        // ex3
+                        snprintf(ybuf12, 5, "%i", yparam12);
+						// write all the thm defaults
+                        snprintf(wbuf, 1024, "I Y %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+    writeEeprom(MSD_EXISTS_LOC, strnlen(msdExist, 5), MSD_EXISTS_SIZE, msdExist),
+	writeEeprom(MSD_ACTIVATE_LOC, strnlen(ybuf1, 5), MSD_ACTIVATE_SIZE, ybuf1),
+    writeEeprom(MSD_ACTIVATE_EXPOSE_LOC, strnlen(ybuf2, 5), MSD_ACTIVATE_EXPOSE_SIZE, ybuf2), 
+    writeEeprom(MSD_ACTIVATE_ON_HIT_LOC, strnlen(ybuf3, 5), MSD_ACTIVATE_ON_HIT_SIZE, ybuf3), 
+    writeEeprom(MSD_ACTIVATE_ON_KILL_LOC, strnlen(ybuf4, 5), MSD_ACTIVATE_ON_KILL_SIZE, ybuf4),
+    writeEeprom(MSD_MS_ON_TIME_LOC, strnlen(ybuf5, 5), MSD_MS_ON_TIME_SIZE, ybuf5),
+    writeEeprom(MSD_MS_OFF_TIME_LOC, strnlen(ybuf6, 5), MSD_MS_OFF_TIME_SIZE, ybuf6),
+    writeEeprom(MSD_START_DELAY_LOC, strnlen(ybuf7, 5), MSD_START_DELAY_SIZE, ybuf7),
+    writeEeprom(MSD_REPEAT_DELAY_LOC, strnlen(ybuf8, 5), MSD_REPEAT_DELAY_SIZE, ybuf8),
+    writeEeprom(MSD_REPEAT_COUNT_LOC, strnlen(ybuf9, 5), MSD_REPEAT_COUNT_SIZE, ybuf9),
+    writeEeprom(MSD_EX1_LOC, strnlen(ybuf10, 5), MSD_EX1_SIZE, ybuf10),
+    writeEeprom(MSD_EX2_LOC, strnlen(ybuf11, 5), MSD_EX2_SIZE, ybuf11),
+    writeEeprom(MSD_EX3_LOC, strnlen(ybuf12, 5), MSD_EX3_SIZE, ybuf12));
+                     } else {	// read
+						char msdExists[MSD_SIZE+1], msd1[MSD_SIZE+1], msd2[MSD_SIZE+1], msd3[MSD_SIZE+1], msd4[MSD_SIZE+1], msd5[MSD_SIZE+1], msd6[MSD_SIZE+1], msd7[MSD_SIZE+1], msd8[MSD_SIZE+1], msd9[MSD_SIZE+1], msd10[MSD_SIZE+1], msd11[MSD_SIZE+1], msd12[MSD_SIZE+1];
+                        memset(msdExists, 0, MSD_SIZE+1);
+						memcpy(msdExists,readEeprom(MSD_EXISTS_LOC, MSD_EXISTS_SIZE), MSD_SIZE);
+                        if (!isNumber(msdExists)) {  //revert to default value
+                           snprintf(msdExists, MSD_SIZE, "%i", MSD_EXISTS);
+                        }
+						memset(msd1, 0, MSD_SIZE+1);
+						memcpy(msd1,readEeprom(MSD_ACTIVATE_LOC, MSD_ACTIVATE_SIZE), MSD_SIZE);
+                        if (!isNumber(msd1)) {  //revert to default value
+                           snprintf(msd1, MSD_SIZE, "%i", MSD_ACTIVATE);
+                        }
+                        memset(msd2, 0, MSD_SIZE+1);
+                        memcpy(msd2,readEeprom(MSD_ACTIVATE_EXPOSE_LOC, MSD_ACTIVATE_EXPOSE_SIZE), MSD_SIZE);
+                        if (!isNumber(msd2)) {  //revert to default value
+                           snprintf(msd2, MSD_SIZE, "%i", MSD_ACTIVATE_EXPOSE);
+                        }
+                        memset(msd3, 0, MSD_SIZE+1);
+                        memcpy(msd3,readEeprom(MSD_ACTIVATE_ON_HIT_LOC, MSD_ACTIVATE_ON_HIT_SIZE), MSD_SIZE);
+                        if (!isNumber(msd3)) {  //revert to default value
+                           snprintf(msd3, MSD_SIZE, "%i", MSD_ACTIVATE_ON_HIT);
+                        }
+                        memset(msd4, 0, MSD_SIZE+1);
+                        memcpy(msd4,readEeprom(MSD_ACTIVATE_ON_KILL_LOC, MSD_ACTIVATE_ON_KILL_SIZE), MSD_SIZE);
+                        if (!isNumber(msd4)) {  //revert to default value
+                           snprintf(msd4, MSD_SIZE, "%i", MSD_ACTIVATE_ON_KILL);
+                        }
+                        memset(msd5, 0, MSD_SIZE+1);
+                        memcpy(msd5,readEeprom(MSD_MS_ON_TIME_LOC, MSD_MS_ON_TIME_SIZE), MSD_SIZE);
+                        if (!isNumber(msd5)) {  //revert to default value
+                           snprintf(msd5, MSD_SIZE, "%i", MSD_MS_ON_TIME);
+                        }
+                        memset(msd6, 0, MSD_SIZE+1);
+                        memcpy(msd6,readEeprom(MSD_MS_OFF_TIME_LOC, MSD_MS_OFF_TIME_SIZE), MSD_SIZE);
+                        if (!isNumber(msd6)) {  //revert to default value
+                           snprintf(msd6, MSD_SIZE, "%i", MSD_MS_OFF_TIME);
+                        }
+                        memset(msd7, 0, MSD_SIZE+1);
+                        memcpy(msd7,readEeprom(MSD_START_DELAY_LOC, MSD_START_DELAY_SIZE), MSD_SIZE);
+                        if (!isNumber(msd7)) {  //revert to default value
+                           snprintf(msd7, MSD_SIZE, "%i", MSD_START_DELAY);
+                        }
+                        memset(msd8, 0, MSD_SIZE+1);
+                        memcpy(msd8,readEeprom(MSD_REPEAT_DELAY_LOC, MSD_REPEAT_DELAY_SIZE), MSD_SIZE);
+                        if (!isNumber(msd8)) {  //revert to default value
+                           snprintf(msd8, MSD_SIZE, "%i", MSD_REPEAT_DELAY);
+                        }
+                        memset(msd9, 0, MSD_SIZE+1);
+                        memcpy(msd9,readEeprom(MSD_REPEAT_COUNT_LOC, MSD_REPEAT_COUNT_SIZE), MSD_SIZE);
+                        if (!isNumber(msd9)) {  //revert to default value
+                           snprintf(msd9, MSD_SIZE, "%i", MSD_REPEAT_COUNT);
+                        }
+                        memset(msd10, 0, MSD_SIZE+1);
+                        memcpy(msd10,readEeprom(MSD_EX1_LOC, MSD_EX1_SIZE), MSD_SIZE);
+                        if (!isNumber(msd10)) {  //revert to default value
+                           snprintf(msd10, MSD_SIZE, "%i", MSD_EX1);
+                        }
+                        memset(msd11, 0, MSD_SIZE+1);
+                        memcpy(msd11,readEeprom(MSD_EX2_LOC, MSD_EX2_SIZE), MSD_SIZE);
+                        if (!isNumber(msd11)) {  //revert to default value
+                           snprintf(msd11, MSD_SIZE, "%i", MSD_EX2);
+                        }
+                        memset(msd12, 0, MSD_SIZE+1);
+                        memcpy(msd12,readEeprom(MSD_EX3_LOC, MSD_EX3_SIZE), MSD_SIZE);
+                        if (!isNumber(msd12)) {  //revert to default value
+                           snprintf(msd12, MSD_SIZE, "%i", MSD_EX3);
+                        }
+                        snprintf(wbuf, 1024, "I Y %s %s %s %s %s %s %s %s %s %s %s %s %s\n", msdExists, msd1, msd2, msd3, msd4, msd5, msd6, msd7, msd8, msd9, msd10, msd11, msd12);
+                     }
+                     break;
                }
                write(client, wbuf, strnlen(wbuf,1024));
                break;
@@ -1729,7 +1847,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                    snprintf(wbuf, 1024, "Request PHI defaults\nFormat: I P\nChange PHI defaults\nFormat: I P (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
 				   break;
                 case 'Q': case 'q':
-                   snprintf(wbuf, 1024, "Docking Station Defaults\nFormat I Q (0|1) home_end\n");
+                   snprintf(wbuf, 1024, "Docking Station Defaults\nFormat I Q (0|1|2|3) home_end_sendtohome_sendtoend\n");
                    break;
 			    case 'R': case 'r':
                    snprintf(wbuf, 1024, "Reboot\nFormat: I R reboot\n");			
@@ -1738,8 +1856,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Request hit sensor type\nFormat: I S\nChange hit sensor type\nFormat: I S (0|1|2)mechanical_or_nchs_or_miles (0|1)invert_input_line\n");
                                 break;
                             case 'T': case 't':
-                                snprintf(wbuf, 1024, "Request THM defaults\nFormat: I T\nChange THM defaults\nFormat: I T (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
-			        break;
+                                snprintf(wbuf, 1024, "Request THM defaults\nFormat: I T\nChange THM defaults\nFormat: I T (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite (#)number_of_thermal_devices ex2 ex3\n");
+			                   break;
                             case 'U': case 'u':
                                snprintf(wbuf, 1024, "Request Radio Frequency\nFormat: I U\nChange Radio Frequency\nFormat: I U <xxx.xxx>\n");
                                break;
@@ -1752,8 +1870,11 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'X': case 'x':
                                snprintf(wbuf, 1024, "Request Serial Number\nFormat: I X\nChange Serial Number\nFormat: I X <xxxxx-x-x>\n");
                                 break;
+                            case 'Y': case 'y':
+                                snprintf(wbuf, 1024, "Request MSD defaults\nFormat: I Y\nChange MSD defaults\nFormat: I Y (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite (1-330)playerID (00-36)code (00-FF)ammo\n");
+			                   break;
                             default:
-                                snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI J: SES defaults\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI O: Bob type\nI P: PHI defaults\nI Q: Docking Station Default\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI U: Radio Frequency\nI V: Radio Power Low\nI W: Radio Power High\nI X: Serial Number\n");
+                                snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI J: SES defaults\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI O: Bob type\nI P: PHI defaults\nI Q: Docking Station Default\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI U: Radio Frequency\nI V: Radio Power Low\nI W: Radio Power High\nI X: Serial Number\nI Y: MSD Defaults");
                                 break;
 						}
                         break; 
