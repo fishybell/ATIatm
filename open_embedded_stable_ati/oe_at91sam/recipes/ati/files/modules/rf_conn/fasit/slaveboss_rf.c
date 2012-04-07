@@ -573,7 +573,9 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
    // change event
    fc->current_event = pkt->event;
    clock_gettime(CLOCK_MONOTONIC,&fc->event_starts[fc->current_event]);
-   fc->future_exp = pkt->expose ? 90 : 0;
+   if (pkt->expose) {
+      fc->future_exp = 90;
+   }
    DCMSG(BLACK, "||||||||||||||||\nSETTING FUTURE: %i\n||||||||||||||||", fc->future_exp);
 
    // send configure hit sensing
@@ -587,7 +589,9 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
 
    
    // send expose command
-   retval |= send_2100_exposure(fc, pkt->expose ? 90 : 0);
+   if (pkt->expose) {
+      retval |= send_2100_exposure(fc, 90);
+   }
    
    return retval;
 }
@@ -775,6 +779,7 @@ int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
    int uptime_sec;
    int uptime_dsec;
    LB_qconceal_t *pkt = (LB_qconceal_t *)(fc->rf_ibuf + start);
+   fc->future_exp = 90;
    DDCMSG(D_RF|D_VERY,RED, "handle_QCONCEAL(%8p, %i, %i)", fc, start, end);
    // pre-calculate uptime into seconds and deciseconds
    uptime_sec = pkt->uptime / 10; // everything above 10, divided by 10
