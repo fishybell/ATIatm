@@ -37,7 +37,7 @@ start () {
    load_modules "target_user_interface.ko mover=0" \
                 "target_battery.ko minvoltval=$sitb shutdown_wait=1" \
                 "target_hit_poll.ko line=0" \
-                "target_generic_output.ko has_muzzle=$mfs has_moon=$moon has_phi=$phi" \
+                "target_generic_output.ko has_muzzle=$mfs has_moon=$moon has_phi=$phi has_thermal=$therm has_thermalX=$thermx has_msdh=$msdh" \
                 "target_lifter_infantry.ko" \
                 "lifter.ko"
 
