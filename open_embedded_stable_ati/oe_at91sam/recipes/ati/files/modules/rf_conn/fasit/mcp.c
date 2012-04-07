@@ -390,20 +390,34 @@ int main(int argc, char **argv) {
 
                   if (addr_cnt<max_addr) {
                      // we already have this devID, so reconnect because the RFslave probably rebooted or something
+                     LB_status_resp_ext_t lbsr;
                      DCMSG(GRAY,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
 
-                     ////////  iniiialize the rest of the minion state from what was reported in the registration packet
+                     // create a message to send to the already initiliazed minion
+#if 0
                      mID = addr_pool[addr_cnt].mID;
-                     minions[mID].S.hit.data = LB_devreg->hits;
-                     minions[mID].S.exp.data = LB_devreg->expose;
-                     minions[mID].S.speed.data = LB_devreg->speed*100.0;
-                     minions[mID].S.move.data = LB_devreg->move;
-                     minions[mID].S.react.data = LB_devreg->react;
-                     minions[mID].S.position.data = LB_devreg->location;
-                     minions[mID].S.mode.data = LB_devreg->hitmode;
-                     minions[mID].S.burst.newdata = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
+                     lbsr.cmd = LBC_STATUS_RESP_EXT; // copy stuff to extended response, it's got it all
+                     lbsr.hits = LB_devreg->hits;
+                     lbsr.expose = LB_devreg->expose;
+                     lbsr.speed = LB_devreg->speed;
+                     lbsr.move = LB_devreg->move;
+                     lbsr.react = LB_devreg->react;
+                     lbsr.location = LB_devreg->location;
+                     lbsr.hitmode = LB_devreg->hitmode;
+                     lbsr.timehits = LB_devreg->timehits;
+                     lbsr.fault = LB_devreg->fault;
+                     set_crc8(&lbsr);
+                     result=write(minions[mID].minion,&lbsr,RF_size(lbsr.cmd));
+                     if (result<0) {
+                        DCMSG(RED,"MCP: reconnect Sent %d bytes to minion %d at fd=%d",
+                              result,mID,minions[mID].minion);
+                        exit(-1);
+                     }
 
-                     minions[mID].S.fault.data = LB_devreg->fault;
+                     DDCMSG(D_NEW,BLUE,"MCP: reconnect Sent %d bytes to minion %d  fd=%d",
+                            result,mID,minions[mID].minion);
+#endif
+
 
                   } else {
                      // we do not have this devID.  Look for the first free address to use
