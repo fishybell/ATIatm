@@ -584,7 +584,7 @@ int SIT_Client::handle_2100(int start, int end) {
             r_seq = resp_seq;
             // send 2102 status
             DCMSG(RED,"CID_Status_Request   send 2102 status") ; 
-            sendStatus2102(1); // forces sending of a 2102
+            doHits(-1); // grab most recent hit status instead of sendStatus2102(1); // forces sending of a 2102
             // send 2112 Muzzle Flash status if supported   
             if (start_config&PD_NES){
                 resp_num = r_num;
@@ -662,7 +662,7 @@ int SIT_Client::handle_2100(int start, int end) {
                 //sendStatus2102(0);  // sends a 2102 only if we changed the the hit calibration
                 DCMSG(RED,"We will send 2102 status in response to the config hit sensor command: %i %i", hits, htons(msg->hit)); 
             } else {
-                doHits(htons(msg->hit));    // set hit count to something other than zero
+                doHits(htons(msg->hit));    // set hit count to something
                 DCMSG(RED,"after doHits(%d) ",htons(msg->hit)) ;
             }
 
@@ -674,7 +674,8 @@ int SIT_Client::handle_2100(int start, int end) {
             DCMSG(RED,"calling doHitCal after setting values") ;        
             // send 2102 status or change the hit count (which will send the 2102 later)
             if (send2102) {
-                sendStatus2102(1);  // sends a 2102 as we won't if we didn't change the the hit count
+                doHits(-1); // grab absolutely most recent version
+                //sendStatus2102(1);  // sends a 2102 as we won't if we didn't change the the hit count
             }
             break;
 
@@ -1286,6 +1287,8 @@ void SIT_Client::didHits(int num) {
 
         // if we have a hit count, send it
         sendStatus2102(0); // send status message to FASIT server
+    } else {
+        sendStatus2102(1); // force send status message to FASIT server (we got here by requesting the most recent status)
     }
 
     FUNCTION_END("SIT_Client::didHits(int num)");

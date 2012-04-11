@@ -56,6 +56,11 @@ atomic_t toggle_last = ATOMIC_INIT(CONCEAL); // assume conceal last to expose fi
 atomic_t driver_id = ATOMIC_INIT(-1);
 
 //---------------------------------------------------------------------------
+// This atomic variable is use to hold what we told userspace last time
+//---------------------------------------------------------------------------
+atomic_t last_sent = ATOMIC_INIT(0);
+
+//---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space of a position
 // change or error detected by the IRQs or the timeout timer.
 //---------------------------------------------------------------------------
@@ -218,24 +223,7 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
         value = nla_get_u8(na);
         delay_printk("Lifter: received value: %i\n", value);
 
-        // reset hit log?
-        if (value == 0) {
-            delay_printk("RESET HITS\n");
-            spin_lock(hit_lock);
-            this = hit_chain;
-            while (this != NULL) {
-                delay_printk("SHRANK ONE HIT\n");
-                hit_chain = this; // remember this
-                this = this->next; // move on to next link
-                kfree(hit_chain); // free it
-            }
-            hit_chain = NULL;
-            spin_unlock(hit_lock);
-            hit_start = current_kernel_time(); // reset hit log start time
-            atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
-        }
-
-        // get data from log
+        // get initial data from log
         rc = 0;
         spin_lock(hit_lock);
         this = hit_chain;
@@ -244,6 +232,53 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
             this = this->next; // next link in chain
         }
         spin_unlock(hit_lock);
+
+        // reset hit log?
+        if (value == 0) {
+            // determine how many we should have at the end
+            if (rc > atomic_read(&last_sent)) {
+                rc = atomic_read(&last_sent); // how many we sent before is how many we need to remove now
+                // if it's less or equal, just reset
+                delay_printk("RESET HITS\n");
+                spin_lock(hit_lock);
+                this = hit_chain;
+                while (rc-- > 0 && this != NULL) {
+                    delay_printk("SHRANK ONE HIT\n");
+                    hit_chain = this; // remember this
+                    this = this->next; // move on to next link
+                    kfree(hit_chain); // free it
+                }
+                rc++; // this is how many are left
+                spin_unlock(hit_lock);
+            } else {
+                // if it's less or equal, just reset
+                delay_printk("RESET HITS\n");
+                spin_lock(hit_lock);
+                this = hit_chain;
+                while (this != NULL) {
+                    delay_printk("SHRANK ONE HIT\n");
+                    hit_chain = this; // remember this
+                    this = this->next; // move on to next link
+                    kfree(hit_chain); // free it
+                }
+                hit_chain = NULL;
+                spin_unlock(hit_lock);
+            }
+            hit_start = current_kernel_time(); // reset hit log start time
+            atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+        }
+
+        // re-get data from log
+        if (value != 0) {
+            rc = 0;
+            spin_lock(hit_lock);
+            this = hit_chain;
+            while (this != NULL) {
+                 rc++; // count hit (doesn't matter which line)
+                 this = this->next; // next link in chain
+            }
+            spin_unlock(hit_lock);
+        }
 
         // fake the hit log data?
         if (value != HIT_REQ && value != 0) {
@@ -274,6 +309,7 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
         }
 
         // prepare response
+        atomic_set(&last_sent, rc); // remember our last sent value
         rc = nla_put_u8(skb, GEN_INT8_A_MSG, rc); // rc is number of hits
 
         // message creation success?
