@@ -43,13 +43,13 @@
 
 // Serial Number defaults
 #define SERIAL_NUMBER "00000-0-0"
-#define SERIAL_NUMBER_LOC 0x280
+#define SERIAL_NUMBER_LOC 0x2A0
 #define SERIAL_NUMBER_SIZE 0x20
 
 #define SERIAL_SIZE 20
 
 // Address Defaults
-#define ADDRESS_LOC 0x2A0
+#define ADDRESS_LOC 0x280
 #define ADDRESS_SIZE 0x20
 
 #define ADD_SIZE 20
