@@ -151,6 +151,8 @@ enum {
    CID_Shutdown = 177,			/* not a standard FASIT value */
    CID_Sleep = 178,			/* not a standard FASIT value */
    CID_Wake = 179,			/* not a standard FASIT value */
+   CID_Dock = 180,			/* not a standard FASIT value */
+   CID_Continuous_Move_Request = 181,/* not a standard FASIT value */
 };
 
 /********************************************/
