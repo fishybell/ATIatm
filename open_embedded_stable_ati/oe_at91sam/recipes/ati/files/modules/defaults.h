@@ -497,6 +497,10 @@
 #define DOCKING_END_LOC 0x55C
 #define DOCKING_END_SIZE 0x4
 
+// home end defaults
+#define HOME_END 0
+#define HOME_END_LOC 0x560
+#define HOME_END_SIZE 0x4
 
 
 // ,.. defaults
