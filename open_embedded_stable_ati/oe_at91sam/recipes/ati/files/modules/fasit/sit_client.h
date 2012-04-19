@@ -30,6 +30,7 @@ public :
    void doShutdown(); // shutdown target
    void doSleep(); // sleep target
    void doWake(); // wake target
+   void doHitCountReset(); // wake target
    void doBattery(); // retrieve battery value
    void didBattery(int val); // current battery value
    void didFault(int val); // current fault value
@@ -144,6 +145,7 @@ public:
    void doShutdown(); // shutdown target
    void doSleep(); // sleep target
    void doWake(); // wake target
+   void doHitCountReset(); // wake target
    void doBattery(); // retrieve battery value
    void doStop(); // immediate stop (stops accessories as well)
    void doHitCal(struct hit_calibration hit_c); // change hit calibration data

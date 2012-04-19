@@ -153,6 +153,7 @@ enum {
    CID_Wake = 179,			/* not a standard FASIT value */
    CID_Dock = 180,			/* not a standard FASIT value */
    CID_Continuous_Move_Request = 181,/* not a standard FASIT value */
+   CID_Hit_Count_Reset = 182,/* not a standard FASIT value */
 };
 
 /********************************************/

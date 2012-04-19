@@ -701,6 +701,10 @@ int SIT_Client::handle_2100(int start, int end) {
             DCMSG(RED,"CID_Wake...waking") ; 
             doWake();
             break;
+        case CID_Hit_Count_Reset:
+            DCMSG(RED,"CID_Wake...waking") ; 
+            doHitCountReset();
+            break;
     }
 
     FUNCTION_INT("::handle_2100(int start, int end)", 0);
@@ -1172,6 +1176,16 @@ void SIT_Client::doWake() {
         nl_conn->doWake();
     }
     FUNCTION_END("::doWake()");
+}
+
+// wake device
+void SIT_Client::doHitCountReset() {
+    FUNCTION_START("::doHitCountReset()");
+    // pass directly to kernel for actual action
+    if (nl_conn != NULL) {
+        nl_conn->doHitCountReset();
+    }
+    FUNCTION_END("::doHitCountReset()");
 }
 
 // retrieve battery value
@@ -1730,6 +1744,16 @@ void SIT_Conn::doWake() {
     queueMsgU8(NL_C_SLEEP, WAKE_COMMAND); // wake command
 
     FUNCTION_END("::doWake()");
+}
+
+// wake device
+void SIT_Conn::doHitCountReset() {
+    FUNCTION_START("::doHitCountReset()");
+
+    // Queue command
+    queueMsgU8(NL_C_HITS, 0); // reset hit command
+
+    FUNCTION_END("::doHitCountReset()");
 }
 
 // retrieve battery value

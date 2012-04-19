@@ -23,6 +23,33 @@
 //---------------------------------------------------------------------------
 #define TARGET_NAME     "lifter"
 
+#define DEBUG_SEND
+
+#ifdef DEBUG_SEND
+#define SENDUSERCONNMSG  sendUserConnMsg
+#else
+#define SENDUSERCONNMSG(...)  //
+#endif
+
+//---------------------------------------------------------------------------
+// Message filler handler for failure messages
+//---------------------------------------------------------------------------
+static int error_mfh(struct sk_buff *skb, void *msg) {
+    // the msg argument is a null-terminated string
+    return nla_put_string(skb, GEN_STRING_A_MSG, msg);
+}
+static void sendUserConnMsg( char *fmt, ...){
+    va_list ap;
+    va_start(ap, fmt);
+     char *msg = kmalloc(256, GFP_KERNEL);
+     if (msg){
+         vsnprintf(msg, 256, fmt, ap);
+         send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+         kfree(msg);
+     }
+   va_end(ap);
+}
+
 //---------------------------------------------------------------------------
 // These variables are parameters given when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
@@ -86,8 +113,8 @@ static struct timespec hit_start; // time the hit log was started
 //---------------------------------------------------------------------------
 // lifter state variables
 //---------------------------------------------------------------------------
-atomic_t hits_to_kill = ATOMIC_INIT(0); // infinite hits to kill
-atomic_t kill_counter = ATOMIC_INIT(-1); // invalid hit count for hits_to_kill
+atomic_t hits_to_kill = ATOMIC_INIT(1); // infinite hits to kill
+atomic_t kill_counter = ATOMIC_INIT(1); // invalid hit count for hits_to_kill
 atomic_t hit_type = ATOMIC_INIT(1); // single-fire mechanical
 atomic_t after_kill = ATOMIC_INIT(0); // stay down on kill
 atomic_t bob_type = ATOMIC_INIT(-1); // invalid hit count for bob_type
@@ -265,7 +292,7 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
                 spin_unlock(hit_lock);
             }
             hit_start = current_kernel_time(); // reset hit log start time
-            atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+//            atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
         }
 
         // re-get data from log
@@ -304,7 +331,7 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
                 }
                 hit_chain = this;
                 spin_unlock(hit_lock);
-                atomic_set(&kill_counter, atomic_read(&hits_to_kill)-rc); // fix kill counter
+//                atomic_set(&kill_counter, atomic_read(&hits_to_kill)-rc); // fix kill counter
             }
         }
 
