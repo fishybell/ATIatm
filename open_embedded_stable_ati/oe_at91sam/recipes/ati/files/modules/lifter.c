@@ -227,7 +227,7 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
         rc = 0;
         spin_lock(hit_lock);
         this = hit_chain;
-        while (this != NULL) {
+        while (this != NULL && value != 0) {
             rc++; // count hit (doesn't matter which line)
             this = this->next; // next link in chain
         }
