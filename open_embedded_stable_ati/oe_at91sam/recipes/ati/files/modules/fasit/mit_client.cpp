@@ -13,6 +13,7 @@ using namespace std;
 #include "eeprom.h"
 #include "defaults.h"
 
+#define DEBUG 1
 
 /***********************************************************
 *                     MIT_Client Class                     *
@@ -313,6 +314,10 @@ FUNCTION_START("::handle_2100(int start, int end)")
       case CID_Shutdown:
          doShutdown();
          break;
+	  case CID_Dock:
+	     doDock();
+        needPass = false; // don't pass this message to the attached SIT
+		 break;
 	  case CID_Sleep:
 	     doSleep();
 		 break;
@@ -342,6 +347,23 @@ FUNCTION_START("::handle_2100(int start, int end)")
                break;
             case 2:
                doMove(ntohf(msg->speed), -1);
+               break;
+         }
+         needPass = false; // don't pass this message to the attached SIT
+         break;
+      case CID_Continuous_Move_Request:
+		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
+	     send_2101_ACK(hdr,'S');
+         
+         switch (msg->move) {
+            case 0:
+               doContinuousMove(0, 0);
+               break;
+            case 1:
+               doContinuousMove(ntohf(msg->speed), 1);
+               break;
+            case 2:
+               doContinuousMove(ntohf(msg->speed), -1);
                break;
          }
          needPass = false; // don't pass this message to the attached SIT
@@ -410,6 +432,26 @@ FUNCTION_END("::doShutdown()")
 }
 
 // sleep device
+void MIT_Client::doExpose(int val) {
+FUNCTION_START("::doExpose(int val)")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doExpose(val);
+   }
+FUNCTION_END("::doExpose(int val)")
+}
+
+// sleep device
+void MIT_Client::doDock() {
+FUNCTION_START("::doDock()")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doDock();
+   }
+FUNCTION_END("::doDock()")
+}
+
+// sleep device
 void MIT_Client::doSleep() {
 FUNCTION_START("::doSleep()")
    // pass directly to kernel for actual action
@@ -437,6 +479,15 @@ FUNCTION_START("::doBattery()")
       nl_conn->doBattery();
    }
 FUNCTION_END("::doBattery()")
+}
+
+// current expose value
+void MIT_Client::didExpose(int val) {
+FUNCTION_START("::didExpose(int val)")
+
+   doExpose(val); // Tell mover expose state
+
+FUNCTION_END("::didExpose(int val)")
 }
 
 // current battery value
@@ -508,6 +559,27 @@ FUNCTION_START("::doMove()")
       nl_conn->doMove();
    }
 FUNCTION_END("::doMove()")
+}
+
+// start movement or change movement
+void MIT_Client::doContinuousMove(float speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
+FUNCTION_START("::doContinuousMove(float speed, int direction)")
+   DMSG("Moving %f %i\n", speed, direction);
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doContinuousMove(speed, direction);
+   }
+FUNCTION_END("::doContinuousMove(float speed, int direction)")
+}
+
+// retrieve movement values
+void MIT_Client::doContinuousMove() {
+FUNCTION_START("::doContinuousMove()")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doContinuousMove();
+   }
+FUNCTION_END("::doContinuousMove()")
 }
 
 // current direction value
@@ -722,6 +794,18 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
          // received emergency stop response
          mit_client->didStop(); // tell client
          break;
+
+      case NL_C_EXPOSE:
+         // Movers need to know the expose state to
+         // know if they can dock
+            genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
+
+            if (attrs[GEN_INT8_A_MSG]) {
+                // received expose value
+                int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
+                mit_client->didExpose(value); // tell client
+            }
+         break;
    }
  
 FUNCTION_INT("::parseData(struct nl_msg *msg)", 0)
@@ -779,6 +863,48 @@ FUNCTION_START("::doMove()")
 FUNCTION_END("::doMove()")
 }
 
+// start movement or change movement
+void MIT_Conn::doContinuousMove(float speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
+FUNCTION_START("::doContinuousMove(float speed, int direction)")
+   DCMSG(GREEN, "MIT_Conn doContinuousMove - speed: %f", speed);
+   // force valid value for speed
+   if (speed < 0 || direction == 0) {
+      DCMSG(RED, "First if speed: %f", speed);
+      speed = 0;
+   }
+   if (speed > 32766) {
+      DCMSG(RED, "Second if speed: %f", speed);
+      speed = 0; // fault, so stop
+   }
+
+   // force valid value for direction
+   if (speed == 0) {
+      direction = 0;
+   }
+
+   //Multiply the speed by 10 to get rid of the decimal
+   
+   // Queue command
+   if (direction < 0) {
+      queueMsgU16(NL_C_CONTINUOUS, 32768-(speed*10));  //speed * 10
+   } else if (direction > 0) {
+      queueMsgU16(NL_C_CONTINUOUS, 32768+(speed*10));  //speed * 10
+   } else {
+      queueMsgU16(NL_C_CONTINUOUS, 0);
+   }
+
+FUNCTION_END("::doContinuousMove(float speed, int direction)")
+}
+
+// retrieve movement values
+void MIT_Conn::doContinuousMove() {
+FUNCTION_START("::doContinuousMove()")
+   // Queue command
+   queueMsgU16(NL_C_CONTINUOUS, 0);
+
+FUNCTION_END("::doContinuousMove()")
+}
+
 // shutdown device
 void MIT_Conn::doShutdown() {
 FUNCTION_START("::doShutdown()")
@@ -787,6 +913,26 @@ FUNCTION_START("::doShutdown()")
    queueMsgU8(NL_C_BATTERY, BATTERY_SHUTDOWN); // shutdown command
 
 FUNCTION_END("::doShutdown()")
+}
+
+// tell mover expose state
+void MIT_Conn::doExpose(int val) {
+FUNCTION_START("::doExpose(int val)")
+
+   // Queue command
+   queueMsgU8(NL_C_EXPOSE, val); // tell mover expose state
+
+FUNCTION_END("::doExpose(int val)")
+}
+
+// dock device
+void MIT_Conn::doDock() {
+FUNCTION_START("::doDock()")
+
+   // Queue command
+   queueMsgU8(NL_C_SLEEP, DOCK_COMMAND); // dock command
+
+FUNCTION_END("::doDock()")
 }
 
 // sleep device

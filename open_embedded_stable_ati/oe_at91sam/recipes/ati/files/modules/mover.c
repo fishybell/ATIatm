@@ -19,7 +19,10 @@
 #include "target_generic_output.h"
 #include "target_battery.h"
 #include "fasit/faults.h"
+#define LIFTER_POSITION_DOWN 0
+#define LIFTER_POSITION_UP 1
 
+#define DEBUG_USERCONN 1
 //---------------------------------------------------------------------------
 // These variables are parameters given when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
@@ -87,6 +90,21 @@ int move_mfh(struct sk_buff *skb, void *move_data) {
     return nla_put_u8(skb, GEN_INT8_A_MSG, *((u8*)move_data));
 }
 
+static void sendUserConnMsg( char *fmt, ...){
+    va_list ap;
+    va_start(ap, fmt);
+#ifdef DEBUG_USERCONN
+   char *msg = kmalloc(256, GFP_KERNEL);
+   if (msg){
+      vsnprintf(msg, 256, fmt, ap);
+      delay_printk(msg);
+      send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+      kfree(msg);
+   }
+#endif
+   va_end(ap);
+}
+
 //---------------------------------------------------------------------------
 // Timer timeout function for finishing a move change
 //---------------------------------------------------------------------------
@@ -96,7 +114,7 @@ static void move_change(unsigned long data) {
     if (atomic_read(&full_init) != TRUE) {
         return;
     }
-
+//sendUserConnMsg( "---randy---move_change--data=%i", data);
     // notify netlink userspace
     move_data = 32768+mover_speed_get(); // signed speed turned to unsigned byte
     send_nl_message_multi(&move_data, pos_mfh, NL_C_MOVE);
@@ -155,6 +173,46 @@ static void move_event_internal(int etype, bool upload) {
             schedule_work(&position_work);
             break;
     }
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for stop commands
+//---------------------------------------------------------------------------
+int nl_continuous_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value = 0;
+delay_printk("Mover: handling continuous movement command\n");
+sendUserConnMsg( "---randy---nl_continuous_handler--");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT16_A_MSG]; // generic 16-bit message
+    if (na) {
+        // grab value from attribute
+        value = nla_get_u16(na); // value is ignored
+delay_printk("Mover: received value: %i\n", value);
+
+sendUserConnMsg( "---randy---nl_continuous_handler---set_continuous_move-value %i", value);
+        mover_set_continuous_move(value-32768); // unsigned value to signed speed (0 will coast)
+
+        // prepare response
+        rc = nla_put_u16(skb, GEN_INT16_A_MSG, 1); // value is ignored
+
+        // message creation success?
+        if (rc == 0) {
+            rc = HANDLE_SUCCESS;
+        } else {
+            delay_printk("Mover: could not create return message\n");
+            rc = HANDLE_FAILURE;
+        }
+    } else {
+sendUserConnMsg( "---randy---nl_continuous_handler--could not get attribute-");
+        delay_printk("Mover: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("Mover: returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
 }
 
 //---------------------------------------------------------------------------
@@ -267,7 +325,7 @@ delay_printk("Mover: handling move command\n");
             // move
             enable_battery_check(0); // disable battery checking while motor is on
             delay_printk("NL_MOVE_HANDLER: value1: %d value2: %d\n", value, value-32768);
-            mover_speed_set(value-32768); // unsigned value to signed speed (0 will coast)
+            mover_set_move_speed(value-32768); // unsigned value to signed speed (0 will coast)
         }
 
     } else {
@@ -322,6 +380,44 @@ delay_printk("Mover: returning rc: %i\n", rc);
 
 
 //---------------------------------------------------------------------------
+// netlink command handler for commands
+//---------------------------------------------------------------------------
+int nl_command_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value = 0;
+    u8 data = BATTERY_SHUTDOWN; // in case we need to shutdown
+delay_printk("Mover: handling event command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    if (na) {
+        // grab value from attribute
+        value = nla_get_u8(na); // value is ignored
+delay_printk("Mover: received value: %i\n", value);
+
+        // handle event
+        switch (value) {
+            case CMD_PAUSE:
+                mover_speed_stop();
+                break;
+            case CMD_ABORT:
+            case CMD_RESTART:
+                mover_go_home();
+                break;
+        }
+
+        rc = HANDLE_SUCCESS_NO_REPLY;
+    } else {
+        delay_printk("Mover: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("Mover: returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
+}
+
+//---------------------------------------------------------------------------
 // netlink command handler for event commands
 //---------------------------------------------------------------------------
 int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
@@ -343,6 +439,12 @@ delay_printk("Mover: received value: %i\n", value);
                 // needs to be converted to NL_C_SHUTDOWN from userspace, so send it back up (and send onwards to other attached devices)
                 queue_nl_multi(NL_C_BATTERY, &data, sizeof(data));
                 break;
+            case EVENT_DOWN:
+               set_lifter_position(LIFTER_POSITION_DOWN);
+               break;
+            case EVENT_UP:
+               set_lifter_position(LIFTER_POSITION_UP);
+               break;
             default:
                 move_event_internal(value, false); // don't repropogate
                 break;
@@ -420,6 +522,8 @@ static int __init Mover_init(void) {
         {NL_C_MOVE,      nl_move_handler},
         {NL_C_POSITION,  nl_position_handler},
         {NL_C_EVENT,     nl_event_handler},
+        {NL_C_CONTINUOUS, nl_continuous_handler},
+        {NL_C_COMMAND, nl_command_handler},
         {NL_C_SLEEP,     nl_sleep_handler},
     };
     struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure

@@ -27,14 +27,19 @@ public :
    void doPosition(); // retrieve position value
    void didPosition(int pos); // current position value
    void doShutdown(); // shutdown the target
+   void doExpose(int val); // tell mover the lifter state
+   void doDock(); // dock the target
    void doSleep(); // sleep the target
    void doWake(); // wake the target
    void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
+   void doContinuousMove(float speed, int direction); // start movement or change movement
+   void doContinuousMove(); // retrieve movement values
    void didMove(float speed, int direction); // current direction value
    void doBattery(); // retrieve battery value
    void didBattery(int val); // current battery value
    void didFault(int val); // current fault value
+   void didExpose(int val); // current expose value
    void doStop(); // emergency stop (stops accessories as well)
    void didStop(); // received immediate stop response
    void Reset(); // received immediate stop response
@@ -137,10 +142,14 @@ public:
    // individual MIT commands to send to kernel
    void doPosition(); // retrieve position value
    void doShutdown(); // shutdown the target
+   void doExpose(int val); // tell mover the lifter state
+   void doDock(); // dock the target
    void doSleep(); // sleep the target
    void doWake(); // wake the target
    void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
+   void doContinuousMove(float speed, int direction); // start movement or change movement
+   void doContinuousMove(); // retrieve movement values
    void doBattery(); // retrieve battery value
    void doStop(); // immediate stop (stops accessories as well)
    void didStop(); // received immediate stop response

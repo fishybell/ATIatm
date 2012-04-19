@@ -243,6 +243,8 @@ enum {
     NL_C_CMD_EVENT,  /* command event (command) (command event structure) */
     NL_C_SCENARIO,   /* run scenario message (reply) (generic string) */
     NL_C_EVENT_REF,  /* reflected event (command) (generic 8-bit int) */
+    NL_C_CONTINUOUS,       /* move continuous as mph (command/reply) (generic 16-bit int) */
+    NL_C_COMMAND,       /* commands - abort, pause, restart */
     NL_C_FAULT,      /* fault event (reply) (generic 8-bit int) */
     __NL_C_MAX,
 };
@@ -273,8 +275,16 @@ static nl_attr_size_t nl_attr_sizes[] = {
    {NL_C_CMD_EVENT, sizeof(cmd_event_t), cmd_event_policy},
    {NL_C_SCENARIO, -1, generic_string_policy},
    {NL_C_EVENT_REF, sizeof(u8), generic_int8_policy},
+   {NL_C_CONTINUOUS, sizeof(u16), generic_int16_policy},
+   {NL_C_COMMAND, sizeof(u8), generic_int8_policy},
    {NL_C_FAULT, sizeof(u8), generic_int8_policy},
    {__NL_C_MAX, 0, NULL},
+};
+
+enum {
+    CMD_PAUSE,       /* pause mover */
+    CMD_ABORT,   /* abort mover - send home */
+    CMD_RESTART,   /* restart mover - send home */
 };
 
 #define CONCEAL 0

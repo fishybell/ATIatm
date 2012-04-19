@@ -682,6 +682,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             case 'Q': case 'q':
                 nl_cmd = NL_C_ACCESSORY;
                 break;
+            case 'R': case 'r':
+                nl_cmd = NL_C_COMMAND;
+                break;
             case 'S': case 's':
                 nl_cmd = NL_C_EXPOSE;
                 break;
@@ -1896,6 +1899,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                     case 'Q': case 'q':
                         snprintf(wbuf, 1024, "Types of accessories: MFS, MGL, SES, PHI, MSD, SMK, THM\nRequest accessory paramaters\nFormat: Q accessory_type\nChange accessory parameters\nFormat: Q accessory_type (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
                         break;
+                    case 'R': case 'r':
+                        snprintf(wbuf, 1024, "Scenario Commands: 0-Pause, 1-Abort, 2-Restart\n");
+                        break;
                     case 'S': case 's':
                         snprintf(wbuf, 1024, "Request exposure data\nFormat: S\n");
                         break;
@@ -1964,7 +1970,19 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 					     ;float farg1;
                     if (cmd[1] == '\0') {
                         nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_REQ); // velocity request
-                    } else if (sscanf(cmd+1, "%f", &farg1) == 1) {
+                        break;
+                    }
+                    int i = 1;
+                    if (cmd[1] == 'C' || cmd[1] == 'c') {
+                        nl_cmd = NL_C_CONTINUOUS;
+                        nlmsg_free(msg);
+                        msg = nlmsg_alloc();
+                        genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, nl_cmd, 1);
+                        i ++;
+                        snprintf(wbuf, 1024, "Continuous Move Request [%s]\n", cmd+i);
+                        write(client, wbuf, strnlen(wbuf,1024));
+                    }
+                    if (sscanf(cmd+i, "%f", &farg1) == 1) {
 						farg1 = farg1*10;	// muliplied to work with floats in target_mover_generic
                         if (farg1 > 32766 || farg1 < -32767) {
                             farg1 = 0; // stay away from the edge conditions
@@ -2177,6 +2195,11 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                     nla_put(msg, GPS_A_MSG, sizeof(struct gps_conf), &gps_c);
                     break;
                 case NL_C_EVENT:
+                    if (sscanf(cmd+1, "%i", &arg1) == 1) {
+                        nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // create event X
+                    }
+                    break;
+                case NL_C_COMMAND:
                     if (sscanf(cmd+1, "%i", &arg1) == 1) {
                         nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // create event X
                     }

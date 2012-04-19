@@ -472,6 +472,20 @@ struct genl_ops provider_gnl_ops_event_ref = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
+struct genl_ops provider_gnl_ops_continuous_move = {
+    .cmd = NL_C_CONTINUOUS,
+    .flags = 0,
+    .policy = generic_int16_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
+struct genl_ops provider_gnl_ops_command = {
+    .cmd = NL_C_COMMAND,
+    .flags = 0,
+    .policy = generic_int8_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
 struct genl_ops provider_gnl_ops_disconnected_hit = {
     .cmd = NL_C_FAULT,
     .flags = 0,
@@ -500,6 +514,8 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_CMD_EVENT */	&provider_gnl_ops_cmd_event,
     /* NL_C_SCENARIO */		&provider_gnl_ops_scenario,
     /* NL_C_EVENT_REF */	&provider_gnl_ops_event_ref,
+    /* NL_C_CONTINUOUS */			&provider_gnl_ops_continuous_move,
+    /* NL_C_COMMAND */			&provider_gnl_ops_command,
     /* NL_C_FAULT */       &provider_gnl_ops_disconnected_hit,
 };
 
