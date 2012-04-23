@@ -38,7 +38,8 @@ typedef struct queue_tag {
 queue_t *queue_init( int size);
 void DeQueue(queue_t *M,int count);
 void ReQueue(queue_t *Mdst,queue_t *Msrc,int count);
-void EnQueue(queue_t *M, void *ptr,int count);
+void EnQueue(queue_t *M, void *ptr,int count); // queue in back
+void QueuePush(queue_t *M, void *ptr,int count); // "queue" in front
 
 int QueuePtype(queue_t *M);
 
@@ -88,6 +89,8 @@ void print_verbosity_bits(void);
 #define LBC_REPORT_REQ                  19
 
 #define LBC_EVENT_REPORT                20
+
+#define LBC_BURST                   25
 
 #define LBC_DEVICE_REG                  29
 #define LBC_REQUEST_NEW                 30
@@ -183,11 +186,10 @@ typedef struct LB_request_new_t {
    uint32 padding0:3 __attribute__ ((packed));
    uint32 low_dev:24 __attribute__ ((packed));          // lowest devID
 
-   uint32 forget_addr:32 __attribute__ ((packed));      // bitfield of which slaves should forget their current addresses
-
+   uint32 forget_addr:8 __attribute__ ((packed));      // bitfield of which slaves should forget their current addresses
    uint32 slottime:8 __attribute__ ((packed));          // slottime (multiply by 5ms)
+   uint32 inittime:8 __attribute__ ((packed));          // initial time (multiply by 5ms)
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:16 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_request_new_t;
 
 // LBC_DEVICE_REG packet
@@ -383,6 +385,17 @@ typedef struct LB_pyro_fire {
    uint32 pad:6 __attribute__ ((packed));
    uint32 crc:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_pyro_fire_t;
+
+// LBC_BURST
+//    this message is intended to let slave devices know how many messages to expect in a burst (they were parsing and responding based on the only part of a burst, then receiving the rest)
+typedef struct LB_burst {
+   // 1 * 32 bytes = 1 long - padding = 3 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 number:7 __attribute__ ((packed)); // max of 128 items in a burst (really max of 83)
+   uint32 pad:4 __attribute__ ((packed));
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:16 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_burst_t;
 
 
 

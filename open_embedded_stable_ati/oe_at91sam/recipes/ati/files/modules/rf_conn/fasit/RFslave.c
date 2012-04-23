@@ -227,7 +227,7 @@ void HandleSlaveRF(int RFfd){
                             DevID,low_dev, RF_addr);
 
                      resp=0;
-                     if ((DevID>=low_dev)&&(DevID<low_dev+32)){         // check range
+                     if ((DevID>=low_dev)&&(DevID<low_dev+8)){         // check range
                         DDCMSG(D_NEW,RED,"Rxed 'request new devices' in range  devid=%x  low_dev=%x  RF_addr=%d",
                                DevID,low_dev, RF_addr);                         
                         if (LB_new->forget_addr&BV(DevID-low_dev)){     // checks if our bit is set
@@ -244,7 +244,7 @@ void HandleSlaveRF(int RFfd){
                      // now we must respond if 'resp' is true
                      if (resp){
                         my_slot=DevID-low_dev+1;        // the slot we should respond in
-                        total_slots=34;                 // total number of slots with end padding
+                        total_slots=10;                 // total number of slots with end padding
 
                         // create a RESPONSE packet
                         LB_devreg =(LB_device_reg_t *)(&rLB);   // map our bitfields in

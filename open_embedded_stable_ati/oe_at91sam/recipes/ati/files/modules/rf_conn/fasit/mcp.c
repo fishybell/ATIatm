@@ -6,7 +6,7 @@
 thread_data_t minions[2046];    // we do start at 0 and there cannot be more than 2046
 struct sockaddr_in fasit_addr;
 int verbose;
-int slottime,total_slots;
+int slottime,total_slots,inittime;
 int low_dev,high_dev;
 
 void print_help(int exval) {
@@ -17,6 +17,7 @@ void print_help(int exval) {
    printf("  -r 127.0.0.1  set RFmaster server IP address\n");
    printf("  -m 4004       set RFmaster server port address\n");
    printf("  -t 50         hunttime in seconds.  Time we wait before doing a slave hunt again\n");
+   printf("  -i 250        initial wait time in ms (5ms granules, 1275 ms max\n");
    printf("  -s 150        slottime in ms (5ms granules, 1275 ms max\n");
    printf("  -d 0x20       Lowest devID to find\n");
    printf("  -D 0x30       Highest devID to find\n");
@@ -49,13 +50,13 @@ static void quitproc(int sig) {
 /**  has to figure out what devid's are in use so we can set up the forget bits
  **
  **  */
-uint32 set_forget_bits(int low_dev,int high_dev,addr_t *addr_pool,int max_addr){
+uint8 set_forget_bits(int low_dev,int high_dev,addr_t *addr_pool,int max_addr){
    int addr,testid;
-   uint32 bits=0xffffffff;              // them all by default
+   uint8 bits=0xff;              // them all by default
 
    addr=1;
    DDCMSG(D_MEGA,RED,"SFB:------------------------ max_addr=%d",max_addr);
-   high_dev=min(low_dev+31,high_dev);   // look for only devid's within 31 of low_dev, or < high_dev
+   high_dev=min(low_dev+7,high_dev);   // look for only devid's within 7 of low_dev, or < high_dev
    while (addr<max_addr){       // spin through our addresses
       testid=addr_pool[addr].devid;
       if ((testid>=low_dev)&&(testid<=high_dev)){       // we have match
@@ -122,7 +123,7 @@ int main(int argc, char **argv) {
    RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");            // RFmaster server the MCP connects to
    RF_addr.sin_port = htons(4004);                              // RFmaster server port number
 
-   while((opt = getopt(argc, argv, "hv:m:r:p:f:s:d:D:t:")) != -1) {
+   while((opt = getopt(argc, argv, "hv:m:r:i:p:f:s:d:D:t:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
@@ -130,6 +131,10 @@ int main(int argc, char **argv) {
 
          case 'v':
             verbose = strtoul(optarg,NULL,16);
+            break;
+
+         case 'i':
+            inittime = atoi(optarg);    // leave it in ms until it gets sent in a packet
             break;
 
          case 's':
@@ -266,8 +271,8 @@ int main(int argc, char **argv) {
          if (slave_hunting==1){
             low=low_dev;
             slave_hunting++;
-         } else if (slave_hunting>1&&slave_hunting<(((high_dev-low_dev)/16)+2)){
-            low=low_dev+((slave_hunting-1)*16); // step through 16 at a time after the first 2
+         } else if (slave_hunting>1&&slave_hunting<(((high_dev-low_dev)/8)+2)){
+            low=low_dev+((slave_hunting-1)*8); // step through 16 at a time after the first 2
             if (low>=high_dev) low=low_dev;             // if we went to far, redo the bottom end
             slave_hunting++;
          } else {
@@ -281,8 +286,9 @@ int main(int argc, char **argv) {
          if (hunt_rotate) {
             timeout=hunttime*1000;      // idle time to wait for next go around
          } else {
-            timeout=slottime*34;        // idle time to wait for next go around
+            timeout=slottime*10;        // idle time to wait for next go around
          }
+         timeout+=(inittime + 50); // add initial time and just a little bit more so the RFmaster can keep up
 
          DDCMSG(D_NEW,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
          /***  we need to use the range we were invoked with
@@ -297,6 +303,7 @@ int main(int argc, char **argv) {
 
          LB_new->forget_addr=set_forget_bits(low,high_dev,addr_pool,max_addr);  // tell everybody to forget
          LB_new->low_dev=low;
+         LB_new->inittime=inittime/5;   // adjust to 5ms granularity
          LB_new->slottime=slottime/5;   // adjust to 5ms granularity
 
          // calculates the correct CRC and adds it to the end of the packet payload
@@ -320,7 +327,13 @@ int main(int argc, char **argv) {
                DDCMSG(D_POLL,RED,"MCP: RF_sock(%d)==events[ready_fd=%d].data.fd=%d   MCP socket is ready",
                       RF_sock,ready_fd,events[ready_fd].data.fd);
                
-               msglen=read(RF_sock, buf, 1023);    
+               msglen=read(RF_sock, buf, 1); // grab first byte so we know how many to grab
+               if (msglen == 1) {
+                  LB=(LB_packet_t *)buf;   // map the header in
+                  msglen+=read(RF_sock, (buf+1), RF_size(LB->cmd)-1); // grab the rest, but leave the rest to be read again later
+                  DDCMSG(D_NEW, RED, "MCP %i read bytes with %i cmd", msglen, LB->cmd);
+                  DDpacket(buf,msglen);
+               }
                if (msglen<0) {
                   strerror_r(errno,buf,BufSize);
                   DCMSG(RED,"MCP: RF_sock error %s  fd=%d\n",buf,RF_sock);

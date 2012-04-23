@@ -44,13 +44,13 @@ static int packetForMe(fasit_connection_t *fc, int start) {
       // special case check: check reregister or devid range
       LB_request_new_t *msg = (LB_request_new_t*)hdr;
 
-      if (msg->low_dev <= fc->devid && msg->low_dev+31 >= fc->devid) {
+      if (msg->low_dev <= fc->devid && msg->low_dev+7 >= fc->devid) {
          if (msg->forget_addr&BV(fc->devid - msg->low_dev)){    // checks if our bit forget bit is set
-            DDCMSG(D_RF,RED, "RF Packet for my devid range: %x:%x  and forget bit is set for our devid", msg->low_dev, msg->low_dev+31);
-            return 1;    // it is for us, (and up to 31 others)  and the forget bit is set so in HANDLE request_new we mustchange our address to 2047
+            DDCMSG(D_RF,RED, "RF Packet for my devid range: %x:%x  and forget bit is set for our devid", msg->low_dev, msg->low_dev+7);
+            return 1;    // it is for us, (and up to 7 others)  and the forget bit is set so in HANDLE request_new we mustchange our address to 2047
          } else if (fc->id==2047){
-            DDCMSG(D_RF,RED, "RF Packet for my devid range: %x:%x  and our address is 2047", msg->low_dev, msg->low_dev+31);
-            return 1;    // we have no address so it is for us (and up to 31 other slaves)
+            DDCMSG(D_RF,RED, "RF Packet for my devid range: %x:%x  and our address is 2047", msg->low_dev, msg->low_dev+7);
+            return 1;    // we have no address so it is for us (and up to 7 other slaves)
          }
       } else if (fc->target_type == RF_Type_Unknown) {
 DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %x", msg->low_dev);

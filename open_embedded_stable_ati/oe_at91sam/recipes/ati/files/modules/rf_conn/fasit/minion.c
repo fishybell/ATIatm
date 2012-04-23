@@ -1024,7 +1024,13 @@ void *minion_thread(thread_data_t *minion){
 
       //check to see if the MCP has any commands for us
       if (FD_ISSET(minion->mcp_sock,&rcc_or_mcp)){
-         msglen=read(minion->mcp_sock, mb.buf, 1023);
+         msglen=read(minion->mcp_sock, mb.buf, 1); // grab first byte so we know how many to grab
+         if (msglen == 1) {
+            LB=(LB_packet_t *)mb.buf;   // map the header in
+            msglen+=read(minion->mcp_sock, (mb.buf+1), RF_size(LB->cmd)-1); // grab the rest, but leave the rest to be read again later
+            DDCMSG(D_NEW, RED, "Minion %i read %i bytes with %i cmd", minion->mID, msglen, LB->cmd);
+            DDpacket(mb.buf,msglen);
+         }
          if (msglen > 0) {
             mb.buf[msglen]=0;
             if (verbose&D_PACKET){      // don't do the sprintf if we don't need to             

@@ -45,6 +45,7 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          case LBC_STATUS_NO_RESP:
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
+         case LBC_BURST:
          case LBC_QEXPOSE:
          case LBC_QCONCEAL:
          case LBC_REPORT_REQ:
@@ -117,7 +118,7 @@ int getTimeout(rf_connection_t *rc) {
 
 // set the timeout for X milliseconds after the start time
 void doTimeAfter(rf_connection_t *rc, int msecs) {
-   DDCMSG(D_TIME, RED, "Add to timeout %i, %9ld", msecs, rc->timeout_start);
+   DDCMSG(D_TIME, RED, "Add to timeout %9ld := %9ld + %i", rc->timeout_start, rc->time_start, msecs);
    // set infinite wait by making the start and end time the same
    if (msecs == INFINITE) {
       DDCMSG(D_TIME, CYAN, "Reset timeout_start to %ld @ %i", rc->time_start, __LINE__);
@@ -126,7 +127,7 @@ void doTimeAfter(rf_connection_t *rc, int msecs) {
    }
 
    // calculate the lower end time
-   rc->timeout_start += msecs;
+   rc->timeout_start = rc->time_start + msecs;
 
    // calculate the upper end time
    msecs += ((2*rc->timeslot_length)/3); // end time is start time plus 2/3 the timeslot length (to allow for transmission time)
@@ -169,7 +170,7 @@ int rcRead(rf_connection_t *rc, int tty) {
    if (dests <= 0) {
       DDCMSG(D_PACKET, tty ? CYAN : BLUE, "ERROR: %i", err);
       perror("Error: ");
-      return rem_ttyEpoll;
+//      return rem_ttyEpoll;
       if (err == EAGAIN) {
          // try again later
          return doNothing;
@@ -192,6 +193,16 @@ int rcRead(rf_connection_t *rc, int tty) {
    return doNothing;
 }
 
+#define MIN_WRITE 15
+void padTTY(rf_connection_t *rc, int tty, int s) {
+/*   if (tty && s < MIN_WRITE) {
+      char emptbuf[MIN_WRITE];
+      memset(emptbuf, 0, MIN_WRITE);
+      DDCMSG(D_NEW, cyan, "TTY PADDING %i BYTES", MIN_WRITE - s);
+      write(rc->tty, emptbuf, MIN_WRITE - s);
+   }*/
+}
+
 // if tty is 1, write data from buffer to tty, otherwise write data from buffer into socket
 int rcWrite(rf_connection_t *rc, int tty) {
    int s, err;
@@ -210,6 +221,11 @@ int rcWrite(rf_connection_t *rc, int tty) {
       return tty ? mark_ttyRead : mark_sockRead;
    }
 
+   // if we're tty, block
+   if (tty) {
+      setblocking(rc->tty);
+   }
+
    // write all the data we can
    if (tty) {
       s = write(rc->tty, rc->tty_obuf, rc->tty_olen);
@@ -217,24 +233,31 @@ int rcWrite(rf_connection_t *rc, int tty) {
       s = write(rc->sock, rc->sock_obuf, rc->sock_olen);
    }
    err = errno; // save errno
-   DDCMSG(D_RF, tty ? cyan : blue, "%s WROTE %i BYTES", tty ? "TTY" : "SOCKET", s);
+   DDCMSG(D_NEW, tty ? cyan : blue, "%s WROTE %i BYTES", tty ? "TTY" : "SOCKET", s);
    debugRF(tty ? cyan : blue, tty ? rc->tty_obuf : rc->sock_obuf, tty ? rc->tty_olen : rc->sock_olen);
 
    // did it fail?
    if (s <= 0) {
       if (s == 0 || err == EAGAIN) {
+         // if we're tty, block no more
+         if (tty) {
+            setnonblocking(rc->tty, 0);
+         }
+
          // try again later
          return doNothing;
       } else {
          // connection dead, remove it
          perror("Died because ");
          DDCMSG(D_RF, tty ? cyan : blue, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
+         // if we're tty, block no more
+         if (tty) {
+            setnonblocking(rc->tty, 0);
+         }
+
          return tty ? rem_ttyEpoll : rem_sockEpoll;
       }
    } else if (s < (tty ? rc->tty_olen : rc->sock_olen)) {
-      // we can't leave only a partial message going out, finish writing even if we block
-      setblocking(tty ? rc->tty : rc->sock);
-
       // loop until written (since we're blocking, it won't loop forever, just until timeout)
       while (s >= 0) {
          int ns;
@@ -248,13 +271,23 @@ int rcWrite(rf_connection_t *rc, int tty) {
             // connection dead, remove it
             perror("Died because ");
             DDCMSG(D_RF, tty ? cyan : blue, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
+            // if we're tty, block no more
+            if (tty) {
+               setnonblocking(rc->tty, 0);
+            }
+
             return tty ? rem_ttyEpoll : rem_sockEpoll;
          }
          s += ns; // increase total written, possibly by zero
       }
 
-      // change to non-blocking from blocking
-      setnonblocking(tty ? rc->tty : rc->sock, 0); // no extra socket stuff this time
+      // make sure to pad the tty to at least MIN_WRITE bytes
+      padTTY(rc, tty, s);
+
+      // if we're tty, block no more
+      if (tty) {
+         setnonblocking(rc->tty, 0);
+      }
 
       // don't try writing again
       return tty ? mark_ttyRead : mark_sockRead;
@@ -266,8 +299,24 @@ int rcWrite(rf_connection_t *rc, int tty) {
          rc->sock_olen = 0;
       }
 
+      // make sure to pad the tty to at least MIN_WRITE bytes
+      padTTY(rc, tty, s);
+
+      // if we're tty, block no more
+      if (tty) {
+         setnonblocking(rc->tty, 0);
+      }
+
       // don't try writing again
       return tty ? mark_ttyRead : mark_sockRead;
+   }
+
+   // make sure to pad the tty to at least MIN_WRITE bytes
+   padTTY(rc, tty, s);
+
+   // if we're tty, block no more
+   if (tty) {
+      setnonblocking(rc->tty, 0);
    }
 
    // partial success, leave writeable so we try again
@@ -452,13 +501,14 @@ int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
    DDCMSG(D_RF, CYAN, "t2s_handle_REQUEST_NEW(%8p, %i, %i)", rc, start, end);
 
    // remember last low/high devid
-   DDCMSG(D_TIME, BLACK, "Setting low/high to %X/%X", pkt->low_dev, pkt->low_dev+31);
+   DDCMSG(D_TIME, BLACK, "Setting low/high to %X/%X", pkt->low_dev, pkt->low_dev+7);
    rc->devid_last_low = pkt->low_dev;
-   rc->devid_last_high = pkt->low_dev+31;
+   rc->devid_last_high = pkt->low_dev+7;
 
    // remember timeslot length
+   rc->timeslot_init = pkt->inittime * 5; // convert to milliseconds
    rc->timeslot_length = pkt->slottime * 5; // convert to milliseconds
-   DDCMSG(D_TIME, BLACK, "Setting timeslot length to %i", rc->timeslot_length);
+   DDCMSG(D_TIME, BLACK, "Setting timeslot stuff to %i %i", rc->timeslot_init, rc->timeslot_length);
 
    return doNothing;
 } 
@@ -480,11 +530,6 @@ int tty2sock(rf_connection_t *rc) {
    int start, end, mnum, retval = doNothing; // start doing nothing
    int added_to_buf = 0;
 
-   // grab now time
-   long nowt;
-   nowt = getTime();
-
-
    // read all available valid messages up until I have to do something on return
    debugRF(cyan, rc->tty_ibuf, rc->tty_ilen);
    while ((retval == doNothing || retval == mark_sockWrite) && (mnum = validMessage(rc, &start, &end, 1)) != -1) { // 1 for tty
@@ -503,6 +548,20 @@ int tty2sock(rf_connection_t *rc) {
          t2s_HANDLE_RF (QCONCEAL); // keep track of ids? no
          t2s_HANDLE_RF (REQUEST_NEW); // keep track of devids
          t2s_HANDLE_RF (ASSIGN_ADDR); // keep track of ids? no
+         case LBC_BURST: { // keep track of packets
+            LB_burst_t *pkt = (LB_burst_t *)(rc->tty_ibuf + start);
+            rc->packets = pkt->number;
+
+            // change the start time to now time (which happened at the start of the burst)
+            DDCMSG(D_TIME, YELLOW, "---------------------------CHANGE IN NUM PACKETS: %i from BURST command", rc->packets);
+            DDCMSG(D_TIME, CYAN, "Reset all to %ld @ %i", rc->nowt, __LINE__);
+            rc->time_start = rc->nowt;
+            rc->timeout_start = rc->nowt; // reset start time as well
+            rc->timeout_end = rc->nowt; // reset end time as well
+            DDCMSG(D_TIME, BLACK, "Clock changed to %9ld", rc->time_start);
+
+            use_command = 0; // don't send this command on to slaveboss
+         }  break;
          default:
             use_command = 0; // ignore requests from other clients
             break;
@@ -510,6 +569,8 @@ int tty2sock(rf_connection_t *rc) {
 
       // was it a valid command that we handled?
       if (use_command) {
+         rc->packets--; // received a new packet, the burst just got smaller
+         DDCMSG(D_TIME, YELLOW, "---------------------------CHANGE IN NUM PACKETS: %i with cmd %i", rc->packets, mnum);
          // copy the found message to the socket "out" buffer
          addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
          added_to_buf = 1;
@@ -521,13 +582,6 @@ int tty2sock(rf_connection_t *rc) {
    
    // if we put anything in the socket "out" buffer...
    if (added_to_buf) {
-      // change the start time to now time (which happened at the start of the read)
-      DDCMSG(D_TIME, CYAN, "Reset all to %ld @ %i", nowt, __LINE__);
-      rc->time_start = nowt;
-      rc->timeout_start = nowt; // reset start time as well
-      rc->timeout_end = nowt; // reset end time as well
-      DDCMSG(D_TIME, BLACK, "Clock changed to %9ld", rc->time_start);
-
       // the socket needs to write it out now and whatever the t2s_* handler said to do
       retval |= mark_sockWrite; 
    }
@@ -656,13 +710,18 @@ int sock2tty(rf_connection_t *rc) {
       DDCMSG(D_TIME, BLACK, "Finding timeslot using rc->id_index %i", rc->id_index);
       // find the lowest matching address
       for (ts = 0; ts < min(rc->id_lasttime_index+1, MAX_IDS); ts++) {
+         DDCMSG(D_TIME, BLACK, "Looking at ts %i...", ts);
          for (i = 0; i < min(rc->id_index+1, MAX_IDS); i++) {
+            DDCMSG(D_TIME, BLACK, "Looking at id_index %i...", i);
             if (rc->ids_lasttime[ts] == rc->ids[i]) {
+               DDCMSG(D_TIME, BLACK, "Found at %ix%i...%ix%i", ts, i, rc->ids_lasttime[ts], rc->ids[i]);
                goto found_ts; // just jump down, my ts variable is now correct
             }
          }
       }
 
+      // label to jump to when I found my timeslot
+      found_ts:
       // reset ids so the timeslot resets
       rc->id_index = -1;
    } else if (rc->devid_last_high >= 0) {
@@ -688,12 +747,10 @@ int sock2tty(rf_connection_t *rc) {
       rc->devid_last_high = -1;
    }
 
-   // label to jump to when I found my timeslot
-   found_ts:
-   DDCMSG(D_TIME, BLACK, "Found timeout slot: %i (%i)", ts, rc->timeslot_length);
+   DDCMSG(D_TIME, BLACK, "Found timeout slot: %i (%i + %i)", ts, rc->timeslot_init, (rc->timeslot_length * ts));
 
    // change timeout
-   doTimeAfter(rc, rc->timeslot_length * (ts+1)); // timeslot length * timeslot I'm in, minimum of timeslot_length
+   doTimeAfter(rc, rc->timeslot_init + (rc->timeslot_length * ts)); // timeslot length * timeslot I'm in, minimum of timeslot_init (ts 1 => run at timeslot_init, 2 => init + timeslot_length)
 
    return (retval | doNothing); // the timeout will determine when we can write, right now do nothing or whatever retval was
 }

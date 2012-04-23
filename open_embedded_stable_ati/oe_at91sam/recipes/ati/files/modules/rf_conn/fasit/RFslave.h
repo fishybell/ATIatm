@@ -32,6 +32,7 @@ typedef struct rf_connection {
    long timeout_end; // the ending of the timeslot when we must send the message
 
    // timeslot stuff
+   int timeslot_init; // the amount of initial time to wait, as determined by the RFmaster
    int timeslot_length; // the amount of time each timeslot is, as determined by the RFmaster
    int ids[MAX_IDS]; // the ids we're sending from this time (standard, and group)
    int id_index; // the last id in the ids list we used
@@ -41,6 +42,8 @@ typedef struct rf_connection {
    int id_lasttime_index; // the last id in the ids_lasttime list we used
    int devid_last_low; // the low_dev from the last LBC_REQUEST_NEW packet
    int devid_last_high; // the high_dev from the last LBC_REQUEST_NEW packet
+   int packets; // the number of packets to expect this "burst"
+   long nowt; // the start of burst time
 } rf_connection_t;
 
 extern int verbose;

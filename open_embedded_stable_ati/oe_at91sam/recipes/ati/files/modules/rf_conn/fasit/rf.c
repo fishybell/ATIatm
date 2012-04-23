@@ -31,6 +31,16 @@ void EnQueue(queue_t *M, void *ptr,int count){
    while(count--) *M->tail++=*data++ ;
 }
 
+// add count bytes to the head of the queue (makes it not a queue, but I won't tell if you don't)
+void QueuePush(queue_t *M, void *ptr,int count){
+   char *tbuf = malloc(M->size);
+   memcpy(tbuf+count, M->head, Queue_Depth(M));   // copy old queue stuff to front...ish
+   memcpy(tbuf, ptr, count);                      // copy new stuff to front
+   memcpy(M->head, tbuf, Queue_Depth(M) + count); // copy back everything
+   free(tbuf);
+   M->tail += count;
+}
+
 
 /*** peek at the queue and return a
  ***   0 if there is not a complete packet at the head
@@ -71,6 +81,7 @@ int Ptype(char *buf){
    if (!crc){ // there seemed to be a good command
       if (LB->cmd==LBC_REQUEST_NEW) return(1);
       if (LB->cmd==LBC_STATUS_REQ) return(2);
+      if (LB->cmd==LBC_REPORT_REQ) return(2);
       return(3);
    }
    return(0);
@@ -137,6 +148,7 @@ int RF_size(int cmd){
       case  LBC_STATUS_REQ:
       case  LBC_STATUS_NO_RESP:
       case  LBC_QEXPOSE:
+      case  LBC_BURST:
          return (3);
 
       case  LBC_STATUS_RESP_LIFTER:
@@ -160,10 +172,8 @@ int RF_size(int cmd){
          return (7);
 
       case  LBC_STATUS_RESP_MOVER:
-         return (8);
-
       case  LBC_REQUEST_NEW:
-         return (10);
+         return (8);
 
       case  LBC_STATUS_RESP_EXT:
          return (11);
@@ -349,6 +359,14 @@ void DDpacket(uint8 *buf,int len){
             strcpy(cmdname,"Qexpose");
             sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
             break;
+
+         case LBC_BURST:
+         {
+            LB_burst_t *L=(LB_burst_t *)LB;
+            strcpy(cmdname,"Burst");
+            sprintf(hbuf,"Number=%3d .....",L->number);
+         }
+         break;
 
          case LBC_QCONCEAL:
          {

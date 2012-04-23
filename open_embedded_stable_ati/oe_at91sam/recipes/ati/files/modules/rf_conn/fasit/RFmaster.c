@@ -41,6 +41,34 @@ void DieWithError(char *errorMessage){
    exit(1);
 }
 
+void setblocking(int fd) {
+   int opts, yes=1;
+
+   // generic file descriptor setup
+   opts = fcntl(fd, F_GETFL); // grab existing flags
+   if (opts < 0) {
+      DieWithError("fcntl(F_GETFL)");
+   }
+   opts = (opts ^ O_NONBLOCK); // remove nonblock from existing flags
+   if (fcntl(fd, F_SETFL, opts) < 0) {
+      DieWithError("fcntl(F_SETFL)");
+   }
+}
+
+void setnonblocking(int fd) {
+   int opts, yes=1;
+
+   // generic file descriptor setup
+   opts = fcntl(fd, F_GETFL); // grab existing flags
+   if (opts < 0) {
+      DieWithError("fcntl(F_GETFL)");
+   }
+   opts = (opts | O_NONBLOCK); // add nonblock to existing flags
+   if (fcntl(fd, F_SETFL, opts) < 0) {
+      DieWithError("fcntl(F_SETFL)");
+   }
+}
+
 /*************
  *************  HandleRF
  *************
@@ -66,26 +94,27 @@ void DieWithError(char *errorMessage){
 
 #define Rxsize 16384
 #define Txsize 256
+#define RF_BUF_SIZE 512
 
-void HandleRF(int MCPsock,int risock,int RFfd){
+void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    struct timespec elapsed_time, start_time, istart_time,delta_time;
    queue_t *Rx,*Tx;
    int seq=1;           // the packet sequence numbers
 
-   char Rbuf[512];
+   char Rbuf[RF_BUF_SIZE];
    char buf[200];        /* text Buffer  */
    char  *Rptr,*Rstart;
-   int size,gathered,gotrf,delta,remaining_time,bytecount;
-   int riclient=-1;    /* radio interface client socket */
+   int end, Rsize=0, size,gathered,gotrf,delta,remaining_time,bytecount,bytecount2;
    int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
    fd_set rf_or_mcp;
    struct timeval timeout;
    int maxcps=500,rfcount=0;            /*  characters per second that we can transmit without melting - 1000 is about 100% */
    double cps;
    uint8 crc;
-   int slottime=0,total_slots;
+   int inittime=0,slottime=0,total_slots;
    int low_dev,high_dev;
-   int burst,ptype;
+   int burst,ptype,packets;
+   LB_burst_t LBb;
 
 
    // packet header so we can determine the length from the command in the header
@@ -121,8 +150,8 @@ void HandleRF(int MCPsock,int risock,int RFfd){
       FD_ZERO(&rf_or_mcp);
       FD_SET(MCPsock,&rf_or_mcp);               // we are interested hearing the mcp
       FD_SET(risock,&rf_or_mcp);                // we are interested hearing the Radio Interface listen socket
-      if (riclient > 0) {
-         FD_SET(riclient,&rf_or_mcp); // only add riclient to select when it exists
+      if (*riclient > 0) {
+         FD_SET(*riclient,&rf_or_mcp); // only add riclient to select when it exists
       }
       FD_SET(RFfd,&rf_or_mcp);          // we also want to hear from the RF world
 
@@ -146,8 +175,17 @@ void HandleRF(int MCPsock,int risock,int RFfd){
          timeout.tv_sec=remaining_time/1000;
          timeout.tv_usec=(remaining_time%1000)*1000;
       }
-      sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
-      if (close_nicely) {break;}
+      // if we don't have anything in the queue, don't timeout
+      bytecount=Queue_Depth(Rx);
+      bytecount2=Queue_Depth(Tx);
+      if (bytecount <= 0) {
+         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_time=%d, rtime=%d, timeout=INFINITE, ", bytecount, bytecount2, remaining_time, rtime);
+         sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, NULL);
+      } else {
+         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_time=%d, rtime=%d, timeout=%d.%03d, ", bytecount, bytecount2, remaining_time, rtime, timeout.tv_sec, timeout.tv_usec);
+         sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
+      }
+   if (close_nicely) {break;}
       DDCMSG(D_TIME,YELLOW,"select returned, sock_ready=%d",sock_ready);
       if (sock_ready<0){
          strerror_r(errno,buf,200);
@@ -199,7 +237,7 @@ void HandleRF(int MCPsock,int risock,int RFfd){
              ******
              ******    all we have to do is have our recieve queue, and put just what we want in the transmit queue.
              ******
-             ******    Algorithm:  for up to 240 bytes, as long as the packets are not type #1 (request new devices) we
+             ******    Algorithm:  for up to 239 bytes, as long as the packets are not type #1 (request new devices) we
              ******                put them in the Tx queue.
              ******                If we do have a #1 then we:
              ******                a) if there are any #2's in the current Tx queue, then we must send the current queue.
@@ -221,11 +259,12 @@ void HandleRF(int MCPsock,int risock,int RFfd){
 
             // loop until we are out of complete packets, and place them into the Tx queue
             burst=3;            // remembers if we upt a type2 into the burst
+            packets=0;          // remembers the number of packets in a burst
             remaining_time = 50;       // reset our remaining_time before we are allowed to Tx again   time needs to be smarter
 
             while((ptype=QueuePtype(Rx))&&              /* we have a complete packet */
                   burst &&                              /* and burst is not 0 (0 forces us to send) */
-                  (Queue_Depth(Tx)<240)&&               /*  room for more */
+                  (Queue_Depth(Tx)<239)&&               /*  room for more */
                   !((ptype==1)&&(burst==2))                           /* and if we are NOT a REQUEST_NEW.   requests get bursted like everything else */
                  ){     
 
@@ -233,19 +272,30 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                DDCMSG(D_MEGA,CYAN,"in loop.  Rx[%d] Tx[%d]",Queue_Depth(Rx),Queue_Depth(Tx));
                if (ptype==1){   /*  parse it to get the slottime and devid range, and set burst to 0 */
                   LB_new =(LB_request_new_t *) Rx->head;        // we need to parse out the slottime, high_dev and low_dev from this packet.
+                  inittime=LB_new->inittime*5;          // convert passed initial time back to milliseconds
                   slottime=LB_new->slottime*5;          // convert passed slottime back to milliseconds
                   low_dev=LB_new->low_dev;
-                  total_slots=34;               // total number of slots with end padding
+                  total_slots=10;               // total number of slots with end padding
                   burst=0;
-                  remaining_time =(total_slots)*slottime;       // set up the timer
-                  DDCMSG(D_TIME,YELLOW,"setting remaining_time to %d  total_slots=%d slottime=%d",
+                  if (burst == 3) {
+                     // no existing stuff in out-queue this burst
+                     remaining_time =(total_slots)*slottime;       // set up the timer
+                     DDCMSG(D_TIME,YELLOW,"setting remaining_time to %d  total_slots=%d slottime=%d",
                          remaining_time,total_slots,slottime);
+                  } else {
+                     // existing stuff in out-queue this burst
+                     remaining_time +=(total_slots)*slottime;       // set up the timer
+                     DDCMSG(D_TIME,YELLOW,"adding remaining_time to %d  total_slots=%d slottime=%d",
+                         remaining_time,total_slots,slottime);
+                  }
                   ReQueue(Tx,Rx,RF_size(LB_new->cmd));  // move it to the Tx queue
+                  packets++;
 
 
                } else {
                   LB=(LB_packet_t *)Rx->head;                   
                   ReQueue(Tx,Rx,RF_size(LB->cmd));      // move it to the Tx queue
+                  packets++;
                   if (ptype==2) {
                      burst=2;
                      remaining_time +=slottime; // add time for a response to this one
@@ -257,21 +307,29 @@ void HandleRF(int MCPsock,int risock,int RFfd){
             }  // end of while loop to build the Tx packet
 
 
+            // build burst header and put in front of transmission (always, even if only one message is being sent)
+            LBb.cmd = LBC_BURST;
+            LBb.number=packets&0x7f; // max of 7 bits for number of packets
+            set_crc8(&LBb);
+            QueuePush(Tx, &LBb, RF_size(LBb.cmd));
+
             /***********    Send the RF burst
              ***********
              ***********/
 
             DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%d]",Queue_Depth(Tx));
+            DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %d %d", remaining_time, inittime);
+            remaining_time += inittime; // add initial delay time
 
             if (Queue_Depth(Tx)){  // if we have something to Tx, Tx it.
 
                // when we're sending, we're busy, tell the Radio Interface client
-               if (riclient > 0) {
+               if (*riclient > 0) {
                   char ri_buf[128];
                   DDCMSG(D_TIME, YELLOW, "Remaining time: %d %d", remaining_time, slottime);
                   snprintf(ri_buf, 128, "B %i\n", (5 * (Queue_Depth(Tx)) / 3) + 37 + remaining_time); // number of bytes * baud rate = milliseconds (9600 baud / 2 for overhead => 600 bytes a second => 5/3 second for 1000 bytes) + transmit delays
-                  DDCMSG(D_NEW, BLACK, "writing riclient %s", ri_buf);
-                  result=write(riclient, ri_buf, strnlen(ri_buf, 128));
+                  DDCMSG(D_RF|D_VERY, BLACK, "writing riclient %s", ri_buf);
+                  result=write(*riclient, ri_buf, strnlen(ri_buf, 128));
                }
 
                result=write(RFfd,Tx->head,Queue_Depth(Tx));
@@ -317,11 +375,82 @@ void HandleRF(int MCPsock,int risock,int RFfd){
       //  if we have data to read from the RF, read it then blast it back upstream to the MCP
       DDCMSG(D_MEGA,BLACK,"RFmaster checking FD_ISSET(RFfd)");
       if (FD_ISSET(RFfd,&rf_or_mcp)){
+         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(RFfd)");
 
          // while gathering RF data, we're busy, tell the Radio Interface client
-         if (riclient > 0) {
-            DDCMSG(D_NEW, BLACK, "writing riclient B\\n");
-            write(riclient, "B\n", 2);
+         if (*riclient > 0) {
+            DDCMSG(D_RF|D_VERY, BLACK, "writing riclient B\\n");
+            write(*riclient, "B\n", 2);
+         }
+
+         DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(RFfd)");
+         /* Receive message, or continue to recieve message from RF */
+         Rptr = Rbuf + Rsize;
+         if ((gotrf = gather_rf(RFfd,Rptr,RF_BUF_SIZE-Rsize)) > 0) {
+            Rsize += gotrf;
+            Rptr = Rbuf + Rsize;
+         }
+
+         // after gathering RF data, we're free, tell the Radio Interface client
+         if (*riclient > 0) {
+            DDCMSG(D_RF|D_VERY, BLACK, "writing riclient F\\n");
+            write(*riclient, "F\n", 2);
+         }
+
+         /* send valid message(s) to mcp */
+         Rstart = Rbuf;
+         while (Rstart < (Rptr - 2)) { /* look up until we don't have enough characters for a full message */
+            LB=(LB_packet_t *)Rstart;   // map the header in
+            size=RF_size(LB->cmd);
+            crc=(size > 2) ? crc8(LB) : 1; // only calculate crc if we have a valid size
+            if (!crc) {
+               result=write(MCPsock,Rstart,size);
+               if (result==size) {
+                  if (verbose&D_RF){
+                     timestamp(&elapsed_time,&istart_time,&delta_time);
+                     sprintf(buf,"[%03d] %4ld.%03ld ->MCP [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,result);
+                     printf("%s",buf);
+                     printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                     if(result>1){
+                        for (int i=0; i<result-1; i++) printf("%02x.", (uint8) Rstart[i]);
+                     }
+                     printf("%02x\n", (uint8) Rstart[result-1]);
+                  }  
+                  if (verbose&D_PARSE){
+                     DDpacket(Rstart,result);
+                  }
+               } else {
+                  sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
+                  DDCMSG_HEXB(D_RF,RED,buf,Rstart,size);
+               }
+               /* remove message, and everything before it, from buffer */
+               end = (Rstart - Rbuf) + size;
+               DDCMSG(D_NEW, BLACK, "About to clear msg from buffer %i, %i, %i, %08x, %08x, %08x", end, size, Rsize, Rbuf, Rstart, Rptr);
+               if (end >= (Rptr - Rbuf)) {
+                  DDCMSG(D_MEGA, RED, "clearing entire buffer");
+                  // clear the entire buffer
+                  Rptr = Rbuf;
+               } else {
+                  // clear out everything up to and including end
+                  char tbuf[RF_BUF_SIZE];
+                  DDCMSG(D_MEGA, RED, "clearing buffer partially: %i-%i", (Rptr - Rbuf), end);
+                  memcpy(tbuf, Rbuf + (sizeof(char) * end), (Rptr - Rbuf) - end);
+                  memcpy(Rbuf, tbuf, (Rptr - Rbuf) - end);
+                  Rstart = Rbuf;
+                  Rptr -= end;
+               }
+               Rsize = Rptr - Rbuf;
+               DDCMSG(D_NEW, BLACK, "After msg cleared from buffer %i, %i, %i, %08x, %08x, %08x", end, size, Rsize, Rbuf, Rstart, Rptr);
+            } else {
+               Rstart++;
+            }
+         }
+
+#if 0
+         // while gathering RF data, we're busy, tell the Radio Interface client
+         if (*riclient > 0) {
+            DDCMSG(D_RF|D_VERY, BLACK, "writing riclient B\\n");
+            write(*riclient, "B\n", 2);
          }
 
          DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(RFfd)");
@@ -344,9 +473,9 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                 gotrf,gathered,(int)(Rptr-Rbuf),(int)(Rstart-Rbuf),(int)(Rptr-Rstart));
 
          // after gathering RF data, we're free, tell the Radio Interface client
-         if (riclient > 0) {
-            DDCMSG(D_NEW, BLACK, "writing riclient F\\n");
-            write(riclient, "F\n", 2);
+         if (*riclient > 0) {
+            DDCMSG(D_RF|D_VERY, BLACK, "writing riclient F\\n");
+            write(*riclient, "F\n", 2);
          }
 
          if (gathered>=3){
@@ -410,23 +539,24 @@ void HandleRF(int MCPsock,int risock,int RFfd){
                DDCMSG(D_VERY,RED,"we do not have a complete RF packet, keep gathering ");
             }
          }  // if gathered >=3
+#endif
       } // if this fd is ready
 
       // read range interface client
       DDCMSG(D_MEGA,BLACK,"RFmaster checking FD_ISSET(riclient)");
-      if (riclient > 0 && FD_ISSET(riclient,&rf_or_mcp)){
+      if (*riclient > 0 && FD_ISSET(*riclient,&rf_or_mcp)){
          DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(riclient)");
          int size;
          char buf[128];
          int err;
-         size=read(riclient,buf,128);
+         size=read(*riclient,buf,128);
          err = errno;
          if (size <= 0 && err != EAGAIN) {
-            DDCMSG(D_NEW, YELLOW, "Range Interface dead");
-            close(riclient);
-            riclient = -1;
+            DDCMSG(D_RF|D_VERY, YELLOW, "Range Interface dead");
+            close(*riclient);
+            *riclient = -1;
          } else {
-            DDCMSG(D_NEW, YELLOW, "Read from Range Interface %i bytes: %s", size,buf);
+            DDCMSG(D_RF|D_VERY, YELLOW, "Read from Range Interface %i bytes: %s", size,buf);
          }
       }
 
@@ -438,17 +568,18 @@ void HandleRF(int MCPsock,int risock,int RFfd){
          struct sockaddr_in ClntAddr;   /* Client address */
          unsigned int clntLen;               /* Length of client address data structure */
          // close existing one
-         if (riclient > 0) {
-            DDCMSG(D_NEW, BLACK, "closing old, but working ri_client %i", riclient);
-            close(riclient);
-            riclient = -1;
+         if (*riclient > 0) {
+            DDCMSG(D_RF|D_VERY, BLACK, "closing old, but working ri_client %i", *riclient);
+            close(*riclient);
+            *riclient = -1;
          }
          if ((newclient = accept(risock, (struct sockaddr *) &ClntAddr,  &clntLen)) > 0) {
             int yes=1;
             // replace existing riclient with new one
-            riclient = newclient;
-            DDCMSG(D_NEW, BLACK, "new working riclient %i from %s", riclient, inet_ntoa(ClntAddr.sin_addr));
-            setsockopt(riclient, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
+            *riclient = newclient;
+            DDCMSG(D_RF|D_VERY, BLACK, "new working riclient %i from %s", *riclient, inet_ntoa(ClntAddr.sin_addr));
+            setsockopt(*riclient, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
+            write(*riclient, "V\n", 2); // we're valid if we connect here
          }// if error, ignore
       }
 
@@ -514,8 +645,8 @@ void HandleRF(int MCPsock,int risock,int RFfd){
    
    close(MCPsock);
    close(risock);
-   if (riclient > 0) {
-      close(riclient);
+   if (*riclient > 0) {
+      close(*riclient);
    }
    close(RFfd);
 }  // end of handle_RF
@@ -551,7 +682,8 @@ void print_help(int exval) {
 
 int main(int argc, char **argv) {
    int serversock;                      /* Socket descriptor for server connection */
-   int risock;                  /* Socket descriptor for radio interface connection */
+   int risock = -1;                  /* Socket descriptor for radio interface connection listener*/
+   int riclient = -1;                  /* Socket descriptor for radio interface connection */
    int MCPsock;                 /* Socket descriptor to use */
    int RFfd;                            /* File descriptor for RFmodem serial port */
    struct sockaddr_in ServAddr; /* Local address */
@@ -578,7 +710,7 @@ int main(int argc, char **argv) {
    signal(SIGINT, quitproc);
    signal(SIGQUIT, quitproc);
 
-   while((opt = getopt(argc, argv, "hv:r:f:t:p:s:x:l:d:D:")) != -1) {
+   while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
@@ -642,7 +774,7 @@ int main(int argc, char **argv) {
 
    if (rtime<350) rtime = 350;  // enforce a minimum rtime  - also the default if no -r option
    if (rtime>35000) rtime = 35000;  // enforce a maximum rtime
-   hardflow|=2; // force BLOCKING for the time being
+   //hardflow|=2; // force BLOCKING for the time being
    
    DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);
    DCMSG(YELLOW,"RFmaster: hardflow is set to 0x%x", hardflow);
@@ -687,6 +819,7 @@ int main(int argc, char **argv) {
 
       RQ->cmd=LBC_REQUEST_NEW;
       RQ->low_dev=low_dev;
+      RQ->inittime=slottime/5; // use slottime as initial time in xmit debug state
       RQ->slottime=slottime/5;
       // calculates the correct CRC and adds it to the end of the packet payload
       // also fills in the length field
@@ -700,6 +833,7 @@ int main(int argc, char **argv) {
          DCMSG(YELLOW,"top usleep for %d ms",xmit);
          
          // now send it to the RF master
+         setblocking(RFfd);
          result=write(RFfd,RQ,size);
          if (result==size) {
             sprintf(buf,"Xmit test  ->RF  [%2d]  ",size);
@@ -708,9 +842,10 @@ int main(int argc, char **argv) {
             sprintf(buf,"Xmit test  ->RF  [%d!=%d]  ",size,result);
             DCMSG_HEXB(RED,buf,RQ,size);
          }
+         setnonblocking(RFfd);
       
          
-         usleep((1+total_slots)*slottime*1000);
+         usleep(slottime + ((1+total_slots)*slottime*1000)); // use slottime as initial time
          DCMSG(YELLOW,"usleep for %d ms",total_slots*slottime);
          
          result = gather_rf(RFfd,rbuf,275);
@@ -783,36 +918,51 @@ int main(int argc, char **argv) {
    RiAddr.sin_addr.s_addr = htonl(INADDR_ANY); /* Any incoming interface */
    RiAddr.sin_port = htons(SRport);      /* Local port */
 
-   /* Bind to the local address */
-   if (bind(risock, (struct sockaddr *) &RiAddr, sizeof(RiAddr)) < 0)
-      DieWithError("bind(risock) failed");
+   /* Mark the socket so it will listen for incoming connections */
+   /* the '1' for MAXPENDINF might need to be a '0')  */
+   if (listen(serversock, 2) < 0) {
+      DieWithError("listen(serversock) failed");
+   }
 
    /* Set the size of the in-out parameter */
    clntLen = sizeof(ClntAddr);
 
-   /* Mark the socket so it will listen for incoming connections */
-   /* the '1' for MAXPENDINF might need to be a '0')  */
-   if (listen(serversock, 2) < 0)
-      DieWithError("listen(serversock) failed");
+   /* Bind to the local address */
+   if (bind(risock, (struct sockaddr *) &RiAddr, sizeof(RiAddr)) < 0) {
+      DCMSG(RED, "bind(risock) failed");
+   }
 
    /* Mark the socket so it will listen for incoming connections */
    /* the '1' for MAXPENDINF might need to be a '0')  */
-   if (listen(risock, 2) < 0)
-      DieWithError("listen(risock) failed");
+   if (listen(risock, 2) < 0) {
+      DCMSG(RED, "listen(risock) failed");
+   }
 
    while (!close_nicely) {
 
-      /* Wait for a client to connect */
-      if ((MCPsock = accept(serversock, (struct sockaddr *) &ClntAddr,  &clntLen)) < 0)
-         DieWithError("accept() failed");
+      /* error existing riclient */
+      if (riclient > 0) {
+         write(riclient, "E\n", 2);
+      }
 
-         int yes = 1;
-         setsockopt(MCPsock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
+      /* Wait for a client to connect */
+      if ((MCPsock = accept(serversock, (struct sockaddr *) &ClntAddr,  &clntLen)) < 0) {
+         DieWithError("accept() failed");
+      }
+
+      int yes = 1;
+      setsockopt(MCPsock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
 
       /* MCPsock is connected to a Master Control Program! */
 
+      /* un-error existing riclient */
+      if (riclient > 0) {
+         write(riclient, "V\n", 2);
+      }
+
+
       DCMSG(BLUE,"Good connection to MCP <%s>  (or telnet or somebody)", inet_ntoa(ClntAddr.sin_addr));
-      HandleRF(MCPsock,risock,RFfd);
+      HandleRF(MCPsock,risock, &riclient,RFfd);
       DCMSG(RED,"Connection to MCP closed.   listening for a new MCP");
 
    }

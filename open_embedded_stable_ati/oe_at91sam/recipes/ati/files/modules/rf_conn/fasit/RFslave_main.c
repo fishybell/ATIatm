@@ -151,6 +151,8 @@ int main(int argc, char **argv) {
    char *ttyport = "/dev/ttyS1";
    struct termios newtio; // the new state of the serial device
    rf_connection_t rc;
+   int tty_fd_n;
+   int sock_fd_n;
 
    // install signal handlers
    signal(SIGINT, quitproc);
@@ -163,6 +165,7 @@ int main(int argc, char **argv) {
    rc.devid_index = -1;
    rc.devid_last_low = -1;
    rc.devid_last_high = -1;
+   rc.packets = -1; // ready for next burst
 
    // initialize addresses
    D_memset(&raddr, 0, sizeof(struct sockaddr_in));
@@ -219,7 +222,22 @@ int main(int argc, char **argv) {
    setnonblocking(rc.sock, 1); // socket first time
    DDCMSG(D_MEGA, BLACK,"RFSLAVE: RF socket fd: %i", rc.sock);
 
-   // open tty and setup the serial device
+    // turn power to low for the radio A/B pin
+    rc.tty=open("/sys/class/gpio/export",O_WRONLY,"w");
+    write(rc.tty,"39",1);
+    close(rc.tty);
+    rc.tty=open("/sys/class/gpio/gpio39/direction",O_WRONLY,"w");
+    write(rc.tty,"out",3);
+    close(rc.tty);
+    rc.tty=open("/sys/class/gpio/gpio39/value",O_WRONLY,"w");
+    write(rc.tty,"0",1);		// a "1" here would turn on high power
+    close(rc.tty);
+    rc.tty=open("/sys/class/gpio/unexport",O_WRONLY,"w");
+    write(rc.tty,"39",1);		// this lets any kernel modules use the pin from now on
+    close(rc.tty);
+    
+    DCMSG(YELLOW,"A/B set for Low power.\n");
+    // open tty and setup the serial device
    rc.tty = open_port(ttyport, 4); // bit 1 for hardware flow control, bit 2 for blocking, bit 3(on) for IGNBRK | IGNCR
    if (rc.tty <= 0) {
       DieWithError("Is unhappy tty");
@@ -253,6 +271,8 @@ int main(int argc, char **argv) {
 
    // main loop
    while (!done && !close_nicely) {
+      tty_fd_n = -1;
+      sock_fd_n = -1;
       int timeout = getTimeout(&rc); // find out timeout...
       DDCMSG(D_MEGA, YELLOW, "RFSLAVE EPOLL WAITING %i msecs", timeout);
       // wait for something to happen
@@ -279,57 +299,78 @@ int main(int argc, char **argv) {
       for (n = 0; !done && !close_nicely && n < nfds; n++) {
          DDCMSG(D_MEGA, YELLOW, "Looking at %i in events...", n);
          if (events[n].data.fd == rc.tty) { // Read/Write from tty
-            DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i tty", n, events[n].events);
-
-            // closed socket?
-            if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
-               // client closed, shutdown
-               done = 1;
-            // writing?
-            } else if (events[n].events & EPOLLOUT) {
-               // rcWrite will push the data as quickly as possible
-               done = handleRet(rcWrite(&rc, 1),&rc, efd); // 1 for tty
-            // reading?
-            } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
-               int ret = rcRead(&rc, 1); // 1 for tty
-               if (ret != doNothing) {
-                  done = handleRet(ret, &rc, efd); // this 
-               } else {
-                  // tty2sock will transfer the data from the tty to the socket and handle as necessary
-                  done = handleRet(tty2sock(&rc), &rc, efd);
-                  
-                  // handle socket write immediately
-                  if (done & mark_sockWrite) {
-                     done ^- mark_sockWrite; // un-mark socket write
-                     done |= mark_sockRead; // continue un-marking
-                     done |= handleRet(sock2tty(&rc), &rc, efd);
-                  }
-               }
-            }
+            tty_fd_n = n;
          } else if (events[n].data.fd == rc.sock) { // Read/Write from socket
-            DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i socket", n, events[n].events);
-
-            // closed socket?
-            if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
-               // close by handling like a rem_sockEpoll
-               done = handleRet(rem_sockEpoll, &rc, efd);
-            // writing?
-            } else if (events[n].events & EPOLLOUT) {
-               // rcWrite will push the data as quickly as possible
-               done = handleRet(rcWrite(&rc, 0), &rc, efd); // 0 for socket
-            // reading?
-            } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
-               int ret = rcRead(&rc, 0); // 0 for socket
-               if (ret != doNothing) {
-                  done = handleRet(ret, &rc, efd); // this 
-               } else {
-                  // sock2tty will transfer the data from the tty to the socket and handle as necessary
-                  done = handleRet(sock2tty(&rc), &rc, efd);
-               }
-            }
+            sock_fd_n = n;
          } else {
             DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i unknown: %i", n, events[n].events, events[n].data.fd);
             done = 1; // exit
+         }
+      }
+
+      if (tty_fd_n != -1) { // Read/Write from tty (always, even if socket is ready)
+         n = tty_fd_n;
+         DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i tty", n, events[n].events);
+
+         // closed socket?
+         if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
+            // client closed, shutdown
+            done = 1;
+         // writing?
+         } else if (events[n].events & EPOLLOUT) {
+            // rcWrite will push the data as quickly as possible
+            done = handleRet(rcWrite(&rc, 1),&rc, efd); // 1 for tty
+         // reading?
+         } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
+            if (rc.packets < 0) { // is this the start of a fresh burst?
+               DDCMSG(D_TIME, YELLOW, "---------------------------START OF BURST!!!");
+               // grab now time
+               rc.nowt = getTime();
+               rc.packets = 0; // in burst now
+            }
+
+            int ret = rcRead(&rc, 1); // 1 for tty
+            if (ret != doNothing) {
+               done = handleRet(ret, &rc, efd); // this 
+            } else {
+               // tty2sock will transfer the data from the tty to the socket and handle as necessary
+               done = handleRet(tty2sock(&rc), &rc, efd);
+               
+               // handle socket write immediately
+               if (done & mark_sockWrite) {
+                  // move to socket
+                  done ^- mark_sockWrite; // un-mark socket write
+                  done |= mark_sockRead; // continue un-marking
+                  done |= handleRet(sock2tty(&rc), &rc, efd);
+               }
+
+               if (rc.packets <= 0) {
+                  DDCMSG(D_TIME, YELLOW, "---------------------------END OF BURST!!!");
+                  rc.packets = -1; // signal ready for next burst
+               }
+            }
+         }
+      } else if (sock_fd_n != -1) { // Read/Write from socket (only if tty isn't ready)
+         n = sock_fd_n;
+         DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i socket", n, events[n].events);
+
+         // closed socket?
+         if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
+            // close by handling like a rem_sockEpoll
+            done = handleRet(rem_sockEpoll, &rc, efd);
+         // writing?
+         } else if (events[n].events & EPOLLOUT) {
+            // rcWrite will push the data as quickly as possible
+            done = handleRet(rcWrite(&rc, 0), &rc, efd); // 0 for socket
+         // reading?
+         } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
+            int ret = rcRead(&rc, 0); // 0 for socket
+            if (ret != doNothing) {
+               done = handleRet(ret, &rc, efd); // this 
+            } else {
+               // sock2tty will transfer the data from the tty to the socket and handle as necessary
+               done = handleRet(sock2tty(&rc), &rc, efd);
+            }
          }
       }
    }
