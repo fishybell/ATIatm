@@ -39,6 +39,10 @@ enum {
    ERR_disconnected_SIT=186,
    ERR_connected_SIT=187,
    ERR_critical_battery=188,
+   ERR_normal_battery=189,
+   ERR_normal_battery=189,
+   ERR_charging_battery=190,
+   ERR_notcharging_battery=191,
 };
 
 #endif
