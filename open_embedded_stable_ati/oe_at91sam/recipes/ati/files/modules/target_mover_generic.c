@@ -527,6 +527,7 @@ static int hardware_motor_on(int direction)
     }
     // Turn off charging relay
     at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+    do_fault(ERR_notcharging_battery);
     dock_timeout_stop();
     memset(pid_errors, 0, sizeof(int)*MAX_PID_ERRORS);
     pid_last_error = 0;				// prior error
@@ -1294,12 +1295,12 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
 
     if (isMoverAtDock() != 0) {
        do_event(EVENT_DOCK_LIMIT); // triggered on dock limit
-       battery_check_is_docked(1);
        do_fault(ERR_stop_dock_limit); // triggered on dock limit
        mover_speed_stop();
        at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
        atomic_set(&find_dock_atomic, 0);
        enable_battery_check(1);
+       battery_check_is_docked(1);
     }
 //    atomic_set(&continuous_speed, 0);
 
@@ -1604,8 +1605,9 @@ static int hardware_init(void)
     // Turn on charging relay
     if (isMoverAtDock() != 0) {
       do_event(EVENT_DOCK_LIMIT);
-      battery_check_is_docked(1);
       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
+      battery_check_is_docked(1);
+      enable_battery_check(1);
     } else {
       do_event(EVENT_UNDOCKED);
       battery_check_is_docked(0);
@@ -2160,14 +2162,15 @@ void mover_find_dock(void) {
 }
 
 void mover_go_home(void) {
+   atomic_set(&continuous_speed, 0);
    if (mover_type == IS_MIT){
       if (home_loc == 1) { // Dock at end away from home
          if (atomic_read(&last_sensor) != MOVER_SENSOR_END){
-            mover_speed_set(3); // Get there kind of fast
+            mover_speed_set(28); // Get there kind of fast
          }
       } else if (home_loc == 0) { // Dock at home end
          if (atomic_read(&last_sensor) != MOVER_SENSOR_HOME){
-            mover_speed_set(-3); // Get there kind of fast
+            mover_speed_set(-28); // Get there kind of fast
          }
       }
    }
@@ -2189,14 +2192,14 @@ DELAY_PRINTK("mover_sleep_set(%i)\n", value);
       if (dock_loc == 1 || dock_loc == 3) { // Dock at end away from home
          mover_speed_set(1); // Go Slow
       } else if (dock_loc == 0 || dock_loc == 2) { // Dock at home end
-         mover_speed_set(-1); // Go Slow
+         mover_speed_set(-10); // Go Slow
       }
    } else if (value == 3) {
 //      mover_find_dock();
 //    Just move to the end of the track where the dock is.
 //    The rest happens automatically
       if (dock_loc == 1 || dock_loc == 3) { // Dock at end away from home
-         mover_speed_set(1); // Go Slow
+         mover_speed_set(10); // Go Slow
       } else if (dock_loc == 0 || dock_loc == 2) { // Dock at home end
          mover_speed_set(-1); // Go Slow
       }
@@ -2842,7 +2845,6 @@ static void pid_step() {
       input_speed /= 2;
     }
     if (!spin_trylock(&pid_lock)) {
-    SENDUSERCONNMSG( "pid_step spin lock fail");
         return;
     }
 

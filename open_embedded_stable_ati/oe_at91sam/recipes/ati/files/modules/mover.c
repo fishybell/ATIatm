@@ -22,7 +22,7 @@
 #define LIFTER_POSITION_DOWN 0
 #define LIFTER_POSITION_UP 1
 
-#define DEBUG_USERCONN 1
+//#define DEBUG_USERCONN
 
 #ifdef DEBUG_USERCONN
 #define SENDUSERCONNMSG  sendUserConnMsg

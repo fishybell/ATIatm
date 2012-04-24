@@ -35,7 +35,7 @@
 #define BATTERY_CHARGING_YES    	1
 #define BATTERY_CHARGING_ERROR  	2
 
-#define DEBUG_SEND
+//#define DEBUG_SEND
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -483,11 +483,9 @@ static void check_charging_fire(unsigned long data) {
        chargingCheckStep = 0;
        if (chargingOnADCVal > chargingOffADCVal){
           // We are charging
-      SENDUSERCONNMSG( "randy - check_charging_fire Charging off,%i,on,%i",chargingOffADCVal, chargingOnADCVal);
          fault = ERR_charging_battery;
          send_nl_message_multi(&fault, bat_mfh, NL_C_FAULT);
       } else {
-      SENDUSERCONNMSG( "randy - check_charging_fire not_Charging");
          fault = ERR_notcharging_battery;
          send_nl_message_multi(&fault, bat_mfh, NL_C_FAULT);
       }
