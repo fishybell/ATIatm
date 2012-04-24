@@ -500,7 +500,7 @@ int main(int argc, char **argv) {
                         ////////  iniiialize the rest of the minion state from what was reported in the registration packet
 
                         minions[mID].S.hit.data = LB_devreg->hits;
-                        minions[mID].S.exp.data = LB_devreg->expose;
+                        minions[mID].S.exp.data = LB_devreg->expose?90:0;
                         minions[mID].S.speed.data = LB_devreg->speed*100.0;
                         minions[mID].S.move.data = LB_devreg->move;
                         minions[mID].S.react.data = LB_devreg->react;
@@ -509,6 +509,14 @@ int main(int argc, char **argv) {
                         minions[mID].S.burst.newdata = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
 
                         minions[mID].S.fault.data = LB_devreg->fault;
+
+                        // new state timer code
+                        // initialize state of expose or conceal timer
+                        if (LB_devreg->expose) {
+                           START_EXPOSE_TIMER(minions[mID].S);
+                        } else {
+                           START_CONCEAL_TIMER(minions[mID].S);
+                        }
 
                         // maybe there should also be stuff for MFS (NES?) MGS MILES and GPS in the device_reg packet
 

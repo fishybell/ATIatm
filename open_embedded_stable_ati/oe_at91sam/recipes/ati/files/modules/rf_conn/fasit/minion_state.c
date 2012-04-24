@@ -71,6 +71,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
     **
     **  */
 
+#if 0 /* start of old state timer code */
    if (!minion->S.state_timer)  { // timer reached zero
       //   We should only do the section if the next timer is really up, and
       //   not just if another fd was ready about the same time
@@ -356,16 +357,133 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          minion->S.event.timer = 55;   // lets try 5.0 seconds         
       }
    }
+#endif /* end of old state timer code */
+
+   
+   // new state timer code
+   if (!minion->S.state_timer)  { // timer reached zero
+      //   We should only do the section if the next timer is really up, and
+      //   not just if another fd was ready about the same time
+      DDCMSG(D_MSTATE,RED,"MINION %d: state timers update:\nfast flags/timer=%i/%i\nslow flags/timer=%i/%i\nexpose flags/timer=%i/%i\nconceal flags/timer=%i/%i\nmove flags/timer=%i/%i\nevent flags/timer=%i/%i", minion->mID,
+               minion->S.rf_t.fast_flags, minion->S.rf_t.fast_timer,
+               minion->S.rf_t.slow_flags, minion->S.rf_t.slow_timer,
+               minion->S.exp.exp_flags, minion->S.exp.exp_timer,
+               minion->S.exp.con_flags, minion->S.exp.con_timer,
+               minion->S.move.flags, minion->S.move.timer,
+               minion->S.event.flags, minion->S.event.timer);
+
+      // check each timer, running its state code if it is needed, moving its timer otherwise
+      #define CHECK_TIMER(S, T, F, CODE) { \
+         if (!S.F) { \
+            if (S.T>elapsed_tenths) { \
+               S.T-=elapsed_tenths;   /* not timed out.  but decrement out timer */ \
+            } \
+         } else { \
+            CODE \
+         } \
+      }
+
+      CHECK_TIMER (minion->S.rf_t, fast_timer, fast_flags, 
+         DDCMSG(D_MSTATE, BLACK, "Now checking fast timer flags: %i", minion->S.rf_t.fast_flags);
+         switch (minion->S.rf_t.fast_flags) {
+            case F_fast_start: {
+               // TODO -- something here?
+               stopTimer(minion->S.rf_t, fast_timer, fast_flags);
+            } break;
+            case F_fast_once: {
+               // TODO -- something here?
+               stopTimer(minion->S.rf_t, fast_timer, fast_flags);
+            } break;
+            case F_fast_end: {
+               // TODO -- something here?
+               stopTimer(minion->S.rf_t, fast_timer, fast_flags);
+            } break;
+         }
+      ); // end of CHECK_TIMER for fast state timer
+
+      CHECK_TIMER (minion->S.rf_t, slow_timer, slow_flags, 
+         DDCMSG(D_MSTATE, BLACK, "Now checking fast timer flags: %i", minion->S.rf_t.slow_flags);
+         switch (minion->S.rf_t.fast_flags) {
+            case F_slow_start: {
+               // TODO -- something here?
+               stopTimer(minion->S.rf_t, slow_timer, slow_flags);
+            } break;
+         }
+      ); // end of CHECK_TIMER for slow state timer
+
+      CHECK_TIMER (minion->S.exp, exp_timer, exp_flags, 
+         DDCMSG(D_MSTATE, BLACK, "Now checking expose timer flags: %i", minion->S.exp.exp_flags);
+         switch (minion->S.exp.exp_flags) {
+            case F_exp_start_transition: {
+               minion->S.exp.data=45;  // make the current positon in movement
+               sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+               setTimerTo(minion->S.exp, exp_timer, exp_flags, TRANSITION_TIME, F_exp_end_transition);
+            } break;
+            case F_exp_end_transition: {
+               // nothing to do here?
+               stopTimer(minion->S.exp, exp_timer, exp_flags);
+            } break;
+         }
+      ); // end of CHECK_TIMER for expose state timer
+
+      CHECK_TIMER (minion->S.exp, con_timer, con_flags, 
+         DDCMSG(D_MSTATE, BLACK, "Now checking conceal timer flags: %i", minion->S.exp.con_flags);
+         switch (minion->S.exp.con_flags) {
+            case F_con_start_transition: {
+               minion->S.exp.data=45;  // make the current positon in movement
+               sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+               setTimerTo(minion->S.exp, con_timer, con_flags, TRANSITION_TIME, F_con_end_transition);
+            } break;
+            case F_con_end_transition: {
+               // nothing to do here?
+               stopTimer(minion->S.exp, con_timer, con_flags);
+            } break;
+         }
+      ); // end of CHECK_TIMER for conceal state timer
+
+      CHECK_TIMER (minion->S.move, timer, flags, 
+         DDCMSG(D_MSTATE, BLACK, "Now checking move timer flags: %i", minion->S.move.flags);
+         switch (minion->S.move.flags) {
+            case F_move_start_movement: {
+               // TODO -- something here?
+               stopTimer(minion->S.move, timer, flags);
+            } break;
+            case F_move_end_movement: {
+               // TODO -- something here?
+               stopTimer(minion->S.move, timer, flags);
+            } break;
+         }
+      ); // end of CHECK_TIMER for move state timer
+
+      CHECK_TIMER (minion->S.event, timer, flags, 
+         DDCMSG(D_MSTATE, BLACK, "Now checking event timer flags: %i", minion->S.event.flags);
+         switch (minion->S.event.flags) {
+            case F_event_start: {
+               // TODO -- something here?
+               stopTimer(minion->S.event, timer, flags);
+            } break;
+            case F_event_end: {
+               // TODO -- something here?
+               stopTimer(minion->S.event, timer, flags);
+            } break;
+         }
+      ); // end of CHECK_TIMER for event state timer
+
+   } // ...end of timer reached zero
+   
 
         // run through all the timers and get the next time we need to process
 #define Set_Timer(T) { if ((T>0)&&(T<minion->S.state_timer)) minion->S.state_timer=T; }
    minion->S.state_timer = 900;    // put in a worst case starting value of 90 seconds
-   Set_Timer(minion->S.exp.timer);         // if arg is >0 and <timer, it is the new timer
-   Set_Timer(minion->S.event.timer);               // if arg is >0 and <timer, it is the new timer
-   Set_Timer(minion->S.rf_t.timer);                // if arg is >0 and <timer, it is the new timer
-   Set_Timer(minion->S.move.timer);               // if arg is >0 and <timer, it is the new timer
+   // if arg is >0 and <timer, it is the new timer
+   Set_Timer(minion->S.exp.exp_timer); // timer for expose state
+   Set_Timer(minion->S.exp.con_timer); // timer for conceal state
+   Set_Timer(minion->S.event.timer); // timer for event response
+   Set_Timer(minion->S.rf_t.fast_timer); // timer for fast status check
+   Set_Timer(minion->S.rf_t.slow_timer); // timer for slow status check
+   Set_Timer(minion->S.move.timer); // timer for movement state
 
-   DDCMSG(D_MSTATE,GRAY,"\nMinion %d:   Set_Timer=%d   exp=%d event=%d rf_t=%d move=%d",
-          minion->mID,minion->S.state_timer,minion->S.exp.timer,minion->S.event.timer,minion->S.rf_t.timer,minion->S.move.timer);
+   DDCMSG(D_MSTATE,GRAY,"\nMinion %d:   Set_Timer=%d   exp.exp=%d exp.con=%d event=%d rf_t.fast=%d ft_t.slow=%d move=%d",
+          minion->mID,minion->S.state_timer, minion->S.exp.exp_timer, minion->S.exp.con_timer, minion->S.event.timer, minion->S.rf_t.fast_timer, minion->S.rf_t.slow_timer, minion->S.move.timer);
 
 }

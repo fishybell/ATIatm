@@ -51,50 +51,82 @@ enum {
    BLANK_ALWAYS,           /* hit sensor disabled blank */
 };
 
-typedef struct state_exp_item {
-   uint8         data;
-   uint8         newdata;
+typedef struct state_exp_item { /* has both expose state and conceal state in single item */
+   uint8         data;     // current exposure value (0/45/90)
+   uint8         newdata;  // destination exposure value (0/90)
    uint16        event;
-   uint16        flags;
-   uint16        timer;
+   uint16        exp_flags;
+   uint16        con_flags;
+   uint16        old_exp_flags;
+   uint16        old_con_flags;
+   uint16        exp_timer;
+   uint16        con_timer;
+   uint16        old_exp_timer;
+   uint16        old_con_timer;
    struct timespec elapsed_time;
 } state_exp_item_t ;
 
-typedef struct state_rf_timeout {
+typedef struct state_rf_timeout { /* has both slow state and fast state in single item */
    uint8         data; // ignored
    uint8         newdata; // ignored
-   uint16        flags;
-   uint16        timer;
+   uint16        fast_flags;
+   uint16        slow_flags;
+   uint16        old_fast_flags;
+   uint16        old_slow_flags;
+   uint16        fast_timer;
+   uint16        slow_timer;
+   uint16        old_fast_timer;
+   uint16        old_slow_timer;
+   uint16        slow_missed; // number of missed responses
+   uint16        fast_missed; // number of missed responses
    struct timespec elapsed_time;
 } state_rf_timeout_t ;
+
+typedef struct event_timeout {
+   uint8         data;
+   uint8         newdata;
+   uint16        flags;
+   uint16        old_flags;
+   uint16        timer;
+   uint16        old_timer;
+   uint16        missed; // number of missed responses
+} event_timeout_t ;
 
 typedef struct state_u8_item {
    uint8         data;
    uint8         newdata;
    uint16        _pad1;
    uint16        flags;
+   uint16        old_flags;
    uint16        timer;
+   uint16        old_timer;
 } state_u8_item_t;
 
 typedef struct state_s16_item {
    int16 data;
    int16 newdata;
    uint16 flags;
+   uint16 old_flags;
    uint16 timer;
+   uint16 old_timer;
 } state_s16_item_t;
 
 typedef struct state_u16_item {
    uint16 data;
    uint16 newdata;
    uint16 flags;
+   uint16 old_flags;
    uint16 timer;
+   uint16 old_timer;
 } state_u16_item_t;
 
 typedef struct state_float_item {
    float data;
    float newdata;
    uint16 flags;
+   uint16 old_flags;
    uint16 timer;
+   uint16 old_timer;
 } state_float_item_t;
 
 
@@ -108,7 +140,7 @@ typedef struct minion_state {
    state_rf_timeout_t           rf_t;   // rf timeout timer
    state_u8_item_t              status; 
    state_exp_item_t             exp;            // exposure state has more stuff
-   state_u8_item_t              event;          // used for timer events
+   event_timeout_t              event;          // used for timer events
    state_u8_item_t              asp;            //  FUTURE FASIT aspect of target
    state_u16_item_t             dir;            //  FUTURE FASIT 0-359 degree angle of target (dir??)
    state_u8_item_t              move;           //  movement direction  0=stopped, 1=forward (away from home), 2=reverse (to home)
@@ -189,6 +221,7 @@ typedef struct slave_state {
 
 } slave_state_t;
 
+#if 0 /* start of old state timer code */
 #define F_exp_ok        0
 #define F_exp_expose_A  1
 #define F_exp_expose_B  2
@@ -208,6 +241,43 @@ typedef struct slave_state {
 
 #define F_rf_t_waiting_short 1 /* the minion is currently waiting for a response from a TM */
 #define F_rf_t_waiting_long 2 /* the minion hasn't talked to the TM in a long time */
+#endif /* end of old state timer code */
+
+enum {
+   F_exp_none = 0, /* no state, doing nothing */
+   F_exp_start_transition, /* starts transition, goes to end transition */
+   F_exp_end_transition, /* ends transition */
+};
+
+enum {
+   F_con_none = 0, /* no state, doing nothing */
+   F_con_start_transition, /* starts transition, goes to end transition */
+   F_con_end_transition, /* ends transition */
+};
+
+enum {
+   F_move_none = 0, /* no state, doing nothing */
+   F_move_start_movement, /* starts movement, goes to start movement */
+   F_move_end_movement, /* ends movement */
+};
+
+enum {
+   F_fast_none = 0, /* no state, doing nothing */
+   F_fast_start, /* starts fast lookup, goes to fast start */
+   F_fast_once, /* starts fast lookup, goes to fast end */
+   F_fast_end, /* ends fast lookup, goes to slow start */
+};
+
+enum {
+   F_slow_none = 0, /* no state, doing nothing */
+   F_slow_start, /* starts slow lookup, goes to slow start */
+};
+
+enum {
+   F_event_none = 0, /* no state, doing nothing */
+   F_event_start, /* starts event lookup, goes to event start */
+   F_event_end, /* ends event lookup */
+};
 
 
 uint64 htonll( uint64 id);
@@ -383,6 +453,73 @@ typedef enum rf_target_type {
    RF_Type_MAT,
    RF_Type_Unknown,
 } rf_target_type_t;
+
+/* stop a state timer, allowing it to be resumed at the same stop later */
+#define stopTimer(S, T, F) { \
+   S.old_ ## T = S.T; \
+   S.old_ ## F = S.F; \
+   S.T = 0; \
+   S.F = 0; \
+}
+/* resume a stopped timer */
+#define resumeTimer(S, T, F) { \
+   S.T = S.old_ ## T; \
+   S.F = S.old_ ## F; \
+   S.old_ ## T = 0; \
+   S.old_ ## F = 0; \
+}
+/* set a state timers flags and timeout value (in tenths of seconds) */
+#define setTimerTo(S, T, F, T_val, F_val) { \
+   S.T = T_val; \
+   S.F = F_val; \
+}
+
+// common timer values
+#define FAST_SOON_TIME        3   /* 3/10 second */
+#define FAST_TIME             30  /* 3 seconds */
+#define SLOW_SOON_TIME        3   /* 3/10 second */
+#define SLOW_TIME             200 /* 20 seconds */
+#define SLOW_RESPONSE_TIME    30  /* 3 seconds */
+#define EVENT_START_TIME      5   /* 1/2 second */
+#define EVENT_RESPONSE_TIME   30  /* 3 seconds */
+#define TRANSITION_START_TIME 1   /* 1/10 second */
+#define TRANSITION_TIME       5   /* 1/2 second */
+
+// other state constants
+#define FAST_TIME_MAX_MISS 3 /* maximum value of the "missed message" counter */
+#define SLOW_TIME_MAX_MISS 1 /* maximum value of the "missed message" counter */
+
+// common complex timer starts
+#define START_EXPOSE_TIMER(S) { \
+   /* start fast, stop slow */ \
+   setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
+   stopTimer(S.rf_t, slow_timer, slow_flags); \
+   /* start transition */ \
+   setTimerTo(S.exp, exp_timer, exp_flags, TRANSITION_START_TIME, F_exp_start_transition); \
+}
+#define START_CONCEAL_TIMER(S) { \
+   /* stop fast, start slow soon */ \
+   stopTimer(S.rf_t, fast_timer, fast_flags); \
+   setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
+   /* start transition */ \
+   setTimerTo(S.exp, con_timer, con_flags, TRANSITION_START_TIME, F_con_start_transition); \
+   /* start event request */ \
+   setTimerTo(S.event, timer, flags, EVENT_START_TIME, F_event_start); \
+}
+#define START_MOVE_TIMER(S) { \
+   /* start fast, stop slow */ \
+   setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
+   stopTimer(S.rf_t, slow_timer, slow_flags); \
+   /* start move simulation */ \
+   setTimerTo(S.move, timer, flags, TRANSITION_START_TIME, F_move_start_movement); \
+}
+#define START_STANDARD_LOOKUP(S) {\
+   /* start fast once, if needed */ \
+   if (S.rf_t.slow_flags != F_slow_none) { \
+      stopTimer(S.rf_t, slow_timer, slow_flags); /* will be resumed later */ \
+      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_once); \
+   } \
+}
 
 
 void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion);

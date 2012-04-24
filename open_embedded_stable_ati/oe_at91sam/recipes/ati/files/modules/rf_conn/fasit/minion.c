@@ -38,7 +38,13 @@ void initialize_state(minion_state_t *S){
 //   S_set(mode,0,0,0,0);
 //   S_set(position,0,0,0,0);
 
-   S_set(rf_t,0,0,0,0);
+   //S_set(rf_t,0,0,0,0);
+   S->rf_t.data = 0;
+   S->rf_t.newdata = 0;
+   S->rf_t.fast_flags = 0;
+   S->rf_t.slow_flags = 0;
+   S->rf_t.fast_timer = 0;
+   S->rf_t.slow_timer = 0;
    
    S_set(asp,0,0,0,0);
    S_set(on,0,0,0,0);
@@ -318,13 +324,24 @@ void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expos
    LB_exp =(LB_expose_t *)qbuf;       // make a pointer to our buffer so we can use the bits right
    LB_exp->cmd=LBC_EXPOSE;
    LB_exp->addr=minion->RF_addr;
-   LB_exp->expose=expose;
+   LB_exp->expose=expose; // not expose vs. conceal, but a flag saying whether to actually expose or just change event number internally
+#if 0 /* start of old state timer code */
    // change state
    LB_exp->event=++minion->S.exp.event;  // fill in the event
    minion->S.exp.flags=F_exp_expose_A;   // start (faking FASIT) moving to expose
    minion->S.exp.timer=5;
    minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec;
    minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
+#endif /* end of old state timer code */
+
+   // new state timer code
+   // change state
+   minion->S.exp.newdata=90; // moving to exposed
+   LB_exp->event=++minion->S.exp.event;  // fill in the event/move to next event
+   minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec; // remember "up" time for event
+   minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
+   START_EXPOSE_TIMER(minion->S); // new state timer code
+
    //  really need to fill in with the right stuff
    LB_exp->hitmode=0;
    LB_exp->tokill=0;
@@ -368,6 +385,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
    LB_qconceal_t        *LB_qcon;
 
 
+#if 0 /* start of old state timer code */
    // stop quick lookup of RF status on command from FASIT server
    minion->S.rf_t.flags = F_rf_t_waiting_long;
    minion->S.rf_t.timer = 3000; // 5 minutes in deciseconds
@@ -379,6 +397,10 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
          minion->S.exp.timer=0;
          break;
    }
+#endif /* end of old state timer code */
+
+   // new state timer code
+   // there is no new timer code on receipt of FASIT message, only on receipt of RF message
 
    // map header and body for both message and response
    header = (FASIT_header*)(buf);
@@ -527,9 +549,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 
                psend_mcp(minion,LB_status_req);
                
+#if 0 /* start of old state timer code */
                // I'm expecting a response within 2 seconds
                minion->S.rf_t.flags=F_rf_t_waiting_short;
                minion->S.rf_t.timer=20; // give it two seconds
+#endif /* end of old state timer code */
 #endif
                break;
 
@@ -558,9 +582,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 
                   DDCMSG(D_VERY,BLACK,"Minion %d: uptime=%d",minion->mID,uptime);
 
-                  minion->S.exp.newdata=0;
+                  minion->S.exp.newdata=0; // moving to concealed
+#if 0 /* start of old state timer code */
                   minion->S.exp.flags=F_exp_conceal_A;  // start (faking FASIT) moving to conceal
                   minion->S.exp.timer=5;
+#endif /* end of old state timer code */
 
                   DDCMSG(D_VERY,BLACK,"Minion %d: &LB_buf=%p",minion->mID,&LB_buf);                     
                   LB_qcon =(LB_qconceal_t *)qbuf;    // make a pointer to our buffer so we can use the bits right
@@ -587,11 +613,13 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                      DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_report_req cmd=%d", minion->mID,L->cmd);
                      psend_mcp(minion,L);
 
+#if 0 /* start of old state timer code */
                      minion->S.event.flags = 0;
                      minion->S.event.timer = 0;
                         // TODO -- what do we do when we don't receive a report?
                         //minion->S.event.flags=F_waiting_for_report;
                         //minion->S.event.timer = 20;   // lets try 5.0 seconds
+#endif /* end of old state timer code */
                   }
                }
 
@@ -658,8 +686,10 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                //                               minion->S.exp.data=0;                   // cheat and set the current state to 45
                minion->S.speed.newdata=message_2100->speed;     // set newdata to be the future state
                minion->S.move.newdata=message_2100->move;       // set newdata to be the future state
+#if 0 /* start of old state timer code */
                minion->S.move.flags=1;
                minion->S.move.timer=10;
+#endif /* end of old state timer code */
 
                LB_move->speed = ((int)(max(0.0,min(htonf(message_2100->speed), 20.0)) * 100)) & 0x7ff;
                DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Move_Request: speed after: %i",minion->mID, LB_move->speed);
@@ -741,36 +771,36 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                //        won't need to simulate at that low of a level.
 
                minion->S.on.newdata  = message_2100->on;        // set the new value for 'on'
-               minion->S.on.flags  |= F_tell_RF;        // just note it was set
+//               minion->S.on.flags  |= F_tell_RF;        // just note it was set
 
                if (htons(message_2100->burst)) {
                   minion->S.burst.newdata = htons(message_2100->burst);      // spec says we only set if non-Zero
-                  minion->S.burst.flags |= F_tell_RF;   // just note it was set
+//                  minion->S.burst.flags |= F_tell_RF;   // just note it was set
                }
                if (htons(message_2100->sens)) {
                   minion->S.sens.newdata = htons(message_2100->sens);
-                  minion->S.sens.flags |= F_tell_RF;    // just note it was set
+//                  minion->S.sens.flags |= F_tell_RF;    // just note it was set
                }
                // remember stated value for later
                //                               fake_sens = htons(message_2100->sens);
 
                if (htons(message_2100->tokill)) {
                   minion->S.tokill.newdata = htons(message_2100->tokill);
-                  minion->S.tokill.flags |= F_tell_RF;  // just note it was set
+//                  minion->S.tokill.flags |= F_tell_RF;  // just note it was set
                }
 
                //                               if (htons(message_2100->hit)) {
                minion->S.hit.newdata = htons(message_2100->hit);
-               minion->S.hit.flags |= F_tell_RF;
+//               minion->S.hit.flags |= F_tell_RF;
                //                               }
                minion->S.react.newdata = message_2100->react;
-               minion->S.react.flags |= F_tell_RF;      // just note it was set
+//               minion->S.react.flags |= F_tell_RF;      // just note it was set
 
                minion->S.mode.newdata = message_2100->mode;
-               minion->S.mode.flags |= F_tell_RF;       // just note it was set
+//               minion->S.mode.flags |= F_tell_RF;       // just note it was set
 
                minion->S.burst.newdata = htons(message_2100->burst);
-               minion->S.burst.flags |= F_tell_RF;      // just note it was set
+//               minion->S.burst.flags |= F_tell_RF;      // just note it was set
 
                //                               doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
                DDCMSG(D_PACKET,BLUE,"Minion %d: calling doHitCal after setting values",minion->mID) ;
@@ -844,13 +874,13 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
          if (minion->S.cap&PD_NES){
 
             minion->S.mfs_on.newdata  = message_2110->on;       // set the new value for 'on'
-            minion->S.mfs_on.flags  |= F_tell_RF;       // just note it was set
+//            minion->S.mfs_on.flags  |= F_tell_RF;       // just note it was set
             minion->S.mfs_mode.newdata  = message_2110->mode;   // set the new value for 'on'
-            minion->S.mfs_mode.flags  |= F_tell_RF;     // just note it was set
+//            minion->S.mfs_mode.flags  |= F_tell_RF;     // just note it was set
             minion->S.mfs_idelay.newdata  = message_2110->idelay;       // set the new value for 'on'
-            minion->S.mfs_idelay.flags  |= F_tell_RF;   // just note it was set
+//            minion->S.mfs_idelay.flags  |= F_tell_RF;   // just note it was set
             minion->S.mfs_rdelay.newdata  = message_2110->rdelay;       // set the new value for 'on'
-            minion->S.mfs_rdelay.flags  |= F_tell_RF;   // just note it was set
+//            minion->S.mfs_rdelay.flags  |= F_tell_RF;   // just note it was set
 
             //doMFS(msg->on,msg->mode,msg->idelay,msg->rdelay);
             // when the didMFS happens fill in the 2112, force a 2112 message to be sent
@@ -864,6 +894,22 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
    }  /**   end of 'switch (packet_num)'   **/
 }
 
+void finishTransition(thread_data_t *minion) {
+   if (minion->S.exp.data == 45 && minion->S.exp.newdata == 90) {
+      // transitioned from conceal to expose
+      START_EXPOSE_TIMER(minion->S);
+   } else if (minion->S.exp.data == 90 && minion->S.exp.newdata == 45) {
+      // transitioned from expose to conceal
+      START_CONCEAL_TIMER(minion->S);
+   } else if (minion->S.exp.data == 0) {
+      // continues to be concealed
+   } else if (minion->S.exp.data == 90) {
+      // continues to be exposed
+   } else {
+      // invalid state -- shouldn't be able to get here
+      DCMSG(RED, "ERROR - Should not be able to be from transition to nowhere: %i %i", minion->S.exp.data, minion->S.exp.newdata);
+   }
+}
 
 /*********************                                  minion_thread                               *************
  *********************
@@ -1039,8 +1085,23 @@ void *minion_thread(thread_data_t *minion){
             }
 
             // we received something over RF, so we haven't timed out: reset the rf timer to look in 5 minutes -- TODO -- make this timeout smarter, or at the very least, user configurable
+#if 0 /* start of old state timer code */
             minion->S.rf_t.flags = F_rf_t_waiting_long;
             minion->S.rf_t.timer = 3000; // 5 minutes in deciseconds
+#endif /* end of old state timer code */
+
+            // new state timer code
+            // we received something over RF, so we haven't timed out: reset the rf timers -- TODO -- make this timeout smarter, or at the very least, user configurable
+            if (minion->S.rf_t.slow_flags != F_slow_none) {
+               // reset the slow timer, if we're doing the slow timer, as we just got a response
+               setTimerTo(minion->S.rf_t, slow_timer, slow_flags, F_slow_start, SLOW_TIME);
+               minion->S.rf_t.slow_missed = 0;
+            }
+            if (minion->S.rf_t.fast_flags != F_fast_none) {
+               // reset the fast timer, if we're doing the fast timer, as we just got a response
+               setTimerTo(minion->S.rf_t, fast_timer, fast_flags, F_fast_start, FAST_TIME);
+               minion->S.rf_t.fast_missed = 0;
+            }
 
             // we have received a message from the mcp, process it
             // it is either a command, or it is an RF response from our slave
@@ -1070,6 +1131,8 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
                   DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'Event_report'. hits=%d  sending 2102 status",
                          minion->mID,minion->RF_addr,L->hits);
+
+                  minion->S.exp.data = 0; // TODO -- take this out when we push and receive valid statuses
                   sendStatus2102(0, NULL,minion);
 
                }
@@ -1078,24 +1141,39 @@ void *minion_thread(thread_data_t *minion){
                case LBC_STATUS_NO_RESP:
                   // Do nothing on the "no response"
                   DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'NO_RESP'...not sending 2102 status",minion->mID,minion->RF_addr);
+#if 0 /* start of old state timer code */
                   // reset lookup timer
                   if (minion->S.exp.flags == F_exp_expose_D) {
                      minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
                      minion->S.exp.timer=15;    // 1.5 second later
                   }
+#endif /* end of old state timer code */
+
+                  // new state timer code
+                  // finish transition
+                  finishTransition(minion);
                   break;
 
                case LBC_STATUS_RESP_EXT:
                {
                   LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
+#if 0 /* start of old state timer code */
                   minion->S.exp.flags=F_exp_ok;
+#endif /* end of old state timer code */
                   if (minion->S.exp.data == 0 && L->expose) {
                      // random movement from down to up, should send "up" command to start event
                      send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
                   }
+
+                  // new state timer code
+                  // finish transition
+                  finishTransition(minion);
+
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
+#if 0 /* start of old state timer code */
                   minion->S.exp.timer=0;
+#endif /* end of old state timer code */
                   
                   minion->S.speed.data = (float)(L->speed / 100.0); // convert back to correct float
                   minion->S.move.data = L->move;
@@ -1112,23 +1190,29 @@ void *minion_thread(thread_data_t *minion){
                }
 
                   // reset lookup timer
+#if 0 /* start of old state timer code */
                if (minion->S.exp.flags == F_exp_expose_D) {
                   minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
                   minion->S.exp.timer=15;    // 1.5 second later
                }
+#endif /* end of old state timer code */
                break;
 
                case LBC_STATUS_RESP_MOVER:
                {
                   LB_status_resp_mover_t *L=(LB_status_resp_mover_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
+#if 0 /* start of old state timer code */
                   minion->S.exp.flags=F_exp_ok;
+#endif /* end of old state timer code */
                   if (minion->S.exp.data == 0 && L->expose) {
                      // random movement from down to up, should send "up" command to start event
                      send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
                   }
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
+#if 0 /* start of old state timer code */
                   minion->S.exp.timer=0;
+#endif /* end of old state timer code */
 
                   minion->S.speed.data = (float)(L->speed / 100.0); // convert back to correct float
                   minion->S.move.data = L->move;
@@ -1137,11 +1221,16 @@ void *minion_thread(thread_data_t *minion){
                          minion->mID,minion->RF_addr,L->hits,L->speed,L->move,L->location);
                   sendStatus2102(0, NULL,minion);
                   
+#if 0 /* start of old state timer code */
                   // reset lookup timer
                   if (minion->S.exp.flags == F_exp_expose_D) {
                      minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
                      minion->S.exp.timer=15;    // 1.5 second later
                   }
+#endif /* end of old state timer code */
+
+                  // new state timer code
+                  // further movement?
                }
                break;
 
@@ -1149,24 +1238,35 @@ void *minion_thread(thread_data_t *minion){
                {
                   LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)(LB); // map our bitfields in
                   minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to
+#if 0 /* start of old state timer code */
                   minion->S.exp.flags=F_exp_ok;
+#endif /* end of old state timer code */
                   if (minion->S.exp.data == 0 && L->expose) {
                      // random movement from down to up, should send "up" command to start event
                      send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
                   }
+
+                  // new state timer code
+                  // finish transition
+                  finishTransition(minion);
+
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
+#if 0 /* start of old state timer code */
                   minion->S.exp.timer=0;
+#endif /* end of old state timer code */
 
                   DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'RESP_LIFTER'. hits=%d  exp=%d sending 2102 status",
                          minion->mID,minion->RF_addr,L->hits,L->expose);
                   sendStatus2102(0, NULL,minion);
 
                   //  exp state reset above
+#if 0 /* start of old state timer code */
                   // reset lookup timer
                   if (minion->S.exp.flags == F_exp_expose_D) {
                      minion->S.exp.flags=F_exp_expose_C;        // we have reached the exposed position, now ask for an update
                      minion->S.exp.timer=15;    // 1.5 second later
                   }
+#endif /* end of old state timer code */
                }
                break;
 
