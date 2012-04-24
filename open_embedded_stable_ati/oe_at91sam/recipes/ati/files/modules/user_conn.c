@@ -1849,7 +1849,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Get/Set address location\nFormat: I A <address location>\n");
                                 break;
 			    case 'B': case 'b':
-                          	snprintf(wbuf, 1024, "Get/Set board type\nFormat: I B <HSAT>, <LSAT>, <MAT>, <MIT>, <SES>, <SIT>\n");
+                          	snprintf(wbuf, 1024, "Get/Set board type\nFormat: I B <HSAT>, <LSAT>, <MAT>, <MIT>, <SES>, <SIT>, <BASE>, <HHC>\n");
 				break;
 			    case 'D': case 'd':
                         	snprintf(wbuf, 1024, "Get/Set comm type\nFormat: I D <local>, <network>, <radio>, <wifi>, <wimax>\n");
