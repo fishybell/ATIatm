@@ -103,7 +103,8 @@ typedef enum {
     EVENT_HIT,		// hit
     EVENT_KILL,		// kill
     EVENT_SHUTDOWN,	// shutdown
-    EVENT_DOCK,	// sleep
+    EVENT_DOCK,	// dock
+    EVENT_UNDOCKED,	// undocked
     EVENT_SLEEP,	// sleep
     EVENT_WAKE,		// wake
     EVENT_HOME_LIMIT,		// triggered on home limit switch
@@ -111,6 +112,10 @@ typedef enum {
     EVENT_DOCK_LIMIT,		// triggered on dock limit switch
     EVENT_TIMED_OUT,		// triggered on end limit switch
     EVENT_IS_MOVING,	// moving is moving and speed has changed
+    EVENT_CHARGING,	// charging
+    EVENT_NOTCHARGING,	// not charging
+    EVENT_ENABLE_BATTERY_CHK,	// enable battery check
+    EVENT_DISABLE_BATTERY_CHK,	// disable battery check
     EVENT_ERROR,	// error with one of the above (always causes immediate deactivate)
 } GO_event_t;
 extern void generic_output_event(GO_event_t type); // can be called from interrupt

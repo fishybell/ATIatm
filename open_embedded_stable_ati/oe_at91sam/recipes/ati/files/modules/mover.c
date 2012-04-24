@@ -23,6 +23,13 @@
 #define LIFTER_POSITION_UP 1
 
 #define DEBUG_USERCONN 1
+
+#ifdef DEBUG_USERCONN
+#define SENDUSERCONNMSG  sendUserConnMsg
+#else
+#define SENDUSERCONNMSG(...)  //
+#endif
+
 //---------------------------------------------------------------------------
 // These variables are parameters given when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
@@ -93,15 +100,12 @@ int move_mfh(struct sk_buff *skb, void *move_data) {
 static void sendUserConnMsg( char *fmt, ...){
     va_list ap;
     va_start(ap, fmt);
-#ifdef DEBUG_USERCONN
    char *msg = kmalloc(256, GFP_KERNEL);
    if (msg){
       vsnprintf(msg, 256, fmt, ap);
-      delay_printk(msg);
       send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
       kfree(msg);
    }
-#endif
    va_end(ap);
 }
 
@@ -114,7 +118,6 @@ static void move_change(unsigned long data) {
     if (atomic_read(&full_init) != TRUE) {
         return;
     }
-//sendUserConnMsg( "---randy---move_change--data=%i", data);
     // notify netlink userspace
     move_data = 32768+mover_speed_get(); // signed speed turned to unsigned byte
     send_nl_message_multi(&move_data, pos_mfh, NL_C_MOVE);
@@ -165,7 +168,7 @@ static void move_event_internal(int etype, bool upload) {
             mod_timer(&moved_timer, jiffies+(((MOVED_DELAY/2)*HZ)/1000)); // wait for X milliseconds for sensor to settle
             break;
         case EVENT_STOPPED:
-            enable_battery_check(1); // enable battery checking while motor is off
+//            enable_battery_check(1); // enable battery checking while motor is off
             mod_timer(&moved_timer, jiffies+(((MOVED_DELAY*4)*HZ)/1000)); // wait for X milliseconds for sensor to settle
             schedule_work(&position_work);
             break;
@@ -182,7 +185,6 @@ int nl_continuous_handler(struct genl_info *info, struct sk_buff *skb, int cmd, 
     struct nlattr *na;
     int rc, value = 0;
 delay_printk("Mover: handling continuous movement command\n");
-sendUserConnMsg( "---randy---nl_continuous_handler--");
     
     // get attribute from message
     na = info->attrs[GEN_INT16_A_MSG]; // generic 16-bit message
@@ -191,7 +193,6 @@ sendUserConnMsg( "---randy---nl_continuous_handler--");
         value = nla_get_u16(na); // value is ignored
 delay_printk("Mover: received value: %i\n", value);
 
-sendUserConnMsg( "---randy---nl_continuous_handler---set_continuous_move-value %i", value);
         mover_set_continuous_move(value-32768); // unsigned value to signed speed (0 will coast)
 
         // prepare response
@@ -205,7 +206,6 @@ sendUserConnMsg( "---randy---nl_continuous_handler---set_continuous_move-value %
             rc = HANDLE_FAILURE;
         }
     } else {
-sendUserConnMsg( "---randy---nl_continuous_handler--could not get attribute-");
         delay_printk("Mover: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
@@ -323,7 +323,7 @@ delay_printk("Mover: handling move command\n");
 //            kfree(msg);
         else {
             // move
-            enable_battery_check(0); // disable battery checking while motor is on
+//            enable_battery_check(0); // disable battery checking while motor is on
             delay_printk("NL_MOVE_HANDLER: value1: %d value2: %d\n", value, value-32768);
             mover_set_move_speed(value-32768); // unsigned value to signed speed (0 will coast)
         }
@@ -425,15 +425,12 @@ int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void 
     int rc, value = 0;
     u8 data = BATTERY_SHUTDOWN; // in case we need to shutdown
 delay_printk("Mover: handling event command\n");
-    
+
     // get attribute from message
     na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
     if (na) {
-        // grab value from attribute
-        value = nla_get_u8(na); // value is ignored
-delay_printk("Mover: received value: %i\n", value);
-
         // handle event
+        value = nla_get_u8(na); // value is ignored
         switch (value) {
             case EVENT_SHUTDOWN:
                 // needs to be converted to NL_C_SHUTDOWN from userspace, so send it back up (and send onwards to other attached devices)
@@ -445,10 +442,39 @@ delay_printk("Mover: received value: %i\n", value);
             case EVENT_UP:
                set_lifter_position(LIFTER_POSITION_UP);
                break;
+            case EVENT_KILL:
+               mover_go_home();
+               break;
             default:
                 move_event_internal(value, false); // don't repropogate
                 break;
         }
+
+        rc = HANDLE_SUCCESS_NO_REPLY;
+    } else {
+        delay_printk("Mover: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("Mover: returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for event commands
+//---------------------------------------------------------------------------
+int nl_fault_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value = 0;
+    u8 data = BATTERY_SHUTDOWN; // in case we need to shutdown
+delay_printk("Mover: handling event command\n");
+
+    // get attribute from message
+    na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
+    if (na) {
+        value = nla_get_u8(na);
+        set_lifter_fault(value);
 
         rc = HANDLE_SUCCESS_NO_REPLY;
     } else {
@@ -522,6 +548,7 @@ static int __init Mover_init(void) {
         {NL_C_MOVE,      nl_move_handler},
         {NL_C_POSITION,  nl_position_handler},
         {NL_C_EVENT,     nl_event_handler},
+        {NL_C_FAULT,     nl_fault_handler},
         {NL_C_CONTINUOUS, nl_continuous_handler},
         {NL_C_COMMAND, nl_command_handler},
         {NL_C_SLEEP,     nl_sleep_handler},

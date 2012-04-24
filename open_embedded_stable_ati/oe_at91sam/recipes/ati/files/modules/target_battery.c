@@ -10,6 +10,8 @@
 
 #include "target.h"
 #include "target_battery.h"
+#include "target_generic_output.h"
+#include "fasit/faults.h"
 //---------------------------------------------------------------------------
 
 #define TARGET_NAME		"battery"
@@ -18,7 +20,8 @@
 // and use of more than one ADC channel at a time.
 
 // various timer timeouts
-#define TIMEOUT_IN_SECONDS				1200	// 20 minutes
+#define CHECK_CHARGING_IN_SECONDS   600
+#define TIMEOUT_IN_SECONDS				20	// 1 minutes
 #define ADC_READ_DELAY_IN_MSECONDS		20
 #define LED_BLINK_ON_IN_MSECONDS		100
 #define LED_BLINK_COUNT					3
@@ -31,6 +34,31 @@
 #define BATTERY_CHARGING_NO   		0
 #define BATTERY_CHARGING_YES    	1
 #define BATTERY_CHARGING_ERROR  	2
+
+#define DEBUG_SEND
+
+#ifdef DEBUG_SEND
+#define SENDUSERCONNMSG  sendUserConnMsg
+#else
+#define SENDUSERCONNMSG(...)  //
+#endif
+
+int error_mfh(struct sk_buff *skb, void *msg) {
+    // the msg argument is a null-terminated string
+    return nla_put_string(skb, GEN_STRING_A_MSG, msg);
+}
+
+void sendUserConnMsg( char *fmt, ...){
+    va_list ap;
+    va_start(ap, fmt);
+     char *msg = kmalloc(256, GFP_KERNEL);
+     if (msg){
+         vsnprintf(msg, 256, fmt, ap);
+         send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+         kfree(msg);
+     }
+   va_end(ap);
+}
 
 
 //#define TESTING_ON_EVAL
@@ -145,6 +173,7 @@ static void led_blink_fire(unsigned long data);
 static void charging_fire(unsigned long data);
 static void shutdown_device(unsigned long data);
 static void reenable_fire(unsigned long data);
+static void check_charging_fire(unsigned long data);
 
 //---------------------------------------------------------------------------
 // Kernel timers for the timeout, adc read delay, and various led blinks
@@ -155,6 +184,20 @@ static struct timer_list led_blink_timer_list = TIMER_INITIALIZER(led_blink_fire
 static struct timer_list charging_timer_list = TIMER_INITIALIZER(charging_fire, 0, 0);
 static struct timer_list shutdown_timer_list = TIMER_INITIALIZER(shutdown_device, 0, 0);
 static struct timer_list reenable_timer_list = TIMER_INITIALIZER(reenable_fire, 0, 0);
+static struct timer_list check_charging_timer_list = TIMER_INITIALIZER(check_charging_fire, 0, 0);
+
+static int chargingCheckStep = 0;
+static int chargingOffADCVal = 0;
+static int chargingOnADCVal = 0;
+static int docked = FALSE;
+
+int isDeviceAtDock(void){
+   int retVal = 0;
+   if (at91_get_gpio_value(INPUT_CHARGING_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE){
+      retVal = 1;
+   }
+   return retVal;
+}
 
 //---------------------------------------------------------------------------
 // Maps the battery charging state to state name.
@@ -214,16 +257,49 @@ void enable_battery_check(int enable) {
       is called multiple places and if we want to return things back to the way
       they were.
       Shelly 3-1-2012 */
-   /*atomic_set(&check_atomic, enable);
+   atomic_set(&check_atomic, enable);
    // automatically reenable the battery check if the calling ko doesn't
+/*
    if (enable == 0) {
       mod_timer(&reenable_timer_list, jiffies+(REENABLE_IN_SECONDS*HZ));
    } else {
       del_timer(&reenable_timer_list);
-   }*/
+   } */
    return;
 }
 EXPORT_SYMBOL(enable_battery_check);
+
+//---------------------------------------------------------------------------
+// Start the ADC reading
+//---------------------------------------------------------------------------
+static void check_charging_start(int secs)
+	{
+      if (secs <=0) secs = CHECK_CHARGING_IN_SECONDS;
+      mod_timer(&check_charging_timer_list, jiffies+(secs*HZ));
+	}
+
+//---------------------------------------------------------------------------
+// Start the ADC reading
+//---------------------------------------------------------------------------
+static void check_charging_stop(void)
+	{
+	   del_timer(&check_charging_timer_list);
+	}
+
+//---------------------------------------------------------------------------
+// enables/disables battery sensing (so we don't sense while running a moter)
+//---------------------------------------------------------------------------
+void battery_check_is_docked(int dockval) {
+   docked =  dockval;
+   if (docked) {
+      chargingCheckStep = 0;
+      check_charging_start(60);
+   } else {
+      check_charging_stop();
+   }
+   return;
+}
+EXPORT_SYMBOL(battery_check_is_docked);
 
 //---------------------------------------------------------------------------
 // Shutdown the device
@@ -366,6 +442,60 @@ static void timeout_fire(unsigned long data) {
 }
 
 //---------------------------------------------------------------------------
+// Message filler handler for battery values
+//---------------------------------------------------------------------------
+int bat_mfh(struct sk_buff *skb, void *bat_data) {
+    // the bat_data argument is a pre-filled integer
+    return nla_put_u8(skb, GEN_INT8_A_MSG, *((int*)bat_data));
+}
+
+//---------------------------------------------------------------------------
+// The function that gets called when the timeout fires.
+//---------------------------------------------------------------------------
+static void check_charging_fire(unsigned long data) {
+   int fault;
+    // check/don't check adc line
+    check_charging_stop();
+   if (chargingCheckStep == 0){
+      // Turn off charging and wait 10 seconds
+     chargingCheckStep ++;
+     at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+     check_charging_start(10);
+   } else if (chargingCheckStep == 1){
+      // Start ADC check and wait 10 seconds
+      chargingCheckStep ++;
+      hardware_adc_read_start();
+      check_charging_start(10);
+   } else if (chargingCheckStep == 2){
+      // Get the value when off, turn on charging and wait 10 seconds
+		chargingOffADCVal = atomic_read(&adc_atomic);
+      at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
+      chargingCheckStep ++;
+      check_charging_start(10);
+   } else if (chargingCheckStep == 3){
+      // Start ADC check and wait 10 seconds
+       chargingCheckStep ++;
+       hardware_adc_read_start();
+       check_charging_start(10);
+   } else {
+      // Evaluate charging results
+		 chargingOnADCVal = atomic_read(&adc_atomic);
+       chargingCheckStep = 0;
+       if (chargingOnADCVal > chargingOffADCVal){
+          // We are charging
+      SENDUSERCONNMSG( "randy - check_charging_fire Charging off,%i,on,%i",chargingOffADCVal, chargingOnADCVal);
+         fault = ERR_charging_battery;
+         send_nl_message_multi(&fault, bat_mfh, NL_C_FAULT);
+      } else {
+      SENDUSERCONNMSG( "randy - check_charging_fire not_Charging");
+         fault = ERR_notcharging_battery;
+         send_nl_message_multi(&fault, bat_mfh, NL_C_FAULT);
+      }
+      check_charging_start(60);
+   }
+}
+
+//---------------------------------------------------------------------------
 // connected or disconnected the charging harness
 //---------------------------------------------------------------------------
 irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
@@ -389,6 +519,9 @@ irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
         // we're connected, start the timer and turn off the led
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
         mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_OFF_IN_MSECONDS*HZ)/1000));
+         int isDeviceAtDock(void){
+            at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
+         }
         }
     else
         {
@@ -495,6 +628,9 @@ static int hardware_adc_init(void)
 	__raw_writel(CH_EN, adc_base + ADC_CHER);     		// Enable ADC Channels we are using
 	__raw_writel(CH_DIS, adc_base + ADC_CHDR);    		// Disable ADC Channels we are not using
 
+   if (isDeviceAtDock()){
+      at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
+   }
 	return 0;
     }
 
@@ -677,14 +813,6 @@ struct target_device target_device_battery =
     };
 
 //---------------------------------------------------------------------------
-// Message filler handler for battery values
-//---------------------------------------------------------------------------
-int bat_mfh(struct sk_buff *skb, void *bat_data) {
-    // the bat_data argument is a pre-filled integer
-    return nla_put_u8(skb, GEN_INT8_A_MSG, *((int*)bat_data));
-}
-
-//---------------------------------------------------------------------------
 // Work item to notify the user-space about an adc level change
 //---------------------------------------------------------------------------
 static void level_changed(struct work_struct * work)
@@ -755,8 +883,10 @@ int nl_battery_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
 static int __init target_battery_init(void)
     {
 	int retval, d_id;
-    struct driver_command commands[] = {{NL_C_BATTERY, nl_battery_handler}};
-    struct nl_driver driver = {NULL, commands, 1, NULL}; // no heartbeat object, 1 command in list, no identifying data structure
+   struct driver_command commands[] = {
+         {NL_C_BATTERY, nl_battery_handler},
+   };
+    struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 
 delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 	hardware_init();

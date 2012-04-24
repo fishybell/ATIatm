@@ -13,6 +13,7 @@
 #include "target.h"
 #include "fasit/faults.h"
 #include "target_mover_generic.h"
+#include "target_battery.h"
 
 #include "target_generic_output.h" /* for EVENT_### definitions */
 
@@ -26,8 +27,8 @@
 //#define WOBBLE_DETECT
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
-//#define DEBUG_SEND
 //#define DEBUG_PRINT
+//#define DEBUG_SEND
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -239,6 +240,8 @@ static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false, false};
 // These atomic variables is use to indicate global position changes
 //---------------------------------------------------------------------------
 atomic_t continuous_speed = ATOMIC_INIT(0);
+atomic_t last_direction = ATOMIC_INIT(0);
+atomic_t lifter_fault = ATOMIC_INIT(0);
 atomic_t found_home = ATOMIC_INIT(0);
 atomic_t velocity = ATOMIC_INIT(0);
 atomic_t last_t = ATOMIC_INIT(0);
@@ -511,6 +514,17 @@ static void do_fault(int etype) {
 //---------------------------------------------------------------------------
 static int hardware_motor_on(int direction)
     {
+    
+// if we are currently docked tell everyone we are not anymore
+// Currently we will assume that we will get off of the dock
+// if we issue a move
+    enable_battery_check(0);
+    if (isMoverAtDock() != 0) {
+       do_event(EVENT_UNDOCKED);
+       battery_check_is_docked(0);
+       enable_battery_check(0);
+       do_fault(ERR_left_dock_limit);
+    }
     // Turn off charging relay
     at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
     dock_timeout_stop();
@@ -593,6 +607,7 @@ static int hardware_motor_on(int direction)
         }
 
         atomic_set(&movement_atomic, MOVER_DIRECTION_REVERSE);
+        atomic_set(&last_direction, MOVER_DIRECTION_REVERSE);
        DELAY_PRINTK("%s - %s() - reverse\n",TARGET_NAME[mover_type], __func__);
         }
     else if (direction == MOVER_DIRECTION_FORWARD)
@@ -615,6 +630,7 @@ static int hardware_motor_on(int direction)
         }
 
         atomic_set(&movement_atomic, MOVER_DIRECTION_FORWARD);
+        atomic_set(&last_direction, MOVER_DIRECTION_FORWARD);
        DELAY_PRINTK("%s - %s() - forward\n",TARGET_NAME[mover_type], __func__);
         }
     else
@@ -684,6 +700,7 @@ static int hardware_motor_off(void)
             at91_set_gpio_output(OUTPUT_MOVER_MOTOR_REV_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // main contacter off
         }
         }
+    enable_battery_check(1);
 
     return 0;
     }
@@ -870,6 +887,7 @@ static void dock_timeout_stop(void)
 //---------------------------------------------------------------------------
 static void dock_timeout_fire(unsigned long data)
     {
+   int fault;
     dock_timeout_stop();
     if (!atomic_read(&full_init))
         {
@@ -878,7 +896,11 @@ static void dock_timeout_fire(unsigned long data)
 
     if (dock_loc == 0) { // Dock at home
        if (atomic_read(&last_sensor) == MOVER_SENSOR_HOME){
-         if (atomic_read(&lifter_position) == LIFTER_POSITION_DOWN){
+         fault = atomic_read(&lifter_fault);
+         if (atomic_read(&lifter_position) == LIFTER_POSITION_DOWN
+               || atomic_read(&sleep_atomic) != 0 
+               || (fault != 0 && fault != ERR_connected_SIT)
+               ){
             mover_find_dock();
          } else {
             dock_timeout_start(60000);
@@ -886,7 +908,11 @@ static void dock_timeout_fire(unsigned long data)
        }
     } else if (dock_loc == 1){ // Dock at end
        if (atomic_read(&last_sensor) == MOVER_SENSOR_END){
-         if (atomic_read(&lifter_position) == LIFTER_POSITION_DOWN){
+         fault = atomic_read(&lifter_fault);
+         if (atomic_read(&lifter_position) == LIFTER_POSITION_DOWN
+               || atomic_read(&sleep_atomic) != 0
+               || (fault != 0 && fault != ERR_connected_SIT)
+               ){
             mover_find_dock();
          } else {
             dock_timeout_start(60000);
@@ -1268,10 +1294,12 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
 
     if (isMoverAtDock() != 0) {
        do_event(EVENT_DOCK_LIMIT); // triggered on dock limit
+       battery_check_is_docked(1);
        do_fault(ERR_stop_dock_limit); // triggered on dock limit
        mover_speed_stop();
        at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
        atomic_set(&find_dock_atomic, 0);
+       enable_battery_check(1);
     }
 //    atomic_set(&continuous_speed, 0);
 
@@ -1575,7 +1603,12 @@ static int hardware_init(void)
     }
     // Turn on charging relay
     if (isMoverAtDock() != 0) {
+      do_event(EVENT_DOCK_LIMIT);
+      battery_check_is_docked(1);
       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
+    } else {
+      do_event(EVENT_UNDOCKED);
+      battery_check_is_docked(0);
     }
 
     // de-assert the pwm line
@@ -1966,6 +1999,7 @@ int mover_set_continuous_move(int c) {
    if (atomic_read(&sleep_atomic) == 1) {
          return 0;
    }
+   atomic_set(&find_dock_atomic, 0);
    if (c != 0) {
       atomic_set(&continuous_speed, abs(c));
       mover_speed_set(c);
@@ -2077,14 +2111,20 @@ EXPORT_SYMBOL(mover_speed_set);
 void set_lifter_position(int val)
 {
     atomic_set(&lifter_position, val);
-    atomic_set(&lifter_position, 0);
 }
 EXPORT_SYMBOL(set_lifter_position);
+
+void set_lifter_fault(int val)
+{
+    atomic_set(&lifter_fault, val);
+}
+EXPORT_SYMBOL(set_lifter_fault);
 
 int mover_speed_stop() {
     do_event(EVENT_STOP); // started stopping
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(FALSE);
+    enable_battery_check(1);
     return 1;
 }
 EXPORT_SYMBOL(mover_speed_stop);
@@ -2123,11 +2163,11 @@ void mover_go_home(void) {
    if (mover_type == IS_MIT){
       if (home_loc == 1) { // Dock at end away from home
          if (atomic_read(&last_sensor) != MOVER_SENSOR_END){
-            mover_speed_set(2); // Go Slow
+            mover_speed_set(3); // Get there kind of fast
          }
       } else if (home_loc == 0) { // Dock at home end
          if (atomic_read(&last_sensor) != MOVER_SENSOR_HOME){
-            mover_speed_set(-2); // Go Slow
+            mover_speed_set(-3); // Get there kind of fast
          }
       }
    }

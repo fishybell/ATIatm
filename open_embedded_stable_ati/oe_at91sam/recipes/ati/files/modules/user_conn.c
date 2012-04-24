@@ -12,6 +12,7 @@
 #include "defaults.h"
 #include "netlink_user.h"
 #include "fasit/faults.h"
+#include "target_generic_output.h"
 
 // tcp port we'll listen to for new connections
 #define PORT 4422
@@ -290,64 +291,85 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                 // a mover/lifter event happened
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
                 switch (value) {
-                  case 0: // start of raise
+                  case EVENT_RAISE: // start of raise
                      snprintf(wbuf, 1024, "V %i start of raise\n", value);
                      break;
-                  case 1: // finished raising
+                  case EVENT_UP: // finished raising
                      snprintf(wbuf, 1024, "V %i finished raising\n", value);
                      break;
-                  case 2: // start of lower
+                  case EVENT_LOWER: // start of lower
                      snprintf(wbuf, 1024, "V %i start of lower\n", value);
                      break;
-                  case 3: // finished lowering
+                  case EVENT_DOWN: // finished lowering
                      snprintf(wbuf, 1024, "V %i finished lowering\n", value);
                      break;
-                  case 4: // start of move
+                  case EVENT_MOVE: // start of move
                      snprintf(wbuf, 1024, "V %i start of move\n", value);
                      break;
-                  case 5: // reached target speed
+                  case EVENT_MOVING: // reached target speed
                      snprintf(wbuf, 1024, "V %i reached target speed\n", value);
                      break;
-                  case 6: // changed position
+                  case EVENT_POSITION: // changed position
                      snprintf(wbuf, 1024, "V %i changed position\n", value);
                      break;
-                  case 7: // started coast
+                  case EVENT_COAST: // started coast
                      snprintf(wbuf, 1024, "V %i started coast\n", value);
                      break;
-                  case 8: // started stopping
+                  case EVENT_STOP: // started stopping
                      snprintf(wbuf, 1024, "V %i started stopping\n", value);
                      break;
-                  case 9: // finished stopping
+                  case EVENT_STOPPED: // finished stopping
                      snprintf(wbuf, 1024, "V %i finished stopping\n", value);
                      break;
-                  case 10: // hit
+                  case EVENT_HIT: // hit
                      snprintf(wbuf, 1024, "V %i hit\n", value);
                      break;
-                  case 11: // kill
+                  case EVENT_KILL: // kill
                      snprintf(wbuf, 1024, "V %i kill\n", value);
                      break;
-                  case 12: // shutdown
+                  case EVENT_SHUTDOWN: // shutdown
                      snprintf(wbuf, 1024, "V %i shutdown\n", value);
                      break;
-                  case 13: // sleep
+                  case EVENT_DOCK: // dock
+                     snprintf(wbuf, 1024, "V %i dock\n", value);
+                     break;
+                  case EVENT_UNDOCKED: // undocked
+                     snprintf(wbuf, 1024, "V %i undocked\n", value);
+                     break;
+                  case EVENT_SLEEP: // sleep
                      snprintf(wbuf, 1024, "V %i sleep\n", value);
                      break;
-                  case 14: // wake
+                  case EVENT_WAKE: // wake
                      snprintf(wbuf, 1024, "V %i wake\n", value);
                      break;
-                  case 15: // home limit
+                  case EVENT_HOME_LIMIT: // home limit
                      snprintf(wbuf, 1024, "V %i home limit\n", value);
                      break;
-                  case 16: // end limit
+                  case EVENT_END_LIMIT: // end limit
                      snprintf(wbuf, 1024, "V %i end limit\n", value);
                      break;
-                  case 17: // timeout
+                  case EVENT_DOCK_LIMIT: // dock limit
+                     snprintf(wbuf, 1024, "V %i dock limit\n", value);
+                     break;
+                  case EVENT_TIMED_OUT: // timeout
                      snprintf(wbuf, 1024, "V %i timeout\n", value);
                      break;
-                  case 18: // speed change
+                  case EVENT_IS_MOVING: // speed change
                      snprintf(wbuf, 1024, "V %i speed change\n", value);
                      break;
-                  case 19: // error
+                  case EVENT_CHARGING: // charging
+                     snprintf(wbuf, 1024, "V %i charging\n", value);
+                     break;
+                  case EVENT_NOTCHARGING: // not charging
+                     snprintf(wbuf, 1024, "V %i not charging\n", value);
+                     break;
+                  case EVENT_ENABLE_BATTERY_CHK: // not charging
+                     snprintf(wbuf, 1024, "V %i enable battery check\n", value);
+                     break;
+                  case EVENT_DISABLE_BATTERY_CHK: // error
+                     snprintf(wbuf, 1024, "V %i disable battery check\n", value);
+                     break;
+                  case EVENT_ERROR: // error
                      snprintf(wbuf, 1024, "V %i error\n", value);
                      break;
                   default: // Other event
@@ -460,6 +482,12 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                    case ERR_invalid_exception:
                       snprintf(wbuf, 1024, "U invalid exception\n");
                       break;
+                   case ERR_left_dock_limit:
+                      snprintf(wbuf, 1024, "U Left Dock\n");
+                      break;
+                   case ERR_stop_dock_limit:
+                      snprintf(wbuf, 1024, "U Arrived at Dock\n");
+                      break;
                    case ERR_disconnected_SIT:
                       snprintf(wbuf, 1024, "U disconnected SIT\n");
                       break;
@@ -468,6 +496,15 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                       break;
                    case ERR_critical_battery:
                       snprintf(wbuf, 1024, "U critical battery\n");
+                      break;
+                   case ERR_normal_battery:
+                      snprintf(wbuf, 1024, "U normal battery\n");
+                      break;
+                   case ERR_charging_battery:
+                      snprintf(wbuf, 1024, "U charging battery\n");
+                      break;
+                   case ERR_notcharging_battery:
+                      snprintf(wbuf, 1024, "U not charging battery\n");
                       break;
                    default:
                       snprintf(wbuf, 1024, "U Unknown: %i\n", value);
