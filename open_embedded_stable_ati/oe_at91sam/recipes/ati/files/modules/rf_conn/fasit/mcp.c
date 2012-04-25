@@ -25,6 +25,10 @@ void print_help(int exval) {
    exit(exval);
 }
 
+#define EXIT(_e) { \
+   DCMSG(RED, "\n\nExiting MCP on line %i, current errno: %i", __LINE__, errno); \
+   exit(_e); \
+}
 // kill switch to program
 int close_nicely = 0;
 static void quitproc(int sig) {
@@ -59,7 +63,7 @@ uint8 set_forget_bits(int low_dev,int high_dev,addr_t *addr_pool,int max_addr){
    high_dev=min(low_dev+7,high_dev);   // look for only devid's within 7 of low_dev, or < high_dev
    while (addr<max_addr){       // spin through our addresses
       testid=addr_pool[addr].devid;
-      if ((testid>=low_dev)&&(testid<=high_dev)){       // we have match
+      if (addr_pool[addr].inuse&&(testid>=low_dev)&&(testid<=high_dev)){       // we have match
          bits^=BV(testid-low_dev);      // turn off the forget bit for this devid
       }
       DDCMSG(D_MEGA,BLUE,"SFB:  addr=%d testid=%x  bits=0x%8x",addr,testid,bits);
@@ -196,7 +200,7 @@ int main(int argc, char **argv) {
 
    if (!slottime || (high_dev<low_dev)){
       DCMSG(RED,"\nMCP: slottime=%d must be set and high_dev=%d cannot be less than low_dev=%d",slottime,high_dev,low_dev);
-      exit(-1);
+      EXIT(-1);
    } else {
 
       DCMSG(RED,"MCP: slottime=%d  low_dev=0x%x high_dev=0x%x  total_slots=%d",slottime,low_dev,high_dev,total_slots);
@@ -223,7 +227,7 @@ int main(int argc, char **argv) {
    if (result<0){
       strerror_r(errno,buf,BufSize);
       DCMSG(RED,"MCP RF Master server not found! connect(%s:%d) error: %s  ", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port),buf);
-      exit(-1);
+      EXIT(-1);
    }
 
    // we now have a socket to the RF Master.
@@ -246,7 +250,7 @@ int main(int argc, char **argv) {
    ev.data.fd = RF_sock; // indicates listener fd
    if (epoll_ctl(fds, EPOLL_CTL_ADD, RF_sock, &ev) < 0) {
       perror("MCP: epoll RF_sock insertion error:\n");
-      return 1;
+      EXIT(-1);
    }
 
    mID=0;
@@ -331,20 +335,20 @@ int main(int argc, char **argv) {
                if (msglen == 1) {
                   LB=(LB_packet_t *)buf;   // map the header in
                   msglen+=read(RF_sock, (buf+1), RF_size(LB->cmd)-1); // grab the rest, but leave the rest to be read again later
-                  DDCMSG(D_NEW, RED, "MCP %i read bytes with %i cmd", msglen, LB->cmd);
+                  DDCMSG(D_RF, RED, "MCP %i read bytes with %i cmd", msglen, LB->cmd);
                   DDpacket(buf,msglen);
                }
                if (msglen<0) {
                   strerror_r(errno,buf,BufSize);
                   DCMSG(RED,"MCP: RF_sock error %s  fd=%d\n",buf,RF_sock);
-                  exit(-1);
+                  EXIT(-1);
                }
                if (msglen==0) {
                   DCMSG(RED,"MCP: RF_sock returned 0 -   Socket to RFmaster closed.");
                   DCMSG(RED,"MCP:   This is where the code should loop and try to reconnect to the RFmaster.");
                   DCMSG(RED,"MCP:   The whole chunk of code for attaching to the RFmaster should be brought inside the while(forever) loop");
                   DCMSG(RED,"MCP:   then the loop will hang until there is an RFmaster to attach or re-attach to.");
-                  exit(-1);
+                  EXIT(-1);
                }
 
                DDCMSG(D_POLL,RED,"MCP:  read %d from RF socket",msglen);
@@ -388,19 +392,21 @@ int main(int argc, char **argv) {
                    ****************************************************************************/
 
                   /////////   CHECK if we already have a minion with this devID
-                  DDCMSG(D_NEW,GRAY,"MCP: CHECK for minion with this devID   max_addr=%d  devID=%06x",max_addr,LB_devreg->devid);
+                  DDCMSG(D_RF|D_MEGA,GRAY,"MCP: CHECK for minion with this devID   max_addr=%d  devID=%06x",max_addr,LB_devreg->devid);
 
                   addr_cnt=1;           //  step through to check if we already had this one
-                  DDCMSG(D_NEW,GRAY,"MCP:     ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) && (addr_pool[%d].inuse=%d)",
+                  DDCMSG(D_RF|D_MEGA,GRAY,"MCP:     ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) && (addr_pool[%d].inuse=%d)",
                          addr_cnt,max_addr,addr_cnt,addr_pool[addr_cnt].devid, LB_devreg->devid, addr_cnt,addr_pool[addr_cnt].inuse);
 
                   while ((addr_cnt<max_addr)&&(addr_pool[addr_cnt].devid!=LB_devreg->devid)&&addr_pool[addr_cnt].inuse) {
-                     DDCMSG(D_NEW,GRAY,"MCP: ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) ... (addr_pool[%d].inuse=%d)",
+                     DDCMSG(D_RF|D_MEGA,GRAY,"MCP: ( (addr_cnt=%d)<(max_addr=%d)) && ((addr_pool[%d].devid=%x)!=(LB_devreg->devid=%x)) ... (addr_pool[%d].inuse=%d)",
                             addr_cnt,max_addr,addr_cnt,addr_pool[addr_cnt].devid, LB_devreg->devid, addr_cnt,addr_pool[addr_cnt].inuse);
                      addr_cnt++;
                   }
 
-                  if (addr_cnt<max_addr) {
+                  if (addr_cnt<max_addr && addr_pool[addr_cnt].inuse &&
+                      addr_pool[addr_cnt].mID > 0 &&
+                      minions[addr_pool[addr_cnt].mID].status==S_open) {
                      // we already have this devID, so reconnect because the RFslave probably rebooted or something
                      LB_status_resp_ext_t lbsr;
                      DCMSG(GRAY,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
@@ -423,7 +429,7 @@ int main(int argc, char **argv) {
                      if (result<0) {
                         DCMSG(RED,"MCP: reconnect Sent %d bytes to minion %d at fd=%d",
                               result,mID,minions[mID].minion);
-                        exit(-1);
+                        EXIT(-1);
                      }
 
                      DDCMSG(D_NEW,BLUE,"MCP: reconnect Sent %d bytes to minion %d  fd=%d",
@@ -432,10 +438,19 @@ int main(int argc, char **argv) {
 
 
                   } else {
-                     // we do not have this devID.  Look for the first free address to use
-                     addr_cnt=1;                //  step through to check to find unused
-                     while (addr_pool[addr_cnt].inuse) addr_cnt++;      // look for an unused address slot
-                     DDCMSG(D_NEW,YELLOW,"MCP: check for unused addr addr_cnt=%d devtype=%d devid=0x%06x",
+                     int oldID=mID+1; // assume we're incrementing minion count
+                     if (addr_pool[addr_cnt].mID > 0 &&
+                         minions[addr_pool[addr_cnt].mID].status==S_closed) {
+                        // we used to have this devID, but the minion disconnected, re-use it
+                        mID=addr_pool[addr_cnt].mID;
+                        oldID--; // un-increment minion count
+                     } else {
+                        // we do not have this devID.  Look for the first free address to use
+                        addr_cnt=1;                //  step through to check to find unused
+                        while (addr_pool[addr_cnt].inuse) addr_cnt++;      // look for an unused address slot
+                        mID+=1; // increment our minion count
+                     }
+                     DDCMSG(D_RF|D_VERY,YELLOW,"MCP: check for unused addr addr_cnt=%d devtype=%d devid=0x%06x",
                             addr_cnt,LB_devreg->dev_type,LB_devreg->devid);
 
                      if (addr_cnt>2046){
@@ -444,7 +459,6 @@ int main(int argc, char **argv) {
                      } else {
                         // we have a free address at addr_cnt
                         max_addr=max(max_addr,addr_cnt+1);      // we probably have a higher address in use
-                        mID+=1; // increment our minion count
                         addr_pool[addr_cnt].mID=mID;                    // update the addr_pool
                         addr_pool[addr_cnt].devid=LB_devreg->devid;
                         addr_pool[addr_cnt].inuse=1;                    // make sure we mark that we are in use!
@@ -526,37 +540,38 @@ int main(int argc, char **argv) {
                         if (child) {
                            /* This is the parent. */
                            DDCMSG(D_MINION,RED,"MCP forked minion %d", mID);
-                           DDCMSG(D_NEW, BLACK, "-------------------------------\nMinion %i:%i\n-------------------------------", mID, addr_cnt);
+                           DDCMSG(D_MINION|D_VERY, BLACK, "-------------------------------\nMinion %i:%i\n-------------------------------", mID, addr_cnt);
                            close(minions[mID].mcp_sock);
 
                         } else {
                            /* This is the child. */
                            close(minions[mID].minion);
                            minion_thread(&minions[mID]);
-                           DDCMSG(D_NEW,BLACK,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
+                           DDCMSG(D_MINION|D_VERY,BLACK,"MCP: minion_thread(...) returned. that minion must have died, so do something smart here like remove it");
 
-                           exit(0);
+                           EXIT(0);
                            break;       // if we come back , bail to another level or something more fatal
                         }
 
                         // add the minion to the set of file descriptors
                         // that are monitored by epoll
-                        ev.events = EPOLLIN;
+                        ev.events = EPOLLIN|EPOLLPRI|EPOLLRDHUP;
 //                        ev.data.fd = minions[mID].minion;     // since fd is a union with ptr, this is a failure!
                         ev.data.ptr = (void *) &minions[mID]; 
 
                         if (epoll_ctl(fds, EPOLL_CTL_ADD, minions[mID].minion, &ev) < 0) {
                            perror("MCP: epoll set insertion error: \n");
-                           return 1;
+                           EXIT(-1);
                         }
 
-                        DDCMSG(D_NEW,RED,"MCP: assigning address slot #%d  mID=%d inuse=%d fd=%d"
+                        DDCMSG(D_MINION|D_VERY,RED,"MCP: assigning address slot #%d  mID=%d inuse=%d fd=%d"
                                ,addr_cnt,addr_pool[addr_cnt].mID,addr_pool[addr_cnt].inuse,minions[addr_pool[addr_cnt].mID].minion);
 
 
                         /***   end of create a new minion 
                          ****************************************************************************/
                      } // else addr_cnt>2046   - not all used
+                     mID=oldID;
                   } // if addr_cnt>2046  devid not found so we made a new minon
 
                   // Create an LB ASSIGN ADDR packet to send back to the slaves
@@ -569,7 +584,7 @@ int main(int argc, char **argv) {
                   LB_addr->devid=addr_pool[addr_cnt].devid;     // get what might have been given out earlier
                   LB_addr->new_addr=addr_cnt;                   // the actual slot is the perm address
 
-                  DDCMSG(D_NEW,RED,"MCP: regX Build a LB device addr packet to assign the address slot %4d %4d"
+                  DDCMSG(D_RF|D_VERY,RED,"MCP: regX Build a LB device addr packet to assign the address slot %4d %4d"
                          ,addr_cnt,LB_addr->new_addr);
 
                   // calculates the correct CRC and adds it to the end of the packet payload
@@ -586,10 +601,10 @@ int main(int argc, char **argv) {
                   if (result<0) {
                      DCMSG(RED,"MCP: regX Sent %d bytes to minion %d at fd=%d",
                            result,addr_cnt,minions[addr_pool[addr_cnt].mID].minion);
-                     exit(-1);
+                     EXIT(-1);
                   }
 
-                  DDCMSG(D_NEW,BLUE,"MCP: regX  Sent %d bytes to minion %d  fd=%d",
+                  DDCMSG(D_RF|D_VERY,BLUE,"MCP: regX  Sent %d bytes to minion %d  fd=%d",
                          result,addr_pool[addr_cnt].mID,minions[addr_pool[addr_cnt].mID].minion);
 
                   // now send it to the RF master
@@ -597,10 +612,10 @@ int main(int argc, char **argv) {
                   if (result<0) {
                      strerror_r(errno,buf,BufSize);                         
                      DCMSG(RED,"MCP: regX write to RF_sock error %s  fd=%d\n",buf,RF_sock);
-                     exit(-1);
+                     EXIT(-1);
                   }
 
-                  DDCMSG(D_NEW,RED,"MCP: regX Sent %d bytes to RF fd=%d",result,RF_sock);
+                  DDCMSG(D_RF,RED,"MCP: regX Sent %d bytes to RF fd=%d",result,RF_sock);
 
                   // done handling the device_reg packet
                } else { // it is any other command than dev regx
@@ -610,7 +625,7 @@ int main(int argc, char **argv) {
                   ////    No, we are sending the packet back to ourselves..................
                   //       display the packet for debugging
                   LB=(LB_packet_t *)buf;
-                  if (addr_pool[LB->addr].inuse){                           
+                  if (addr_pool[LB->addr].inuse && minions[addr_pool[LB->addr].mID].status != S_closed) {
                      if (verbose&D_RF){ // don't do the sprintf if we don't need to
                         sprintf(hbuf,"MCP: passing RF packet from RF_addr %d on to Minion %d (fd=%d).   cmd=%2d  length=%d msglen=%d"
                                 ,LB->addr,addr_pool[LB->addr].mID,minions[addr_pool[LB->addr].mID].minion,LB->cmd,RF_size(LB->cmd),msglen);
@@ -623,7 +638,7 @@ int main(int argc, char **argv) {
                         strerror_r(errno,buf,BufSize);                      
                         DCMSG(RED,"MCP:  write to minion %d error %s  fd=%d",
                               addr_pool[LB->addr].mID,buf,minions[addr_pool[addr_cnt].mID].minion);
-                        exit(-1);
+                        EXIT(-1);
                      }
 
                      DDCMSG(D_RF,BLUE,"MCP: @3 Sent %d bytes to minion %d at fd=%d",
@@ -647,46 +662,70 @@ int main(int argc, char **argv) {
                //                   
                minion=(thread_data_t *)events[ready_fd].data.ptr;
                minion_fd=minion->minion;                    
-               mID=minion->mID;
+               //mID=minion->mID; don't overwrite this value, we are keeping track of stuff elsewhere with it
+DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\tEPOLLERR:%i\tEPOLLHUP:%i", minion->mID, (events[ready_fd].events&EPOLLIN)!=0, (events[ready_fd].events&EPOLLPRI)!=0, (events[ready_fd].events&EPOLLRDHUP)!=0, (events[ready_fd].events&EPOLLERR)!=0, (events[ready_fd].events&EPOLLHUP)!=0);
                DDCMSG(D_POLL,RED,"MCP: events[ready_fd=%d] minion->minion=%d for minion %d ready  [RF_addr=%d]  -}",
-                      ready_fd,minion_fd,mID,minion->RF_addr);             
+                      ready_fd,minion_fd,minion->mID,minion->RF_addr);             
 
-               DDCMSG(D_POLL,BLUE,"MCP: fd %d for minion %d ready  [RF_addr=%d]  -}",minion_fd,mID,minion->RF_addr);
+               DDCMSG(D_POLL,BLUE,"MCP: fd %d for minion %d ready  [RF_addr=%d]  -}",minion_fd,minion->mID,minion->RF_addr);
                if(minion_fd>2048){
                   DCMSG(RED,"MCP:  Trying create more than 2048 minions!  Call the Wizard");
-                  exit(-1);
+                  EXIT(-1);
                }
-               msglen=read(minion_fd, buf, 1023);
+               // pre-empt a failure to read by looking at *HUP statuses
+               if (events[ready_fd].events&EPOLLRDHUP || events[ready_fd].events&EPOLLRDHUP) {
+                  DDCMSG(D_RF|D_VERY, RED, "MCP: pretended to read from minion %i (%i:%s)!\n", minion->mID, errno, strerror(errno));
+                  msglen = 0; // pretend we closed
+                  buf[0] = '\0'; // clear buffer
+               } else {
+                  msglen=read(minion_fd, buf, 1023);
+               }
                LB=(LB_packet_t *)buf;
                if (verbose&D_RF){       // don't do the sprintf if we don't need to
                   sprintf(hbuf,"MCP:    read Minion %2d's LB packet(s). address=%2d  cmd=%2d  length=%2d msglen=%2d  -}"
-                          ,mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
+                          ,minion->mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
                   DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,msglen);
                }
-               if (!msglen){
-                  DCMSG(RED,"MCP:  attempted read from minion returned 0!\n");
-                  sleep(1);
+// handle bad read as proper disconnect below
+               if (msglen <= 0) {
+                  DDCMSG(D_RF, RED, "MCP:  attempted read from minion returned %i (%i:%s)!\n", msglen, errno, strerror(errno));
+                  if (epoll_ctl(fds, EPOLL_CTL_DEL, minion_fd, NULL) < 0) { /* still remove from epoll as we're not properly handling this */
+                     DCMSG(RED, "Failure to remove %i from epoll: %s", minion_fd, strerror(errno));
+                     EXIT(-1);
+                  }
+                  // close connection
+                  close(minion_fd); // -- the bug is in my ability to handle the way epoll handles a socket that writes data and then immediately closes ... see minion_state.c for my fix
+                  minion->status=S_closed;
                } else if (LB->cmd==LBC_ILLEGAL){
-                  DDCMSG(D_NEW,BLACK,"Dead minion %i:%i, closing it down", minion->mID, minion->RF_addr);
+                  DDCMSG(D_RF,BLACK,"Dead minion %i:%i, closing down fd %i", minion->mID, minion->RF_addr, minion_fd);
                   // minion is dead, reset forget bit for it
                   addr_pool[minion->RF_addr].inuse=0;
-                  addr_pool[minion->RF_addr].devid=0xffffffff; // invalid devid
-                  addr_pool[minion->RF_addr].mID=0;
+// re-use this spot when slave reconnects
+//                  addr_pool[minion->RF_addr].devid=0xffffffff; // invalid devid
+//                  addr_pool[minion->RF_addr].mID=0;
+                  // remove from epoll
+                  if (epoll_ctl(fds, EPOLL_CTL_DEL, minion_fd, NULL) < 0) { /* still remove from epoll as we're not properly handling this */
+                     DCMSG(RED, "Failure to remove %i from epoll: %s", minion_fd, strerror(errno));
+//                     //close(minion_fd);
+                     EXIT(-1);
+                  }
                   // close connection
-                  close(minion_fd);
+                  minion->status=S_closed;
+//                  close(minion_fd); -- appears to be a linux bug here that prevents from using close() to both a) close the fd and b) remove it from the epoll
                } else {
                   // just display the packet for debugging
                   LB=(LB_packet_t *)buf;
                   // do the copy down here
+//                  DDCMSG(D_POINTER, GRAY, "Writing buf %p len %i", LB, msglen);
                   result=write(RF_sock,LB,msglen);
                   if (result<0) {
                      strerror_r(errno,buf,BufSize);                         
                      DCMSG(RED,"MCP:  write to RF_sock error %s  fd=%d\n",buf,RF_sock);
-                     exit(-1);
+                     EXIT(-1);
                   }
                   if (verbose&D_RF){    // don't do the sprintf if we don't need to
                      sprintf(hbuf,"MCP: passing Minion %2d's LB packet(s) to RF_addr=%2d cmd=%2d length=%2d result=%2d  -}"
-                             ,mID,LB->addr,LB->cmd,msglen,result);
+                             ,minion->mID,LB->addr,LB->cmd,msglen,result);
                      DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,result);
                   }
                }
