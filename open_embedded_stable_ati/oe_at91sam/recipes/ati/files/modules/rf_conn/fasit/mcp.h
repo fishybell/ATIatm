@@ -348,7 +348,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 #define C_DEBUG 1
 
-#define DDCMSG(DBG,SC, FMT, ...) { if (((DBG)&verbose)==(DBG)) { fprintf(stdout, "\x1B[3%d;%dm[%03x] " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1,(DBG), ##__VA_ARGS__ ); fflush(stdout);}}
+#define DDCMSG(DBG,SC, FMT, ...) { if (((DBG)&verbose)==(DBG)) { fprintf(stdout, "\x1B[3%d;%dm[%04x] " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1,(DBG), ##__VA_ARGS__ ); fflush(stdout);}}
 #define DCMSG(SC, FMT, ...) { if (C_DEBUG) { fprintf(stdout, "\x1B[3%d;%dm      " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
 #define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm      " FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
 #define DCOLOR(SC) { if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm",SC&7,(SC>>3)&1); fflush(stdout);}}
@@ -378,9 +378,9 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 //  this one prints the hex dump on next line, and prefixs the second line with [dbg]
 #define DDCMSG2_HEXB(DBG,SC,hbuf,data, size)  { if ((verbose&(DBG))==(DBG)) {{ \
-                                                 fprintf(stdout, "\x1B[3%d;%dm[%03x] %s\n",(SC)&7,((SC)>>3)&1,(DBG),hbuf); \
+                                                 fprintf(stdout, "\x1B[3%d;%dm[%04x] %s\n",(SC)&7,((SC)>>3)&1,(DBG),hbuf); \
                                                  char *_data = (char*)data; \
-                                                 fprintf(stdout, "[%03x]    ", (DBG)); \
+                                                 fprintf(stdout, "[%04x]    ", (DBG)); \
                                                  for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
                                                  fprintf(stdout, " in %s at line %i\x1B[30;0m\n", __FILE__, __LINE__); \
                                               }; fflush(stdout); }}
@@ -388,7 +388,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 //  this one prints the hex dump on the same line as 'hbuf'
 #define DDCMSG_HEXB(DBG,SC,hbuf,data, size)  { if ((verbose&(DBG))==(DBG)) {{ \
-                                                fprintf(stdout, "\x1B[3%d;%dm[%03x] %s",(SC)&7,((SC)>>3)&1,(DBG),hbuf); \
+                                                fprintf(stdout, "\x1B[3%d;%dm[%04x] %s",(SC)&7,((SC)>>3)&1,(DBG),hbuf); \
                                                 char *_data = (char*)data; \
                                                 fprintf(stdout, "  "); \
                                                 for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \

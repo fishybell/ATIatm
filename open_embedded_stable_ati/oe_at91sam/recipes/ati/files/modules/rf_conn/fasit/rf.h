@@ -15,6 +15,7 @@
 #define D_MSTATE        0x200
 #define D_QUEUE         0x400
 #define D_PARSE         0x800
+#define D_POINTER       0x1000
 
 #include "mcp.h"
 

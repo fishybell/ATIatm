@@ -123,7 +123,8 @@ void print_verbosity(void){
    printf("  -v 200         sets D_MSTATE  \n");
    printf("  -v 400         sets D_QUEUE  \n");
    printf("  -v 800         sets D_PARSE  \n");
-   printf("  -v FFF         sets all of the above  \n");
+   printf("  -v 1000        sets D_POINTER  \n");
+   printf("  -v FFFF        sets all of the above  \n");
 }
 
 void print_verbosity_bits(void){
@@ -139,6 +140,7 @@ void print_verbosity_bits(void){
    DDCMSG(D_MSTATE      ,black,"  D_MSTATE");
    DDCMSG(D_QUEUE       ,black,"  D_QUEUE");
    DDCMSG(D_PARSE       ,black,"  D_PARSE");
+   DDCMSG(D_POINTER     ,black,"  D_POINTER");
 }
 
 
