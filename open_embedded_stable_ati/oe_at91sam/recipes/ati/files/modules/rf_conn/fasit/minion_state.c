@@ -376,15 +376,16 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
       #define DISCONNECT { \
          /* break connection to FASIT server */ \
          close(minion->rcc_sock); /* close FASIT */ \
-         DCMSG(BLACK,"\n\n-----------------------------------\nDisconnected minion %i:%i:%i\n-----------------------------------\n\n", \
-               minion->mID, minion->rcc_sock, minion->mcp_sock); \
+         DCMSG(BLACK,"\n\n-----------------------------------\nDisconnected minion %i:%i:%i\n----------------------------------- %i\n\n", \
+               minion->mID, minion->rcc_sock, minion->mcp_sock, __LINE__); \
          minion->rcc_sock = -1; \
          minion->status = S_closed; \
          LB_buf.cmd = LBC_ILLEGAL; /* send an illegal packet, which makes mcp forget me */ \
          /* now send it to the MCP master */ \
          DDCMSG(D_PACKET,BLUE,"Minion %d:  LBC_ILLEGAL cmd=%d", minion->mID,LB_buf.cmd); \
          result= psend_mcp(minion,&LB_buf); \
-         close(minion->mcp_sock); /* close mcp */ \
+         fsync(minion->mcp_sock); /* make sure the data gets written to the mcp before we close */ \
+         close(minion->mcp_sock); /* close this half of the connection to mcp */ \
          exit(0); /* exit the forked minion */ \
       }
 
