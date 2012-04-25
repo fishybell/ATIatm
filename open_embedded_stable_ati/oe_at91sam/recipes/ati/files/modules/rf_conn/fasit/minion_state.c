@@ -372,6 +372,32 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                minion->S.move.flags, minion->S.move.timer,
                minion->S.event.flags, minion->S.event.timer);
 
+      // macro to disconnect minion
+      #define DISCONNECT { \
+         /* break connection to FASIT server */ \
+         close(minion->rcc_sock); /* close FASIT */ \
+         DCMSG(BLACK,"\n\n-----------------------------------\nDisconnected minion %i:%i:%i\n-----------------------------------\n\n", \
+               minion->mID, minion->rcc_sock, minion->mcp_sock); \
+         minion->rcc_sock = -1; \
+         minion->status = S_closed; \
+         LB_buf.cmd = LBC_ILLEGAL; /* send an illegal packet, which makes mcp forget me */ \
+         /* now send it to the MCP master */ \
+         DDCMSG(D_PACKET,BLUE,"Minion %d:  LBC_ILLEGAL cmd=%d", minion->mID,LB_buf.cmd); \
+         result= psend_mcp(minion,&LB_buf); \
+         close(minion->mcp_sock); /* close mcp */ \
+         exit(0); /* exit the forked minion */ \
+      }
+
+      // macro to send a status request
+      #define SEND_STATUS_REQUEST { \
+         /* send out a request for actual position */ \
+         LB_status_req_t *L=(LB_status_req_t *)&LB_buf; \
+         L->cmd=LBC_STATUS_REQ;          /* start filling in the packet */ \
+         L->addr=minion->RF_addr; \
+         DDCMSG(D_MSTATE,GREEN,"Minion %d:   build and send L LBC_STATUS_REQ", minion->mID); \
+         result= psend_mcp(minion,&LB_buf); \
+      }
+
       // check each timer, running its state code if it is needed, moving its timer otherwise
       #define CHECK_TIMER(S, T, F, CODE) { \
          if (!S.F) { \
@@ -387,16 +413,42 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking fast timer flags: %i", minion->S.rf_t.fast_flags);
          switch (minion->S.rf_t.fast_flags) {
             case F_fast_start: {
-               // TODO -- something here?
-               stopTimer(minion->S.rf_t, fast_timer, fast_flags);
+               // might get here from a miss or just because it's our time again, assume miss
+               // incriment miss number and check against max
+               if (++minion->S.rf_t.fast_missed > FAST_TIME_MAX_MISS) {
+                  DISCONNECT;
+               } else {
+                  SEND_STATUS_REQUEST;
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start); // same state over and over
+               }
             } break;
             case F_fast_once: {
-               // TODO -- something here?
-               stopTimer(minion->S.rf_t, fast_timer, fast_flags);
+               // should only get here as start of message, so just add one to the miss counter as we normally assume a miss
+               ++minion->S.rf_t.fast_missed;
+               SEND_STATUS_REQUEST;
+               setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_end); // move to end
             } break;
             case F_fast_end: {
-               // TODO -- something here?
-               stopTimer(minion->S.rf_t, fast_timer, fast_flags);
+               // might get here from a miss or just because it's our time again, assume miss
+               // incriment miss number and check against max
+               if (++minion->S.rf_t.fast_missed > FAST_TIME_MAX_MISS) {
+                  DISCONNECT;
+               } else if (minion->S.rf_t.fast_missed > 1) {
+                  // missed, keep trying fast
+                  SEND_STATUS_REQUEST;
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_end); // move to end
+               } else {
+                  // didn't miss, so go slow again
+                  if (minion->S.rf_t.old_slow_flags == 0) {
+                     // didn't save previous slow state, so make a new one
+                     setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start);
+                  } else {
+                     // saved previous slow state, resume it
+                     resumeTimer(minion->S.rf_t, slow_timer, slow_flags);
+                  }
+                  // ... either way, stop the fast timer
+                  stopTimer(minion->S.rf_t, fast_timer, fast_flags);
+               }
             } break;
          }
       ); // end of CHECK_TIMER for fast state timer
@@ -405,8 +457,18 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking fast timer flags: %i", minion->S.rf_t.slow_flags);
          switch (minion->S.rf_t.fast_flags) {
             case F_slow_start: {
-               // TODO -- something here?
-               stopTimer(minion->S.rf_t, slow_timer, slow_flags);
+               SEND_STATUS_REQUEST;
+               setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_RESPONSE_TIME, F_slow_continue); // will only get to F_slow_continue if we don't reset (code in minion.c)
+            } break;
+            case F_slow_continue: {
+               // shouldn't get here unless we missed
+               // incriment miss number and check against max
+               if (++minion->S.rf_t.slow_missed > SLOW_TIME_MAX_MISS) {
+                  DISCONNECT;
+               } else {
+                  SEND_STATUS_REQUEST;
+                  setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_RESPONSE_TIME, F_slow_continue);
+               }
             } break;
          }
       ); // end of CHECK_TIMER for slow state timer
@@ -459,12 +521,26 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking event timer flags: %i", minion->S.event.flags);
          switch (minion->S.event.flags) {
             case F_event_start: {
-               // TODO -- something here?
-               stopTimer(minion->S.event, timer, flags);
+               // shouldn't get here unless we missed
+               // incriment miss number and check against max
+               if (++minion->S.event.missed > EVENT_MAX_MISS) {
+                  setTimerTo(minion->S.event, timer, flags, EVENT_RESPONSE_TIME, F_event_end); // disconnect later to give a slight chance to the response coming in
+               } else {
+                  // send another request
+                  LB_report_req_t L;
+
+                  L.cmd=LBC_REPORT_REQ;
+                  L.addr=minion->RF_addr;
+                  L.event=minion->S.exp.last_event; // use saved event number
+
+                  DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_report_req cmd=%d", minion->mID,L.cmd);
+                  psend_mcp(minion,&L);
+                  setTimerTo(minion->S.event, timer, flags, EVENT_RESPONSE_TIME, F_event_start); // try again
+               }
             } break;
             case F_event_end: {
-               // TODO -- something here?
-               stopTimer(minion->S.event, timer, flags);
+               // we missed too many times
+               DISCONNECT;
             } break;
          }
       ); // end of CHECK_TIMER for event state timer

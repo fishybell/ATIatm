@@ -55,6 +55,7 @@ typedef struct state_exp_item { /* has both expose state and conceal state in si
    uint8         data;     // current exposure value (0/45/90)
    uint8         newdata;  // destination exposure value (0/90)
    uint16        event;
+   uint16        last_event; // for retrying event request even if we've moved on to a different event
    uint16        exp_flags;
    uint16        con_flags;
    uint16        old_exp_flags;
@@ -270,7 +271,8 @@ enum {
 
 enum {
    F_slow_none = 0, /* no state, doing nothing */
-   F_slow_start, /* starts slow lookup, goes to slow start */
+   F_slow_start, /* starts slow lookup, goes to slow continue */
+   F_slow_continue, /* continues slow lookup, goes to slow start */
 };
 
 enum {
@@ -480,14 +482,14 @@ typedef enum rf_target_type {
 #define SLOW_SOON_TIME        3   /* 3/10 second */
 #define SLOW_TIME             200 /* 20 seconds */
 #define SLOW_RESPONSE_TIME    30  /* 3 seconds */
-#define EVENT_START_TIME      5   /* 1/2 second */
 #define EVENT_RESPONSE_TIME   30  /* 3 seconds */
 #define TRANSITION_START_TIME 1   /* 1/10 second */
 #define TRANSITION_TIME       5   /* 1/2 second */
 
 // other state constants
 #define FAST_TIME_MAX_MISS 3 /* maximum value of the "missed message" counter */
-#define SLOW_TIME_MAX_MISS 1 /* maximum value of the "missed message" counter */
+#define SLOW_TIME_MAX_MISS 2 /* maximum value of the "missed message" counter */
+#define EVENT_MAX_MISS 2 /* maximum value of the "missed message" counter */
 
 // common complex timer starts
 #define START_EXPOSE_TIMER(S) { \
@@ -503,8 +505,8 @@ typedef enum rf_target_type {
    setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
    /* start transition */ \
    setTimerTo(S.exp, con_timer, con_flags, TRANSITION_START_TIME, F_con_start_transition); \
-   /* start event request */ \
-   setTimerTo(S.event, timer, flags, EVENT_START_TIME, F_event_start); \
+   /* start event timer */ \
+   setTimerTo(S.event, timer, flags, EVENT_RESPONSE_TIME, F_event_start); \
 }
 #define START_MOVE_TIMER(S) { \
    /* start fast, stop slow */ \

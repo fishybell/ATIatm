@@ -609,6 +609,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                      L->cmd=LBC_REPORT_REQ;
                      L->addr=minion->RF_addr;
                      L->event=minion->S.exp.event;
+                     minion->S.exp.last_event=minion->S.exp.event; // save this event
 
                      DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_report_req cmd=%d", minion->mID,L->cmd);
                      psend_mcp(minion,L);
@@ -897,7 +898,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 void finishTransition(thread_data_t *minion) {
    if (minion->S.exp.data == 45 && minion->S.exp.newdata == 90) {
       // transitioned from conceal to expose
-      START_EXPOSE_TIMER(minion->S);
+      //START_EXPOSE_TIMER(minion->S); -- don't do this, it has already started
    } else if (minion->S.exp.data == 90 && minion->S.exp.newdata == 45) {
       // transitioned from expose to conceal
       START_CONCEAL_TIMER(minion->S);
@@ -1098,8 +1099,7 @@ void *minion_thread(thread_data_t *minion){
                minion->S.rf_t.slow_missed = 0;
             }
             if (minion->S.rf_t.fast_flags != F_fast_none) {
-               // reset the fast timer, if we're doing the fast timer, as we just got a response
-               setTimerTo(minion->S.rf_t, fast_timer, fast_flags, F_fast_start, FAST_TIME);
+               // reset the fast timer miss counter, keep going on the same timer interval so they burst
                minion->S.rf_t.fast_missed = 0;
             }
 
@@ -1135,6 +1135,10 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.exp.data = 0; // TODO -- take this out when we push and receive valid statuses
                   sendStatus2102(0, NULL,minion);
 
+                  // new state timer code
+                  // we received the event report, reset the counter and stop the timer
+                  minion->S.event.missed = 0;
+                  stopTimer(minion->S.event, timer, flags);
                }
                break;
 
