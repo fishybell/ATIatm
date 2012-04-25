@@ -552,7 +552,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          size=read(*riclient,buf,128);
          err = errno;
          if (size <= 0 && err != EAGAIN) {
-            DDCMSG(D_RF|D_VERY, YELLOW, "Range Interface dead");
+            DDCMSG(D_NEW, YELLOW, "Range Interface %i dead @ line %i", *riclient, __LINE__);
             close(*riclient);
             *riclient = -1;
          } else {
@@ -569,7 +569,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          unsigned int clntLen;               /* Length of client address data structure */
          // close existing one
          if (*riclient > 0) {
-            DDCMSG(D_RF|D_VERY, BLACK, "closing old, but working ri_client %i", *riclient);
+            DDCMSG(D_NEW, YELLOW, "Range Interface %i dead @ line %i", *riclient, __LINE__);
             close(*riclient);
             *riclient = -1;
          }
@@ -646,6 +646,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    close(MCPsock);
    close(risock);
    if (*riclient > 0) {
+      DDCMSG(D_NEW, YELLOW, "Range Interface %i dead @ line %i", *riclient, __LINE__);
       close(*riclient);
    }
    close(RFfd);
@@ -955,9 +956,12 @@ int main(int argc, char **argv) {
 
       /* MCPsock is connected to a Master Control Program! */
 
-      /* un-error existing riclient */
+      /* un-error existing riclient, by disconnecting */
       if (riclient > 0) {
-         write(riclient, "V\n", 2);
+         //write(riclient, "V\n", 2);
+         DDCMSG(D_NEW, YELLOW, "Range Interface %i dead @ line %i", riclient, __LINE__);
+         close(riclient);
+         riclient = -1;
       }
 
 
