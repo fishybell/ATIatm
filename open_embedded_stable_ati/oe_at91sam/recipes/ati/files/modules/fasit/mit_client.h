@@ -33,6 +33,7 @@ public :
    void doWake(); // wake the target
    void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
+   void doGoHome(); // go home
    void doContinuousMove(float speed, int direction); // start movement or change movement
    void doContinuousMove(); // retrieve movement values
    void didMove(float speed, int direction); // current direction value
@@ -148,6 +149,7 @@ public:
    void doWake(); // wake the target
    void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
+   void doGoHome(); // go home
    void doContinuousMove(float speed, int direction); // start movement or change movement
    void doContinuousMove(); // retrieve movement values
    void doBattery(); // retrieve battery value

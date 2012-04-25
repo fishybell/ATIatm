@@ -190,13 +190,10 @@ delay_printk("Mover: handling continuous movement command\n");
     na = info->attrs[GEN_INT16_A_MSG]; // generic 16-bit message
     if (na) {
         // grab value from attribute
-        value = nla_get_u16(na); // value is ignored
+        value = nla_get_u16(na);
 delay_printk("Mover: received value: %i\n", value);
 
         mover_set_continuous_move(value-32768); // unsigned value to signed speed (0 will coast)
-
-        // prepare response
-        rc = nla_put_u16(skb, GEN_INT16_A_MSG, 1); // value is ignored
 
         // message creation success?
         if (rc == 0) {
@@ -382,7 +379,7 @@ delay_printk("Mover: returning rc: %i\n", rc);
 //---------------------------------------------------------------------------
 // netlink command handler for commands
 //---------------------------------------------------------------------------
-int nl_command_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+int nl_gohome_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
     int rc, value = 0;
     u8 data = BATTERY_SHUTDOWN; // in case we need to shutdown
@@ -395,16 +392,7 @@ delay_printk("Mover: handling event command\n");
         value = nla_get_u8(na); // value is ignored
 delay_printk("Mover: received value: %i\n", value);
 
-        // handle event
-        switch (value) {
-            case CMD_PAUSE:
-                mover_speed_stop();
-                break;
-            case CMD_ABORT:
-            case CMD_RESTART:
-                mover_go_home();
-                break;
-        }
+        mover_go_home();
 
         rc = HANDLE_SUCCESS_NO_REPLY;
     } else {
@@ -550,7 +538,7 @@ static int __init Mover_init(void) {
         {NL_C_EVENT,     nl_event_handler},
         {NL_C_FAULT,     nl_fault_handler},
         {NL_C_CONTINUOUS, nl_continuous_handler},
-        {NL_C_COMMAND, nl_command_handler},
+        {NL_C_GOHOME, nl_gohome_handler},
         {NL_C_SLEEP,     nl_sleep_handler},
     };
     struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure

@@ -479,8 +479,8 @@ struct genl_ops provider_gnl_ops_continuous_move = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
-struct genl_ops provider_gnl_ops_command = {
-    .cmd = NL_C_COMMAND,
+struct genl_ops provider_gnl_ops_gohome = {
+    .cmd = NL_C_GOHOME,
     .flags = 0,
     .policy = generic_int8_policy,
     .doit = provider_command_handler,
@@ -515,7 +515,7 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_SCENARIO */		&provider_gnl_ops_scenario,
     /* NL_C_EVENT_REF */	&provider_gnl_ops_event_ref,
     /* NL_C_CONTINUOUS */			&provider_gnl_ops_continuous_move,
-    /* NL_C_COMMAND */			&provider_gnl_ops_command,
+    /* NL_C_GOHOME */			&provider_gnl_ops_gohome,
     /* NL_C_FAULT */       &provider_gnl_ops_disconnected_hit,
 };
 

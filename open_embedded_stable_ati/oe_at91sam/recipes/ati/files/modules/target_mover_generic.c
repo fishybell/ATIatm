@@ -1996,6 +1996,7 @@ int mover_speed_get(void) {
 EXPORT_SYMBOL(mover_speed_get);
 
 int mover_set_continuous_move(int c) {
+   int sensor, speed;
    DELAY_PRINTK("mover_set_continuous_move\n");
    // check to see if we're sleeping or not
    if (atomic_read(&sleep_atomic) == 1) {
@@ -2004,7 +2005,22 @@ int mover_set_continuous_move(int c) {
    atomic_set(&find_dock_atomic, 0);
    if (c != 0) {
       atomic_set(&continuous_speed, abs(c));
-      mover_speed_set(c);
+      speed = abs(c);
+      if (isMoverAtDock()){
+         if (dock_loc == 1) { // Dock at end away from home
+            speed *= -1;
+         }
+      } else {
+         sensor = atomic_read(&last_sensor); // home sensor
+         if (sensor == MOVER_SENSOR_END) {
+            speed *= -1;
+         } else {
+            if (home_loc == 1) { // Dock at end away from home
+               speed *= -1;
+            }
+         }
+      }
+      mover_speed_set( speed );
    } else {
       atomic_set(&continuous_speed, 0);
       mover_speed_stop();
@@ -2166,11 +2182,19 @@ void mover_go_home(void) {
    if (mover_type == IS_MIT){
       if (home_loc == 1) { // Dock at end away from home
          if (atomic_read(&last_sensor) != MOVER_SENSOR_END){
-            mover_speed_set(28); // Get there kind of fast
+               mover_speed_set(28); // Get there kind of fast
+         } else {
+            if (dock_loc == 0 && isMoverAtDock()) { // Dock at end away from home
+               mover_speed_set(28); // Get there kind of fast
+            }
          }
       } else if (home_loc == 0) { // Dock at home end
          if (atomic_read(&last_sensor) != MOVER_SENSOR_HOME){
-            mover_speed_set(-28); // Get there kind of fast
+               mover_speed_set(-28); // Get there kind of fast
+         } else {
+            if (dock_loc == 1 && isMoverAtDock()) {
+               mover_speed_set(-28); // Get there kind of fast
+            }
          }
       }
    }

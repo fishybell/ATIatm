@@ -720,7 +720,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                 nl_cmd = NL_C_ACCESSORY;
                 break;
             case 'R': case 'r':
-                nl_cmd = NL_C_COMMAND;
+                nl_cmd = NL_C_GOHOME;
                 break;
             case 'S': case 's':
                 nl_cmd = NL_C_EXPOSE;
@@ -1947,7 +1947,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Types of accessories: MFS, MGL, SES, PHI, MSD, SMK, THM\nRequest accessory paramaters\nFormat: Q accessory_type\nChange accessory parameters\nFormat: Q accessory_type (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
                         break;
                     case 'R': case 'r':
-                        snprintf(wbuf, 1024, "Scenario Commands: 0-Pause, 1-Abort, 2-Restart\n");
+                        snprintf(wbuf, 1024, "Go Home used for Scenario Commands: 0-Pause, 1-Abort, 2-Restart\n");
                         break;
                     case 'S': case 's':
                         snprintf(wbuf, 1024, "Request exposure data\nFormat: S\n");
@@ -2246,10 +2246,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // create event X
                     }
                     break;
-                case NL_C_COMMAND:
-                    if (sscanf(cmd+1, "%i", &arg1) == 1) {
-                        nla_put_u8(msg, GEN_INT8_A_MSG, arg1); // create event X
-                    }
+                case NL_C_GOHOME:
+                    nla_put_u8(msg, GEN_INT8_A_MSG, 1); // create event X
                     break;
             }
 

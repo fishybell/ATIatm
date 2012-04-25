@@ -334,6 +334,11 @@ FUNCTION_START("::handle_2100(int start, int end)")
          resetMIT = true;
          break;
 
+      case CID_Gohome:
+		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
+         doGoHome();
+         needPass = false; // don't pass this message to the attached SIT
+         break;
       case CID_Move_Request:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
 	     send_2101_ACK(hdr,'S');
@@ -353,19 +358,7 @@ FUNCTION_START("::handle_2100(int start, int end)")
          break;
       case CID_Continuous_Move_Request:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
-	     send_2101_ACK(hdr,'S');
-         
-         switch (msg->move) {
-            case 0:
-               doContinuousMove(0, 0);
-               break;
-            case 1:
-               doContinuousMove(ntohf(msg->speed), 1);
-               break;
-            case 2:
-               doContinuousMove(ntohf(msg->speed), -1);
-               break;
-         }
+         doContinuousMove(ntohf(msg->speed), 1);
          needPass = false; // don't pass this message to the attached SIT
          break;
    }
@@ -499,6 +492,8 @@ FUNCTION_START("::didBattery(int val)")
       didFailure(ERR_critical_battery);
    } else if (val <= MIN_BATTERY_VAL) {
       didFailure(ERR_low_battery);
+   } else {
+      didFailure(ERR_normal_battery);
    }
 
    // save the information for the next time
@@ -559,6 +554,17 @@ FUNCTION_START("::doMove()")
       nl_conn->doMove();
    }
 FUNCTION_END("::doMove()")
+}
+
+// start movement or change movement
+void MIT_Client::doGoHome() {
+FUNCTION_START("::doGoHome()")
+   DMSG("GoHome\n");
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doGoHome();
+   }
+FUNCTION_END("::doGoHome()")
 }
 
 // start movement or change movement
@@ -863,35 +869,22 @@ FUNCTION_START("::doMove()")
 FUNCTION_END("::doMove()")
 }
 
+// Command
+void MIT_Conn::doGoHome() {
+FUNCTION_START("::doGoHome()")
+   DCMSG(GREEN, "MIT_Conn doGoHome ");
+   
+   queueMsgU8(NL_C_GOHOME, 1);
+
+FUNCTION_END("::doGoHome()")
+}
+
 // start movement or change movement
 void MIT_Conn::doContinuousMove(float speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
 FUNCTION_START("::doContinuousMove(float speed, int direction)")
    DCMSG(GREEN, "MIT_Conn doContinuousMove - speed: %f", speed);
-   // force valid value for speed
-   if (speed < 0 || direction == 0) {
-      DCMSG(RED, "First if speed: %f", speed);
-      speed = 0;
-   }
-   if (speed > 32766) {
-      DCMSG(RED, "Second if speed: %f", speed);
-      speed = 0; // fault, so stop
-   }
-
-   // force valid value for direction
-   if (speed == 0) {
-      direction = 0;
-   }
-
-   //Multiply the speed by 10 to get rid of the decimal
-   
    // Queue command
-   if (direction < 0) {
-      queueMsgU16(NL_C_CONTINUOUS, 32768-(speed*10));  //speed * 10
-   } else if (direction > 0) {
-      queueMsgU16(NL_C_CONTINUOUS, 32768+(speed*10));  //speed * 10
-   } else {
-      queueMsgU16(NL_C_CONTINUOUS, 0);
-   }
+   queueMsgU16(NL_C_CONTINUOUS, 32768+(speed*10));  //speed * 10
 
 FUNCTION_END("::doContinuousMove(float speed, int direction)")
 }
