@@ -687,16 +687,8 @@ DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\
                   DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,msglen);
                }
 // handle bad read as proper disconnect below
-               if (msglen <= 0) {
+               if (LB->cmd==LBC_ILLEGAL || msglen <= 0){
                   DDCMSG(D_RF, RED, "MCP:  attempted read from minion returned %i (%i:%s)!\n", msglen, errno, strerror(errno));
-                  if (epoll_ctl(fds, EPOLL_CTL_DEL, minion_fd, NULL) < 0) { /* still remove from epoll as we're not properly handling this */
-                     DCMSG(RED, "Failure to remove %i from epoll: %s", minion_fd, strerror(errno));
-                     EXIT(-1);
-                  }
-                  // close connection
-                  close(minion_fd); // -- the bug is in my ability to handle the way epoll handles a socket that writes data and then immediately closes ... see minion_state.c for my fix
-                  minion->status=S_closed;
-               } else if (LB->cmd==LBC_ILLEGAL){
                   DDCMSG(D_RF,BLACK,"Dead minion %i:%i, closing down fd %i", minion->mID, minion->RF_addr, minion_fd);
                   // minion is dead, reset forget bit for it
                   addr_pool[minion->RF_addr].inuse=0;
@@ -711,7 +703,7 @@ DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\
                   }
                   // close connection
                   minion->status=S_closed;
-//                  close(minion_fd); -- appears to be a linux bug here that prevents from using close() to both a) close the fd and b) remove it from the epoll
+                  close(minion_fd);
                } else {
                   // just display the packet for debugging
                   LB=(LB_packet_t *)buf;
