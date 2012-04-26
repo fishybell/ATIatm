@@ -770,7 +770,6 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     atomic_set(&enable_on, hit_c->enable_on);
                     atomic_set(&enable_doing, 2); // a calibration, not an action is changing the sensor
                     schedule_work(&hit_enable_work); // fix the hit sensor enabling soon
-                    atomic_set(&kill_counter, hit_c->hits_to_kill); // reset kill counter
                     break;
                 case HIT_OVERWRITE_CAL:   /* overwrites calibration values (sensitivity, seperation) */
                     set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
@@ -785,7 +784,6 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     atomic_set(&after_kill, hit_c->after_kill);
                     atomic_set(&hit_type, hit_c->type);
                     set_hit_invert(hit_c->invert);
-                    atomic_set(&kill_counter, hit_c->hits_to_kill); // reset kill counter
                     break;
                 case HIT_OVERWRITE_TYPE: /* overwrites type value only */
                     atomic_set(&hit_type, hit_c->type);
@@ -795,7 +793,6 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     htk = atomic_read(&hits_to_kill);
                     atomic_set(&hits_to_kill, hit_c->hits_to_kill);
                     atomic_set(&after_kill, hit_c->after_kill);
-                    atomic_set(&kill_counter, hit_c->hits_to_kill); // reset kill counter
                     break;
             }
             /* if we changed hits to kill see if we need to do kill */
