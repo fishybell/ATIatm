@@ -43,6 +43,7 @@ void EnQueue(queue_t *M, void *ptr,int count); // queue in back
 void QueuePush(queue_t *M, void *ptr,int count); // "queue" in front
 
 int QueuePtype(queue_t *M);
+int Ptype(char *buf);
 
 #define Queue_Depth(M) ((int)((M)->tail - (M)->head))
 
