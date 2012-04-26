@@ -23,7 +23,7 @@
 //---------------------------------------------------------------------------
 #define TARGET_NAME     "lifter"
 
-#define DEBUG_SEND
+//#define DEBUG_SEND
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -153,6 +153,7 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
                     // was down, go up
                     lifter_position_set(LIFTER_POSITION_UP); // expose now
                     atomic_set(&toggle_last, EXPOSE); // remember toggle direction
+		              atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
                 } else { // moving or error
                     // otherwise go opposite of last direction
                     if (atomic_read(&toggle_last) == EXPOSE) {
@@ -173,6 +174,7 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
                 // do expose
                 if (lifter_position_get() != LIFTER_POSITION_UP) {
                     lifter_position_set(LIFTER_POSITION_UP); // expose now
+		              atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
                     rc = -1; // we'll be going later
                 } else {
                     rc = EXPOSE; // we're already there
