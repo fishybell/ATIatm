@@ -899,7 +899,7 @@ void finishTransition(thread_data_t *minion) {
    if (minion->S.exp.data == 45 && minion->S.exp.newdata == 90) {
       // transitioned from conceal to expose
       //START_EXPOSE_TIMER(minion->S); -- don't do this, it has already started
-   } else if (minion->S.exp.data == 90 && minion->S.exp.newdata == 45) {
+   } else if (minion->S.exp.data == 45 && minion->S.exp.newdata == 0) {
       // transitioned from expose to conceal
       START_CONCEAL_TIMER(minion->S);
    } else if (minion->S.exp.data == 0) {
