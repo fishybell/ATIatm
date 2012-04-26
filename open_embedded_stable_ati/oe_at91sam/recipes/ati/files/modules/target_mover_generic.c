@@ -869,6 +869,133 @@ static int hardware_movement_stop(int stop_timer)
     return 0;
     }
 
+static int mover_speed_stop() {
+    do_event(EVENT_STOP); // started stopping
+    atomic_set(&goal_atomic, 0); // reset goal speed
+    hardware_movement_stop(FALSE);
+    enable_battery_check(1);
+    return 1;
+}
+
+static int mover_speed_reverse(int speed) {
+   mover_speed_stop();
+   atomic_set(&reverse_speed, speed);
+   return 1;
+}
+
+//---------------------------------------------------------------------------
+// set moving forward or reverse
+//---------------------------------------------------------------------------
+static int hardware_movement_set(int movement)
+    {
+    if ((movement == MOVER_DIRECTION_REVERSE) || (movement == MOVER_DIRECTION_FORWARD))
+        {
+
+        // signal that an operation is in progress
+#ifndef DEBUG_PID
+//send_nl_message_multi("\n---------Changing moving_atomic to 1\n", error_mfh, NL_C_FAILURE);
+#endif
+        atomic_set(&moving_atomic, 1);
+
+        hardware_motor_on(movement);
+
+        // notify user-space
+        schedule_work(&movement_work);
+
+        timeout_timer_start(MOVER_DELAY_MULT[mover_type]); // initial timeout timer twice as long as normal
+
+        return TRUE;
+        }
+    else
+        {
+        return FALSE;
+        }
+    }
+
+static int mover_speed_set(int speed) {
+   int tmpSpeed = 0, selectSpeed = 0;
+   int o_speed = current_speed10();
+
+   if (speed != 0){
+      if (mover_type == IS_MIT){
+         selectSpeed = abs(speed);
+         if (selectSpeed <= 10) tmpSpeed = 7;
+         else if (selectSpeed <= 20) tmpSpeed = 16;
+         else if (selectSpeed <= 30) tmpSpeed = 28;
+         else tmpSpeed = 41;
+//         if (selectSpeed > MOVER_SPEED_SELECTIONS) selectSpeed = MOVER_SPEED_SELECTIONS;
+//         tmpSpeed = MIT_SPEEDS[selectSpeed];
+         if (speed < 0) tmpSpeed *= -1;
+         speed = tmpSpeed;
+      }
+      if (speed > 10) {
+         atomic_set(&find_dock_atomic, 0); // if moving fast do not ignore sensors
+      }
+   }
+
+   last_pid_speed = 0;
+   memset(pid_errors, 0, sizeof(int)*MAX_PID_ERRORS);
+   
+   // special function for reversing
+   atomic_set(&reverse_speed, 0);
+   if ((o_speed > 0 && speed < 0) || (o_speed < 0 && speed > 0)) {
+      // can't use a scenario, because a scenario may cause a reverse
+      timeout_timer_stop();
+      mover_speed_stop();
+      mover_speed_reverse(speed);
+      timeout_timer_start(2);
+      return 1;
+   }
+
+   // can we go the requested speed?
+   if (abs(speed) > NUMBER_OF_SPEEDS[mover_type]) {
+      do_fault(ERR_invalid_speed_req); // The fasit spec has this message
+      return 0; // nope
+   }
+   else if (speed == 0) {
+      do_fault(ERR_speed_zero_req); // The fasit spec has this message
+      // do not return, we will just coast
+   }
+   else if (abs(speed) < MIN_SPEED[mover_type]) {
+      do_fault(ERR_invalid_speed_req); // The fasit spec has this message
+      // do not return, there is logic in the 
+      // hardware_speed_set function to handle this.
+   }
+
+   // first select desired movement movement
+   if (speed < 0) {
+      // if we are home, do not allow reverse
+      if (atomic_read(&last_sensor) == MOVER_SENSOR_HOME) {
+         if (atomic_read(&find_dock_atomic) == 0){
+         do_fault(ERR_invalid_direction_req);
+         return 0;
+         }
+      }
+      hardware_movement_set(MOVER_DIRECTION_REVERSE);
+   } else if (speed > 0) {
+      // if we are at the end, do not allow forward
+      if (atomic_read(&last_sensor) == MOVER_SENSOR_END) {
+         if (atomic_read(&find_dock_atomic) == 0){
+         do_fault(ERR_invalid_direction_req);
+         return 0;
+         }
+      }
+      hardware_movement_set(MOVER_DIRECTION_FORWARD);
+   } else { 
+      // setting 0 will cause the mover to "coast" if it isn't already stopped
+#ifndef DEBUG_PID
+//          send_nl_message_multi("Started coasting...", error_mfh, NL_C_FAILURE);
+#endif
+   }
+
+// Since we are moving the last_sensor needs to be unknown
+   atomic_set(&last_sensor, MOVER_SENSOR_UNKNOWN);
+
+   hardware_speed_set(abs(speed));
+
+   return 1;
+}
+ 
 static void dock_timeout_start(int ms)
 	{
    if (ms <= 0) ms = DOCK_TIMEOUT_IN_MILLISECONDS;
@@ -1702,35 +1829,6 @@ static int hardware_exit(void)
     }
 
 //---------------------------------------------------------------------------
-// set moving forward or reverse
-//---------------------------------------------------------------------------
-static int hardware_movement_set(int movement)
-    {
-    if ((movement == MOVER_DIRECTION_REVERSE) || (movement == MOVER_DIRECTION_FORWARD))
-        {
-
-        // signal that an operation is in progress
-#ifndef DEBUG_PID
-//send_nl_message_multi("\n---------Changing moving_atomic to 1\n", error_mfh, NL_C_FAILURE);
-#endif
-        atomic_set(&moving_atomic, 1);
-
-        hardware_motor_on(movement);
-
-        // notify user-space
-        schedule_work(&movement_work);
-
-        timeout_timer_start(MOVER_DELAY_MULT[mover_type]); // initial timeout timer twice as long as normal
-
-        return TRUE;
-        }
-    else
-        {
-        return FALSE;
-        }
-    }
-
-//---------------------------------------------------------------------------
 // get current direction
 //---------------------------------------------------------------------------
 static int hardware_movement_get(void)
@@ -1924,11 +2022,6 @@ static int current_speed10() {
     return vel;
 }
 
-static int mover_speed_reverse(int speed) {
-   mover_speed_stop();
-   atomic_set(&reverse_speed, speed);
-   return 1;
-}
 static int calcPidError( int new, int input){
     int pidError = 0, diff = 0;
     pidError = new - input; // set point - input
@@ -1995,6 +2088,14 @@ int mover_speed_get(void) {
 }
 EXPORT_SYMBOL(mover_speed_get);
 
+int mover_continuous_speed_get(void) {
+   int speed;
+   DELAY_PRINTK("mover_speed_get\n");
+   speed = atomic_read(&continuous_speed);
+   return speed;
+}
+EXPORT_SYMBOL(mover_continuous_speed_get);
+
 int mover_set_continuous_move(int c) {
    int sensor, speed;
    DELAY_PRINTK("mover_set_continuous_move\n");
@@ -2040,92 +2141,6 @@ int mover_set_move_speed(int speed) {
 }
 EXPORT_SYMBOL(mover_set_move_speed);
 
-int mover_speed_set(int speed) {
-   int tmpSpeed = 0, selectSpeed = 0;
-   int o_speed = current_speed10();
-
-// Always unset continuous move
-   if (speed != 0){
-      if (mover_type == IS_MIT){
-         selectSpeed = abs(speed);
-         if (selectSpeed <= 10) tmpSpeed = 7;
-         else if (selectSpeed <= 20) tmpSpeed = 16;
-         else if (selectSpeed <= 30) tmpSpeed = 28;
-         else tmpSpeed = 41;
-//         if (selectSpeed > MOVER_SPEED_SELECTIONS) selectSpeed = MOVER_SPEED_SELECTIONS;
-//         tmpSpeed = MIT_SPEEDS[selectSpeed];
-         if (speed < 0) tmpSpeed *= -1;
-         speed = tmpSpeed;
-      }
-      if (speed > 10) {
-         atomic_set(&find_dock_atomic, 0); // if moving fast do not ignore sensors
-      }
-   }
-
-   last_pid_speed = 0;
-   memset(pid_errors, 0, sizeof(int)*MAX_PID_ERRORS);
-   
-   // special function for reversing
-   atomic_set(&reverse_speed, 0);
-   if ((o_speed > 0 && speed < 0) || (o_speed < 0 && speed > 0)) {
-      // can't use a scenario, because a scenario may cause a reverse
-      timeout_timer_stop();
-      mover_speed_stop();
-      mover_speed_reverse(speed);
-      timeout_timer_start(2);
-      return 1;
-   }
-
-   // can we go the requested speed?
-   if (abs(speed) > NUMBER_OF_SPEEDS[mover_type]) {
-      do_fault(ERR_invalid_speed_req); // The fasit spec has this message
-      return 0; // nope
-   }
-   else if (speed == 0) {
-      do_fault(ERR_speed_zero_req); // The fasit spec has this message
-      // do not return, we will just coast
-   }
-   else if (abs(speed) < MIN_SPEED[mover_type]) {
-      do_fault(ERR_invalid_speed_req); // The fasit spec has this message
-      // do not return, there is logic in the 
-      // hardware_speed_set function to handle this.
-   }
-
-   // first select desired movement movement
-   if (speed < 0) {
-      // if we are home, do not allow reverse
-      if (atomic_read(&last_sensor) == MOVER_SENSOR_HOME) {
-         if (atomic_read(&find_dock_atomic) == 0){
-         do_fault(ERR_invalid_direction_req);
-         return 0;
-         }
-      }
-      hardware_movement_set(MOVER_DIRECTION_REVERSE);
-   } else if (speed > 0) {
-      // if we are at the end, do not allow forward
-      if (atomic_read(&last_sensor) == MOVER_SENSOR_END) {
-         if (atomic_read(&find_dock_atomic) == 0){
-         do_fault(ERR_invalid_direction_req);
-         return 0;
-         }
-      }
-      hardware_movement_set(MOVER_DIRECTION_FORWARD);
-   } else { 
-      // setting 0 will cause the mover to "coast" if it isn't already stopped
-#ifndef DEBUG_PID
-//          send_nl_message_multi("Started coasting...", error_mfh, NL_C_FAILURE);
-#endif
-   }
-
-// Since we are moving the last_sensor needs to be unknown
-   atomic_set(&last_sensor, MOVER_SENSOR_UNKNOWN);
-
-   hardware_speed_set(abs(speed));
-
-   return 1;
-}
-EXPORT_SYMBOL(mover_speed_set);
- 
 void set_lifter_position(int val)
 {
     atomic_set(&lifter_position, val);
@@ -2138,14 +2153,12 @@ void set_lifter_fault(int val)
 }
 EXPORT_SYMBOL(set_lifter_fault);
 
-int mover_speed_stop() {
-    do_event(EVENT_STOP); // started stopping
-    atomic_set(&goal_atomic, 0); // reset goal speed
-    hardware_movement_stop(FALSE);
-    enable_battery_check(1);
+int mover_set_speed_stop() {
+    atomic_set(&continuous_speed, 0);
+    mover_speed_stop();
     return 1;
 }
-EXPORT_SYMBOL(mover_speed_stop);
+EXPORT_SYMBOL(mover_set_speed_stop);
 
 extern int mover_position_get() {
     int pos = atomic_read(&position);

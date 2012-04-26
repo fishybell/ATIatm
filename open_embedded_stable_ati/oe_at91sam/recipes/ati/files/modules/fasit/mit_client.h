@@ -34,6 +34,7 @@ public :
    void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
    void doGoHome(); // go home
+   void doHitCal(struct hit_calibration hit_c);  // so we know the kill reaction
    void doContinuousMove(float speed, int direction); // start movement or change movement
    void doContinuousMove(); // retrieve movement values
    void didMove(float speed, int direction); // current direction value
@@ -94,6 +95,8 @@ private:
    int lastDirection;
    FASIT_2111 lastSITdevcaps;
    FASIT_2102 lastSITstatus;
+   // hit calibration table (ours to theirs and back)
+   static const u32 cal_table[16];
 };
 
 // class for FASIT client
@@ -150,6 +153,7 @@ public:
    void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
    void doGoHome(); // go home
+   void doHitCal(struct hit_calibration hit_c);  // so we know the kill reaction
    void doContinuousMove(float speed, int direction); // start movement or change movement
    void doContinuousMove(); // retrieve movement values
    void doBattery(); // retrieve battery value

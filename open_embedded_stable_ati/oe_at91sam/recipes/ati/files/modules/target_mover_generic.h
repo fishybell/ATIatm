@@ -6,8 +6,8 @@
 // get current speed (positive/negative for direction)
 extern int mover_speed_get(void); // in whole mph
 
-// set current speed (positive/negative for direction)
-extern int mover_speed_set(int speed); // in whole mph
+// get continuous speed
+extern int mover_continuous_speed_get(void);
 
 // set current speed (positive/negative for direction)
 extern int mover_set_move_speed(int speed); // in whole mph
@@ -16,7 +16,7 @@ extern int mover_set_move_speed(int speed); // in whole mph
 extern int mover_set_continuous_move(int speed); // in whole mph
 
 // immediate stop (set to 0 will coast to a stop)
-extern int mover_speed_stop(void);
+extern int mover_set_speed_stop(void);
 
 // go to where the home position has been set
 extern void mover_go_home(void);

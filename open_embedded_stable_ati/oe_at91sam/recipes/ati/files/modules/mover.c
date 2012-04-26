@@ -46,6 +46,8 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 //---------------------------------------------------------------------------
 atomic_t driver_id = ATOMIC_INIT(-1);
 
+atomic_t mover_reaction = ATOMIC_INIT(0);
+
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space of a position
 // change or error detected by the IRQs or the timeout timer.
@@ -153,7 +155,7 @@ static void move_event_internal(int etype, bool upload) {
     // event causes change in motion?
     if (etype == EVENT_KILL) {
         // TODO -- programmable coast vs. stop vs. ignore
-        mover_speed_stop();
+        mover_set_speed_stop();
         // mover_speed_set(0);
     }
 
@@ -228,7 +230,7 @@ delay_printk("Mover: handling stop command\n");
 delay_printk("Mover: received value: %i\n", value);
 
         // stop mover
-        mover_speed_stop();
+        mover_set_speed_stop();
 // report as emergency stop
         move_faults(ERR_emergency_stop);
 
@@ -278,7 +280,7 @@ delay_printk("Mover: handling move command\n");
         // do something to the mover
         if (value == VELOCITY_STOP) {
             // stop
-            mover_speed_stop(); // -- this is emergency stop
+            mover_set_speed_stop(); // -- this is emergency stop
 // report as requested stop
             move_faults(ERR_stop);
             // mover_speed_set(0); -- this is "coast" stop
@@ -406,11 +408,49 @@ delay_printk("Mover: returning rc: %i\n", rc);
 }
 
 //---------------------------------------------------------------------------
+// netlink command handler for accessory commands
+//---------------------------------------------------------------------------
+int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    struct hit_calibration *hit_c;
+    int rc = HANDLE_SUCCESS_NO_REPLY; // by default this is a command with no response
+    delay_printk("Lifter: handling hit-calibration command\n");
+
+    // get attribute from message
+    na = info->attrs[HIT_A_MSG]; // accessory message
+    if (na) {
+        // grab value from attribute
+        hit_c = (struct hit_calibration*)nla_data(na);
+        if (hit_c != NULL) {
+            switch (hit_c->set) {
+                case HIT_GET_CAL:        /* overwrites nothing (gets calibration values) */
+                case HIT_GET_TYPE:       /* overwrites nothing (gets type value) */
+                case HIT_GET_KILL:       /* overwrites nothing (gets hi ts_to_kill value) */
+                case HIT_OVERWRITE_NONE: /* overwrite nothing (gets reply with current values) */
+                case HIT_OVERWRITE_CAL:   /* overwrites calibration values (sensitivity, seperation) */
+                case HIT_OVERWRITE_TYPE: /* overwrites type value only */
+                     // Movers do not provide this, so ignore these types
+                     // As of now 4/25/12 movers only care about kill reaction (after_kill)
+                    break;
+                case HIT_OVERWRITE_ALL:   /* overwrites every value */
+                case HIT_OVERWRITE_OTHER: /* overwrites non-calibration values (type, etc.) */
+                case HIT_OVERWRITE_KILL:  /* overwrites hits_to_kill value only */
+                    atomic_set(&mover_reaction, hit_c->after_kill);
+                    break;
+            }
+        }
+    }
+
+    // return status
+    return rc;
+}
+
+//---------------------------------------------------------------------------
 // netlink command handler for event commands
 //---------------------------------------------------------------------------
 int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
-    int rc, value = 0;
+    int rc, value = 0, reaction;
     u8 data = BATTERY_SHUTDOWN; // in case we need to shutdown
 delay_printk("Mover: handling event command\n");
 
@@ -431,7 +471,21 @@ delay_printk("Mover: handling event command\n");
                set_lifter_position(LIFTER_POSITION_UP);
                break;
             case EVENT_KILL:
-               mover_go_home();
+               set_lifter_position(LIFTER_POSITION_DOWN);
+               reaction = atomic_read(&mover_reaction);
+// 0-fall, 1-kill, 2-stop, 3-fall and stop, 4-bob - see definitions for lifter kills
+               if (reaction == 2 || reaction == 3){
+                  if (mover_continuous_speed_get() > 0){
+                     mover_set_continuous_move(0);
+                  } else {
+                     mover_set_speed_stop();
+                  }
+               } else { // 0, 1, 4 and any undefined reactions
+                  if (mover_continuous_speed_get() > 0){
+                     mover_set_continuous_move(0);
+                     mover_go_home();
+                  }
+               }
                break;
             default:
                 move_event_internal(value, false); // don't repropogate
@@ -539,6 +593,7 @@ static int __init Mover_init(void) {
         {NL_C_FAULT,     nl_fault_handler},
         {NL_C_CONTINUOUS, nl_continuous_handler},
         {NL_C_GOHOME, nl_gohome_handler},
+        {NL_C_HIT_CAL,   nl_hit_cal_handler},
         {NL_C_SLEEP,     nl_sleep_handler},
     };
     struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
@@ -555,6 +610,7 @@ delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
 
     // signal that we are fully initialized
     atomic_set(&full_init, TRUE);
+            mod_timer(&moved_timer, jiffies+(((MOVED_DELAY/2)*HZ)/1000)); // wait for X milliseconds for sensor to settle
     return retval;
     }
 

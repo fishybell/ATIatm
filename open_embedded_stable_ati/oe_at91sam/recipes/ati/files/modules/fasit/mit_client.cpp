@@ -15,6 +15,9 @@ using namespace std;
 
 #define DEBUG 1
 
+// setup calibration table
+const u32 MIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,1};
+
 /***********************************************************
 *                     MIT_Client Class                     *
 ***********************************************************/
@@ -293,6 +296,7 @@ FUNCTION_INT("::handle_100(int start, int end)", 0)
 }
 
 int MIT_Client::handle_2100(int start, int end) {
+   struct hit_calibration lastHitCal;
    int pid;
    int resetMIT = false;
 FUNCTION_START("::handle_2100(int start, int end)")
@@ -323,6 +327,29 @@ FUNCTION_START("::handle_2100(int start, int end)")
 		 break;
 	  case CID_Wake:
 	     doWake();
+		 break;
+	  case CID_Config_Hit_Sensor:
+         switch (msg->on) {
+             case 0: lastHitCal.enable_on = BLANK_ALWAYS; break; // hit sensor Off
+             case 1: lastHitCal.enable_on = ENABLE_ALWAYS; break; // hit sensor On
+             case 2: lastHitCal.enable_on = ENABLE_AT_POSITION; break; // hit sensor On at Position
+             case 3: lastHitCal.enable_on = DISABLE_AT_POSITION; break; // hit sensor Off at Position
+             case 4: lastHitCal.enable_on = BLANK_ON_CONCEALED; break; // hit sensor On when exposed
+         }
+         if (htons(msg->burst)) lastHitCal.seperation = htons(msg->burst);      // spec says we only set if non-Zero
+         if (htons(msg->sens)) {
+             if (htons(msg->sens) > 15) {
+                 lastHitCal.sensitivity = cal_table[15];
+             } else {
+                 lastHitCal.sensitivity = cal_table[htons(msg->sens)];
+             }
+         }
+
+         if (htons(msg->tokill))  lastHitCal.hits_to_kill = htons(msg->tokill); 
+         lastHitCal.after_kill = msg->react;    // 0 for stay down
+         lastHitCal.type = msg->mode;           // mechanical sensor
+         lastHitCal.set = HIT_OVERWRITE_ALL;    // nothing will change without this
+	     doHitCal(lastHitCal);
 		 break;
      case CID_Reset_Device:
          // send 2101 ack
@@ -462,6 +489,15 @@ FUNCTION_START("::doWake()")
       nl_conn->doWake();
    }
 FUNCTION_END("::doWake()")
+}
+
+void MIT_Client::doHitCal(struct hit_calibration hit_c) {
+    FUNCTION_START("::doHitCal(struct hit_calibration hit_c)");
+    // pass directly to kernel for actual action
+    if (hasPair()) {
+        nl_conn->doHitCal(hit_c);
+    }
+    FUNCTION_END("::doHitCal(struct hit_calibration hit_c)");
 }
 
 // retrieve battery value
@@ -946,6 +982,16 @@ FUNCTION_START("::doWake()")
    queueMsgU8(NL_C_SLEEP, WAKE_COMMAND); // wake command
 
 FUNCTION_END("::doWake()")
+}
+
+// change hit calibration data
+void MIT_Conn::doHitCal(struct hit_calibration hit_c) {
+    FUNCTION_START("::doHitCal(struct hit_calibration hit_c)");
+
+    // Queue command
+    queueMsg(NL_C_HIT_CAL, HIT_A_MSG, sizeof(struct hit_calibration), &hit_c); // pass structure without changing
+
+    FUNCTION_END("::doHitCal(struct hit_calibration hit_c)");
 }
 
 // retrieve battery value
