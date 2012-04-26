@@ -477,23 +477,24 @@ typedef enum rf_target_type {
 }
 
 // common timer values
-#define FAST_SOON_TIME        3   /* 3/10 second */
+#define FAST_SOON_TIME        7   /* 7/10 second */
 #define FAST_TIME             30  /* 3 seconds */
-#define SLOW_SOON_TIME        3   /* 3/10 second */
-#define SLOW_TIME             200 /* 20 seconds */
-#define SLOW_RESPONSE_TIME    30  /* 3 seconds */
-#define EVENT_RESPONSE_TIME   30  /* 3 seconds */
-#define TRANSITION_START_TIME 1   /* 1/10 second */
+#define SLOW_SOON_TIME        7   /* 7/10 second */
+#define SLOW_TIME             250 /* 25 seconds */
+#define SLOW_RESPONSE_TIME    90  /* 9 seconds */
+#define EVENT_RESPONSE_TIME   90  /* 9 seconds */
+#define TRANSITION_START_TIME 5   /* 1/2 second */
 #define TRANSITION_TIME       5   /* 1/2 second */
 
 // other state constants
-#define FAST_TIME_MAX_MISS 3 /* maximum value of the "missed message" counter */
-#define SLOW_TIME_MAX_MISS 2 /* maximum value of the "missed message" counter */
-#define EVENT_MAX_MISS 2 /* maximum value of the "missed message" counter */
+#define FAST_TIME_MAX_MISS 30 /* maximum value of the "missed message" counter */
+#define SLOW_TIME_MAX_MISS 20 /* maximum value of the "missed message" counter */
+#define EVENT_MAX_MISS 20 /* maximum value of the "missed message" counter */
 
 // common complex timer starts
 #define START_EXPOSE_TIMER(S) { \
    /* start fast, stop slow */ \
+   S.rf_t.fast_missed = 0; \
    setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
    stopTimer(S.rf_t, slow_timer, slow_flags); \
    /* start transition */ \
@@ -502,10 +503,12 @@ typedef enum rf_target_type {
 #define START_CONCEAL_TIMER(S) { \
    /* stop fast, start slow soon */ \
    stopTimer(S.rf_t, fast_timer, fast_flags); \
+   S.rf_t.slow_missed = 0; \
    setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
    /* start transition */ \
    setTimerTo(S.exp, con_timer, con_flags, TRANSITION_START_TIME, F_con_start_transition); \
    /* start event timer */ \
+   S.event.missed = 0; \
    setTimerTo(S.event, timer, flags, EVENT_RESPONSE_TIME, F_event_start); \
 }
 #define START_MOVE_TIMER(S) { \
