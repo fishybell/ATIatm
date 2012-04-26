@@ -99,6 +99,7 @@ void setnonblocking(int fd) {
 void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    struct timespec elapsed_time, start_time, istart_time,delta_time;
    queue_t *Rx,*Tx;
+   int Queue_Contains[2048]; // used to see what commands the outbound queue contains. max of rf addr 2047, 0 is not used
    int seq=1;           // the packet sequence numbers
 
    char Rbuf[RF_BUF_SIZE];
@@ -130,6 +131,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    Tx=queue_init(Txsize);       // outgoing Tx buffer
 
    memset(Rstart,0,100);
+   memset(Queue_Contains, 0, 2048);
 
    remaining_time=100;          //  remaining time before we can transmit (in ms)
 
@@ -179,10 +181,10 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
       bytecount=Queue_Depth(Rx);
       bytecount2=Queue_Depth(Tx);
       if (bytecount <= 0) {
-         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_time=%d, rtime=%d, timeout=INFINITE, ", bytecount, bytecount2, remaining_time, rtime);
+         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, timeout=INFINITE, ", bytecount, bytecount2, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec);
          sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, NULL);
       } else {
-         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_time=%d, rtime=%d, timeout=%d.%03d, ", bytecount, bytecount2, remaining_time, rtime, timeout.tv_sec, timeout.tv_usec);
+         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, timeout=%d.%03d, ", bytecount, bytecount2, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, timeout.tv_sec, timeout.tv_usec);
          sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
       }
    if (close_nicely) {break;}
@@ -294,15 +296,19 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
 
                } else {
                   LB=(LB_packet_t *)Rx->head;                   
-                  ReQueue(Tx,Rx,RF_size(LB->cmd));      // move it to the Tx queue
-                  packets++;
                   if (ptype==2) {
                      burst=2;
                      remaining_time +=slottime; // add time for a response to this one
                      DDCMSG(D_TIME,YELLOW,"incrementing remaining_time by slottime to %d  slottime=%d",
                             remaining_time,slottime);
 
+                     // no longer in Rx queue; un-mark
+                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: %i currently in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                     Queue_Contains[LB->addr] ^= (1<<LB->cmd);
+                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: %i no longer in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
                   }                         
+                  ReQueue(Tx,Rx,RF_size(LB->cmd));      // move it to the Tx queue
+                  packets++;
                }
             }  // end of while loop to build the Tx packet
 
@@ -620,7 +626,8 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          if (MsgSize){
 
             /***************    Sorting is needlessly complicated.
-             ***************       Just queue it up in our Rx queue .
+             ***************       Just queue it up in our Rx queue as long as it doesn't
+             ***************       exist already in the queue.
              ***************
              ***************       I suppose it should check for fullness
              ***************
@@ -628,12 +635,35 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
              ***************    
              ***************    */
 
-            Rx->tail+=MsgSize;  // add on the new length
+            // check against our existing messages in the queue
+            while (MsgSize > 0) {
+               LB=(LB_packet_t *)Rx->tail;   // map the header in
+               if (Ptype(Rx->tail)==2) {
+                  // only type 2 messages can be rejected from queue: they are the only 
+                  //   messages that cause wait time and have only one destination.
+                  //   they are also 100% redundant to have in multiple times.
+                  if (Queue_Contains[LB->addr] & (1<<LB->cmd)) {
+                     // already in queue, remove from Rx buffer
+                     if (RF_size(LB->cmd) < MsgSize) { /* only remove if we're not the end */
+                        char tbuf[RF_BUF_SIZE];
+                        memcpy(tbuf, Rx->tail + RF_size(LB->cmd), MsgSize - RF_size(LB->cmd));
+                        memcpy(Rx->tail, tbuf, MsgSize - RF_size(LB->cmd));
+                     }
+                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: Rejecting %i from queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                  } else {
+                     // not in queue already, add and mark
+                     Rx->tail+=RF_size(LB->cmd);
+                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: Going to allow %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                     Queue_Contains[LB->addr] |= (1<<LB->cmd);
+                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: Allowing %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                  }
+               } else {
+                  Rx->tail+=RF_size(LB->cmd);  // add on the new length
+               }
+               MsgSize-=RF_size(LB->cmd); // we've looked at this message, now look for more
+            }
             bytecount=Queue_Depth(Rx);
             DDCMSG(D_QUEUE,YELLOW,"Rx[%d]",bytecount);
-
-            // we don't need to parse or anything....
-
          }  // if msgsize was positive
 
       }  // end of MCP_sock
