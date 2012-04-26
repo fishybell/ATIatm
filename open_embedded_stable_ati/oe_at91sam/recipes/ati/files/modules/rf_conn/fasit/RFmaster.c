@@ -97,7 +97,7 @@ void setnonblocking(int fd) {
 #define RF_BUF_SIZE 512
 
 void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
-   struct timespec elapsed_time, start_time, istart_time,delta_time;
+   struct timespec elapsed_time, start_time, istart_time,delta_time, dwait_time;
    queue_t *Rx,*Tx;
    int Queue_Contains[2048]; // used to see what commands the outbound queue contains. max of rf addr 2047, 0 is not used
    int seq=1;           // the packet sequence numbers
@@ -138,12 +138,21 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    /**   loop until we lose connection  **/
    clock_gettime(CLOCK_MONOTONIC,&istart_time); // get the intial current time
    timestamp(&elapsed_time,&istart_time,&delta_time);   // make sure the delta_time gets set    
+   dwait_time.tv_sec=0; dwait_time.tv_nsec=0;   // make sure the dwait_time gets set
    while(!close_nicely) {
 
       timestamp(&elapsed_time,&istart_time,&delta_time);
-      DDCMSG(D_TIME,CYAN,"Top of loop    %5ld.%09ld timestamp, delta=%5ld.%09ld"
-             ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-      delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000000);
+      // now add my delta to my dwait 
+      dwait_time.tv_sec+=delta_time.tv_sec;	 // add seconds
+      dwait_time.tv_nsec+=delta_time.tv_nsec; // add nanoseconds
+      if (dwait_time.tv_nsec>=1000000000L) {  // fix nanoseconds
+         dwait_time.tv_sec++;
+         dwait_time.tv_nsec-=1000000000L;
+      }
+
+      DDCMSG(D_TIME,CYAN,"Top of loop    %5ld.%09ld timestamp, delta=%5ld.%09ld, dwait=%5ld.%09ld, "
+             ,elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec);
+      delta = (dwait_time.tv_sec*1000)+(dwait_time.tv_nsec/1000000);
       DDCMSG(D_TIME,CYAN,"delta=%2dms",delta);
 
       /*   do a select to see if we have a message from either the RF or the MCP  */
@@ -181,10 +190,10 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
       bytecount=Queue_Depth(Rx);
       bytecount2=Queue_Depth(Tx);
       if (bytecount <= 0) {
-         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, timeout=INFINITE, ", bytecount, bytecount2, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec);
+         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, dwait_t=%3ld.%09ld, timeout=INFINITE, ", bytecount, bytecount2, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec);
          sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, NULL);
       } else {
-         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, timeout=%d.%03d, ", bytecount, bytecount2, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, timeout.tv_sec, timeout.tv_usec);
+         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, dwait_t=%3ld.%09ld, timeout=%d.%03d, ", bytecount, bytecount2, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec, timeout.tv_sec, timeout.tv_usec);
          sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
       }
    if (close_nicely) {break;}
@@ -303,9 +312,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                             remaining_time,slottime);
 
                      // no longer in Rx queue; un-mark
-                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: %i currently in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                     DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: %i currently in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
                      Queue_Contains[LB->addr] ^= (1<<LB->cmd);
-                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: %i no longer in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                     DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: %i no longer in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
                   }                         
                   ReQueue(Tx,Rx,RF_size(LB->cmd));      // move it to the Tx queue
                   packets++;
@@ -364,13 +373,18 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
 
             }
             timestamp(&elapsed_time,&istart_time,&delta_time);
-            DDCMSG(D_MEGA,CYAN,"Just might have Tx'ed to RF   at %5ld.%09ld timestamp, delta=%5ld.%09ld"
-                   ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
+            // adjust dwait_time to the time to nothing, as we haven't waited anything yet
+            dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
+            DDCMSG(D_MEGA,CYAN,"Just might have Tx'ed to RF   at %5ld.%09ld timestamp, delta=%5ld.%09ld, dwait=%5ld.%09ld"
+                   ,elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec);
             /*****    this stuff below isn't really tested  *****/              
             rfcount+=MsgSize;
             cps=(double) rfcount/(double)elapsed_time.tv_sec;
             DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
 
+         } else {
+            DDCMSG(D_NEW,GRAY,"Timed out, but didn't do anything: elapsed_t=%5ld.%09ld delta_t=%5ld.%09ld, dwait_t=%5ld.%09ld"
+                   ,elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec);
          }
       }
 
@@ -649,13 +663,13 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                         memcpy(tbuf, Rx->tail + RF_size(LB->cmd), MsgSize - RF_size(LB->cmd));
                         memcpy(Rx->tail, tbuf, MsgSize - RF_size(LB->cmd));
                      }
-                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: Rejecting %i from queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                     DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Rejecting %i from queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
                   } else {
                      // not in queue already, add and mark
                      Rx->tail+=RF_size(LB->cmd);
-                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: Going to allow %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                     DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Going to allow %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
                      Queue_Contains[LB->addr] |= (1<<LB->cmd);
-                     DDCMSG(D_NEW,MAGENTA,"QUEUE_CONTAINS: Allowing %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                     DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Allowing %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
                   }
                } else {
                   Rx->tail+=RF_size(LB->cmd);  // add on the new length
