@@ -25,6 +25,8 @@ void print_help(int exval) {
    exit(exval);
 }
 
+#define RF_MASTER_DELAY 250 /* the amount of time to wait for the RFmaster to receive the data and send it */
+
 #define EXIT(_e) { \
    DCMSG(RED, "\n\nExiting MCP on line %i, current errno: %i", __LINE__, errno); \
    exit(_e); \
@@ -90,7 +92,9 @@ int main(int argc, char **argv) {
    int rereg=1;
    addr_t addr_pool[2048];      // 0 and 2047 cannot be used
    int max_addr;                //  count of our max_addr given out
-   int hunttime,slave_hunting,low,hunt_rotate=0;
+   int hunttime,slave_hunting,low,hunt_rotate=0, delta;
+   struct timespec elapsed_time, start_time, istart_time,delta_time, dwait_time;
+   int tempslot = 0; // keep track if of what we're adding to our timeout based on having the slavehunt not overlap normal commands:requests
 
    LB_packet_t *LB,LB_buf;
    LB_request_new_t *LB_new;
@@ -101,6 +105,8 @@ int main(int argc, char **argv) {
    //signal(SIGINT, quitproc);
    //signal(SIGQUIT, quitproc);
 
+   clock_gettime(CLOCK_MONOTONIC,&istart_time); // get the intial current time
+   timestamp(&elapsed_time,&istart_time,&delta_time);   // make sure the delta_time gets set    
 
    // process the arguments
    //  -f 192.168.10.203   RCC ip address
@@ -258,12 +264,34 @@ int main(int argc, char **argv) {
 
    // loop until we lose connection to the rfmaster.
    while(!close_nicely) {
+      // grab timestamp before epoll..
+      timestamp(&elapsed_time,&istart_time,&delta_time);
+      // now add my delta to my dwait 
+      dwait_time.tv_sec+=delta_time.tv_sec;	 // add seconds
+      dwait_time.tv_nsec+=delta_time.tv_nsec; // add nanoseconds
+      if (dwait_time.tv_nsec>=1000000000L) {  // fix nanoseconds
+         dwait_time.tv_sec++;
+         dwait_time.tv_nsec-=1000000000L;
+      }
+      delta = (dwait_time.tv_sec*1000)+(dwait_time.tv_nsec/1000000);
 
       // wait for data from either the RFmaster or from a minion
-      DDCMSG(D_POLL,RED,"MCP: epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
+      DDCMSG(D_NEW,RED,"MCP: epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld, delta=%i, timeout-delta=%i", timeout, slave_hunting, low, hunttime, dwait_time.tv_sec, dwait_time.tv_nsec, delta, timeout-delta);
 
-      ready_fd_count = epoll_wait(fds, events, MAX_NUM_Minions, timeout);
+      ready_fd_count = epoll_wait(fds, events, MAX_NUM_Minions, max(0,timeout-delta));
       DDCMSG(D_POLL,RED,"MCP: epoll_wait over   ready_fd_count = %d",ready_fd_count);
+
+      // ...and grab timestamp after epoll (without this second one the times don't stay properly set)
+      timestamp(&elapsed_time,&istart_time,&delta_time);
+      // now add my delta to my dwait 
+      dwait_time.tv_sec+=delta_time.tv_sec;	 // add seconds
+      dwait_time.tv_nsec+=delta_time.tv_nsec; // add nanoseconds
+      if (dwait_time.tv_nsec>=1000000000L) {  // fix nanoseconds
+         dwait_time.tv_sec++;
+         dwait_time.tv_nsec-=1000000000L;
+      }
+      delta = (dwait_time.tv_sec*1000)+(dwait_time.tv_nsec/1000000);
+      DDCMSG(D_NEW,YELLOW,"MCP: after epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld, delta=%i, timeout-delta=%i", timeout, slave_hunting, low, hunttime, dwait_time.tv_sec, dwait_time.tv_nsec, delta, timeout-delta);
       if (close_nicely) {break;}
 
 
@@ -286,15 +314,20 @@ int main(int argc, char **argv) {
             hunt_rotate = 1;
          } 
 
+         // reset our pseudo-burst slot value
+         tempslot = 0;
+
          // if we've rotated through the hunt, use the hunttime, otherwise use slottime
          if (hunt_rotate) {
             timeout=hunttime*1000;      // idle time to wait for next go around
          } else {
             timeout=slottime*10;        // idle time to wait for next go around
          }
-         timeout+=(inittime + 50); // add initial time and just a little bit more so the RFmaster can keep up
+         timeout+=(inittime + RF_MASTER_DELAY); // add initial time and just a little bit more so the RFmaster can keep up (RFmaster will collect messages for 200ms minimum)
+         // adjust dwait_time to the time to nothing, as we haven't waited anything yet
+         dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
 
-         DDCMSG(D_NEW,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d",timeout,slave_hunting,low,hunttime);
+         DDCMSG(D_NEW,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld",timeout,slave_hunting,low,hunttime, dwait_time.tv_sec, dwait_time.tv_nsec);
          /***  we need to use the range we were invoked with
           ***  we need to handle a range greater than 32
           ***  the forget_addr needs to be set by looking at the addr_pool
@@ -373,6 +406,8 @@ int main(int argc, char **argv) {
                //  mcp also has to pass new_address LB packets on to the minion so it can figure out it's own RF_address
                //  mcp passes all other LB packets on to the minions they are destined for
 
+               // reset our pseudo-burst slot value
+               tempslot = 0;
 
                if  (LB->cmd==LBC_DEVICE_REG){
                   LB_devreg =(LB_device_reg_t *)(LB);   // change our pointer to the correct packet type
@@ -705,7 +740,7 @@ DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\
                   minion->status=S_closed;
                   close(minion_fd);
                } else {
-                  // just display the packet for debugging
+                  // move packet to RFmaster and display the packet for debugging
                   LB=(LB_packet_t *)buf;
                   // do the copy down here
 //                  DDCMSG(D_POINTER, GRAY, "Writing buf %p len %i", LB, msglen);
@@ -720,6 +755,15 @@ DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\
                              ,minion->mID,LB->addr,LB->cmd,msglen,result);
                      DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,result);
                   }
+                  if (tempslot == 0) {
+                     // first in pseudo-burst to RFmaster, include inittime
+                     tempslot = inittime + slottime + RF_MASTER_DELAY;
+                  } else {
+                     // not the first, just use slottime
+                     tempslot = slottime;
+                  }
+                  timeout+=tempslot; // we now need to wait for this packet to respond
+                  DDCMSG(D_NEW,MAGENTA, "Minion %i caused increas of timeout by %i to %i",minion->mID, tempslot, timeout);
                }
 
             } // it is from a minion

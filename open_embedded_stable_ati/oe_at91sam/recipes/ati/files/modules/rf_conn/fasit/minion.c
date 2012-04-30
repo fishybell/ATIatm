@@ -340,6 +340,7 @@ void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expos
    LB_exp->event=++minion->S.exp.event;  // fill in the event/move to next event
    minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec; // remember "up" time for event
    minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
+   minion->S.exp.data=45;  // make the current positon in movement
    START_EXPOSE_TIMER(minion->S); // new state timer code
 
    //  really need to fill in with the right stuff
@@ -603,6 +604,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                   // we also need a report for this event from the target, so we will have to send a request_rep packet soon.
                   // just go ahead and send the report request now, too
                   //                  build an LB packet  report_req packet
+#if 0 /* start of old state timer code */
                   {
                      LB_report_req_t *L=(LB_report_req_t *) rbuf;
 
@@ -614,14 +616,19 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                      DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_report_req cmd=%d", minion->mID,L->cmd);
                      psend_mcp(minion,L);
 
-#if 0 /* start of old state timer code */
                      minion->S.event.flags = 0;
                      minion->S.event.timer = 0;
                         // TODO -- what do we do when we don't receive a report?
                         //minion->S.event.flags=F_waiting_for_report;
                         //minion->S.event.timer = 20;   // lets try 5.0 seconds
-#endif /* end of old state timer code */
                   }
+#endif /* end of old state timer code */
+
+                  // new state timer code
+                  minion->S.exp.data=45;  // make the current positon in movement
+                  minion->S.event.missed = 0;
+                  setTimerTo(minion->S.event, timer, flags, EVENT_RESPONSE_TIME, F_event_start);
+                  START_CONCEAL_TIMER(minion->S);
                }
 
                // send 2101 ack  (2102's will be generated at start and stop of actuator)
@@ -901,7 +908,7 @@ void finishTransition(thread_data_t *minion) {
       //START_EXPOSE_TIMER(minion->S); -- don't do this, it has already started
    } else if (minion->S.exp.data == 45 && minion->S.exp.newdata == 0) {
       // transitioned from expose to conceal
-      START_CONCEAL_TIMER(minion->S);
+      //START_CONCEAL_TIMER(minion->S);
    } else if (minion->S.exp.data == 0) {
       // continues to be concealed
    } else if (minion->S.exp.data == 90) {
@@ -1095,7 +1102,7 @@ void *minion_thread(thread_data_t *minion){
             // we received something over RF, so we haven't timed out: reset the rf timers -- TODO -- make this timeout smarter, or at the very least, user configurable
             if (minion->S.rf_t.slow_flags != F_slow_none) {
                // reset the slow timer, if we're doing the slow timer, as we just got a response
-               setTimerTo(minion->S.rf_t, slow_timer, slow_flags, F_slow_start, SLOW_TIME);
+               setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start);
                minion->S.rf_t.slow_missed = 0;
             }
             if (minion->S.rf_t.fast_flags != F_fast_none) {
@@ -1132,7 +1139,7 @@ void *minion_thread(thread_data_t *minion){
                   DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'Event_report'. hits=%d  sending 2102 status",
                          minion->mID,minion->RF_addr,L->hits);
 
-                  minion->S.exp.data = 0; // TODO -- take this out when we push and receive valid statuses
+                  minion->S.exp.data = minion->S.exp.newdata; // finish transition
                   sendStatus2102(0, NULL,minion);
 
                   // new state timer code

@@ -507,9 +507,6 @@ typedef enum rf_target_type {
    setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
    /* start transition */ \
    setTimerTo(S.exp, con_timer, con_flags, TRANSITION_START_TIME, F_con_start_transition); \
-   /* start event timer */ \
-   S.event.missed = 0; \
-   setTimerTo(S.event, timer, flags, EVENT_RESPONSE_TIME, F_event_start); \
 }
 #define START_MOVE_TIMER(S) { \
    /* start fast, stop slow */ \

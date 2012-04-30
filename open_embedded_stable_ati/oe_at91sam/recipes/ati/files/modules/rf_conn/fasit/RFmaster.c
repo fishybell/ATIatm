@@ -97,7 +97,7 @@ void setnonblocking(int fd) {
 #define RF_BUF_SIZE 512
 
 void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
-   struct timespec elapsed_time, start_time, istart_time,delta_time, dwait_time;
+   struct timespec elapsed_time, start_time, istart_time,delta_time, dwait_time, collect_time;
    queue_t *Rx,*Tx;
    int Queue_Contains[2048]; // used to see what commands the outbound queue contains. max of rf addr 2047, 0 is not used
    int seq=1;           // the packet sequence numbers
@@ -105,7 +105,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    char Rbuf[RF_BUF_SIZE];
    char buf[200];        /* text Buffer  */
    char  *Rptr,*Rstart;
-   int end, Rsize=0, size,gathered,gotrf,delta,remaining_time,bytecount,bytecount2;
+   int end, Rsize=0, size,gathered,gotrf,delta,cdelta,remaining_time,bytecount,bytecount2;
    int MsgSize,result,sock_ready,pcount=0;                    /* Size of received message */
    fd_set rf_or_mcp;
    struct timeval timeout;
@@ -150,10 +150,19 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          dwait_time.tv_nsec-=1000000000L;
       }
 
-      DDCMSG(D_TIME,CYAN,"Top of loop    %5ld.%09ld timestamp, delta=%5ld.%09ld, dwait=%5ld.%09ld, "
-             ,elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec);
+      // now add my delta to my collect time
+      collect_time.tv_sec+=delta_time.tv_sec;	 // add seconds
+      collect_time.tv_nsec+=delta_time.tv_nsec; // add nanoseconds
+      if (collect_time.tv_nsec>=1000000000L) {  // fix nanoseconds
+         collect_time.tv_sec++;
+         collect_time.tv_nsec-=1000000000L;
+      }
+
+      DDCMSG(D_TIME,CYAN,"Top of loop    %5ld.%09ld timestamp, delta=%5ld.%09ld, dwait=%5ld.%09ld, collect=%5ld.%09ld"
+             ,elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec, collect_time.tv_sec, collect_time.tv_nsec);
       delta = (dwait_time.tv_sec*1000)+(dwait_time.tv_nsec/1000000);
-      DDCMSG(D_TIME,CYAN,"delta=%2dms",delta);
+      cdelta = (collect_time.tv_sec*1000)+(collect_time.tv_nsec/1000000);
+      DDCMSG(D_TIME,CYAN,"delta=%2dms\tcdelta=%2dms", delta, cdelta);
 
       /*   do a select to see if we have a message from either the RF or the MCP  */
       /* then based on the source, send the message to the destination  */
@@ -180,11 +189,14 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
 
       // check that we're waiting at least rtime   configurable via command line with the option -r
       if (remaining_time < rtime) {
-         timeout.tv_sec=rtime/1000;
-         timeout.tv_usec=(rtime%1000)*1000;
+         timeout.tv_sec=max(200-cdelta, rtime)/1000; // minimimum of 200-cdelta
+         timeout.tv_usec=(max(200-cdelta, rtime)%1000)*1000; // minimimum of 200-cdelta
+      } else if (remaining_time > delta) {
+         timeout.tv_sec=max(200-cdelta, (remaining_time-delta))/1000; // minimimum of 200-cdelta
+         timeout.tv_usec=(max(200-cdelta, (remaining_time-delta))%1000)*1000; // minimimum of 200-cdelta
       } else {
-         timeout.tv_sec=remaining_time/1000;
-         timeout.tv_usec=(remaining_time%1000)*1000;
+         timeout.tv_sec=max(200-cdelta, remaining_time)/1000; // minimimum of 200-cdelta
+         timeout.tv_usec=(max(200-cdelta, remaining_time)%1000)*1000; // minimimum of 200-cdelta
       }
       // if we don't have anything in the queue, don't timeout
       bytecount=Queue_Depth(Rx);
@@ -194,6 +206,12 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, NULL);
       } else {
          DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, dwait_t=%3ld.%09ld, timeout=%d.%03d, ", bytecount, bytecount2, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec, timeout.tv_sec, timeout.tv_usec);
+         if ((remaining_time-delta) <= 0) {
+            // will cause an immediate return if we're ready to send another burst
+            DDCMSG(D_NEW,MAGENTA,"GOING TO RETURN IMMEDIATELY FROM SELECT (%i-%i <= 0)", remaining_time, delta);
+            timeout.tv_sec=0;
+            timeout.tv_usec=0;
+         }
          sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
       }
    if (close_nicely) {break;}
@@ -216,13 +234,15 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          timestamp(&elapsed_time,&istart_time,&delta_time);
          DDCMSG(D_TIME,CYAN,"select timed out at %5ld.%09ld timestamp, delta=%5ld.%09ld"
                 ,elapsed_time.tv_sec, elapsed_time.tv_nsec,delta_time.tv_sec, delta_time.tv_nsec);
-         delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000000);
+      delta = (dwait_time.tv_sec*1000)+(dwait_time.tv_nsec/1000000);
+      //   delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000000);
          DDCMSG(D_TIME,CYAN,"delta=%2dms",delta);
 
          DDCMSG(D_TIME,YELLOW,"select timed out  delta=%d remaining_time=%d  Rx[%d] Tx[%d]"
                 ,delta,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
 
-         if (delta>remaining_time-1) {
+         // broken -- if (delta>remaining_time-1)
+         if (1) {
 
 
             /***************     TIME to send on the radio
@@ -675,6 +695,11 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                   Rx->tail+=RF_size(LB->cmd);  // add on the new length
                }
                MsgSize-=RF_size(LB->cmd); // we've looked at this message, now look for more
+            }
+            // check to see if we're the first of many messages from the mcp
+            if (bytecount == 0 && Queue_Depth(Rx) > 0) {
+               // adjust collect_time to the time to nothing, as we haven't waited anything yet
+               collect_time.tv_sec=0; collect_time.tv_nsec=0;
             }
             bytecount=Queue_Depth(Rx);
             DDCMSG(D_QUEUE,YELLOW,"Rx[%d]",bytecount);
