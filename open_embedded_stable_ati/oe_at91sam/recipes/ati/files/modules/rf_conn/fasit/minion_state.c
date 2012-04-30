@@ -478,7 +478,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking expose timer flags: %i", minion->S.exp.exp_flags);
          switch (minion->S.exp.exp_flags) {
             case F_exp_start_transition: {
-               minion->S.exp.data=45;  // make the current positon in movement
                sendStatus2102(0,mb->header,minion); // forces sending of a 2102
                setTimerTo(minion->S.exp, exp_timer, exp_flags, TRANSITION_TIME, F_exp_end_transition);
             } break;
@@ -493,7 +492,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking conceal timer flags: %i", minion->S.exp.con_flags);
          switch (minion->S.exp.con_flags) {
             case F_con_start_transition: {
-               minion->S.exp.data=45;  // make the current positon in movement
                sendStatus2102(0,mb->header,minion); // forces sending of a 2102
                setTimerTo(minion->S.exp, con_timer, con_flags, TRANSITION_TIME, F_con_end_transition);
             } break;
