@@ -70,6 +70,10 @@ DDCMSG(D_RF,RED, "RF Packet for my devid: %x:%x", msg->devid, fc->devid);
       } else if (fc->target_type == RF_Type_Unknown) {
 DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %x", msg->devid);
          return 0;
+      } else if (msg->new_addr == fc->id) {
+DDCMSG(D_RF,RED, "RF Packet for someone else's devid: %x:%x, but for my addr %i", msg->devid, fc->devid, msg->new_addr);
+         fc->id = 2047;
+         return 0;
       } else {
 DDCMSG(D_RF,RED, "RF Packet for someone else's devid: %x:%x", msg->devid, fc->devid);
          return 0;
