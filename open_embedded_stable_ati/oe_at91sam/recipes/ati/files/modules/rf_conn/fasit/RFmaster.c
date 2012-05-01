@@ -2,7 +2,7 @@
 #include "mcp.h"
 #include "rf.h"
 
-int verbose,rtime;    // globals
+int verbose,rtime,collecting_time;    // globals
 
 // this makes the warning go away
 extern size_t strnlen (__const char *__string, size_t __maxlen)
@@ -16,6 +16,9 @@ __THROW __attribute_pure__ __nonnull ((1));
 
 // size of client buffer
 #define CLIENT_BUFFER 1024
+
+// size of mcp buffer
+#define MCP_BUF_SIZE 16384
 
 // kill switch to program
 static int close_nicely = 0;
@@ -69,6 +72,20 @@ void setnonblocking(int fd) {
    }
 }
 
+// add message to the write buffer
+static void queueMsg(char *msgbuf, int *buflen, void *msg, int size) {
+
+   // check buffer remaining...
+   if ((size + *buflen) > MCP_BUF_SIZE) {
+      // buffer not big enough
+      return;
+   }
+
+   // append to existing message
+   memcpy(msgbuf + (sizeof(char) * *buflen), msg, size);
+   *buflen += size;
+}
+
 /*************
  *************  HandleRF
  *************
@@ -116,6 +133,8 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    int low_dev,high_dev;
    int burst,ptype,packets;
    LB_burst_t LBb;
+   char mcpbuf[MCP_BUF_SIZE];
+   int mcpbuf_len=0;
 
 
    // packet header so we can determine the length from the command in the header
@@ -188,24 +207,27 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
              ,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
 
       // check that we're waiting at least rtime   configurable via command line with the option -r
-      if (remaining_time < rtime) {
-         timeout.tv_sec=max(200-cdelta, rtime)/1000; // minimimum of 200-cdelta
-         timeout.tv_usec=(max(200-cdelta, rtime)%1000)*1000; // minimimum of 200-cdelta
-      } else if (remaining_time > delta) {
-         timeout.tv_sec=max(200-cdelta, (remaining_time-delta))/1000; // minimimum of 200-cdelta
-         timeout.tv_usec=(max(200-cdelta, (remaining_time-delta))%1000)*1000; // minimimum of 200-cdelta
-      } else {
-         timeout.tv_sec=max(200-cdelta, remaining_time)/1000; // minimimum of 200-cdelta
-         timeout.tv_usec=(max(200-cdelta, remaining_time)%1000)*1000; // minimimum of 200-cdelta
+      if (remaining_time < rtime) { // look at rtime, minimum of collecting_time-cdelta
+         DDCMSG(D_TIME|D_NEW, MAGENTA, "TIMEOUT: Looking at %i vs rtime of %i", collecting_time-cdelta, rtime);
+         timeout.tv_sec=max(collecting_time-cdelta, rtime)/1000;
+         timeout.tv_usec=(max(collecting_time-cdelta, rtime)%1000)*1000;
+      } else if (remaining_time > delta) { // look at remaining_time-delta, minimum of collecting_time-cdelta
+         DDCMSG(D_TIME|D_NEW, MAGENTA, "TIMEOUT: Looking at %i vs remaining_time-delta of %i", collecting_time-cdelta, remaining_time-delta);
+         timeout.tv_sec=max(collecting_time-cdelta, (remaining_time-delta))/1000;
+         timeout.tv_usec=(max(collecting_time-cdelta, (remaining_time-delta))%1000)*1000;
+      } else { // look at remaining_time, minimum of collecting_time-cdelta
+         DDCMSG(D_TIME|D_NEW, MAGENTA, "TIMEOUT: Looking at %i vs remaining_time of %i", collecting_time-cdelta, remaining_time);
+         timeout.tv_sec=max(collecting_time-cdelta, remaining_time)/1000;
+         timeout.tv_usec=(max(collecting_time-cdelta, remaining_time)%1000)*1000;
       }
       // if we don't have anything in the queue, don't timeout
       bytecount=Queue_Depth(Rx);
       bytecount2=Queue_Depth(Tx);
-      if (bytecount <= 0) {
-         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, dwait_t=%3ld.%09ld, timeout=INFINITE, ", bytecount, bytecount2, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec);
+      if (bytecount <= 0 && mcpbuf_len <= 0) {
+         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, mcp: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, dwait_t=%3ld.%09ld, timeout=INFINITE, ", bytecount, bytecount2, mcpbuf_len, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec);
          sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, NULL);
       } else {
-         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, dwait_t=%3ld.%09ld, timeout=%d.%03d, ", bytecount, bytecount2, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec, timeout.tv_sec, timeout.tv_usec);
+         DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, mcp: %i, remaining_t=%d, elapsed_t=%3ld.%09ld, delta_t=%3ld.%09ld, dwait_t=%3ld.%09ld, timeout=%d.%03d, ", bytecount, bytecount2, mcpbuf_len, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec, timeout.tv_sec, timeout.tv_usec);
          if ((remaining_time-delta) <= 0) {
             // will cause an immediate return if we're ready to send another burst
             DDCMSG(D_NEW,MAGENTA,"GOING TO RETURN IMMEDIATELY FROM SELECT (%i-%i <= 0)", remaining_time, delta);
@@ -241,8 +263,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          DDCMSG(D_TIME,YELLOW,"select timed out  delta=%d remaining_time=%d  Rx[%d] Tx[%d]"
                 ,delta,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
 
-         // broken -- if (delta>remaining_time-1)
-         if (1) {
+         // if we timed out to process an RF transmission
+         bytecount=Queue_Depth(Rx);
+         if (bytecount > 0) {
 
 
             /***************     TIME to send on the radio
@@ -402,9 +425,40 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             cps=(double) rfcount/(double)elapsed_time.tv_sec;
             DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
 
+         } else if (mcpbuf_len > 0) {
+            result=write(MCPsock,mcpbuf,mcpbuf_len);
+            if (result==mcpbuf_len) {
+               // debug stuff
+               if (verbose&D_RF){
+                  timestamp(&elapsed_time,&istart_time,&delta_time);
+                  sprintf(buf,"[%03d] %4ld.%03ld ->MCP [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,result);
+                  printf("%s",buf);
+                  printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                  if(result>1){
+                     for (int i=0; i<result-1; i++) printf("%02x.", (uint8) mcpbuf[i]);
+                  }
+                  printf("%02x\n", (uint8) mcpbuf[result-1]);
+               }  
+               if (verbose&D_PARSE){
+                  DDpacket(mcpbuf,result);
+               }
+               // clear out mcp buffer
+               mcpbuf_len = 0;
+            } else if (result > 0) {
+               // clear out what was sent
+               char tbuf[MCP_BUF_SIZE];
+               memcpy(tbuf, mcpbuf + (sizeof(char) * result), mcpbuf_len - result);
+               memcpy(mcpbuf, tbuf, mcpbuf_len - result);
+               mcpbuf_len -= result;
+            } else {
+               sprintf(buf,"RF ->MCP  [%d!=%d]  ",mcpbuf_len,result);
+               DDCMSG_HEXB(D_RF,RED,buf,mcpbuf,mcpbuf_len);
+               close(MCPsock);    /* Close socket */    
+               return;            /* go back to the main loop waiting for MCP connection */
+            }
          } else {
-            DDCMSG(D_NEW,GRAY,"Timed out, but didn't do anything: elapsed_t=%5ld.%09ld delta_t=%5ld.%09ld, dwait_t=%5ld.%09ld"
-                   ,elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec);
+            DDCMSG(D_NEW,GRAY,"Timed out, but didn't do anything: elapsed_t=%5ld.%09ld delta_t=%5ld.%09ld, dwait_t=%5ld.%09ld, bytecount: %i, mcpbuf_len: %i"
+                   ,elapsed_time.tv_sec, elapsed_time.tv_nsec, delta_time.tv_sec, delta_time.tv_nsec, dwait_time.tv_sec, dwait_time.tv_nsec, bytecount, mcpbuf_len);
          }
       }
 
@@ -444,6 +498,8 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             size=RF_size(LB->cmd);
             crc=(size > 2) ? crc8(LB) : 1; // only calculate crc if we have a valid size
             if (!crc) {
+               queueMsg(mcpbuf, &mcpbuf_len, Rstart, size); // queue for transmission later
+               #if 0 /* start of old, pre-queue, method */
                result=write(MCPsock,Rstart,size);
                if (result==size) {
                   if (verbose&D_RF){
@@ -463,6 +519,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                   sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
                   DDCMSG_HEXB(D_RF,RED,buf,Rstart,size);
                }
+               #endif /* end of old, pre-queue, method */
                /* remove message, and everything before it, from buffer */
                end = (Rstart - Rbuf) + size;
                DDCMSG(D_NEW, BLACK, "About to clear msg from buffer %i, %i, %i, %08x, %08x, %08x", end, size, Rsize, Rbuf, Rstart, Rptr);
@@ -730,6 +787,7 @@ void print_help(int exval) {
    printf("  -t /dev/ttyS1 set serial port device\n");
    printf("  -x 800        xmit test, xmit a request devices every arg milliseconds (default=disabled=0)\n");
    printf("  -s 150        slottime in ms (5ms granules, 1275 ms max  ONLY WITH -x\n");
+   printf("  -c 300        collection time for burst messages in ms\n");
    printf("  -d 0x20       Lowest devID to find  ONLY WITH -x\n");
    printf("  -D 0x30       Highest devID to find  ONLY WITH -x\n");
    print_verbosity();
@@ -768,6 +826,7 @@ int main(int argc, char **argv) {
    int low_dev,high_dev;
 
    rtime=0;
+   collecting_time=300; //  minimum time to wait for collecting messages for a burst (in ms)
    slottime=0;
    verbose=0;
    xmit=0;              // used for testing
@@ -780,7 +839,7 @@ int main(int argc, char **argv) {
    signal(SIGINT, quitproc);
    signal(SIGQUIT, quitproc);
 
-   while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:")) != -1) {
+   while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:c:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
@@ -792,6 +851,10 @@ int main(int argc, char **argv) {
 
          case 'r':
             rtime = atoi(optarg);            
+            break;
+
+         case 'c':
+            collecting_time = atoi(optarg);            
             break;
 
          case 'v':
