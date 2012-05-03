@@ -200,9 +200,6 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
      {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_1} \
      {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_2} \
      {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_3} \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_4} \
-     {Send;R_MOVER;NL_C_MOVE;1;1080} \
-     {DoWait;%s;EVENT_STOPPED;15000;%s} \
      ";
 #if 0
     const char *scen = "\
@@ -317,7 +314,6 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
                                    hex_buf_1, hex_buf_3, hex_buf_5,
                                    conceal_msg, nothing_buf,
                                    hex_buf_2, hex_buf_4, hex_buf_6,
-                                   nothing_buf, nothing_buf,
                                    nothing_buf, nothing_buf,
                                    nothing_buf, nothing_buf);
 
