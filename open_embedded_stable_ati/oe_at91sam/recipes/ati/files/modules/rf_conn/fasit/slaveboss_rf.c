@@ -335,7 +335,7 @@ int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
    DDCMSG(D_RF|D_VERY,RED, "handle_STATUS_REQ(%8p, %i, %i)", fc, start, end);
    // wait 'til we have the most up-to-date information to send
    fc->waiting_status_resp = 1;
-   DCMSG(BLACK, "#######################################\nWaiting: %i, Epoll: %i\n#######################################", fc->waiting_status_resp, fc->added_rf_to_epoll);
+   DDCMSG(D_RF|D_MEGA, BLACK, "#######################################\nWaiting: %i, Epoll: %i\n#######################################", fc->waiting_status_resp, fc->added_rf_to_epoll);
    return send_2100_status_req(fc); // gather latest information
 }
 
@@ -406,7 +406,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    D_memset(&s, 0, sizeof(LB_status_resp_ext_t));
    s.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
-      DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+      //DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       s.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
    } else {
       s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
@@ -424,8 +424,12 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    if (s.fault) {
       fc->last_fault = 0; // clear out fault
    }
+   // we don't know if they received the last response, so send everything every time
+   retval = send_STATUS_RESP_EXT(fc);
+   goto SR_end;
 
-   DCMSG(BLACK, "\n============================\nNew values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\nOld values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\nf2102 vals: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\n",
+#if 0
+   DDCMSG(D_MEGA, BLACK, "\n============================\nNew values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\nOld values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\nf2102 vals: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\n",
       s.hits, s.expose, s.speed, s.move, s.react, s.location, s.hitmode, s.tokill, s.sensitivity, s.timehits, s.fault,
       fc->last_status.hits, fc->last_status.expose, fc->last_status.speed, fc->last_status.move, fc->last_status.react, fc->last_status.location, fc->last_status.hitmode, fc->last_status.tokill, fc->last_status.sensitivity, fc->last_status.timehits, fc->last_status.fault,
       htons(fc->f2102_resp.body.hit), fc->f2102_resp.body.exp, htonf(fc->f2102_resp.body.speed), htons(fc->f2102_resp.body.move), fc->f2102_resp.body.hit_conf.react, htons(fc->f2102_resp.body.pos), fc->f2102_resp.body.hit_conf.mode, htons(fc->f2102_resp.body.hit_conf.tokill), htons(fc->f2102_resp.body.hit_conf.sens), htons(fc->f2102_resp.body.hit_conf.burst), htons(fc->f2102_resp.body.fault));
@@ -467,6 +471,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
       goto SR_end;
 #endif
    }
+#endif
    // single spot to reset hit_hit
    SR_end:
    fc->hit_hit = last_hh;
@@ -580,7 +585,7 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
    if (pkt->expose) {
       fc->future_exp = 90;
    }
-   DCMSG(BLACK, "||||||||||||||||\nSETTING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+   //DCMSG(BLACK, "||||||||||||||||\nSETTING FUTURE: %i\n||||||||||||||||", fc->future_exp);
 
    // send configure hit sensing
    retval |= send_2100_conf_hit(fc, 4, /* blank on conceal */
@@ -815,7 +820,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    // status block
    bdy.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
-      DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+      //DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       bdy.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
    } else {
       bdy.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"

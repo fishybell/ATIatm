@@ -38,13 +38,8 @@ void initialize_state(minion_state_t *S){
 //   S_set(mode,0,0,0,0);
 //   S_set(position,0,0,0,0);
 
+   // timers (above and rf_t) might be set from mcp before the minion was forked off; leave them be
    //S_set(rf_t,0,0,0,0);
-   S->rf_t.data = 0;
-   S->rf_t.newdata = 0;
-   S->rf_t.fast_flags = 0;
-   S->rf_t.slow_flags = 0;
-   S->rf_t.fast_timer = 0;
-   S->rf_t.slow_timer = 0;
    
    S_set(asp,0,0,0,0);
    S_set(on,0,0,0,0);
@@ -349,7 +344,7 @@ void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expos
    LB_exp->react=0;
    LB_exp->mfs=0;
    LB_exp->thermal=0;
-   DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_exp cmd=%d", minion->mID,LB_exp->cmd);
+   DDCMSG(D_NEW,BLUE,"Minion %d:  LB_exp cmd=%d", minion->mID,LB_exp->cmd);
    psend_mcp(minion,LB_exp);
 }
 
@@ -905,14 +900,16 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 void finishTransition(thread_data_t *minion) {
    if (minion->S.exp.data == 45 && minion->S.exp.newdata == 90) {
       // transitioned from conceal to expose
-      //START_EXPOSE_TIMER(minion->S); -- don't do this, it has already started
+      START_EXPOSE_TIMER(minion->S); // will do non-45 based timer stuff
    } else if (minion->S.exp.data == 45 && minion->S.exp.newdata == 0) {
       // transitioned from expose to conceal
-      //START_CONCEAL_TIMER(minion->S);
+      START_CONCEAL_TIMER(minion->S); // will do non-45 based timer stuff
    } else if (minion->S.exp.data == 0) {
       // continues to be concealed
+      //START_CONCEAL_TIMER(minion->S); // will do non-45 based timer stuff
    } else if (minion->S.exp.data == 90) {
       // continues to be exposed
+      //START_EXPOSE_TIMER(minion->S); // will do non-45 based timer stuff
    } else {
       // invalid state -- shouldn't be able to get here
       DCMSG(RED, "ERROR - Should not be able to be from transition to nowhere: %i %i", minion->S.exp.data, minion->S.exp.newdata);
@@ -1175,6 +1172,9 @@ void *minion_thread(thread_data_t *minion){
                   if (minion->S.exp.data == 0 && L->expose) {
                      // random movement from down to up, should send "up" command to start event
                      send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
+                  } else if (!L->expose && minion->S.rf_t.fast_flags) {
+                     // we're down, change state to going slow
+                     START_CONCEAL_TIMER(minion->S);
                   }
 
                   // new state timer code
@@ -1219,6 +1219,9 @@ void *minion_thread(thread_data_t *minion){
                   if (minion->S.exp.data == 0 && L->expose) {
                      // random movement from down to up, should send "up" command to start event
                      send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
+                  } else if (!L->expose && minion->S.rf_t.fast_flags) {
+                     // we're down, change state to going slow
+                     START_CONCEAL_TIMER(minion->S);
                   }
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
 #if 0 /* start of old state timer code */
@@ -1255,6 +1258,9 @@ void *minion_thread(thread_data_t *minion){
                   if (minion->S.exp.data == 0 && L->expose) {
                      // random movement from down to up, should send "up" command to start event
                      send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
+                  } else if (!L->expose && minion->S.rf_t.fast_flags) {
+                     // we're down, change state to going slow
+                     START_CONCEAL_TIMER(minion->S);
                   }
 
                   // new state timer code

@@ -420,14 +420,24 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   DISCONNECT;
                } else {
                   SEND_STATUS_REQUEST;
-                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start); // same state over and over
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start); // same state over and over (short interval)
+               }
+            } break;
+            case F_fast_medium: {
+               // might get here from a miss or just because it's our time again, assume miss
+               // incriment miss number and check against max
+               if (++minion->S.rf_t.fast_missed > FAST_TIME_MAX_MISS) {
+                  DISCONNECT;
+               } else {
+                  SEND_STATUS_REQUEST;
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_RESPONSE_TIME, F_fast_medium); // same state over and over (medium interval)
                }
             } break;
             case F_fast_once: {
                // should only get here as start of message, so just add one to the miss counter as we normally assume a miss
                ++minion->S.rf_t.fast_missed;
                SEND_STATUS_REQUEST;
-               setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_end); // move to end
+               setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_RESPONSE_TIME, F_fast_end); // move to end (medium interval)
             } break;
             case F_fast_end: {
                // might get here from a miss or just because it's our time again, assume miss
@@ -437,7 +447,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                } else if (minion->S.rf_t.fast_missed > 1) {
                   // missed, keep trying fast
                   SEND_STATUS_REQUEST;
-                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_end); // move to end
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_RESPONSE_TIME, F_fast_end); // move to end (medium interval)
                } else {
                   // didn't miss, so go slow again
                   if (minion->S.rf_t.old_slow_flags == 0) {

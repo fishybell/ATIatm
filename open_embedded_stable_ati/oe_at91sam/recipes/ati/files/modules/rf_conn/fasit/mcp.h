@@ -1,6 +1,11 @@
 #ifndef __MCP_H__
 #define __MCP_H__
 
+#undef CLOCK_MONOTONIC
+#define CLOCK_MONOTONIC CLOCK_REALTIME
+#undef CLOCK_MONOTONIC_RAW
+#define CLOCK_MONOTONIC_RAW CLOCK_REALTIME
+
 #include <netinet/tcp.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -265,6 +270,7 @@ enum {
 enum {
    F_fast_none = 0, /* no state, doing nothing */
    F_fast_start, /* starts fast lookup, goes to fast start */
+   F_fast_medium, /* starts medium fast lookup, goes to fast medium */
    F_fast_once, /* starts fast lookup, goes to fast end */
    F_fast_end, /* ends fast lookup, goes to slow start */
 };
@@ -477,14 +483,15 @@ typedef enum rf_target_type {
 }
 
 // common timer values
-#define FAST_SOON_TIME        7   /* 7/10 second */
-#define FAST_TIME             30  /* 3 seconds */
-#define SLOW_SOON_TIME        7   /* 7/10 second */
+#define FAST_SOON_TIME        4   /* 4/10 second */
+#define FAST_TIME             10  /* 1 second */
+#define FAST_RESPONSE_TIME    20  /* 2 seconds */
+#define SLOW_SOON_TIME        4   /* 4/10 second */
 #define SLOW_TIME             250 /* 25 seconds */
-#define SLOW_RESPONSE_TIME    90  /* 9 seconds */
-#define EVENT_RESPONSE_TIME   90  /* 9 seconds */
-#define TRANSITION_START_TIME 5   /* 1/2 second */
-#define TRANSITION_TIME       5   /* 1/2 second */
+#define SLOW_RESPONSE_TIME    30  /* 3 seconds */
+#define EVENT_RESPONSE_TIME   30  /* 3 seconds */
+#define TRANSITION_START_TIME 4   /* 4/10 second */
+#define TRANSITION_TIME       4   /* 4/10 second */
 
 // other state constants
 #define FAST_TIME_MAX_MISS 30 /* maximum value of the "missed message" counter */
@@ -493,18 +500,34 @@ typedef enum rf_target_type {
 
 // common complex timer starts
 #define START_EXPOSE_TIMER(S) { \
-   /* start fast, stop slow */ \
-   S.rf_t.fast_missed = 0; \
-   setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
-   stopTimer(S.rf_t, slow_timer, slow_flags); \
-   /* start transition */ \
-   setTimerTo(S.exp, exp_timer, exp_flags, TRANSITION_START_TIME, F_exp_start_transition); \
+   if (S.exp.data == 45) { \
+      /* we're starting transistion: start fast, stop slow */ \
+      S.rf_t.fast_missed = 0; \
+      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
+      stopTimer(S.rf_t, slow_timer, slow_flags); \
+      /* will be fast until we receive an ack, then it will be slow */ \
+      /* start transition */ \
+      setTimerTo(S.exp, exp_timer, exp_flags, TRANSITION_START_TIME, F_exp_start_transition); \
+   } else { \
+      /* we're finished with transition: stop fast, start medium */ \
+      S.rf_t.fast_missed = 0; \
+      stopTimer(S.rf_t, slow_timer, slow_flags); \
+      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_medium); \
+   } \
 }
 #define START_CONCEAL_TIMER(S) { \
-   /* stop fast, start slow soon */ \
-   stopTimer(S.rf_t, fast_timer, fast_flags); \
-   S.rf_t.slow_missed = 0; \
-   setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
+   if (S.exp.data == 45) { \
+      /* we're starting transistion: start fast, stop slow */ \
+      S.rf_t.fast_missed = 0; \
+      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
+      stopTimer(S.rf_t, slow_timer, slow_flags); \
+      /* will be fast until we receive an ack, then it will be slow */ \
+   } else { \
+      /* we're finished with transition: stop fast, start slow soon */ \
+      stopTimer(S.rf_t, fast_timer, fast_flags); \
+      S.rf_t.slow_missed = 0; \
+      setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
+   } \
    /* start transition */ \
    setTimerTo(S.exp, con_timer, con_flags, TRANSITION_START_TIME, F_con_start_transition); \
 }

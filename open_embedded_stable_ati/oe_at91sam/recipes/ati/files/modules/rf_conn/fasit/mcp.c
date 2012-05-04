@@ -757,13 +757,13 @@ DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\
                   }
                   if (tempslot == 0) {
                      // first in pseudo-burst to RFmaster, include inittime
-                     tempslot = inittime + slottime + RF_MASTER_DELAY;
+                     tempslot = inittime + slottime;
                   } else {
                      // not the first, just use slottime
                      tempslot = slottime;
                   }
                   timeout+=tempslot; // we now need to wait for this packet to respond
-                  DDCMSG(D_NEW,MAGENTA, "Minion %i caused increase of timeout by %i to %i",minion->mID, tempslot, timeout);
+                  DDCMSG(D_NEW, MAGENTA, "Minion %i caused increase of timeout by %i to %i (timeout-delta=%i)",minion->mID, tempslot, timeout, timeout-delta);
                }
 
             } // it is from a minion

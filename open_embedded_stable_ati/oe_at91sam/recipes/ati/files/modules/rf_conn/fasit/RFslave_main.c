@@ -8,6 +8,9 @@
 int verbose = 0;    // so debugging works right in all modules
 int last_slot = -1; // last slot used starts at no slot used
 
+
+struct timespec elapsed_time, start_time, istart_time,delta_time; // global timers
+
 #define MAX_EVENTS 16
 #define BAUDRATE B19200
 
@@ -37,7 +40,7 @@ long getTime() {
    return (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000l);
 }
 
-void print_help(int exval) { printf("slaveboss [-h] [-v num] [-f port] [-r port] [-n num]\n\n");
+void print_help(int exval) { printf("RFslave.new [-h] [-v num] [-f port] [-r port] [-n num]\n\n");
    printf("  -h            print this help and exit\n");
    printf("  -i 127.0.0.1  set RF ip address\n");
    printf("  -p 14004      set RF tcp port\n");
@@ -49,7 +52,7 @@ void print_help(int exval) { printf("slaveboss [-h] [-v num] [-f port] [-r port]
 void DieWithError(char *errorMessage){
     char buf[200];
     strerror_r(errno,buf,200);
-    DCMSG(RED,"slaveboss %s %s \n", errorMessage,buf);
+    DCMSG(RED,"RFslave.new %s %s \n", errorMessage,buf);
     exit(1);
 }
 
@@ -210,6 +213,9 @@ int main(int argc, char **argv) {
    DCMSG(BLACK,"RFSLAVE: RF address = %s:%d", inet_ntoa(raddr.sin_addr),htons(raddr.sin_port));
    DCMSG(BLACK,"RFSLAVE: RF tty = %s", ttyport);
 
+   // initialize timers
+   clock_gettime(CLOCK_MONOTONIC,&istart_time); // get the intial current time
+   timestamp(&elapsed_time,&istart_time,&delta_time);   // make sure the delta_time gets set    
    // connect to slaveboss
    if ((rc.sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
       perror("Error creating socket: ");
@@ -320,6 +326,15 @@ int main(int argc, char **argv) {
          } else if (events[n].events & EPOLLOUT) {
             // rcWrite will push the data as quickly as possible
             done = handleRet(rcWrite(&rc, 1),&rc, efd); // 1 for tty
+            // reset timeslot stuff now
+            rc.id_index = -1;
+            for (i = 0; i < MAX_IDS; i++) {rc.ids[i] = -1;}
+            rc.id_lasttime_index = -1;
+            for (i = 0; i < MAX_IDS; i++) {rc.ids_lasttime[i] = -1;}
+            rc.devid_index = -1;
+            rc.devid_last_low = -1;
+            rc.devid_last_high = -1;
+            for (i = 0; i < MAX_IDS; i++) {rc.devids[i] = -1;}
          // reading?
          } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
             if (rc.packets < 0) { // is this the start of a fresh burst?

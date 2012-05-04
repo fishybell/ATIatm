@@ -2,33 +2,43 @@
 #include "rf_debug.h"
 #include "RFslave.h"
 
+extern struct timespec elapsed_time, start_time, istart_time,delta_time; // global timers
+
 // the start and end values may be set even if no valid message is found
 static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
    LB_packet_t *hdr;
    int hl = -1;
    int mnum = -1;
-   *start = 0;
    // loop through entire buffer, parsing starting at each character
-   while (*start < (tty ? rc->tty_ilen : rc->sock_ilen) && mnum == -1) {
+   while (*start >= 0 && ((tty == 0 && *start < rc->sock_ilen) ||
+                          (tty == 1 && *start < rc->tty_ilen) ||
+                          (tty == 2 && *start < rc->tty_olen)) && mnum == -1) {
       // map the memory, we don't need to manipulate it
       if (tty) {
-         hdr = (LB_packet_t*)(rc->tty_ibuf + *start);
+         if (tty == 1) {
+            hdr = (LB_packet_t*)(rc->tty_ibuf + *start);
+         } else {
+            hdr = (LB_packet_t*)(rc->tty_obuf + *start);
+         }
       } else {
          hdr = (LB_packet_t*)(rc->sock_ibuf + *start);
       }
       
       // check for valid message first
       hl = RF_size(hdr->cmd);
-      if (tty && ((rc->tty_ilen - (*start)) < hl)) {
+      if (tty == 1 && ((rc->tty_ilen - (*start)) < hl)) {
          DDCMSG(D_RF, cyan, "Invalid tty message length %i - %i < %i", rc->tty_ilen, *start, hl);
+         *start = *start + 1; continue; // invalid message length, or more likely, don't have all of the message yet
+      } else if (tty == 2 && ((rc->tty_olen - (*start)) < hl)) {
+         DDCMSG(D_RF, cyan, "Invalid tty message length %i - %i < %i", rc->tty_olen, *start, hl);
          *start = *start + 1; continue; // invalid message length, or more likely, don't have all of the message yet
       } else if (!tty && ((rc->sock_ilen - (*start)) < hl)) {
          DDCMSG(D_RF, blue, "Invalid socket message length %i - %i < %i", rc->sock_ilen, *start, hl);
          *start = *start + 1; continue; // invalid message length, or more likely, don't have all of the message yet
       }
 
-      *end = *start + hl;
-      DDCMSG(D_RF, tty ? cyan : blue, "Checking %s validMessage for %i", tty ? "TTY" : "SOCKET", hdr->cmd);
+      *end = *start + hl; // one character after the end of the message
+      DDCMSG(D_RF, tty ? cyan : blue, "Checking %s validMessage for %i (s:%i e:%i)", tty ? "TTY" : "SOCKET", hdr->cmd, *start, *end);
       switch (hdr->cmd) {
          // they all have a crc, check it
          case LBC_EXPOSE:
@@ -164,7 +174,8 @@ int rcRead(rf_connection_t *rc, int tty) {
    dests = read(tty ? rc->tty : rc->sock, dest, RF_BUF_SIZE);
    err = errno; // save errno
 
-   DDCMSG(D_PACKET, tty ? CYAN : BLUE, "%s READ %i BYTES", tty ? "TTY" : "SOCKET", dests);
+   timestamp(&elapsed_time,&istart_time,&delta_time);
+   DDCMSG(D_NEW, tty ? CYAN : BLUE, "%s READ %i BYTES @ time %5ld.%09ld", tty ? "TTY" : "SOCKET", dests, elapsed_time.tv_sec, elapsed_time.tv_nsec);
 
    // did we read nothing?
    if (dests <= 0) {
@@ -233,7 +244,8 @@ int rcWrite(rf_connection_t *rc, int tty) {
       s = write(rc->sock, rc->sock_obuf, rc->sock_olen);
    }
    err = errno; // save errno
-   DDCMSG(D_NEW, tty ? cyan : blue, "%s WROTE %i BYTES", tty ? "TTY" : "SOCKET", s);
+   timestamp(&elapsed_time,&istart_time,&delta_time);
+   DDCMSG(D_NEW, tty ? cyan : blue, "%s WROTE %i BYTES @ time %5ld.%09ld", tty ? "TTY" : "SOCKET", s, elapsed_time.tv_sec, elapsed_time.tv_nsec);
    debugRF(tty ? cyan : blue, tty ? rc->tty_obuf : rc->sock_obuf, tty ? rc->tty_olen : rc->sock_olen);
 
    // did it fail?
@@ -330,7 +342,7 @@ DDCMSG(D_MEGA, RED, "clearing entire buffer");
       // clear the entire buffer
       rc->tty_ilen = 0;
    } else {
-      // clear out everything up to and including end
+      // clear out everything up to end
       char tbuf[RF_BUF_SIZE];
 DDCMSG(D_MEGA, RED, "clearing buffer partially: %i-%i", rc->tty_ilen, end);
       D_memcpy(tbuf, rc->tty_ibuf + (sizeof(char) * end), rc->tty_ilen - end);
@@ -346,7 +358,7 @@ static void clearBuffer_sock(rf_connection_t *rc, int end) {
       // clear the entire buffer
       rc->sock_ilen = 0;
    } else {
-      // clear out everything up to and including end
+      // clear out everything up to end
       char tbuf[RF_BUF_SIZE];
       D_memcpy(tbuf, rc->sock_ibuf + (sizeof(char) * end), rc->sock_ilen - end);
       D_memcpy(rc->sock_ibuf, tbuf, rc->sock_ilen - end);
@@ -375,8 +387,48 @@ void addToBuffer_generic(char *dbuf, int *dbuf_len, char *ibuf, int ibuf_len) {
    }
 }
 
+// check to see if the given packet is a response packet or not
+// these packets should only have one in the queue at a time for a given source address
+int isPacketResponse(LB_packet_t *LB) {
+   if (LB->cmd == LBC_STATUS_RESP_LIFTER ||
+       LB->cmd == LBC_STATUS_RESP_MOVER ||
+       LB->cmd == LBC_STATUS_RESP_EXT ||
+       LB->cmd == LBC_STATUS_NO_RESP) {
+      return 1;
+   } else {
+      return 0;
+   }
+}
+
 void addToBuffer_tty_out(rf_connection_t *rc, char *buf, int s) {
-   addToBuffer_generic(rc->tty_obuf, &rc->tty_olen, buf, s);
+   // look to see if we should replace an item rather than queue it
+   LB_packet_t *LB = (LB_packet_t*)buf, *LBt;
+   if (isPacketResponse(LB)) {
+      int start, end, mnum, s2;
+      start=0;
+      while ((mnum = validMessage(rc, &start, &end, 2)) != -1) { // 2 for tty outbound
+         LBt = (LB_packet_t*)(buf + start);
+         if (LBt->addr == LB->addr && isPacketResponse(LBt)) {
+            // matching address and also a response: replace
+            char tbuf[RF_BUF_SIZE];
+            s2 = rc->tty_olen-end; // remember length of tail
+            DDCMSG(D_QUEUE, GRAY, "Replaced %i with %i from %i in queue (%i, %i, %i)",
+                   LBt->cmd, LB->cmd, LB->addr, start, end, s2);
+            D_memcpy(tbuf, buf+end, s2); // copy tail end of buffer to temp
+            D_memcpy(buf+start, buf, s); // copy new message to correct spot
+            rc->tty_olen = start + s; // change length of outbound buffer
+            addToBuffer_generic(rc->tty_obuf, &rc->tty_olen, tbuf, s2);  // copy tail back to end
+            return; // should only ever be one unsent response
+         }
+         DDCMSG(D_PARSE, BLACK, "Calling validMessage again @ %i", __LINE__);
+         start += RF_size(LB->cmd);
+      }
+      // did not find existing resposne, push it along as normal
+      addToBuffer_generic(rc->tty_obuf, &rc->tty_olen, buf, s);
+   } else {
+      // normal message, push it along
+      addToBuffer_generic(rc->tty_obuf, &rc->tty_olen, buf, s);
+   }
 }
 
 void addToBuffer_tty_in(rf_connection_t *rc, char *buf, int s) {
@@ -501,14 +553,14 @@ int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
    DDCMSG(D_RF, CYAN, "t2s_handle_REQUEST_NEW(%8p, %i, %i)", rc, start, end);
 
    // remember last low/high devid
-   DDCMSG(D_TIME, BLACK, "Setting low/high to %X/%X", pkt->low_dev, pkt->low_dev+7);
+   DDCMSG(D_T_SLOT|D_VERY, BLACK, "Setting low/high to %X/%X", pkt->low_dev, pkt->low_dev+7);
    rc->devid_last_low = pkt->low_dev;
    rc->devid_last_high = pkt->low_dev+7;
 
    // remember timeslot length
    rc->timeslot_init = pkt->inittime * 5; // convert to milliseconds
    rc->timeslot_length = pkt->slottime * 5; // convert to milliseconds
-   DDCMSG(D_TIME, BLACK, "Setting timeslot stuff to %i %i", rc->timeslot_init, rc->timeslot_length);
+   DDCMSG(D_T_SLOT|D_VERY, BLACK, "Setting timeslot stuff to %i %i", rc->timeslot_init, rc->timeslot_length);
 
    return doNothing;
 } 
@@ -532,6 +584,7 @@ int tty2sock(rf_connection_t *rc) {
 
    // read all available valid messages up until I have to do something on return
    debugRF(cyan, rc->tty_ibuf, rc->tty_ilen);
+   start = 0;
    while ((retval == doNothing || retval == mark_sockWrite) && (mnum = validMessage(rc, &start, &end, 1)) != -1) { // 1 for tty
       int use_command = 1;
       switch (mnum) {
@@ -578,6 +631,8 @@ int tty2sock(rf_connection_t *rc) {
 
       // clear out the found message
       clearBuffer(rc, end, 1); // 1 for tty
+      start=0;
+      DDCMSG(D_PARSE, BLACK, "Calling validMessage again @ %i", __LINE__);
    }
    
    // if we put anything in the socket "out" buffer...
@@ -684,6 +739,7 @@ int sock2tty(rf_connection_t *rc) {
 
    // read all available valid messages up until I have to do something on return
    debugRF(blue, rc->sock_ibuf, rc->sock_ilen);
+   start = 0;
    while (retval == doNothing && (mnum = validMessage(rc, &start, &end, 0)) != -1) { // 0 for socket
       switch (mnum) {
          s2t_HANDLE_RF (STATUS_RESP_LIFTER); // keep track of ids
@@ -700,57 +756,75 @@ int sock2tty(rf_connection_t *rc) {
 
       // clear out the found message
       clearBuffer(rc, end, 0); // 0 for socket
+      start=0;
+      DDCMSG(D_PARSE, BLACK, "Calling validMessage again @ %i", __LINE__);
    }
 
    // find which timeslot I'm in (the mcp should always leave us with exactly one of these tests as true)
-   DDCMSG(D_TIME, BLACK, "Finding timeslot uinsg rc->id_index (%X) or rc->devid_last_high (%X)", rc->id_index, rc->devid_last_high);
+   DDCMSG(D_T_SLOT, BLACK, "Finding timeslot uinsg rc->id_index (%X) or rc->devid_last_high (%X)", rc->id_index, rc->devid_last_high);
    if (rc->id_index >= 0) {
       // timeslot is decided by which address I am in the chain
       int i;
-      DDCMSG(D_TIME, BLACK, "Finding timeslot using rc->id_index %i", rc->id_index);
+      DDCMSG(D_T_SLOT, BLACK, "Finding timeslot using rc->id_index %i", rc->id_index);
       // find the lowest matching address
       for (ts = 0; ts < min(rc->id_lasttime_index+1, MAX_IDS); ts++) {
-         DDCMSG(D_TIME, BLACK, "Looking at ts %i...", ts);
+         DDCMSG(D_T_SLOT, BLACK, "Looking at ts %i...", ts);
          for (i = 0; i < min(rc->id_index+1, MAX_IDS); i++) {
-            DDCMSG(D_TIME, BLACK, "Looking at id_index %i...", i);
+            DDCMSG(D_T_SLOT, BLACK, "Looking at id_index %i...", i);
             if (rc->ids_lasttime[ts] == rc->ids[i]) {
-               DDCMSG(D_TIME, BLACK, "Found at %ix%i...%ix%i", ts, i, rc->ids_lasttime[ts], rc->ids[i]);
+               DDCMSG(D_T_SLOT, BLACK, "Found at %ix%i...%ix%i of %ix%i", ts, i, rc->ids_lasttime[ts], rc->ids[i], min(rc->id_lasttime_index+1, MAX_IDS), min(rc->id_index+1, MAX_IDS));
                goto found_ts; // just jump down, my ts variable is now correct
             }
          }
       }
 
+#if 0
       // label to jump to when I found my timeslot
       found_ts:
       // reset ids so the timeslot resets
       rc->id_index = -1;
+      for (i = 0; i < MAX_IDS; i++) {rc->ids[i] = -1;}
+      rc->id_lasttime_index = -1;
+      for (i = 0; i < MAX_IDS; i++) {rc->ids_lasttime[i] = -1;}
+#endif
    } else if (rc->devid_last_high >= 0) {
       int i;
-      DDCMSG(D_TIME, BLACK, "Finding timeslot using rc->devid_last_high %X", rc->devid_last_high);
+      DDCMSG(D_T_SLOT, BLACK, "Finding timeslot using rc->devid_last_high %X", rc->devid_last_high);
       ts = 0xffff; // start off as a really big number
       // timeslot is decided by which devid I am in the range, find lowest devid
       for (i = 0; i < min(rc->devid_index+1, MAX_IDS); i++) {
-         DDCMSG(D_TIME, BLACK, "Looking %X-%X < %X for index %i", rc->devids[i], rc->devid_last_low, ts, i);
+         DDCMSG(D_T_SLOT, BLACK, "Looking %X-%X < %X for index %i", rc->devids[i], rc->devid_last_low, ts, i);
          if ((rc->devids[i] - rc->devid_last_low) < ts) {
             ts = rc->devids[i] - rc->devid_last_low; // exact match would be 0 slot, then 1, etc.
             DDCMSG(D_VERY, BLACK, "Found new low: %i", ts);
          }
       }
-      DDCMSG(D_VERY, BLACK, "Ended up with %i", ts);
+      DDCMSG(D_T_SLOT, BLACK, "Ended up with %i", ts);
       if (ts == 0xffff || ts < 0) {
          ts = 0; // should never get here, but just in case be a sane value
       }
-
+#if 0
       // reset ids so the timeslot resets
       rc->devid_index = -1;
       rc->devid_last_low = -1;
       rc->devid_last_high = -1;
+      for (i = 0; i < MAX_IDS; i++) {rc->devids[i] = -1;}
+#endif
    }
+   // label to jump to when I found my timeslot
+   found_ts:
 
-   DDCMSG(D_TIME, BLACK, "Found timeout slot: %i (%i + %i)", ts, rc->timeslot_init, (rc->timeslot_length * ts));
+#if 1 /* timeslot with initial time */
+   DDCMSG(D_T_SLOT, BLACK, "Found timeout slot: %i (%i + %i)", ts, rc->timeslot_init, (rc->timeslot_length * ts));
 
    // change timeout
-   doTimeAfter(rc, rc->timeslot_init + (rc->timeslot_length * ts)); // timeslot length * timeslot I'm in, minimum of timeslot_init (ts 1 => run at timeslot_init, 2 => init + timeslot_length)
+   doTimeAfter(rc, rc->timeslot_init + (rc->timeslot_length * ts)); // initial time + timeslot length * timeslot I'm in
+#else /* timeslot without initial time */
+   DDCMSG(D_T_SLOT, BLACK, "Found timeout slot: %i (NONE + %i)", ts, (rc->timeslot_length * ts));
+
+   // change timeout
+   doTimeAfter(rc, rc->timeslot_length * ts); // timeslot length * timeslot I'm in
+#endif /* timeslot with(out) initial time */
 
    return (retval | doNothing); // the timeout will determine when we can write, right now do nothing or whatever retval was
 }

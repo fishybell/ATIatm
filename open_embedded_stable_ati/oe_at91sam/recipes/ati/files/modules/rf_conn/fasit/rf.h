@@ -16,6 +16,7 @@
 #define D_QUEUE         0x400
 #define D_PARSE         0x800
 #define D_POINTER       0x1000
+#define D_T_SLOT        0x2000
 
 #include "mcp.h"
 
@@ -38,6 +39,7 @@ typedef struct queue_tag {
 
 queue_t *queue_init( int size);
 void DeQueue(queue_t *M,int count);
+void ClearQueue(queue_t *M);
 void ReQueue(queue_t *Mdst,queue_t *Msrc,int count);
 void EnQueue(queue_t *M, void *ptr,int count); // queue in back
 void QueuePush(queue_t *M, void *ptr,int count); // "queue" in front

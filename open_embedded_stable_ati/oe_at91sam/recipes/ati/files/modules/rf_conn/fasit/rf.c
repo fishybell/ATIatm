@@ -94,6 +94,11 @@ void DeQueue(queue_t *M,int count){
    M->head=M->buf;
 }
 
+void ClearQueue(queue_t *M){
+   M->tail=M->buf;
+   M->head=M->buf;
+}
+
 // move count from the front of queue Msrc to tail of Mdst
 //   and shift up the old queue for now
 // having bounds checking and stuff might be nice during debugging
@@ -124,6 +129,7 @@ void print_verbosity(void){
    printf("  -v 400         sets D_QUEUE  \n");
    printf("  -v 800         sets D_PARSE  \n");
    printf("  -v 1000        sets D_POINTER  \n");
+   printf("  -v 2000        sets D_T_SLOT  \n");
    printf("  -v FFFF        sets all of the above  \n");
 }
 
@@ -141,6 +147,7 @@ void print_verbosity_bits(void){
    DDCMSG(D_QUEUE       ,black,"  D_QUEUE");
    DDCMSG(D_PARSE       ,black,"  D_PARSE");
    DDCMSG(D_POINTER     ,black,"  D_POINTER");
+   DDCMSG(D_T_SLOT      ,black,"  D_T_SLOT");
 }
 
 
@@ -208,7 +215,7 @@ int gather_rf(int fd, char *tail,int max){
 //         sleep(1);
       } else {
          strerror_r(errno,buf,100);
-         DCMSG(RED,"gather_rf:  read returned error %s \n",buf);
+         DDCMSG(D_RF, RED, "gather_rf:  read returned error %s \n", buf);
 
          if (errno!=EAGAIN){
             DCMSG(RED,"gather_rf:  halting \n");
@@ -219,6 +226,7 @@ int gather_rf(int fd, char *tail,int max){
       DDCMSG(D_VERY,GREEN,"gather_rf:  new bytes=%2d ",ready);
       return(ready);
    }
+   return ready;
 }
 
 void DDpacket(uint8 *buf,int len){
