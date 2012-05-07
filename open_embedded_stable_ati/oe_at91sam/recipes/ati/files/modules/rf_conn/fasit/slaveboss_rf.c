@@ -121,7 +121,7 @@ int rfRead(int fd, char *dest, int *dests) {
          // connection dead, remove it
          *dests = 0;
 perror("RF Died because ");
-DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
+DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
    }
@@ -155,7 +155,7 @@ int rfWrite(fasit_connection_t *fc) {
       } else {
          // connection dead, remove it
 perror("RF Died because ");
-DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
+DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
    } else if (s < fc->rf_olen) {
@@ -166,13 +166,13 @@ DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
       opts = fcntl(fc->rf, F_GETFL); // grab existing flags
       if (opts < 0) {
 perror("RF Died because ");
-DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
+DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
       opts = (opts ^ O_NONBLOCK); // remove nonblock from existing flags
       if (fcntl(fc->rf, F_SETFL, opts) < 0) {
 perror("RF Died because ");
-DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
+DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
 
@@ -183,7 +183,7 @@ DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
          if (ns < 0 && err != EAGAIN) {
             // connection dead, remove it
 perror("RF Died because ");
-DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
+DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
             return rem_rfEpoll;
          }
          s += ns; // increase total written, possibly by zero
@@ -193,7 +193,7 @@ DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
       opts = (opts | O_NONBLOCK); // add nonblock back into existing flags
       if (fcntl(fc->rf, F_SETFL, opts) < 0) {
 perror("RF Died because ");
-DDCMSG(D_RF,RED, "RF Dead at %i", __LINE__);
+DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
 
@@ -259,6 +259,7 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
          case LBC_QEXPOSE:
+         case LBC_RESET:
          case LBC_QCONCEAL:
          case LBC_REQUEST_NEW:
             if (crc8(hdr) == 0) {
@@ -318,6 +319,7 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
                HANDLE_RF (POWER_CONTROL);
                HANDLE_RF (PYRO_FIRE);
                HANDLE_RF (QEXPOSE);
+               HANDLE_RF (RESET);
                HANDLE_RF (QCONCEAL);
                HANDLE_RF (REQUEST_NEW);
                HANDLE_RF (ASSIGN_ADDR);
@@ -335,7 +337,7 @@ int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
    DDCMSG(D_RF|D_VERY,RED, "handle_STATUS_REQ(%8p, %i, %i)", fc, start, end);
    // wait 'til we have the most up-to-date information to send
    fc->waiting_status_resp = 1;
-   DDCMSG(D_RF|D_MEGA, BLACK, "#######################################\nWaiting: %i, Epoll: %i\n#######################################", fc->waiting_status_resp, fc->added_rf_to_epoll);
+   DDCMSG(D_RF|D_MEGA, BLACK, "#######################################\nWaiting: %i, Epoll: %i\n#######################################", fc->waiting_status_resp, added_rf_to_epoll);
    return send_2100_status_req(fc); // gather latest information
 }
 
@@ -406,11 +408,12 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    D_memset(&s, 0, sizeof(LB_status_resp_ext_t));
    s.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
-      //DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+      DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       s.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
    } else {
       s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
    }
+   DCMSG(RED, "****************\nFound expose: s.expose=%i, fc->f2102_resp.body.exp=%i\n**************** @ %i", s.expose, fc->f2102_resp.body.exp, __LINE__);
    s.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
    s.move = fc->f2102_resp.body.move & 0x3;
    s.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
@@ -425,6 +428,8 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
       fc->last_fault = 0; // clear out fault
    }
    // we don't know if they received the last response, so send everything every time
+   // copy current status to last status and send it
+   fc->last_status = s;
    retval = send_STATUS_RESP_EXT(fc);
    goto SR_end;
 
@@ -585,7 +590,7 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
    if (pkt->expose) {
       fc->future_exp = 90;
    }
-   //DCMSG(BLACK, "||||||||||||||||\nSETTING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+   DCMSG(BLACK, "||||||||||||||||\nSETTING FUTURE: %i\n||||||||||||||||", fc->future_exp);
 
    // send configure hit sensing
    retval |= send_2100_conf_hit(fc, 4, /* blank on conceal */
@@ -783,6 +788,13 @@ int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
    return send_2100_exposure(fc, 90); // 90^ = exposed
 }
 
+int handle_RESET(fasit_connection_t *fc, int start, int end) {
+   DDCMSG(D_RF|D_VERY,RED, "handle_RESET(%8p, %i, %i)", fc, start, end);
+   fc->doing_reset = 1;
+   // send reset command
+   return send_2100_reset(fc);
+}
+
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
    struct timespec *tv;
    int uptime_sec;
@@ -820,12 +832,13 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    // status block
    bdy.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
-      //DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+      DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       bdy.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
    } else {
       bdy.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
    }
    bdy.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
+   DCMSG(RED, "****************\nFound expose: bdy.expose=%i, fc->f2102_resp.body.exp=%i\n**************** @ %i", bdy.expose, fc->f2102_resp.body.exp, __LINE__);
    bdy.move = fc->f2102_resp.body.move & 0x3;
    bdy.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
    bdy.hitmode = fc->hit_mode;
