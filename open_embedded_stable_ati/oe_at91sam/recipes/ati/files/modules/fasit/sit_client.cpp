@@ -116,6 +116,9 @@ FUNCTION_START("::reInit()");
      hits = 0;
      doHits(-1); // get correct value from kernel
 
+     exposure = EXPOSURE_REQ; // invalid value...
+     nl_conn->doMoving(); // get correct exposure value from kernel
+
      lastBatteryVal = MAX_BATTERY_VAL;
      nl_conn->doBattery(); // get a correct battery value soon
 FUNCTION_END("::reInit()");
@@ -135,9 +138,9 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
 
     // exposure
     switch (exposure) {
-        case 0: msg->body.exp = 0; break;
-        case 1: msg->body.exp = 90; break;
-        default: msg->body.exp = 45; break;
+        case CONCEAL: msg->body.exp = 0; break;
+        case EXPOSE: msg->body.exp = 90; break;
+        case LIFTING: msg->body.exp = 45; break;
     }
 
     // device type
@@ -584,6 +587,7 @@ int SIT_Client::handle_2100(int start, int end) {
             r_seq = resp_seq;
             // send 2102 status
             DCMSG(RED,"CID_Status_Request   send 2102 status") ; 
+            if (exposure == EXPOSURE_REQ) { nl_conn->doMoving(); } // if we haven't found our exposure yet, find it now
             doHits(-1); // grab most recent hit status instead of sendStatus2102(1); // forces sending of a 2102
             // send 2112 Muzzle Flash status if supported   
             if (start_config&PD_NES){
@@ -1537,13 +1541,13 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
                 // received change in exposure
                 int value = nla_get_u8(attrs[GEN_INT8_A_MSG]);
                 switch (value) {
-                    case 0:
+                    case CONCEAL:
                         sit_client->didConceal(); // tell client
                         break;
-                    case 1:
+                    case EXPOSE:
                         sit_client->didExpose(); // tell client
                         break;
-                    default:
+                    case LIFTING:
                         sit_client->didMoving(); // tell client
                         break;
                 }
