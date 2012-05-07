@@ -483,19 +483,20 @@ typedef enum rf_target_type {
 }
 
 // common timer values
-#define FAST_SOON_TIME        4   /* 4/10 second */
-#define FAST_TIME             10  /* 1 second */
-#define FAST_RESPONSE_TIME    20  /* 2 seconds */
-#define SLOW_SOON_TIME        4   /* 4/10 second */
+#define FAST_SOON_TIME        7   /* 7/10 second */
+#define FAST_TIME             25  /* 2 1/2 seconds */
+#define FAST_RESPONSE_TIME    40  /* 3 seconds */
+#define SLOW_SOON_TIME        9   /* 9/10 second */
 #define SLOW_TIME             250 /* 25 seconds */
-#define SLOW_RESPONSE_TIME    30  /* 3 seconds */
-#define EVENT_RESPONSE_TIME   30  /* 3 seconds */
+#define SLOW_RESPONSE_TIME    40  /* 3 seconds */
+#define EVENT_SOON_TIME       7   /* 7/10 second */
+#define EVENT_RESPONSE_TIME   15  /* 1 1/2 seconds */
 #define TRANSITION_START_TIME 4   /* 4/10 second */
 #define TRANSITION_TIME       4   /* 4/10 second */
 
 // other state constants
-#define FAST_TIME_MAX_MISS 30 /* maximum value of the "missed message" counter */
-#define SLOW_TIME_MAX_MISS 20 /* maximum value of the "missed message" counter */
+#define FAST_TIME_MAX_MISS 15 /* maximum value of the "missed message" counter */
+#define SLOW_TIME_MAX_MISS 10 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_MISS 20 /* maximum value of the "missed message" counter */
 
 // common complex timer starts
@@ -544,6 +545,24 @@ typedef enum rf_target_type {
       stopTimer(S.rf_t, slow_timer, slow_flags); /* will be resumed later */ \
       setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_once); \
    } \
+}
+
+// macro to disconnect minion
+//  -- can be used only in certain parts of minion.c and minion_state.c
+#define DISCONNECT { \
+   /* break connection to FASIT server */ \
+   close(minion->rcc_sock); /* close FASIT */ \
+   DCMSG(BLACK,"\n\n-----------------------------------\nDisconnected minion %i:%i:%i\n----------------------------------- %i\n\n", \
+         minion->mID, minion->rcc_sock, minion->mcp_sock, __LINE__); \
+   minion->rcc_sock = -1; \
+   minion->status = S_closed; \
+   LB_buf.cmd = LBC_ILLEGAL; /* send an illegal packet, which makes mcp forget me */ \
+   /* now send it to the MCP master */ \
+   DDCMSG(D_PACKET,BLUE,"Minion %d:  LBC_ILLEGAL cmd=%d", minion->mID,LB_buf.cmd); \
+   result= psend_mcp(minion,&LB_buf); \
+   fsync(minion->mcp_sock); /* make sure the data gets written to the mcp before we close */ \
+   close(minion->mcp_sock); /* close this half of the connection to mcp */ \
+   exit(0); /* exit the forked minion */ \
 }
 
 
