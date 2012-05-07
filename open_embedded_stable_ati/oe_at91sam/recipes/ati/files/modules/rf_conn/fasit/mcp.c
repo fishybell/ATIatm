@@ -3,6 +3,10 @@
 #include "fasit_c.h"
 #include "rf.h"
 
+#ifdef ATMEL_ARM
+   #define EPOLLRDHUP EPOLLHUP /* redefine EPOLLRDHUP as we don't have it on the arm board */
+#endif
+
 thread_data_t minions[2046];    // we do start at 0 and there cannot be more than 2046
 struct sockaddr_in fasit_addr;
 int verbose;
@@ -550,6 +554,7 @@ int main(int argc, char **argv) {
 
                         minions[mID].S.hit.data = LB_devreg->hits;
                         minions[mID].S.exp.data = LB_devreg->expose?90:0;
+                        DCMSG(RED, "****************\nFound expose: exp.data=%i, LB_devreg->expose=%i\n**************** @ %i", minions[mID].S.exp.data, LB_devreg->expose, __LINE__);
                         minions[mID].S.speed.data = LB_devreg->speed*100.0;
                         minions[mID].S.move.data = LB_devreg->move;
                         minions[mID].S.react.data = LB_devreg->react;
@@ -727,6 +732,9 @@ DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\
                   DDCMSG(D_RF,BLACK,"Dead minion %i:%i, closing down fd %i", minion->mID, minion->RF_addr, minion_fd);
                   // minion is dead, reset forget bit for it
                   addr_pool[minion->RF_addr].inuse=0;
+                  // reset various information
+                  minion->S.fault.data = 0;
+                  minion->S.hit.data = 0;
 // re-use this spot when slave reconnects
 //                  addr_pool[minion->RF_addr].devid=0xffffffff; // invalid devid
 //                  addr_pool[minion->RF_addr].mID=0;

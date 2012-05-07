@@ -87,6 +87,8 @@ void print_verbosity_bits(void);
 #define LBC_STATUS_RESP_EXT             10
 #define LBC_STATUS_NO_RESP              11
 
+#define LBC_RESET                       12
+
 #define LBC_QEXPOSE                     16
 #define LBC_QCONCEAL                    17
 #define LBC_STATUS_REQ                  18
@@ -398,8 +400,18 @@ typedef struct LB_burst {
    uint32 number:7 __attribute__ ((packed)); // max of 128 items in a burst (really max of 83)
    uint32 pad:4 __attribute__ ((packed));
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:16 __attribute__ ((packed));
+   uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_burst_t;
+
+// LBC_RESET
+//    this message tells the slave device to reset its status
+typedef struct LB_reset {
+   // 1 * 32 bytes = 1 long - padding = 3 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:8 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_reset_t;
 
 
 

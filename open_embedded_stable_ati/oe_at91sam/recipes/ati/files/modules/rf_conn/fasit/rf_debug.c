@@ -67,6 +67,16 @@ void debug_QEXPOSE(int color, LB_packet_t *pkt) {
    DCMSG(color, "LBC_QEXPOSE: cmd: %i, addr: %i, crc: %02X", p->cmd, p->addr, p->crc);
 }
 
+void debug_BURST(int color, LB_packet_t *pkt) {
+   LB_burst_t *p = (LB_burst_t*)pkt;
+   DCMSG(color, "LBC_BURST: cmd: %i, number: %i, crc: %02X", p->cmd, p->number, p->crc);
+}
+
+void debug_RESET(int color, LB_packet_t *pkt) {
+   LB_reset_t *p = (LB_reset_t*)pkt;
+   DCMSG(color, "LBC_RESET: cmd: %i, addr: %i, crc: %02X", p->cmd, p->addr, p->crc);
+}
+
 void debug_QCONCEAL(int color, LB_packet_t *pkt) {
    LB_qconceal_t *p = (LB_qconceal_t*)pkt;
    DCMSG(color, "LBC_QCONCEAL: cmd: %i, addr: %im event: %i, uptime: %i, crc: %02X", p->cmd, p->addr, p->event, p->uptime, p->crc);
@@ -133,6 +143,10 @@ void debugRF(int color, char *packet, int len) {
             debug_STATUS_NO_RESP(color,pkt); break;
          case LBC_QEXPOSE:
             debug_QEXPOSE(color,pkt); break;
+         case LBC_BURST:
+            debug_BURST(color,pkt); break;
+         case LBC_RESET:
+            debug_RESET(color,pkt); break;
          case LBC_QCONCEAL:
             debug_QCONCEAL(color,pkt); break;
          case LBC_DEVICE_REG:

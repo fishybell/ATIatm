@@ -63,9 +63,9 @@ typedef struct fasit_connection {
    FASIT_2113 f2113_resp;
    LB_status_resp_ext_t last_status; 
    int last_fault;
-   int added_rf_to_epoll;
    int devid;
    int future_exp;
+   int doing_reset;
 
    // Data for RF handling
    int waiting_status_resp;
@@ -77,6 +77,7 @@ typedef struct fasit_connection {
 extern fasit_connection_t fconns[MAX_CONNECTIONS]; // a slot available for each connection
 extern int last_slot; // the last slot used
 extern int verbose;
+extern int added_rf_to_epoll; // whether or not we've connect the RF device
 
 // read/write function helpers
 int rfRead(int fd, char *dest, int *dests); // read a single RF message into given buffer, return do next
@@ -92,6 +93,7 @@ int handle_2005(fasit_connection_t *fc, int start, int end);
 int handle_2006(fasit_connection_t *fc, int start, int end);
 int send_2100_status_req(fasit_connection_t *fc);
 int send_2100_exposure(fasit_connection_t *fc, int exp);
+int send_2100_reset(fasit_connection_t *fc);
 int send_2100_power(fasit_connection_t *fc, int cmd);
 int send_2100_movement(fasit_connection_t *fc, int move, float speed);
 int send_2100_estop(fasit_connection_t *fc);
@@ -131,6 +133,7 @@ int handle_AUDIO_CONTROL(fasit_connection_t *fc, int start, int end);
 int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end);
 int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end);
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end);
+int handle_RESET(fasit_connection_t *fc, int start, int end);
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end);
 int send_EVENT_REPORT(fasit_connection_t *fc, int event);
 int send_DEVICE_REG(fasit_connection_t *fc);

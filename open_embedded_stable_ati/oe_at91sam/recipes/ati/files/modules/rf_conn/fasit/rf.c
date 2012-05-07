@@ -158,6 +158,7 @@ int RF_size(int cmd){
       case  LBC_STATUS_NO_RESP:
       case  LBC_QEXPOSE:
       case  LBC_BURST:
+      case  LBC_RESET:
          return (3);
 
       case  LBC_STATUS_RESP_LIFTER:
@@ -354,9 +355,12 @@ void DDpacket(uint8 *buf,int len){
             break;
 
          case LBC_STATUS_RESP_EXT:
+         {
+            LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)LB;
             strcpy(cmdname,"Status_Resp_Ext");
-            sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
+            sprintf(hbuf,"RFaddr=%3d hits=%2d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->addr,L->hits,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
             color=MAGENTA;
+         }
             break;
 
          case LBC_STATUS_NO_RESP:
@@ -367,6 +371,11 @@ void DDpacket(uint8 *buf,int len){
 
          case LBC_QEXPOSE:
             strcpy(cmdname,"Qexpose");
+            sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
+            break;
+
+         case LBC_RESET:
+            strcpy(cmdname,"Reset");
             sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
             break;
 

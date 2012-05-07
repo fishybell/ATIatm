@@ -138,7 +138,7 @@ int fasitRead(int fd, char *dest, int *dests) {
          // connection dead, remove it
          *dests = 0;
 perror("FASIT Died because ");
-DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
+DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
    }
@@ -172,7 +172,7 @@ int fasitWrite(fasit_connection_t *fc) {
       } else {
          // connection dead, remove it
 perror("FASIT Died because ");
-DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
+DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
    } else if (s < fc->fasit_olen) {
@@ -183,13 +183,13 @@ DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
       opts = fcntl(fc->fasit, F_GETFL); // grab existing flags
       if (opts < 0) {
 perror("FASIT Died because ");
-DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
+DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
       opts = (opts ^ O_NONBLOCK); // remove nonblock from existing flags
       if (fcntl(fc->fasit, F_SETFL, opts) < 0) {
 perror("FASIT Died because ");
-DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
+DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
 
@@ -199,7 +199,7 @@ DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
          if (ns < 0 && err != EAGAIN) {
             // connection dead, remove it
 perror("FASIT Died because ");
-DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
+DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
             return rem_fasitEpoll;
          }
          s += ns; // increase total written, possibly by zero
@@ -209,7 +209,7 @@ DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
       opts = (opts | O_NONBLOCK); // add nonblock back into existing flags
       if (fcntl(fc->fasit, F_SETFL, opts) < 0) {
 perror("FASIT Died because ");
-DDCMSG(D_PACKET,CYAN, "FASIT Dead at %i", __LINE__);
+DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
 
@@ -347,6 +347,7 @@ int send_2100_status_req(fasit_connection_t *fc) {
    FASIT_header hdr;
    FASIT_2100 bdy;
    DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_status_req(%08X)", fc);
+   DDCMSG(D_NEW, RED, "send_2100_status_req(%08X)", fc);
    defHeader(fc, 2100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
 
@@ -388,6 +389,23 @@ int send_2100_exposure(fasit_connection_t *fc, int exp) {
    D_memset(&bdy, 0, sizeof(FASIT_2100));
    bdy.cid = CID_Expose_Request;
    bdy.exp = exp;
+
+   // send
+   queueMsg(fc, &hdr, sizeof(FASIT_header));
+   queueMsg(fc, &bdy, sizeof(FASIT_2100));
+   return mark_fasitWrite;
+}
+
+int send_2100_reset(fasit_connection_t *fc) {
+   FASIT_header hdr;
+   FASIT_2100 bdy;
+   DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_reset(%8p)", fc);
+   defHeader(fc, 2100, &hdr); // sets the sequence number and other data
+   hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
+
+   // fill in body
+   D_memset(&bdy, 0, sizeof(FASIT_2100));
+   bdy.cid = CID_Reset_Device;
 
    // send
    queueMsg(fc, &hdr, sizeof(FASIT_header));
@@ -475,7 +493,14 @@ int handle_2101(fasit_connection_t *fc, int start, int end) {
    DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2101(%8p, %i, %i)", fc, start, end);
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2101_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2101));
-   return doNothing;
+   // doing reset? if so, disconnect
+   if (fc->doing_reset) {
+      fc->doing_reset = 0;
+DCMSG(RED, "Going to disconnect fasit connection...");
+      return rem_fasitEpoll;
+   } else {
+      return doNothing;
+   }
 }
 
 int handle_2102(fasit_connection_t *fc, int start, int end) {
@@ -507,6 +532,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
          fc->target_type = RF_Type_SES;
          break;
    }
+   DCMSG(RED, "****************\nFound expose: fc->f2102_resp.body.exp=%i\n****************", fc->f2102_resp.body.exp);
    // remember hit sensing settings
    fc->hit_on = fc->f2102_resp.body.hit_conf.on;
    if (htons(fc->f2102_resp.body.hit) > fc->hit_hit) {
@@ -528,8 +554,8 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    if (fc->waiting_status_resp) {
       fc->waiting_status_resp = 0; // not waiting anymore
       return send_STATUS_RESP(fc); // return appropriate information
-   } else if (!fc->added_rf_to_epoll) {
-      fc->added_rf_to_epoll = 1;
+   } else if (!added_rf_to_epoll) {
+      added_rf_to_epoll = 1;
       return add_rfEpoll; // the RF is ready to work now that I have a type
    } else {
       return doNothing; // just remember the status for later

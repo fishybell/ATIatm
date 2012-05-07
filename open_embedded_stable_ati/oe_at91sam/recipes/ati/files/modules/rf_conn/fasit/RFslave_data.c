@@ -56,6 +56,7 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
          case LBC_BURST:
+         case LBC_RESET:
          case LBC_QEXPOSE:
          case LBC_QCONCEAL:
          case LBC_REPORT_REQ:
@@ -539,6 +540,14 @@ int t2s_handle_QEXPOSE(rf_connection_t *rc, int start, int end) {
    return doNothing;
 } 
 
+int t2s_handle_RESET(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_RESET(%8p, %i, %i)", rc, start, end);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   return doNothing;
+} 
+
 int t2s_handle_QCONCEAL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
@@ -601,6 +610,7 @@ int tty2sock(rf_connection_t *rc) {
          t2s_HANDLE_RF (QCONCEAL); // keep track of ids? no
          t2s_HANDLE_RF (REQUEST_NEW); // keep track of devids
          t2s_HANDLE_RF (ASSIGN_ADDR); // keep track of ids? no
+         t2s_HANDLE_RF (RESET); // keep track of ids? no
          case LBC_BURST: { // keep track of packets
             LB_burst_t *pkt = (LB_burst_t *)(rc->tty_ibuf + start);
             rc->packets = pkt->number;
