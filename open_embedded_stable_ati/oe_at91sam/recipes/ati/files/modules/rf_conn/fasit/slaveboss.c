@@ -5,6 +5,7 @@
 #include "rf_debug.h"
 
 int verbose = 0;    // so debugging works right in all modules
+int added_rf_to_epoll = 0; // whether or not we've connect the RF device
 int last_slot = -1; // last slot used starts at no slot used
 fasit_connection_t fconns[MAX_CONNECTIONS];
 
@@ -132,6 +133,7 @@ int handleRet(int ret, fasit_connection_t *fc, int efd) {
          perror("errno: ");
       close(fc->rf); // nothing to do if errors...ignore return value from close()
          //exit(1);
+      DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__);
       done = 1; // TODO -- don't be done, accept again on rfclient
    }
    if (ret & rem_fasitEpoll) {
@@ -154,6 +156,7 @@ int handleRet(int ret, fasit_connection_t *fc, int efd) {
 DDCMSG(D_MEGA, GREEN,"ADDING %i TO EPOLL(rfclient)", fc->rf);
       if (epoll_ctl(efd, EPOLL_CTL_ADD, fc->rf, &ev) < 0) {
          DDCMSG(D_MEGA, RED, "slaveboss epoll add rfclient failed");
+         DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__);
          done = 1;
       }
    }
@@ -296,6 +299,7 @@ int main(int argc, char **argv) {
                // closed socket?
                if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
                   // client closed, shutdown -- TODO -- don't shutdown, handle new connection
+                  DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__);
                   done = 1;
                // writing?
                } else if (events[n].events & EPOLLOUT) {
@@ -303,6 +307,7 @@ int main(int argc, char **argv) {
                   for (i = 0; !done && !close_nicely && i <= last_slot; i++) {
                      // rfWrite will decide whether to handle the packet or not
                      done = handleRet(rfWrite(&fconns[i]),&fconns[i], efd);
+                     if (done) { DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__); }
                   }
                // reading?
                } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
@@ -321,6 +326,7 @@ int main(int argc, char **argv) {
                         // rf2fasit will decide whether to handle the packet or not
                         while (!done && !close_nicely && (ret = rf2fasit(&fconns[i], tbuf, ms)) != doNothing) {
                            done = handleRet(ret, &fconns[i], efd);
+                           if (done) { DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__); }
                         }
                      }
                   }
@@ -379,6 +385,7 @@ int main(int argc, char **argv) {
 
                // send 100 message
                done = handleRet(send_100(&fconns[index]), &fconns[index], efd);
+               if (done) { DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__); }
             } else if (events[n].data.ptr != NULL) {
                // mangle and send to to rf connection
                fasit_connection_t *fc = (fasit_connection_t*) events[n].data.ptr;
@@ -388,10 +395,12 @@ int main(int argc, char **argv) {
                if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
                   // close by handling like a rem_fasitEpoll
                   done = handleRet(rem_fasitEpoll, fc, efd);
+                  if (done) { DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__); }
                // writing?
                } else if (events[n].events & EPOLLOUT) {
                   // fasitWrite will write what's available to the fasit client
                   done = handleRet(fasitWrite(fc), fc, efd);
+                  if (done) { DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__); }
                // reading?
                } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
                   char tbuf[FASIT_BUF_SIZE]; // temporary read buffer
@@ -403,11 +412,13 @@ int main(int argc, char **argv) {
                   addToFASITBuffer(fc, tbuf, ms);
                   if (ret != doNothing) {
                      done = handleRet(ret, fc, efd);
+                     if (done) { DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__); }
                   } else {
                      // fasit2rf will decide whether to handle the packet or not
                      while (!done && !close_nicely && (ret = fasit2rf(fc, tbuf, ms)) != doNothing) {
                         DDCMSG(D_MEGA, CYAN, "FASIT ret is %i", ret);
                         done = handleRet(ret, fc, efd);
+                        if (done) { DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__); }
                      }
                      DDCMSG(D_MEGA, BLUE, "FASIT ret is %i", ret);
                   }
