@@ -20,6 +20,10 @@ default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm RFslave
 mcp : mcp.c minion_state.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion_state.c minion.c $(MCFILES)
 
+mcp.arm : mcp.c minion_state.c minion.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o mcp mcp.c minion_state.c minion.c $(MCFILES)
+	$(XGCC) -D ATMEL_ARM --sysroot=$(SYSROOT) -lrt -std=gnu99 -o mcp.arm mcp.c minion_state.c minion.c $(MCFILES)
+
 mcp.exe : mcp.c minion_state.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp.exe mcp.c minion_state.c minion.c $(MCFILES)
 
