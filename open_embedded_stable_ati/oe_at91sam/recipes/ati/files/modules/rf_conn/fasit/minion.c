@@ -179,12 +179,14 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
          // instead of obfuscating the 0,45,and 90 values, just use them.
 
          msg.body.exp = minion->S.exp.data;
+         DCMSG(RED, "****************\nFound expose: msg.body.exp=%i\n**************** @ %i", msg.body.exp, __LINE__);
          msg.body.speed = 0.0;
          break;
       case Type_MIT:
       case Type_MAT:
          msg.body.speed = htonf(minion->S.speed.data);
          msg.body.exp = minion->S.exp.data;
+         DCMSG(RED, "****************\nFound expose: msg.body.exp=%i\n**************** @ %i", msg.body.exp, __LINE__);
          msg.body.move = minion->S.move.data;
          msg.body.pos = htons(minion->S.position.data);
          DDCMSG(D_PACKET,BLUE,"Minion %d: building 2102 status.   S.position.data=%d msg.body.pos=%d  htons(...)=%d ",
@@ -336,6 +338,7 @@ void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expos
    minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec; // remember "up" time for event
    minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
    minion->S.exp.data=45;  // make the current positon in movement
+   DCMSG(RED, "****************\nFound expose: S.exp.newdata=%i, S.exp.data=%i\n**************** @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
    START_EXPOSE_TIMER(minion->S); // new state timer code
 
    //  really need to fill in with the right stuff
@@ -621,8 +624,9 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 
                   // new state timer code
                   minion->S.exp.data=45;  // make the current positon in movement
+                  DCMSG(RED, "****************\nFound expose: S.exp.newdata=%i, S.exp.data=%i\n**************** @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
                   minion->S.event.missed = 0;
-                  setTimerTo(minion->S.event, timer, flags, EVENT_RESPONSE_TIME, F_event_start);
+                  setTimerTo(minion->S.event, timer, flags, EVENT_SOON_TIME, F_event_start);
                   START_CONCEAL_TIMER(minion->S);
                }
 
@@ -634,11 +638,16 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                //    that is causing a bit of trouble.
                break;
 
-            case CID_Reset_Device:
+            case CID_Reset_Device: {
+               LB_reset_t LBr;
                // send 2101 ack
                DDCMSG(D_PACKET,BLUE,"Minion %d: CID_Reset_Device  send 'S'uccess ack.   set lastHitCal.* to defaults",minion->mID) ;
                send_2101_ACK(header,'S',minion);
-               // TODO -- this opens a serious can of worms, should probably handle via minion telling RFmaster to set the forget bit and resetting its own state
+               // this opens a serious can of worms, should probably handle via minion telling RFmaster to set the forget bit and resetting its own state
+               LBr.cmd = LBC_RESET;
+               LBr.addr=minion->RF_addr;
+               psend_mcp(minion,&LBr);
+               DISCONNECT; // will reset minion state properly
 
                // also supposed to reset all values to the 'initial exercise step value'
                //  which I am not sure if it is different than ordinary inital values 
@@ -674,7 +683,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                //minion->S.mode.newdata = message_2100->mode;
                //minion->S.mode.flags |= F_tell_RF;     // just note it was set
 #endif
-               break;
+            }   break;
 
                /* handle emergency stop the same as a move request */               
             case CID_Stop: 
@@ -1136,6 +1145,7 @@ void *minion_thread(thread_data_t *minion){
                   DDCMSG(D_PARSE,YELLOW,"Minion %d: (Rf_addr=%d) parsed 'Event_report'. hits=%d  sending 2102 status",
                          minion->mID,minion->RF_addr,L->hits);
 
+                  DCMSG(RED, "****************\nFound expose: before:exp.data=%i, after:exp.newdata=%i\n**************** @ %i", minion->S.exp.data, minion->S.exp.newdata, __LINE__);
                   minion->S.exp.data = minion->S.exp.newdata; // finish transition
                   sendStatus2102(0, NULL,minion);
 
@@ -1181,6 +1191,7 @@ void *minion_thread(thread_data_t *minion){
                   // finish transition
                   finishTransition(minion);
 
+                  DCMSG(RED, "****************\nFound expose: before:exp.data=%i, after:L->expose=%i\n**************** @ %i", minion->S.exp.data, L->expose, __LINE__);
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
 #if 0 /* start of old state timer code */
                   minion->S.exp.timer=0;
@@ -1223,6 +1234,7 @@ void *minion_thread(thread_data_t *minion){
                      // we're down, change state to going slow
                      START_CONCEAL_TIMER(minion->S);
                   }
+                  DCMSG(RED, "****************\nFound expose: before:exp.data=%i, after:L->expose=%i\n**************** @ %i", minion->S.exp.data, L->expose, __LINE__);
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
 #if 0 /* start of old state timer code */
                   minion->S.exp.timer=0;
@@ -1267,6 +1279,7 @@ void *minion_thread(thread_data_t *minion){
                   // finish transition
                   finishTransition(minion);
 
+                  DCMSG(RED, "****************\nFound expose: before:exp.data=%i, after:L->expose=%i\n**************** @ %i", minion->S.exp.data, L->expose, __LINE__);
                   minion->S.exp.data=L->expose ? 90 : 0; // convert to only up or down
 #if 0 /* start of old state timer code */
                   minion->S.exp.timer=0;
