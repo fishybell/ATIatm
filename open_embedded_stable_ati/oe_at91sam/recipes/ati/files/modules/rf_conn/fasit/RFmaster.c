@@ -551,6 +551,68 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          }
       }
 
+      // read range interface client
+      TIMESTAMP_NOW;
+      DDCMSG(D_TIME,BLACK,"RFmaster checking FD_ISSET(riclient:%i)=%i @ time %5ld.%03ld", *riclient, ep_ric, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+#if 0 /* old select method */
+      if (*riclient > 0 && FD_ISSET(*riclient,&rf_or_mcp))
+#endif /* end of old select method */
+      if (*riclient > 0 && ep_ric != -1) {
+         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(riclient)=%i @ time %5ld.%03ld", ep_ric, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+         int size;
+         char buf[128];
+         int err;
+         size=read(*riclient,buf,128);
+         err = errno;
+         if (size <= 0 && err != EAGAIN) {
+            DDCMSG(D_NEW, YELLOW, "Range Interface %i dead @ line %i", *riclient, __LINE__);
+            close(*riclient);
+            *riclient = -1;
+            // new epoll method
+            epoll_ctl(efd, EPOLL_CTL_DEL, *riclient, NULL);
+         } else {
+            DDCMSG(D_RF|D_VERY, YELLOW, "Read from Range Interface %i bytes: %s", size,buf);
+         }
+      }
+
+      // accept range interface client
+      TIMESTAMP_NOW;
+      DDCMSG(D_TIME,BLACK,"RFmaster checking FD_ISSET(risock:%i)=%i @ time %5ld.%03ld", risock, ep_ris, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+#if 0 /* old select method */
+      if (FD_ISSET(risock,&rf_or_mcp))
+#endif /* end of old select method */
+      if (ep_ris != -1) {
+         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(risock)=%i @ time %5ld.%03ld", ep_ris, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+         int newclient = -1;
+         struct sockaddr_in ClntAddr;   /* Client address */
+         unsigned int clntLen;               /* Length of client address data structure */
+         // close existing one
+         if (*riclient > 0) {
+            DDCMSG(D_NEW, YELLOW, "Range Interface %i dead @ line %i", *riclient, __LINE__);
+            close(*riclient);
+            *riclient = -1;
+            // new epoll method
+            epoll_ctl(efd, EPOLL_CTL_DEL, *riclient, NULL);
+         }
+         if ((newclient = accept(risock, (struct sockaddr *) &ClntAddr,  &clntLen)) > 0) {
+            int yes=1;
+            // replace existing riclient with new one
+            *riclient = newclient;
+            DDCMSG(D_RF|D_VERY, BLACK, "new working riclient %i from %s", *riclient, inet_ntoa(ClntAddr.sin_addr));
+            setsockopt(*riclient, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
+            setnonblocking(*riclient);
+            write(*riclient, "V\n", 2); // we're valid if we connect here
+            // new epoll method
+            if (epoll_ctl(efd, EPOLL_CTL_ADD, *riclient, &ev) < 0) {
+               fprintf(stderr, "epoll *riclient insertion error\n");
+               //close_nicely=1; -- not on riclient, it's just not worth it
+               close(*riclient);
+               *riclient = 1;
+               epoll_ctl(efd, EPOLL_CTL_DEL, *riclient, NULL);
+            }
+         }// if error, ignore
+      }
+
       //  Testing has shown that we generally get 8 character chunks from the serial port
       //  when set up the way it is right now.
       // we must splice them back together
@@ -576,23 +638,35 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          if ((gotrf = gather_rf(RFfd,Rptr,RF_BUF_SIZE-Rsize)) > 0) {
             Rsize += gotrf;
             Rptr = Rbuf + Rsize;
+         } else {
+            Rsize = Rptr - Rbuf;
          }
 
          if (gotrf <= 0) {
-            DDCMSG(D_NEW,BLACK,"RFmaster RF Received no data");
+            DDCMSG(D_NEW,BLACK,"RFmaster RF Received no data: %p %i", riclient, gotrf);
          } else {
             DDCMSG(D_NEW,BLACK,"RFmaster RF Received %i bytes", gotrf);
          }
 
          // after gathering RF data, we're free, tell the Radio Interface client
-         if (*riclient > 0) {
-            DDCMSG(D_RF|D_VERY, BLACK, "writing riclient F\\n");
+         DDCMSG(D_NEW,BLACK,"RFmaster got to here 1...");
+         if (gotrf <= 0) {
+            DDCMSG(D_NEW,BLACK,"RFmaster got to here 3...");
+            DDCMSG(D_NEW,BLACK,"clowing riclient %i", *riclient);
+            close(*riclient);
+            *riclient = -1;
+            // new epoll method
+            epoll_ctl(efd, EPOLL_CTL_DEL, *riclient, NULL);
+         } else if (*riclient > 0) {
+            DDCMSG(D_RF|D_VERY, BLACK, "writing riclient %i F\\n", *riclient);
             write(*riclient, "F\n", 2);
          }
+         DDCMSG(D_NEW,BLACK,"RFmaster got to here 2...");
 
          /* send valid message(s) to mcp */
          Rstart = Rbuf;
          while (Rstart < (Rptr - 2)) { /* look up until we don't have enough characters for a full message */
+            DDCMSG(D_NEW,BLACK,"RFmaster got to here as well...%p %p", Rstart, Rptr);
             LB=(LB_packet_t *)Rstart;   // map the header in
             size=RF_size(LB->cmd);
             crc=(size > 2) ? crc8(LB) : 1; // only calculate crc if we have a valid size
@@ -736,68 +810,6 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
 #endif
       } // if this fd is ready
 
-      // read range interface client
-      TIMESTAMP_NOW;
-      DDCMSG(D_TIME,BLACK,"RFmaster checking FD_ISSET(riclient:%i)=%i @ time %5ld.%03ld", *riclient, ep_ric, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
-#if 0 /* old select method */
-      if (*riclient > 0 && FD_ISSET(*riclient,&rf_or_mcp))
-#endif /* end of old select method */
-      if (*riclient > 0 && ep_ric != -1) {
-         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(riclient)=%i @ time %5ld.%03ld", ep_ric, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
-         int size;
-         char buf[128];
-         int err;
-         size=read(*riclient,buf,128);
-         err = errno;
-         if (size <= 0 && err != EAGAIN) {
-            DDCMSG(D_NEW, YELLOW, "Range Interface %i dead @ line %i", *riclient, __LINE__);
-            close(*riclient);
-            *riclient = -1;
-            // new epoll method
-            epoll_ctl(efd, EPOLL_CTL_DEL, *riclient, NULL);
-         } else {
-            DDCMSG(D_RF|D_VERY, YELLOW, "Read from Range Interface %i bytes: %s", size,buf);
-         }
-      }
-
-      // accept range interface client
-      TIMESTAMP_NOW;
-      DDCMSG(D_TIME,BLACK,"RFmaster checking FD_ISSET(risock:%i)=%i @ time %5ld.%03ld", risock, ep_ris, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
-#if 0 /* old select method */
-      if (FD_ISSET(risock,&rf_or_mcp))
-#endif /* end of old select method */
-      if (ep_ris != -1) {
-         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(risock)=%i @ time %5ld.%03ld", ep_ris, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
-         int newclient = -1;
-         struct sockaddr_in ClntAddr;   /* Client address */
-         unsigned int clntLen;               /* Length of client address data structure */
-         // close existing one
-         if (*riclient > 0) {
-            DDCMSG(D_NEW, YELLOW, "Range Interface %i dead @ line %i", *riclient, __LINE__);
-            close(*riclient);
-            *riclient = -1;
-            // new epoll method
-            epoll_ctl(efd, EPOLL_CTL_DEL, *riclient, NULL);
-         }
-         if ((newclient = accept(risock, (struct sockaddr *) &ClntAddr,  &clntLen)) > 0) {
-            int yes=1;
-            // replace existing riclient with new one
-            *riclient = newclient;
-            DDCMSG(D_RF|D_VERY, BLACK, "new working riclient %i from %s", *riclient, inet_ntoa(ClntAddr.sin_addr));
-            setsockopt(*riclient, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)); // set keepalive so we disconnect on link failure or timeout
-            setnonblocking(*riclient);
-            write(*riclient, "V\n", 2); // we're valid if we connect here
-            // new epoll method
-            if (epoll_ctl(efd, EPOLL_CTL_ADD, *riclient, &ev) < 0) {
-               fprintf(stderr, "epoll *riclient insertion error\n");
-               //close_nicely=1; -- not on riclient, it's just not worth it
-               close(*riclient);
-               *riclient = 1;
-               epoll_ctl(efd, EPOLL_CTL_DEL, *riclient, NULL);
-            }
-         }// if error, ignore
-      }
-
       /***************     reads the message from MCP into the Rx Queue
        ***************/
       TIMESTAMP_NOW;
@@ -894,7 +906,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    if (*riclient > 0) {
       DDCMSG(D_NEW, YELLOW, "Range Interface %i dead @ line %i", *riclient, __LINE__);
       close(*riclient);
-      *riclient = 1;
+      *riclient = -1;
       // new epoll method
       epoll_ctl(efd, EPOLL_CTL_DEL, *riclient, NULL);
    }
