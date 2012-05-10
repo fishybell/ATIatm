@@ -271,7 +271,6 @@ mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return l
     // determine established value
     if (--sensors[line].l_count == 0) { // tests if the new value is 0 or not
         sensors[line].establish_val = in_val; // set as established
-
         // was it a hit?
         if (in_val == 1) {
             if (hit_callback == NULL) {
@@ -279,7 +278,7 @@ mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return l
             } else {
                 hit_callback(line); // the hit sensor polling will wait for this to finish
             }
-        }
+        } 
     }
 
     // remember this value as the new last value
@@ -345,10 +344,12 @@ void set_hit_invert(int invert) { // resets current poll counters
 
     // invert line (discard current data)
     spin_lock(&sensors[line].lock);
-    sensors[line].invert = invert;
-    sensors[line].last_val = -1; // invalid last value
-    sensors[line].establish_val = -1; // invalid established value
-    sensors[line].l_count = -1; // invalid counting value
+    if (invert != sensors[line].invert) {
+        sensors[line].invert = invert;
+        sensors[line].last_val = -1; // invalid last value
+        sensors[line].establish_val = -1; // invalid established value
+        sensors[line].l_count = -1; // invalid counting value
+    }
     spin_unlock(&sensors[line].lock);
 }
 EXPORT_SYMBOL(set_hit_invert);
