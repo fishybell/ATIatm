@@ -167,6 +167,7 @@ int RF_size(int cmd){
          return (4);
 
       case  LBC_REPORT_REQ:
+      case  LBC_REPORT_ACK:
       case  LBC_MOVE:
       case  LBC_GROUP_CONTROL:
          return (5);
@@ -282,6 +283,14 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_report_req_t *L=(LB_report_req_t *)LB;
             strcpy(cmdname,"Report_Req");
+            sprintf(hbuf,"RFaddr=%3d   event=%2d",L->addr,L->event);
+         }
+         break;
+
+         case LBC_REPORT_ACK:
+         {
+            LB_report_ack_t *L=(LB_report_ack_t *)LB;
+            strcpy(cmdname,"Report_Ack");
             sprintf(hbuf,"RFaddr=%3d   event=%2d",L->addr,L->event);
          }
          break;

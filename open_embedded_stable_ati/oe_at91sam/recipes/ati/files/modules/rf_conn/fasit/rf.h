@@ -95,6 +95,7 @@ void print_verbosity_bits(void);
 #define LBC_REPORT_REQ                  19
 
 #define LBC_EVENT_REPORT                20
+#define LBC_REPORT_ACK                  21
 
 #define LBC_BURST                   25
 
@@ -311,6 +312,20 @@ typedef struct LB_event_report {
 
 } __attribute__ ((packed))  LB_event_report_t;
 
+
+//                                                  LBC_REPORT_ACK packet
+//   LBC_REPORT_ACK packet
+typedef struct LB_report_ack {
+   // 5 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+   uint32 event:13 __attribute__ ((packed));
+   uint32 pad:3 __attribute__ ((packed));
+
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
+
+} __attribute__ ((packed))  LB_report_ack_t;
 
 // LBC_MOVE
 //    we still have 4 more bits

@@ -256,6 +256,7 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_STATUS_NO_RESP:
          case LBC_EVENT_REPORT:
          case LBC_REPORT_REQ:
+         case LBC_REPORT_ACK:
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
          case LBC_QEXPOSE:
