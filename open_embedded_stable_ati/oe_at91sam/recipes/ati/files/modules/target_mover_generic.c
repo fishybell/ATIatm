@@ -28,7 +28,7 @@
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
 //#define DEBUG_PRINT
-//#define DEBUG_SEND
+#define DEBUG_SEND
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -240,6 +240,7 @@ static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false, false};
 // These atomic variables is use to indicate global position changes
 //---------------------------------------------------------------------------
 atomic_t continuous_speed = ATOMIC_INIT(0);
+atomic_t last_reported_speed = ATOMIC_INIT(0);
 atomic_t last_direction = ATOMIC_INIT(0);
 atomic_t lifter_fault = ATOMIC_INIT(0);
 atomic_t found_home = ATOMIC_INIT(0);
@@ -710,28 +711,17 @@ static void setPidSettings(int new_speed)
 {
    int Ku = 0, Pu = 1000, Kp = 0, Tu = 100;
     if (mover_type == IS_MAT) { // MAT
-       if (new_speed <= 50) {
-         Ku = new_speed;
-//         Kp = Ku * 10 / 6; //Classic
+      Ku = new_speed;
+//      Kp = Ku * 10 / 6; //Classic
+      if (new_speed <= 200) {
+         Kp = Ku / 8; // some overshoot
+      } else {
          Kp = Ku / 3; // some overshoot
-//         kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 8; // classic
-         kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 3; // some overshoot
-       } else if (new_speed <= 100) {
-         Ku = new_speed;
-         Kp = Ku / 3; // some overshoot
-         kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 3; // some overshoot
-       } else if (new_speed <= 200) {
-         Ku = new_speed;
-         Kp = Ku / 3; // some overshoot
-         kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 3; // some overshoot
-       } else if (new_speed <= 1000) {
-         kp_m = 1; kp_d = 3; ki_m = 15; ki_d = 47515; kd_m = 190060; kd_d = 15;
-         Ku = 2 * new_speed;
-         Kp = Ku * 10 / 6;
-         kp_m = Ku; kp_d = 1; ki_m = 4 * Kp; ki_d = Pu; kd_m = Kp * Pu; kd_d = 8;
-       } else {
-         kp_m = 1; kp_d = 3; ki_m = 15; ki_d = 47515; kd_m = 190060; kd_d = 15;
-       }
+      }
+//      kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 8; // classic
+      kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 3; // some overshoot
+//      ki_m = 0; // No pid_d for MITs
+      kd_m = 0; // No pid_d for MITs
     } else if (mover_type == IS_MIT) { // MIT
          Ku = new_speed;
 //         Kp = Ku * 10 / 6; //Classic
@@ -742,27 +732,7 @@ static void setPidSettings(int new_speed)
          }
 //         kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 8; // classic
          kp_m = Kp; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 3; // some overshoot
-#if 0
-       if (new_speed <= 50) {
-         Ku = new_speed;
-//         Kp = Ku * 10 / 6; //Classic
-         Kp = Ku / 3; // some overshoot
-//         kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 8; // classic
-         kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 3; // some overshoot
-       } else if (new_speed <= 100) {
-         kp_m = 2; kp_d = 15; ki_m = 1; ki_d = 184320; kd_m = 32768; kd_d = 15;
-         Ku = 2 * new_speed;
-         Kp = Ku * 10 / 6;
-         kp_m = Ku; kp_d = 1; ki_m = 4 * Kp; ki_d = Pu; kd_m = Kp * Pu; kd_d = 8;
-       } else if (new_speed <= 250) {
-         kp_m = 2; kp_d = 15; ki_m = 1; ki_d = 184320; kd_m = 32768; kd_d = 15;
-         Ku = 2 * new_speed;
-         Kp = Ku * 10 / 6;
-         kp_m = Ku; kp_d = 1; ki_m = 4 * Kp; ki_d = Pu; kd_m = Kp * Pu; kd_d = 8;
-       } else {
-         kp_m = 2; kp_d = 15; ki_m = 1; ki_d = 184320; kd_m = 32768; kd_d = 15;
-       }
-#endif
+         kd_m = 0; // No pid_d for MITs
     }
 }
 
@@ -1085,6 +1055,26 @@ static void pid_timeout_fire(unsigned long data)
       }
 
       pid_timeout_stop();
+#if 0
+      if (atomic_read(&goal_atomic) != 0){
+         // We only care about direction if we are moving
+         if (atomic_read(&quad_direction) == 1){
+            // Forward detected
+            if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE){
+               do_fault(ERR_wrong_direction);
+               atomic_set(&continuous_speed, 0);
+               mover_speed_stop();
+            }
+         } else {
+            // Reverse detected
+            if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD){
+               do_fault(ERR_wrong_direction);
+               atomic_set(&continuous_speed, 0);
+               mover_speed_stop();
+            }
+         }
+      }
+#endif
       pid_step();
       pid_timeout_start();
     }
@@ -2026,6 +2016,10 @@ static int calcPidError( int new, int input){
     int pidError = 0, diff = 0;
     pidError = new - input; // set point - input
     if (pidError < 0) { // Going too fast
+// If the error is too big set error as 1/2 of the desired speed
+      if (pidError < ((((-1) * new) * 3) / 2)){
+         pidError = (((-1) * new) / 2);
+      } else {
 // Allow error to be less than actual error
 // if within a percentage. This will allow
 // the effort to float down. This is especially
@@ -2041,6 +2035,7 @@ static int calcPidError( int new, int input){
          pidError /= 3;
       } else {
          pidError /= 2;
+      }
       }
     } else {
     }
@@ -2083,8 +2078,19 @@ static int calcTargetRatio( int input, int new){
 // Get/set functions for external control from within kernel
 //---------------------------------------------------------------------------
 int mover_speed_get(void) {
+   int rtnSpeed;
    DELAY_PRINTK("mover_speed_get\n");
-   return current_speed10();  // changed from current_speed
+   rtnSpeed = current_speed10();  // changed from current_speed
+#if 0
+   if (rtnSpeed < 1000) {
+      rtnSpeed = atomic_read(&last_reported_speed);
+   } else if (rtnSpeed > 1000) {
+      rtnSpeed = atomic_read(&last_reported_speed);
+   }
+   atomic_set(&last_reported_speed, rtnSpeed);
+#endif
+   SENDUSERCONNMSG( "rtnSpeed,%i" ,rtnSpeed);
+   return rtnSpeed;  // changed from current_speed
 }
 EXPORT_SYMBOL(mover_speed_get);
 
@@ -2912,7 +2918,7 @@ static void pid_step() {
 
        // descrete PID algorithm gleamed from Scott's brain
 //       pid_effort = pid_last_effort + pid_p + pid_i + pid_d;
-       pid_effort = pid_p + pid_i;
+       pid_effort = pid_p + pid_i + pid_d;
 
    SENDUSERCONNMSG( "pid0,r,%d,p,%i,i,%i,d,%i,e,%i,t,%i", pid_error, pid_p, pid_i, pid_d, pid_effort,direction);
     // max effort to 100%
@@ -2920,6 +2926,7 @@ static void pid_step() {
       pid_effort += 1000;
    }
 
+    pid_last_error = pid_error;
     // move past errors back in error buffer
     for (i=0; i<MAX_PID_ERRORS-1; i++) {
        pid_errors[i] = pid_errors[i+1];
