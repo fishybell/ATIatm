@@ -249,61 +249,65 @@ typedef struct LB_assign_addr_t {
 // LBC_EXPOSE
 //    we still have 4 more bits
 typedef struct LB_expose {
-   // 6
+   // 7
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
-
-   uint32 event:5 __attribute__ ((packed));
    uint32 expose:1 __attribute__ ((packed)); // wait...the expose command always does expose...we now use this bit to say "yes, we're doing an expose" vs. "no, just change the 'event' number we're on, the hit sensing, etc."
    uint32 hitmode:1 __attribute__ ((packed));
    uint32 tokill:4 __attribute__ ((packed));
    uint32 react:3 __attribute__ ((packed));
    uint32 mfs:2 __attribute__ ((packed));
-
    uint32 thermal:1 __attribute__ ((packed));
    uint32 pad:7 __attribute__ ((packed));
+
+   uint32 event:13 __attribute__ ((packed));
+   uint32 pad2:3 __attribute__ ((packed));
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:16 __attribute__ ((packed));
+   uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_expose_t;
 
 //                                                LBC_QCONCEAL
 // LBC_QCONCEAL
 //    
 typedef struct LB_qconceal {
-   // 5 bytes
+   // 7 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed));     // destination address (always from basestation)
-   uint32 event:5 __attribute__ ((packed));     // rolling event sequence number
-   uint32 uptime:11 __attribute__ ((packed));   // time target was up, in deciseconds ( max 204.7 seconds)
+   uint32 event:13 __attribute__ ((packed));     // rolling event sequence number
+   uint32 pad:3 __attribute__ ((packed));
 
+   uint32 uptime:11 __attribute__ ((packed));   // time target was up, in deciseconds ( max 204.7 seconds)
+   uint32 pad2:5 __attribute__ ((packed));
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:24 __attribute__ ((packed));
+   uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_qconceal_t;
 
 //                                                  LBC_REPORT_REQ packet
 //   LBC_REPORT_REQ packet
 typedef struct LB_report_req {
-   // 4 bytes
+   // 5 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
-   uint32 event:5 __attribute__ ((packed));
+   uint32 event:13 __attribute__ ((packed));
    uint32 pad:3 __attribute__ ((packed));
+
    uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
 
 } __attribute__ ((packed))  LB_report_req_t;
 
 //                                                  LBC_EVENT_REPORT packet
 //   LBC_EVENT_REPORT packet
 typedef struct LB_event_report {
-   // 5 bytes
+   // 6 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
-   uint32 event:5 __attribute__ ((packed));
+   uint32 event:13 __attribute__ ((packed));
    uint32 pad:3 __attribute__ ((packed));
-   uint32 hits:8 __attribute__ ((packed));
 
+   uint32 hits:8 __attribute__ ((packed));
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:24 __attribute__ ((packed));
+   uint32 padding:16 __attribute__ ((packed));
 
 } __attribute__ ((packed))  LB_event_report_t;
 
