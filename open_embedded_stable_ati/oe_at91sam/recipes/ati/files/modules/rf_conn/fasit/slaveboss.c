@@ -9,14 +9,16 @@ int added_rf_to_epoll = 0; // whether or not we've connect the RF device
 int last_slot = -1; // last slot used starts at no slot used
 fasit_connection_t fconns[MAX_CONNECTIONS];
 
-#define MAX_EVENTS 16
+#define MAX_EVENTS 16 /* for epoll */
 
 // global hit logging routines
 void log_ResetHits(fasit_connection_t *fc) {
    int i;
    DDCMSG(D_PACKET, RED, "Reset hits for %i", fc->current_event);
-   for (i = 0; i < 128; i++) {
-      D_memset(&fc->hit_times[fc->current_event][i], 0, sizeof(struct timespec));
+   for (i = 0; i < MAX_HITS; i++) {
+      if (fc->hit_times[i].event == fc->current_event) {
+         D_memset(&fc->hit_times[i], 0, sizeof(hit_event_t));
+      }
    }
    fc->hits_per_event[fc->current_event] = 0;
 }
@@ -24,14 +26,23 @@ void log_ResetHits(fasit_connection_t *fc) {
 void log_NewHits(fasit_connection_t *fc, int new_hits) {
    // got new hits
    struct timespec tv;
+   int i=0;
    clock_gettime(CLOCK_MONOTONIC,&tv);
    DDCMSG(D_PACKET, YELLOW, "Remembering %i new hits", new_hits);
    
    // log each hit time individually
    while (new_hits-- > 0) {
       if (++fc->hits_per_event[fc->current_event] <= 127) {
-         DCMSG(BLACK, "Setting %ld:%ld in fc->hit_times[%i][%i] (from fc->hits_per_event[%i])", tv.tv_sec, tv.tv_nsec, fc->current_event, fc->hits_per_event[fc->current_event], fc->current_event);
-         fc->hit_times[fc->current_event][fc->hits_per_event[fc->current_event]] = tv;
+         for (/* don't reset i */; i < MAX_HITS; i++) {
+            if (fc->hit_times[i].event == 0 &&
+                fc->hit_times[i].time.tv_sec == 0 &&
+                fc->hit_times[i].time.tv_nsec == 0l) {
+               DCMSG(BLACK, "Setting %5ld.%03ld in fc->hit_times[%i] with event %i", tv.tv_sec, tv.tv_nsec/1000000l, i, fc->current_event);
+               fc->hit_times[i].time = tv;
+               fc->hit_times[i].event = fc->current_event;
+               break; // move on to next hit
+            }
+         }
       }
    }
 }
