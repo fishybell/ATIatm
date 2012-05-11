@@ -470,12 +470,11 @@ int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int t
    // remember for later
    fc->hit_on = on;
    DDCMSG(D_PACKET, RED, "Setting Hits to %i", hit);
-   if (hit > fc->hit_hit) {
-      log_NewHits(fc, hit - fc->hit_hit);
+   if (hit > 0) {
+      log_NewHits(fc, hit);
    } else if (hit == 0) {
-      log_ResetHits(fc);
+// TODO -- reset when we get the event ack for the given event --      log_ResetHits(fc);
    }
-   fc->hit_hit = hit;
    fc->hit_react = react;
    fc->hit_tokill = tokill;
    fc->hit_sens = sens;
@@ -504,6 +503,7 @@ DCMSG(RED, "Going to disconnect fasit connection...");
 }
 
 int handle_2102(fasit_connection_t *fc, int start, int end) {
+   int retval = doNothing;
    DDCMSG(D_PACKET|D_VERY,CYAN, "handle_2102(%8p, %i, %i)", fc, start, end);
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2102_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2102));
@@ -535,15 +535,24 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    DCMSG(RED, "****************\nFound expose: fc->f2102_resp.body.exp=%i\n****************", fc->f2102_resp.body.exp);
    // remember hit sensing settings
    fc->hit_on = fc->f2102_resp.body.hit_conf.on;
-   if (htons(fc->f2102_resp.body.hit) > fc->hit_hit) {
-      log_NewHits(fc, htons(fc->f2102_resp.body.hit) - fc->hit_hit);
-   }
-   fc->hit_hit = htons(fc->f2102_resp.body.hit);
    fc->hit_react = fc->f2102_resp.body.hit_conf.react;
    fc->hit_tokill = htons(fc->f2102_resp.body.hit_conf.tokill);
    fc->hit_sens = htons(fc->f2102_resp.body.hit_conf.sens);
    fc->hit_mode = fc->f2102_resp.body.hit_conf.mode;
    fc->hit_burst = htons(fc->f2102_resp.body.hit_conf.burst);
+   // check for new hits
+   if (htons(fc->f2102_resp.body.hit) > 0) {
+      // log...
+      log_NewHits(fc, htons(fc->f2102_resp.body.hit));
+      // ...then reset back to fasit client
+      retval |= send_2100_conf_hit(fc, 4, /* blank on conceal */
+                                   0, /* reset hit value */
+                                   fc->hit_react, /* remembered hit reaction */
+                                   fc->hit_tokill, /* remembered hits to kill */
+                                   fc->hit_sens, /* remembered hit sensitivity */
+                                   fc->hit_mode, /* remembered hit mode */
+                                   fc->hit_burst); /* remembered hit burst seperation */
+   }
 
    // remember fault status, but don't clear out existing faults unless there is a new one
    if (htons(fc->f2102_resp.body.fault)) {
@@ -553,12 +562,12 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    // check to see if we're waiting to send the information back
    if (fc->waiting_status_resp) {
       fc->waiting_status_resp = 0; // not waiting anymore
-      return send_STATUS_RESP(fc); // return appropriate information
+      return retval|send_STATUS_RESP(fc); // return appropriate information
    } else if (!added_rf_to_epoll) {
       added_rf_to_epoll = 1;
-      return add_rfEpoll; // the RF is ready to work now that I have a type
+      return retval|add_rfEpoll; // the RF is ready to work now that I have a type
    } else {
-      return doNothing; // just remember the status for later
+      return retval; // just remember the status for later
    }
 }
 

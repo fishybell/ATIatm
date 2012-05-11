@@ -373,9 +373,10 @@ int send_EVENT_REPORT(fasit_connection_t *fc, int event) {
    bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
    bdy.event = event;
    bdy.hits = 0;
-   for (i = 0; i <= fc->hits_per_event[event]; i++) { // find valid hits for this event
-      if (compTime(fc->event_starts[event], fc->hit_times[event][i]) <= 0 &&
-          compTime(fc->event_ends[event], fc->hit_times[event][i]) >= 0) {
+   for (i = 0; i <= MAX_HITS; i++) {
+      if (fc->hit_times[i].event == event && /* find valid hits for this event */
+          compTime(fc->event_starts[event], fc->hit_times[i].time) <= 0 &&
+          compTime(fc->event_ends[event], fc->hit_times[i].time) >= 0) {
          // hit was between start and end
          bdy.hits++;
       }
@@ -388,25 +389,13 @@ int send_EVENT_REPORT(fasit_connection_t *fc, int event) {
 }
 
 int send_STATUS_RESP(fasit_connection_t *fc) {
-   int last_hh = fc->hit_hit; // remember hit_hit value
    int retval = doNothing, i;
-   // find out how many hits to send, and remove them from the event list -- TODO -- what happens if the RF master didn't receive?
-   fc->hit_hit = 0;
-   for (i = 0; i <= fc->hits_per_event[fc->current_event]; i++) { // find valid hits for this event
-      if (fc->hit_times[fc->current_event][i].tv_sec != 0) {
-         // hit was for a valid time
-         DDCMSG(D_RF|D_VERY, BLACK, "Counting new hit for status response: %i[%i]", fc->hit_hit, i);
-         fc->hit_hit++;
-         // invalidate this hit so we don't count it again
-         fc->hit_times[fc->current_event][i].tv_sec = 0;
-      }
-   }
    
    // build up current response
    LB_status_resp_ext_t s;
    DDCMSG(D_RF|D_VERY,RED, "send_STATUS_RESP(%08X)", fc);
    D_memset(&s, 0, sizeof(LB_status_resp_ext_t));
-   s.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
+   s.hits = max(0,min(fc->hits_per_event[fc->current_event], 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
       DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       s.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
@@ -431,7 +420,6 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    // copy current status to last status and send it
    fc->last_status = s;
    retval = send_STATUS_RESP_EXT(fc);
-   goto SR_end;
 
 #if 0
    DDCMSG(D_MEGA, BLACK, "\n============================\nNew values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\nOld values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\nf2102 vals: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\n",
@@ -476,10 +464,10 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
       goto SR_end;
 #endif
    }
-#endif
    // single spot to reset hit_hit
    SR_end:
    fc->hit_hit = last_hh;
+#endif
    return retval;
 }
 
@@ -628,6 +616,7 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
    LB_configure_t *pkt = (LB_configure_t *)(fc->rf_ibuf + start);
    int retval = doNothing;
+   int hit_temp = -1;
    DDCMSG(D_RF|D_VERY,RED, "handle_CONFIGURE_HIT(%8p, %i, %i)", fc, start, end);
 
    // check for thermal control only
@@ -643,15 +632,15 @@ int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
          break;
       case 1:
          // reset to zero
-         fc->hit_hit = 0;
+         hit_temp = 0;
          break;
       case 2:
          // incriment by one
-         fc->hit_hit++;
+         hit_temp = 1;
          break;
       case 3:
          // set to hits-to-kill value
-         fc->hit_hit = pkt->tokill;
+         hit_temp = pkt->tokill;
          break;
    }
 
@@ -676,7 +665,7 @@ int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
    
    // send configure hit sensing
    retval |= send_2100_conf_hit(fc, 4, /* blank on conceal */
-                                fc->hit_hit, /* remembered hit reset value */
+                                hit_temp, /* remembered hit reset value */
                                 fc->hit_react, /* remembered hit reaction */
                                 fc->hit_tokill, /* remembered hits to kill */
                                 fc->hit_sens, /* remembered hit sensitivity */
@@ -830,7 +819,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    DDCMSG(D_RF|D_MEGA, BLACK, "Going to pass devid: %02X:%02X:%02X:%02X", (bdy.devid & 0xff000000) >> 24, (bdy.devid & 0xff0000) >> 16, (bdy.devid & 0xff00) >> 8, bdy.devid & 0xff);
 
    // status block
-   bdy.hits = max(0,min(fc->hit_hit, 127)); // cap upper/lower bounds
+   bdy.hits = max(0,min(fc->hits_per_event[fc->current_event], 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
       DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       bdy.expose = fc->future_exp == 90 ? 1 : 0; // look into the future

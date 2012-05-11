@@ -6,10 +6,16 @@
 
 #define MAX_CONNECTIONS 16
 #define MAX_GROUPS 32
-#define MAX_HIT_EVENTS 32
+#define MAX_HIT_EVENTS 8192
+#define MAX_HITS 1024
 
 #define FASIT_BUF_SIZE 4096
 #define RF_BUF_SIZE 1024
+
+typedef struct hit_event {
+   int event;
+   struct timespec time;
+} hit_event_t;
 
 typedef struct fasit_connection {
    int rf; // the file descriptor to talk low-bandwidth rf on
@@ -37,7 +43,6 @@ typedef struct fasit_connection {
 
    // for 2100/2102 commands
    int hit_on;
-   int hit_hit; // not the hit count we report, but rather the hit count we send over FASIT
    int hit_react;
    int hit_tokill;
    int hit_sens;
@@ -46,7 +51,7 @@ typedef struct fasit_connection {
    int hit_phi;
 
    // for hit event logging
-   struct timespec hit_times[MAX_HIT_EVENTS][128]; // remember hits that happened at certain times (maximum of 127 hits per event, count as hit 1 is @ index 1, etc. to hit 127)
+   hit_event_t hit_times[MAX_HITS]; // remember hits that happened at certain times (maximum of 127 hits per event, count as hit 1 is @ index 1, etc. to hit 127)
    struct timespec event_starts[MAX_HIT_EVENTS]; // rememeber start of events
    struct timespec event_ends[MAX_HIT_EVENTS]; // rememeber end of events
    int hits_per_event[MAX_HIT_EVENTS]; // number of hits for each event
