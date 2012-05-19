@@ -3,6 +3,8 @@
 
 int verbose;
 
+const char *__PROGRAM__ = "RFdump ";
+
 
 void print_help(int exval) {
     printf("RFdump [-h] [-t port] [-v verbosity] \n\n");
@@ -74,12 +76,12 @@ int main(int argc, char **argv) {
 		break;
 		
 	    case ':':
-		fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+		EMSG("Error - Option `%c' needs a value\n\n", optopt);
 		print_help(1);
 		break;
 
 	    case '?':
-		fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+		EMSG("Error - No such option: `%c'\n\n", optopt);
 		print_help(1);
 
 		break;

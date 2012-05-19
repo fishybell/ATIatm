@@ -5,6 +5,8 @@
 #include "RFslave.h"
 #include "rf_debug.h"
 
+const char *__PROGRAM__ = "RFslave.new ";
+
 int verbose = 0;    // so debugging works right in all modules
 int last_slot = -1; // last slot used starts at no slot used
 
@@ -36,7 +38,7 @@ long getTime() {
    while (clock_gettime(CLOCK_MONOTONIC,&tv) != 0) {
       usleep(1);
    }
-//   DDCMSG(D_TIME, GRAY, "CURRENT TIME: %d from %5d.%03ld", (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000l), tv.tv_sec, tv.tv_nsec / 1000000l);
+//   DDCMSG(D_TIME, GRAY, "CURRENT TIME: %d from %5i.%03ld", (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000l), tv.tv_sec, tv.tv_nsec / 1000000l);
    return (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000l);
 }
 
@@ -64,7 +66,7 @@ void setnonblocking(int fd, int sock_stuff) {
       // disable Nagle's algorithm so we send messages as discrete packets
       if (setsockopt(fd, SOL_SOCKET, TCP_NODELAY, &yes, sizeof(int)) == -1) {
          DCMSG(RED, "Could not disable Nagle's algorithm\n");
-         perror("setsockopt(TCP_NODELAY)");
+         PERROR("setsockopt(TCP_NODELAY)");
       }
 
       if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)) < 0) { // set keepalive so we disconnect on link failure or timeout
@@ -200,11 +202,11 @@ int main(int argc, char **argv) {
             strcpy(ttyport,optarg);
             break;
          case ':':
-            fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+            EMSG("Error - Option `%c' needs a value\n\n", optopt);
             print_help(1);
             break;
          case '?':
-            fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+            EMSG("Error - No such option: `%c'\n\n", optopt);
             print_help(1);
             break;
       }
@@ -218,11 +220,11 @@ int main(int argc, char **argv) {
    timestamp(&elapsed_time,&istart_time,&delta_time);   // make sure the delta_time gets set    
    // connect to slaveboss
    if ((rc.sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-      perror("Error creating socket: ");
+      PERROR("Error creating socket: ");
       DieWithError("socket");
    }
    if (connect(rc.sock, (struct sockaddr *)&raddr, sizeof(raddr)) < 0) {
-      perror("Error connecting to slaveboss: ");
+      PERROR("Error connecting to slaveboss: ");
       DieWithError("connect");
    }
    setnonblocking(rc.sock, 1); // socket first time
@@ -258,7 +260,7 @@ int main(int argc, char **argv) {
    ev.events = EPOLLIN; // only for reading to start
    ev.data.fd = rc.sock; // remember for later
    if (epoll_ctl(efd, EPOLL_CTL_ADD, rc.sock, &ev) < 0) {
-      fprintf(stderr, "epoll socket insertion error");
+      EMSG("epoll socket insertion error");
       close_nicely=1;
    }
 
@@ -267,7 +269,7 @@ int main(int argc, char **argv) {
    ev.events = EPOLLIN; // only for reading to start
    ev.data.fd = rc.tty; // remember for later
    if (epoll_ctl(efd, EPOLL_CTL_ADD, rc.tty, &ev) < 0) {
-      fprintf(stderr, "epoll tty insertion error");
+      EMSG("epoll tty insertion error");
       close_nicely=1;
    }
 

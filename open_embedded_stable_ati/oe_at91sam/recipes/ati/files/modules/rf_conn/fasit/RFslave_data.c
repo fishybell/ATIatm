@@ -41,6 +41,7 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
       DDCMSG(D_RF, tty ? cyan : blue, "Checking %s validMessage for %i (s:%i e:%i)", tty ? "TTY" : "SOCKET", hdr->cmd, *start, *end);
       switch (hdr->cmd) {
          // they all have a crc, check it
+         case LBC_REPORT_ACK:
          case LBC_EXPOSE:
          case LBC_MOVE:
          case LBC_CONFIGURE_HIT:
@@ -49,24 +50,20 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          case LBC_DEVICE_REG:
          case LBC_ASSIGN_ADDR:
          case LBC_STATUS_REQ:
-         case LBC_STATUS_RESP_LIFTER:
-         case LBC_STATUS_RESP_MOVER:
-         case LBC_STATUS_RESP_EXT:
-         case LBC_STATUS_NO_RESP:
+         case LBC_STATUS_RESP:
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
          case LBC_BURST:
          case LBC_RESET:
          case LBC_QEXPOSE:
          case LBC_QCONCEAL:
-         case LBC_REPORT_REQ:
-         case LBC_REPORT_ACK:
          case LBC_EVENT_REPORT:
          case LBC_REQUEST_NEW:
             if (crc8(hdr) == 0) {
                DDCMSG(D_RF, tty ? cyan : blue, "%s VALID CRC", tty ? "TTY" : "SOCKET");
                return hdr->cmd;
             } else {
+               DCMSG(GREEN, "INVALID CRC for msg %i", hdr->cmd);
                DDCMSG(D_RF, tty ? cyan : blue, "%s INVALID CRC", tty ? "TTY" : "SOCKET");
             }
             break;
@@ -182,14 +179,14 @@ int rcRead(rf_connection_t *rc, int tty) {
    // did we read nothing?
    if (dests <= 0) {
       DDCMSG(D_PACKET, tty ? CYAN : BLUE, "ERROR: %i", err);
-      perror("Error: ");
+      PERROR("Error: ");
 //      return rem_ttyEpoll;
       if (err == EAGAIN) {
          // try again later
          return doNothing;
       } else {
          // connection dead, remove it
-         perror("Died because ");
+         PERROR("Died because ");
          DDCMSG(D_PACKET, tty ? CYAN : BLUE, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
          return tty ? rem_ttyEpoll : rem_sockEpoll;
       }
@@ -262,7 +259,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
          return doNothing;
       } else {
          // connection dead, remove it
-         perror("Died because ");
+         PERROR("Died because ");
          DDCMSG(D_RF, tty ? cyan : blue, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
          // if we're tty, block no more
          if (tty) {
@@ -283,7 +280,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
          err = errno; // save errno
          if (ns < 0 && err != EAGAIN) {
             // connection dead, remove it
-            perror("Died because ");
+            PERROR("Died because ");
             DDCMSG(D_RF, tty ? cyan : blue, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
             // if we're tty, block no more
             if (tty) {
@@ -392,10 +389,7 @@ void addToBuffer_generic(char *dbuf, int *dbuf_len, char *ibuf, int ibuf_len) {
 // check to see if the given packet is a response packet or not
 // these packets should only have one in the queue at a time for a given source address
 int isPacketResponse(LB_packet_t *LB) {
-   if (LB->cmd == LBC_STATUS_RESP_LIFTER ||
-       LB->cmd == LBC_STATUS_RESP_MOVER ||
-       LB->cmd == LBC_STATUS_RESP_EXT ||
-       LB->cmd == LBC_STATUS_NO_RESP) {
+   if (LB->cmd == LBC_STATUS_RESP) {
       return 1;
    } else {
       return 0;
@@ -469,14 +463,6 @@ int t2s_handle_STATUS_REQ(rf_connection_t *rc, int start, int end) {
    return doNothing;
 } 
 
-int t2s_handle_REPORT_REQ(rf_connection_t *rc, int start, int end) {
-   int i;
-   LB_report_req_t *pkt = (LB_report_req_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_REPORT_REQ(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
-   return doNothing;
-} 
-
 int t2s_handle_EXPOSE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_expose_t *pkt = (LB_expose_t *)(rc->tty_ibuf + start);
@@ -489,6 +475,14 @@ int t2s_handle_MOVE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_move_t *pkt = (LB_move_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_MOVE(%8p, %i, %i)", rc, start, end);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   return doNothing;
+} 
+
+int t2s_handle_REPORT_ACK(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_report_ack_t *pkt = (LB_report_ack_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_REPORT_ACK(%8p, %i, %i)", rc, start, end);
    // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
@@ -599,8 +593,8 @@ int tty2sock(rf_connection_t *rc) {
       int use_command = 1;
       switch (mnum) {
          t2s_HANDLE_RF (STATUS_REQ); // keep track of ids? yes
-         t2s_HANDLE_RF (REPORT_REQ); // keep track of ids? yes
          t2s_HANDLE_RF (EXPOSE); // keep track of ids? no
+         t2s_HANDLE_RF (REPORT_ACK); // keep track of ids? no
          t2s_HANDLE_RF (MOVE); // keep track of ids? no
          t2s_HANDLE_RF (CONFIGURE_HIT); // keep track of ids? no
          t2s_HANDLE_RF (GROUP_CONTROL); // keep track of ids? no
@@ -691,34 +685,10 @@ void addDevidToNowDevIDs(rf_connection_t *rc, int devid) {
    DDCMSG(D_MEGA, BLACK, "rc->devid_index %i", rc->devid_index);
 }
 
-int s2t_handle_STATUS_RESP_LIFTER(rf_connection_t *rc, int start, int end) {
+int s2t_handle_STATUS_RESP(rf_connection_t *rc, int start, int end) {
    int i;
-   LB_status_resp_lifter_t *pkt = (LB_status_resp_lifter_t *)(rc->sock_ibuf + start);
-   DDCMSG(D_RF, CYAN, "s2t_handle_STATUS_RESP_LIFTER(%8p, %i, %i)", rc, start, end);
-   addAddrToNowIDs(rc, pkt->addr);
-   return doNothing;
-} 
-
-int s2t_handle_STATUS_RESP_MOVER(rf_connection_t *rc, int start, int end) {
-   int i;
-   LB_status_resp_mover_t *pkt = (LB_status_resp_mover_t *)(rc->sock_ibuf + start);
-   DDCMSG(D_RF, CYAN, "s2t_handle_STATUS_RESP_MOVER(%8p, %i, %i)", rc, start, end);
-   addAddrToNowIDs(rc, pkt->addr);
-   return doNothing;
-} 
-
-int s2t_handle_STATUS_RESP_EXT(rf_connection_t *rc, int start, int end) {
-   int i;
-   LB_status_resp_ext_t *pkt = (LB_status_resp_ext_t *)(rc->sock_ibuf + start);
-   DDCMSG(D_RF, CYAN, "s2t_handle_STATUS_RESP_EXT(%8p, %i, %i)", rc, start, end);
-   addAddrToNowIDs(rc, pkt->addr);
-   return doNothing;
-} 
-
-int s2t_handle_STATUS_NO_RESP(rf_connection_t *rc, int start, int end) {
-   int i;
-   LB_status_no_resp_t *pkt = (LB_status_no_resp_t *)(rc->sock_ibuf + start);
-   DDCMSG(D_RF, CYAN, "s2t_handle_STATUS_NO_RESP(%8p, %i, %i)", rc, start, end);
+   LB_status_resp_t *pkt = (LB_status_resp_t *)(rc->sock_ibuf + start);
+   DDCMSG(D_RF, CYAN, "s2t_handle_STATUS_RESP(%8p, %i, %i)", rc, start, end);
    addAddrToNowIDs(rc, pkt->addr);
    return doNothing;
 } 
@@ -753,10 +723,7 @@ int sock2tty(rf_connection_t *rc) {
    start = 0;
    while (retval == doNothing && (mnum = validMessage(rc, &start, &end, 0)) != -1) { // 0 for socket
       switch (mnum) {
-         s2t_HANDLE_RF (STATUS_RESP_LIFTER); // keep track of ids
-         s2t_HANDLE_RF (STATUS_RESP_MOVER); // keep track of ids
-         s2t_HANDLE_RF (STATUS_RESP_EXT); // keep track of ids
-         s2t_HANDLE_RF (STATUS_NO_RESP); // keep track of ids
+         s2t_HANDLE_RF (STATUS_RESP); // keep track of ids
          s2t_HANDLE_RF (EVENT_REPORT); // keep track of ids
          s2t_HANDLE_RF (DEVICE_REG); // keep track of devids
          default:

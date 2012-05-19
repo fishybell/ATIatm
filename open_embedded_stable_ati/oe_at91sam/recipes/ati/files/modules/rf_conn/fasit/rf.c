@@ -63,7 +63,6 @@ int QueuePtype(queue_t *M){
       if (RF_size(LB->cmd)<=depth){ // there are enough bytes for this command
          if (LB->cmd==LBC_REQUEST_NEW) return(1);
          if (LB->cmd==LBC_STATUS_REQ) return(2);
-         if (LB->cmd==LBC_REPORT_REQ) return(2);
          return(3);
       }
    }
@@ -77,11 +76,11 @@ int Ptype(char *buf){
 
    LB=(LB_packet_t *)buf;
    if (LB->cmd==LBC_ILLEGAL) return(0);    
+   if (LB->cmd==LBC_ILLEGAL_CANCEL) return(0);    
    crc=crc8(buf);
    if (!crc){ // there seemed to be a good command
       if (LB->cmd==LBC_REQUEST_NEW) return(1);
       if (LB->cmd==LBC_STATUS_REQ) return(2);
-      if (LB->cmd==LBC_REPORT_REQ) return(2);
       return(3);
    }
    return(0);
@@ -155,42 +154,39 @@ int RF_size(int cmd){
    // set LB_size  based on which command it is
    switch (cmd){
       case  LBC_STATUS_REQ:
-      case  LBC_STATUS_NO_RESP:
       case  LBC_QEXPOSE:
       case  LBC_BURST:
       case  LBC_RESET:
+      case  LBC_ILLEGAL_CANCEL:
          return (3);
 
-      case  LBC_STATUS_RESP_LIFTER:
       case  LBC_POWER_CONTROL:
       case  LBC_PYRO_FIRE:
          return (4);
 
-      case  LBC_REPORT_REQ:
-      case  LBC_REPORT_ACK:
       case  LBC_MOVE:
       case  LBC_GROUP_CONTROL:
          return (5);
 
-      case  LBC_EVENT_REPORT:
       case  LBC_AUDIO_CONTROL:
       case  LBC_CONFIGURE_HIT:
          return (6);
 
+      case  LBC_REPORT_ACK:
+      case  LBC_EVENT_REPORT:
       case  LBC_EXPOSE:
       case  LBC_ASSIGN_ADDR:
       case  LBC_QCONCEAL:
          return (7);
 
-      case  LBC_STATUS_RESP_MOVER:
       case  LBC_REQUEST_NEW:
          return (8);
 
-      case  LBC_STATUS_RESP_EXT:
-         return (11);
+      case  LBC_STATUS_RESP:
+         return (9);
 
       case  LBC_DEVICE_REG:
-         return (13);
+         return (12);
 
       default:
          return (1);
@@ -268,8 +264,7 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_device_reg_t *L=(LB_device_reg_t *)LB;
             strcpy(cmdname,"Device_Reg");
-            sprintf(hbuf,"devid=%3x devtype=%x hits=%2d exp=%d speed=%d move=%d loc=%d",
-                    L->devid,L->dev_type,L->hits,L->expose,L->speed,L->move,L->location);
+            sprintf(hbuf,"devid=%3x devtype=%d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->devid,L->dev_type,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
             color=MAGENTA;
          }
          break;
@@ -279,19 +274,11 @@ void DDpacket(uint8 *buf,int len){
             sprintf(hbuf,"RFaddr=%3d",LB->addr);
             break;
 
-         case LBC_REPORT_REQ:
-         {
-            LB_report_req_t *L=(LB_report_req_t *)LB;
-            strcpy(cmdname,"Report_Req");
-            sprintf(hbuf,"RFaddr=%3d   event=%2d",L->addr,L->event);
-         }
-         break;
-
          case LBC_REPORT_ACK:
          {
             LB_report_ack_t *L=(LB_report_ack_t *)LB;
             strcpy(cmdname,"Report_Ack");
-            sprintf(hbuf,"RFaddr=%3d   event=%2d",L->addr,L->event);
+            sprintf(hbuf,"RFaddr=%3d   event=%2d hit=%d report=%d",L->addr,L->event,L->hits,L->report);
          }
          break;
 
@@ -299,7 +286,7 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_event_report_t *L=(LB_event_report_t *)LB;
             strcpy(cmdname,"Event_Report");
-            sprintf(hbuf,"RFaddr=%3d   event=%2d hit_count=%d",L->addr,L->event,L->hits);
+            sprintf(hbuf,"RFaddr=%3d   event=%2d hit=%d qualified=%d report=%d",L->addr,L->event,L->hits,L->qualified,L->report);
             color=MAGENTA;
          }
          break;
@@ -345,37 +332,13 @@ void DDpacket(uint8 *buf,int len){
             sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
             break;
 
-         case LBC_STATUS_RESP_LIFTER:
+         case LBC_STATUS_RESP:
          {
-            LB_status_resp_lifter_t *L=(LB_status_resp_lifter_t *)LB;
-            strcpy(cmdname,"Status_Resp_Lifter");
-            sprintf(hbuf,"RFaddr=%3d hits=%2d exp=%d",L->addr,L->hits,L->expose);
-            color=MAGENTA;
-         }
-            break;
-
-         case LBC_STATUS_RESP_MOVER:
-         {
-            LB_status_resp_mover_t *L=(LB_status_resp_mover_t *)LB;
-            strcpy(cmdname,"Status_Resp_Mover");
-            sprintf(hbuf,"RFaddr=%3d hits=%2d exp=%d speed=%d move=%d loc=%d",L->addr,L->hits,L->expose,L->speed,L->move,L->location);
-            color=MAGENTA;
-         }
-            break;
-
-         case LBC_STATUS_RESP_EXT:
-         {
-            LB_status_resp_ext_t *L=(LB_status_resp_ext_t *)LB;
+            LB_status_resp_t *L=(LB_status_resp_t *)LB;
             strcpy(cmdname,"Status_Resp_Ext");
-            sprintf(hbuf,"RFaddr=%3d hits=%2d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->addr,L->hits,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
+            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->addr,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
             color=MAGENTA;
          }
-            break;
-
-         case LBC_STATUS_NO_RESP:
-            strcpy(cmdname,"Status_No_Resp");
-            sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
-            color=MAGENTA;
             break;
 
          case LBC_QEXPOSE:
@@ -458,12 +421,12 @@ uint32 getDevID () {
       // find mac by looking at the network interfaces
       sock = socket(AF_INET, SOCK_DGRAM, 0); // need a valid socket to look at interfaces
       if (sock == -1) {
-         perror("getDevID-socket() SOCK_DGRAM error");
+         PERROR("getDevID-socket() SOCK_DGRAM error");
          return 0;
       }
       // only look at the first ethernet device
       if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, "eth0", 5) == -1) {
-         perror("getDevID-setsockopt() BINDTO error");
+         PERROR("getDevID-setsockopt() BINDTO error");
          return 0;
       }
 

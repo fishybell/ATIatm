@@ -4,6 +4,8 @@
 #include "slaveboss.h"
 #include "rf_debug.h"
 
+const char *__PROGRAM__ = "slaveboss ";
+
 int verbose = 0;    // so debugging works right in all modules
 int added_rf_to_epoll = 0; // whether or not we've connect the RF device
 int last_slot = -1; // last slot used starts at no slot used
@@ -12,15 +14,44 @@ fasit_connection_t fconns[MAX_CONNECTIONS];
 #define MAX_EVENTS 16 /* for epoll */
 
 // global hit logging routines
-void log_ResetHits(fasit_connection_t *fc) {
+void log_ResetHits_All(fasit_connection_t *fc) { // clear all hits for the current event
    int i;
-   DDCMSG(D_PACKET, RED, "Reset hits for %i", fc->current_event);
+//   DDCMSG(D_PACKET, RED, "Reset hits for %i", fc->current_event);
    for (i = 0; i < MAX_HITS; i++) {
       if (fc->hit_times[i].event == fc->current_event) {
          D_memset(&fc->hit_times[i], 0, sizeof(hit_event_t));
       }
    }
-   fc->hits_per_event[fc->current_event] = 0;
+   fc->hit_event_sum[fc->current_event].hits = 0; // no hits
+   fc->hit_event_sum[fc->current_event].reported = 0; // not reported
+   fc->hit_event_sum[fc->current_event].new_report = -1; // no new report
+}
+
+void log_ResetHits_Some(fasit_connection_t *fc, int event, int hits, int report) { // clear the given number of reported hits
+   int i, deleted = 0;
+   DDCMSG(D_PACKET, RED, "Reset hits for %i", fc->current_event);
+   DDCMSG(D_POINTER, BLACK, "Here @ %s:%i for %i %i %i", __FILE__, __LINE__, event, hits, report);
+   // look for the first "hits" number of reported hits for this event
+   for (i = 0; i < MAX_HITS && deleted < hits; i++) {
+      if (fc->hit_times[i].event == event &&
+          fc->hit_times[i].report == report) {
+   DDCMSG(D_POINTER, BLACK, "Here @ %s:%i with %i, %i %i", __FILE__, __LINE__, i, fc->hit_times[i].event, fc->hit_times[i].report);
+         // ... and clear them out
+         D_memset(&fc->hit_times[i], 0, sizeof(hit_event_t));
+         deleted++; // cleared out another
+      }
+   }
+   // correct hits per event number
+   DDCMSG(D_POINTER, BLACK, "Here @ %s:%i with %i, %i", __FILE__, __LINE__, fc->hit_event_sum[event].hits,fc->hit_event_sum[event].reported);
+   fc->hit_event_sum[event].hits -= deleted;
+   DDCMSG(D_POINTER, BLACK, "Here @ %s:%i with %i, %i", __FILE__, __LINE__, fc->hit_event_sum[event].hits,fc->hit_event_sum[event].reported);
+   if (fc->hit_event_sum[event].hits <= 0) {
+   DDCMSG(D_POINTER, BLACK, "Here @ %s:%i with %i, %i", __FILE__, __LINE__, fc->hit_event_sum[event].hits,fc->hit_event_sum[event].reported);
+      fc->hit_event_sum[event].hits = 0;
+      fc->hit_event_sum[event].reported = 0; // when we have no more hits, we effectively haven't reported this event either
+      fc->hit_event_sum[fc->current_event].new_report = -1; // no new report
+   }
+   DDCMSG(D_POINTER, BLACK, "Here @ %s:%i with %i, %i", __FILE__, __LINE__, fc->hit_event_sum[event].hits,fc->hit_event_sum[event].reported);
 }
 
 void log_NewHits(fasit_connection_t *fc, int new_hits) {
@@ -32,7 +63,7 @@ void log_NewHits(fasit_connection_t *fc, int new_hits) {
    
    // log each hit time individually
    while (new_hits-- > 0) {
-      if (++fc->hits_per_event[fc->current_event] <= 127) {
+      if (++fc->hit_event_sum[fc->current_event].hits <= 255) {
          for (/* don't reset i */; i < MAX_HITS; i++) {
             if (fc->hit_times[i].event == 0 &&
                 fc->hit_times[i].time.tv_sec == 0 &&
@@ -40,10 +71,11 @@ void log_NewHits(fasit_connection_t *fc, int new_hits) {
                DCMSG(BLACK, "Setting %5ld.%03ld in fc->hit_times[%i] with event %i", tv.tv_sec, tv.tv_nsec/1000000l, i, fc->current_event);
                fc->hit_times[i].time = tv;
                fc->hit_times[i].event = fc->current_event;
+               fc->hit_times[i].report = -1; // not reported yet
                break; // move on to next hit
             }
          }
-      }
+      } // else we've maxed out this event's hits
    }
 }
 
@@ -86,7 +118,7 @@ void setnonblocking(int sock) {
    // disable Nagle's algorithm so we send messages as discrete packets
    if (setsockopt(sock, SOL_SOCKET, TCP_NODELAY, &yes, sizeof(int)) == -1) {
       DDCMSG(D_MEGA, RED, "Could not disable Nagle's algorithm\n");
-      perror("setsockopt(TCP_NODELAY)");
+      PERROR("setsockopt(TCP_NODELAY)");
    }
 
    if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(int)) < 0) { // set keepalive so we disconnect on link failure or timeout
@@ -141,7 +173,7 @@ int handleRet(int ret, fasit_connection_t *fc, int efd) {
    if (ret & rem_rfEpoll) {
       DDCMSG(D_MEGA, RED, "rem_rfEpoll: %i", fc->rf);
       epoll_ctl(efd, EPOLL_CTL_DEL, fc->rf, NULL);
-         perror("errno: ");
+         PERROR("errno: ");
       close(fc->rf); // nothing to do if errors...ignore return value from close()
          //exit(1);
       DCMSG(RED, "Client closed down @ line %s:%i", __FILE__, __LINE__);
@@ -151,7 +183,7 @@ int handleRet(int ret, fasit_connection_t *fc, int efd) {
       DDCMSG(D_MEGA, RED, "rem_fasitEpoll: %i", fc->fasit);
       int index = fc->index;
       epoll_ctl(efd, EPOLL_CTL_DEL, fc->fasit, NULL);
-         perror("errno: ");
+         PERROR("errno: ");
       close(fc->fasit); // nothing to do if errors...ignore return value from close()
          //exit(1);
       D_memset(fc, 0, sizeof(fasit_connection_t)); // reset to blank
@@ -225,11 +257,11 @@ int main(int argc, char **argv) {
             faddr.sin_port = htons(atoi(optarg));
             break;
          case ':':
-            fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+            EMSG("Error - Option `%c' needs a value\n\n", optopt);
             print_help(1);
             break;
          case '?':
-            fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+            EMSG("Error - No such option: `%c'\n\n", optopt);
             print_help(1);
             break;
       }
@@ -266,7 +298,7 @@ int main(int argc, char **argv) {
       DDCMSG(D_MEGA, BLACK,"SLAVEBOSS: client RF address = %s:%d", inet_ntoa(caddr.sin_addr),htons(caddr.sin_port));
       if (rfclient <= 0) {
          DDCMSG(D_MEGA, RED, "slaveboss accept() failed");
-         perror("errno: ");
+         PERROR("errno: ");
          exit(1);
          continue;
       }
@@ -350,7 +382,7 @@ int main(int argc, char **argv) {
 
                if (newsock <= 0) {
                   DDCMSG(D_MEGA, RED, "slaveboss accept() failed");
-                  perror("errno: ");
+                  PERROR("errno: ");
                   exit(1);
                   continue;
                }
@@ -369,6 +401,7 @@ int main(int argc, char **argv) {
                      fconns[i].index = i; // remember its own index
    DDCMSG(D_MEGA, GREEN,"ADDING rf:%i fasit:%i TO fconns[%i]: %08X", fconns[i].rf, fconns[i].fasit, i, &fconns[i]);
                      fconns[i].target_type = RF_Type_Unknown; // unknown target type
+                     fconns[i].last_report = -1; // no report used
 
                      // are we the last slot?
                      if ((last_slot + 1) == index) {

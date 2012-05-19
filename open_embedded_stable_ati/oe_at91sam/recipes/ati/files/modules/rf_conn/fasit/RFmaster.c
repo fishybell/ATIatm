@@ -5,6 +5,8 @@
 #define MAX_EVENTS 16
 #define MAX_CONNECTIONS 16
 
+const char *__PROGRAM__ = "RFmaster ";
+
 int verbose,rtime,collecting_time;    // globals
 
 // this makes the warning go away
@@ -152,7 +154,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    ev.events = EPOLLIN; // only for reading to start
    ev.data.fd = MCPsock; // remember for later
    if (epoll_ctl(efd, EPOLL_CTL_ADD, MCPsock, &ev) < 0) {
-      fprintf(stderr, "epoll MCPsock insertion error\n");
+      EMSG("epoll MCPsock insertion error\n");
       close_nicely=1;
    }
 
@@ -161,7 +163,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    ev.events = EPOLLIN; // only for reading to start
    ev.data.fd = risock; // remember for later
    if (epoll_ctl(efd, EPOLL_CTL_ADD, risock, &ev) < 0) {
-      fprintf(stderr, "epoll risock insertion error\n");
+      EMSG("epoll risock insertion error\n");
       close_nicely=1;
    }
 
@@ -170,7 +172,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    ev.events = EPOLLIN; // only for reading to start
    ev.data.fd = RFfd; // remember for later
    if (epoll_ctl(efd, EPOLL_CTL_ADD, RFfd, &ev) < 0) {
-      fprintf(stderr, "epoll RFfd insertion error\n");
+      EMSG("epoll RFfd insertion error\n");
       close_nicely=1;
    }
 
@@ -221,7 +223,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
              ,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l, delta_time.tv_sec, delta_time.tv_nsec/1000000l, dwait_time.tv_sec, dwait_time.tv_nsec/1000000l, collect_time.tv_sec, collect_time.tv_nsec/1000000l);
       delta = (dwait_time.tv_sec*1000)+(dwait_time.tv_nsec/1000000l);
       cdelta = (collect_time.tv_sec*1000)+(collect_time.tv_nsec/1000000l);
-      DDCMSG(D_TIME,CYAN,"delta=%2dms\tcdelta=%2dms", delta, cdelta);
+      DDCMSG(D_TIME,CYAN,"delta=%2ims\tcdelta=%2ims", delta, cdelta);
 
 #if 0 /* old select method */      
       /*   do a select to see if we have a message from either the RF or the MCP  */
@@ -332,7 +334,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                 ,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,delta_time.tv_sec, delta_time.tv_nsec/1000000l);
       delta = (dwait_time.tv_sec*1000)+(dwait_time.tv_nsec/1000000l);
       //   delta = (delta_time.tv_sec*1000)+(delta_time.tv_nsec/1000000l);
-         DDCMSG(D_TIME,CYAN,"delta=%2dms",delta);
+         DDCMSG(D_TIME,CYAN,"delta=%2ims",delta);
 
          DDCMSG(D_TIME,YELLOW,"select timed out  delta=%d remaining_time=%d  Rx[%d] Tx[%d]"
                 ,delta,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
@@ -486,7 +488,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                      DCMSG(RED,"write Tx queue to RF returned 0");
                   }
                   if (verbose&D_RF){
-                        sprintf(buf,"[%03d] %4ld.%03ld  ->RF [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
+                        sprintf(buf,"[%03d] %4ld.%03ld  ->RF [%2i] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
                         printf("%s",buf);
                         printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
                         if(result>1){
@@ -521,7 +523,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             if (result==mcpbuf_len) {
                // debug stuff
                if (verbose&D_RF){
-                  sprintf(buf,"[%03d] %4ld.%03ld ->MCP [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
+                  sprintf(buf,"[%03d] %4ld.%03ld ->MCP [%2i] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
                   printf("%s",buf);
                   printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
                   if(result>1){
@@ -604,7 +606,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             write(*riclient, "V\n", 2); // we're valid if we connect here
             // new epoll method
             if (epoll_ctl(efd, EPOLL_CTL_ADD, *riclient, &ev) < 0) {
-               fprintf(stderr, "epoll *riclient insertion error\n");
+               EMSG("epoll *riclient insertion error\n");
                //close_nicely=1; -- not on riclient, it's just not worth it
                close(*riclient);
                *riclient = 1;
@@ -676,7 +678,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                result=write(MCPsock,Rstart,size);
                if (result==size) {
                   if (verbose&D_RF){
-                     sprintf(buf,"[%03d] %4ld.%03ld ->MCP [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
+                     sprintf(buf,"[%03d] %4ld.%03ld ->MCP [%2i] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
                      printf("%s",buf);
                      printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
                      if(result>1){
@@ -727,18 +729,18 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
 
          gotrf = gather_rf(RFfd,Rptr,300);
          if (gotrf>0){  // increment our current pointer
-            DDCMSG(D_VERY,GREEN,"gotrf=%d gathered =%2d, incrementing  Rptr=%2d (%p)  Rbuf=%p",
+            DDCMSG(D_VERY,GREEN,"gotrf=%d gathered =%2i, incrementing  Rptr=%2i (%p)  Rbuf=%p",
                    gotrf,gathered,(int)(Rptr-Rbuf), Rptr, Rbuf);
             Rptr+=gotrf;
             gathered+=gotrf;
-            DDCMSG(D_VERY,GREEN,"gotrf=%d gathered =%2d  Rptr=%2d (%p) Rbuf=%p ",
+            DDCMSG(D_VERY,GREEN,"gotrf=%d gathered =%2i  Rptr=%2i (%p) Rbuf=%p ",
                    gotrf,gathered,(int)(Rptr-Rbuf), Rptr, Rbuf);
          } else {
-            DDCMSG(D_VERY,RED,"gotrf=%d gathered =%2d  Rptr=%2d (%p) ",
+            DDCMSG(D_VERY,RED,"gotrf=%d gathered =%2i  Rptr=%2i (%p) ",
                    gotrf,gathered,(int)(Rptr-Rbuf), Rptr);
          }
          /* Receive message, or continue to recieve message from RF */
-         DDCMSG(D_VERY,YELLOW,"gotrf=%d  gathered=%2d  Rptr=%2d Rstart=%2d Rptr-Rstart=%2d  ",
+         DDCMSG(D_VERY,YELLOW,"gotrf=%d  gathered=%2i  Rptr=%2i Rstart=%2i Rptr-Rstart=%2i  ",
                 gotrf,gathered,(int)(Rptr-Rbuf),(int)(Rstart-Rbuf),(int)(Rptr-Rstart));
 
          // after gathering RF data, we're free, tell the Radio Interface client
@@ -753,7 +755,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             size=RF_size(LB->cmd);
 
             /* Receive message, or continue to recieve message from RF */
-            DDCMSG(D_VERY,GREEN,"cmd=%d addr=%d RF_size =%2d  Rptr-Rstart=%2d  ",
+            DDCMSG(D_VERY,GREEN,"cmd=%d addr=%d RF_size =%2i  Rptr-Rstart=%2i  ",
                    LB->cmd,LB->addr,size,(int)(Rptr-Rstart));
 
             if ((Rptr-Rstart) >= size){
@@ -765,7 +767,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                   result=write(MCPsock,Rstart,size);
                   if (result==size) {
                      if (verbose&D_RF){
-                        sprintf(buf,"[%03d] %4ld.%03ld ->MCP [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
+                        sprintf(buf,"[%03d] %4ld.%03ld ->MCP [%2i] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
                         printf("%s",buf);
                         printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
                         if(result>1){
@@ -825,7 +827,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          err=errno;
 
          if (verbose&D_PACKET){
-            sprintf(buf,"[%03d] %4ld.%03ld MCP-> [%2d] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,MsgSize);
+            sprintf(buf,"[%03d] %4ld.%03ld MCP-> [%2i] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,MsgSize);
             printf("%s",buf);
             printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
             if(MsgSize>1){
@@ -862,7 +864,8 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             // check against our existing messages in the queue
             while (MsgSize > 0) {
                LB=(LB_packet_t *)Rx->tail;   // map the header in
-               if (Ptype(Rx->tail)==2) {
+               ptype = Ptype(Rx->tail);
+               if (ptype==2) {
                   // only type 2 messages can be rejected from queue: they are the only 
                   //   messages that cause wait time and have only one destination.
                   //   they are also 100% redundant to have in multiple times.
@@ -870,10 +873,12 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                      // already in queue, remove from Rx buffer
                      if (RF_size(LB->cmd) < MsgSize) { /* only remove if we're not the end */
                         char tbuf[RF_BUF_SIZE];
-                        memcpy(tbuf, Rx->tail + RF_size(LB->cmd), MsgSize - RF_size(LB->cmd));
-                        memcpy(Rx->tail, tbuf, MsgSize - RF_size(LB->cmd));
+                        int rs = MsgSize - RF_size(LB->cmd); // move the buffer after this message to the tail
+                        memcpy(tbuf, Rx->tail + RF_size(LB->cmd), rs);
+                        memcpy(Rx->tail, tbuf, rs);
                      }
                      DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Rejecting %i from queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                     // don't move the tail, as we'll need to check the next message which is now at tail
                   } else {
                      // not in queue already, add and mark
                      Rx->tail+=RF_size(LB->cmd);
@@ -881,6 +886,38 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                      Queue_Contains[LB->addr] |= (1<<LB->cmd);
                      DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Allowing %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
                   }
+               } else if (ptype==0) {
+                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %i %i (%p)", __FILE__, __LINE__, LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                  // type 0 messages are Always rejected from the queue, and they may remove others as well
+                  if (LB->cmd == LBC_ILLEGAL_CANCEL && (Queue_Contains[LB->addr] & (1<<LBC_STATUS_REQ))) {
+                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
+                     // illegal-cancel causes all status requests for a target to be cancelled
+                     // find the offending items in the queue, and clear it out
+                     char *ts = Rx->head;
+                     DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Rejecting %i from queue for addr %i, and removing STAT_REQs", LB->cmd, LB->addr);
+                     while (ts < Rx->tail) {
+                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %p", __FILE__, __LINE__, ts);
+                        LB_packet_t *lb=(LB_packet_t *)ts;   // map the header in
+                        if (lb->cmd == LBC_STATUS_REQ && lb->addr == LB->addr) {
+                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %p", __FILE__, __LINE__, ts);
+                           // found our culprit, move the queue to engulf it
+                           char tbuf[RF_BUF_SIZE];
+                           int rs = (Rx->tail + MsgSize) - (ts + RF_size(lb->cmd)); // move entire buffer after the message, not just what's in the queue
+                           DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Removing %i from queue for addr %i (%i-%i...)", lb->cmd, lb->addr, Queue_Depth(Rx), RF_size(lb->cmd)); memcpy(tbuf, ts + RF_size(lb->cmd), rs);
+                           memcpy(ts, tbuf, rs);
+                           Rx->tail -= RF_size(lb->cmd); // move the tail down
+                           LB=(LB_packet_t *)Rx->tail;   // re-map the header in to the new tail position
+                           DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Removed from queue (...=%i)", Queue_Depth(Rx));
+                           Queue_Contains[LB->addr] ^= (1<<LBC_STATUS_REQ);
+                        } else {
+                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %p", __FILE__, __LINE__, ts);
+                           ts += RF_size(lb->cmd); // not this message, maybe the next?
+                        }
+                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %p", __FILE__, __LINE__, ts);
+                     }
+                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
+                  }
+                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
                } else {
                   Rx->tail+=RF_size(LB->cmd);  // add on the new length
                }
@@ -1031,12 +1068,12 @@ int main(int argc, char **argv) {
             break;
 
          case ':':
-            fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+            EMSG("Error - Option `%c' needs a value\n\n", optopt);
             print_help(1);
             break;
 
          case '?':
-            fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+            EMSG("Error - No such option: `%c'\n\n", optopt);
             print_help(1);
             break;
       }
@@ -1106,7 +1143,7 @@ int main(int argc, char **argv) {
          setblocking(RFfd);
          result=write(RFfd,RQ,size);
          if (result==size) {
-            sprintf(buf,"Xmit test  ->RF  [%2d]  ",size);
+            sprintf(buf,"Xmit test  ->RF  [%2i]  ",size);
             DCMSG_HEXB(BLUE,buf,RQ,size);
          } else {
             sprintf(buf,"Xmit test  ->RF  [%d!=%d]  ",size,result);
@@ -1121,8 +1158,8 @@ int main(int argc, char **argv) {
          result = gather_rf(RFfd,rbuf,275);
 
          if (result>0) {
-            sprintf(buf,"Rcved [%2d]  ",result);
-//            sprintf(buf,"%4ld.%03ld  %2d    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,gathered);
+            sprintf(buf,"Rcved [%2i]  ",result);
+//            sprintf(buf,"%4ld.%03ld  %2i    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,gathered);
 //	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
             printf("%s",buf);
             printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
@@ -1136,7 +1173,7 @@ int main(int argc, char **argv) {
                DDCMSG(D_NEW, GREEN, "\t<-\tReceived %i bytes over RF", result);
             }
          } else {
-            printf("Rcved [%2d] \n",result);
+            printf("Rcved [%2i] \n",result);
          }
 
 //         usleep(total_slots*slottime*1000);
@@ -1145,8 +1182,8 @@ int main(int argc, char **argv) {
          result = gather_rf(RFfd,rbuf,275);
 
          if (result>0) {
-            sprintf(buf,"x2 Rcved [%2d]  ",result);
-//            sprintf(buf,"%4ld.%03ld  %2d    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,gathered);
+            sprintf(buf,"x2 Rcved [%2i]  ",result);
+//            sprintf(buf,"%4ld.%03ld  %2i    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,gathered);
 //	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
             printf("%s",buf);
             printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
@@ -1160,7 +1197,7 @@ int main(int argc, char **argv) {
                DDCMSG(D_NEW, GREEN, "\t<-\tReceived %i more bytes over RF", result);
             }
          } else {
-            printf("x2 Rcved [%2d] \n",result);
+            printf("x2 Rcved [%2i] \n",result);
          }
 
       }

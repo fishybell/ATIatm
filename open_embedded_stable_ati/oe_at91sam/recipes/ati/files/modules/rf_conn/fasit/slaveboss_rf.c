@@ -120,7 +120,7 @@ int rfRead(int fd, char *dest, int *dests) {
       } else {
          // connection dead, remove it
          *dests = 0;
-perror("RF Died because ");
+PERROR("RF Died because ");
 DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
@@ -154,7 +154,7 @@ int rfWrite(fasit_connection_t *fc) {
          return doNothing;
       } else {
          // connection dead, remove it
-perror("RF Died because ");
+PERROR("RF Died because ");
 DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
@@ -165,13 +165,13 @@ DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
       // change to blocking from non-blocking
       opts = fcntl(fc->rf, F_GETFL); // grab existing flags
       if (opts < 0) {
-perror("RF Died because ");
+PERROR("RF Died because ");
 DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
       opts = (opts ^ O_NONBLOCK); // remove nonblock from existing flags
       if (fcntl(fc->rf, F_SETFL, opts) < 0) {
-perror("RF Died because ");
+PERROR("RF Died because ");
 DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
@@ -182,7 +182,7 @@ DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          err = errno; // save errno
          if (ns < 0 && err != EAGAIN) {
             // connection dead, remove it
-perror("RF Died because ");
+PERROR("RF Died because ");
 DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
             return rem_rfEpoll;
          }
@@ -192,7 +192,7 @@ DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
       // change to non-blocking from blocking
       opts = (opts | O_NONBLOCK); // add nonblock back into existing flags
       if (fcntl(fc->rf, F_SETFL, opts) < 0) {
-perror("RF Died because ");
+PERROR("RF Died because ");
 DDCMSG(D_RF,RED, "RF Dead at %s:%i", __FILE__, __LINE__);
          return rem_rfEpoll;
       }
@@ -250,12 +250,8 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_DEVICE_REG:
          case LBC_ASSIGN_ADDR:
          case LBC_STATUS_REQ:
-         case LBC_STATUS_RESP_LIFTER:
-         case LBC_STATUS_RESP_MOVER:
-         case LBC_STATUS_RESP_EXT:
-         case LBC_STATUS_NO_RESP:
+         case LBC_STATUS_RESP:
          case LBC_EVENT_REPORT:
-         case LBC_REPORT_REQ:
          case LBC_REPORT_ACK:
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
@@ -301,17 +297,17 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
    debugRF(RED, fc->rf_ibuf, fc->rf_ilen);
    while ((mnum = validMessage(fc, &start, &end)) != -1) {
       if (!packetForMe(fc, start)) {
-         DDCMSG(D_RF,RED,"Ignored RF message %d",mnum);
+         DDCMSG(D_RF,BLACK,"Ignored RF message %d",mnum);
       } else {
-         DDCMSG(D_RF,RED,"Recieved RF message %d",mnum);
+         DDCMSG(D_RF,BLACK,"Recieved RF message %d",mnum);
          debugRF(RED, fc->rf_ibuf + start, end-start);
          if (fc->sleeping && mnum != LBC_POWER_CONTROL) {
             // ignore message when sleeping
-            DDCMSG(D_RF,RED,"Slept through RF message %d",mnum);
+            DDCMSG(D_RF,BLACK,"Slept through RF message %d",mnum);
          } else {
             switch (mnum) {
                HANDLE_RF (STATUS_REQ);
-               HANDLE_RF (REPORT_REQ);
+               HANDLE_RF (REPORT_ACK);
                HANDLE_RF (EXPOSE);
                HANDLE_RF (MOVE);
                HANDLE_RF (CONFIGURE_HIT);
@@ -342,10 +338,14 @@ int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
    return send_2100_status_req(fc); // gather latest information
 }
 
-int handle_REPORT_REQ(fasit_connection_t *fc, int start, int end) {
-   LB_report_req_t *pkt = (LB_report_req_t *)(fc->rf_ibuf + start);
-   DDCMSG(D_RF|D_VERY,RED, "handle_REPORT_REQ(%8p, %i, %i)", fc, start, end);
-   return send_EVENT_REPORT(fc, pkt->event);
+int handle_REPORT_ACK(fasit_connection_t *fc, int start, int end) {
+   LB_report_ack_t *pkt = (LB_report_ack_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_RF|D_VERY,RED, "handle_REPORT_ACK(%8p, %i, %i)", fc, start, end);
+   
+   // reset the given amount of hits for the event in question
+   log_ResetHits_Some(fc, pkt->event, pkt->hits, pkt->report);
+   DDCMSG(D_POINTER, black, "handled REPORT ACK for %i %i %i", pkt->event, pkt->hits, pkt->report);
+   return doNothing;
 }
 
 // returns 1 if a > b, 0 if a == b, -1 if a < b
@@ -365,38 +365,240 @@ int compTime(struct timespec a, struct timespec b) {
    }
 }
 
-int send_EVENT_REPORT(fasit_connection_t *fc, int event) {
-   int i;
-   // create message from parts of fc->last_status
-   LB_event_report_t bdy;
-   DDCMSG(D_RF|D_VERY,RED, "send_EVENT_REPORT(%08X,%i)", fc, event);
-   bdy.cmd = LBC_EVENT_REPORT;
-   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
-   bdy.event = event;
-   bdy.hits = 0;
-   for (i = 0; i <= MAX_HITS; i++) {
-      if (fc->hit_times[i].event == event && /* find valid hits for this event */
-          compTime(fc->event_starts[event], fc->hit_times[i].time) <= 0 &&
-          compTime(fc->event_ends[event], fc->hit_times[i].time) >= 0) {
-         // hit was between start and end
-         bdy.hits++;
+int send_EVENT_REPORTs(fasit_connection_t *fc) {
+   int i, retval = doNothing;
+   int report_limit = 4; // assuming 36 bytes allowed per response window (110 ms @ 9600 baud with 64 bytes overhead and 26.6 ms warm-up) and 9 bytes from the status response, that leaves almost room for 4 reports per response (1 byte too small, boo-hoo, we're going for it)
+   hit_event_link_t *this = NULL; // chain of reports to send
+   hit_event_link_t **head =  &this;
+   hit_event_link_t *temp = NULL; // a temporary reference to possibly prevent looking through chain twice
+   hit_event_link_t *last = NULL; // the last this
+
+   // don't remember the new report between report sending times
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+   for (i=0; i < MAX_HIT_EVENTS; i++) {
+      fc->hit_event_sum[i].new_report = -1;
+   }
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+
+   // look at each hit and place in the report chain
+   for (i=0; i < MAX_HITS; i++) {
+      if (!(fc->hit_times[i].time.tv_sec == 0 && fc->hit_times[i].time.tv_nsec == 0l)) {
+   DDCMSG(D_POINTER, GREEN, "Looking @ %s:%i with %i", __FILE__, __LINE__, i);
+         int found = 0; // have we found a link for this hits event/report combo
+         int event = fc->hit_times[i].event; // shortcut to the current event
+         this = *head;
+         // look through chain to see if I already created a report to send
+         while (this != NULL && (found == 0 || found == 2)) {
+            if (event == this->event &&
+                fc->hit_times[i].report != -1 &&
+                fc->hit_times[i].report == this->report) {
+   DDCMSG(D_POINTER, GREEN, "Found @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+               // matched event and (valid) report
+               found = 1; // will re-report (adding on to this reports count)
+            } else {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+               if (event == this->event) {
+   DDCMSG(D_POINTER, GREEN, "Partial @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+                  found = 2; // we found a report that matched my event; we'll have to keep looking and might have to come back to this report
+                  if (fc->hit_event_sum[event].new_report != -1 &&
+                      this->report == fc->hit_event_sum[event].new_report) {
+   DDCMSG(D_POINTER, GREEN, "Temp @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+                     // we found the latest report for this event, remember it for later (should only be one match)
+                     temp = this;
+                  }
+               }
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+               // move on to next item
+               last = this;
+               this = this->next;
+            }
+         }
+
+         // partial match? we need to either use the newly created report for this event or create a new one
+         if (found == 2) {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+            // check to see if I want to use the found report or not
+            if (fc->hit_times[i].report == -1 && fc->hit_event_sum[event].reported == 0) {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+               // we have created a report number for this event and the hit has not been reported
+               if (temp != NULL) {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+                  // we found the correct link to use before
+                  this = temp;
+                  found = 1;
+               } else {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+                  // we need to create a new report for this event
+                  // TODO -- we should never get here as it implies we recently created a report, but can't find it -- we need to prove that we can't get here or do something more drastic here
+                  found = 0;
+               }
+            } else {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+               // the hit as been reported, or both have been reported, either way, create a new link
+               found = 0;
+            }
+         }
+
+         // create a new link in the chain?
+         if (found == 0) {
+            // no match, create a new link in the chain
+            this = malloc(sizeof(hit_event_link_t));
+   DDCMSG(D_POINTER, GREEN, "Creating @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+            if (last != NULL) {
+               last->next = this; // link together
+            }
+
+            // prepare chain
+            this->event = event;
+            if (fc->hit_times[i].report == -1) {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+               if (++fc->last_report > 255) {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+                  fc->last_report = 0;
+               }
+               fc->hit_times[i].report = fc->last_report;
+            }
+            this->report = fc->hit_times[i].report;
+            this->next = NULL;
+            // prepare packet
+            memset(&this->pkt, 0, sizeof(this->pkt));
+            this->pkt.cmd = LBC_EVENT_REPORT;
+            this->pkt.event = event;
+            this->pkt.report = this->report;
+            this->pkt.addr = fc->id & 0x7ff; // source address (always to basestation)
+            if (!(fc->event_starts[event].tv_sec == 0 && fc->event_starts[event].tv_nsec == 0l) &&
+                fc->event_ends[event].tv_sec == 0 && fc->event_ends[event].tv_nsec == 0l) {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+               // start time, but no end time, count everything as unqualified
+               this->pkt.qualified = 0;
+            } else {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+               // there is an expose and conceal time, we're qualified 
+               this->pkt.qualified = 1;
+            }
+            // remember the last report used with this event (so other non-reported hits use the same report)
+            fc->hit_event_sum[event].new_report = this->report;
+         }
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+         
+         // "this" is now a correct match, count the hit
+         if (this->pkt.qualified == 0) {
+   DDCMSG(D_POINTER, GREEN, "Count unqual @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+            // unqualified packets count everything
+            this->pkt.hits++;
+         } else {
+   DDCMSG(D_POINTER, GREEN, "Check qual @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+            // qualified packets require correct time
+            if (compTime(fc->event_starts[event], fc->hit_times[i].time) <= 0 &&
+                compTime(fc->event_ends[event], fc->hit_times[i].time) >= 0) {
+   DDCMSG(D_POINTER, GREEN, "Count qual @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+               this->pkt.hits++;
+            }
+         }
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
       }
    }
 
-   // set crc and send
-   set_crc8(&bdy);
-   queueMsg(fc, &bdy, RF_size(LBC_EVENT_REPORT));
-   return mark_rfWrite;
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+   // send the reports
+   this = *head;
+   while (this != NULL) {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
+      if (this->pkt.hits > 0) {
+   DDCMSG(D_POINTER, GREEN, "Sending @ %s:%i with %p", __FILE__, __LINE__, this);
+         // finish and send
+         set_crc8(&this->pkt);
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
+         queueMsg(fc, &this->pkt, RF_size(LBC_EVENT_REPORT));
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
+         retval |= mark_rfWrite;
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p, %p, %i", __FILE__, __LINE__, this, fc, this->event);
+         // mark this event as reported
+         fc->hit_event_sum[this->event].reported = 1;
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
+
+         // limit number of event reports to send each time
+         if (--report_limit <= 0) {
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
+            // we've reached our maximum of sent reports, call it good
+            break;
+         }
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
+      }
+      this = this->next; // next link in chain
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
+   }
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+
+   // free allocated memory
+   this = *head;
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+   while (this != NULL) {
+   DDCMSG(D_POINTER, GREEN, "Freeing @ %s:%i", __FILE__, __LINE__);
+      temp = this;
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+      this = this->next; // next link in chain
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+      free(temp);
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+   }
+   
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+   return retval;
+#if 0
+   // prepare message
+   LB_event_report_t LB;
+   memset(&LB, 0, sizeof(LB));
+   LB.cmd = LBC_EVENT_REPORT;
+   LB.event = event;
+   LB.report = report;
+   LB.addr = fc->id & 0x7ff; // source address (always to basestation)
+
+   // check if qualified or unqualified
+   if (fc->event_starts[event].tv_sec !=0 && fc->event_starts[event].tv_nsec != 0l &&
+       fc->event_ends[event].tv_sec == 0 && fc->event_ends[event].tv_nsec == 0l) {
+      // start time, but no end time, count everything as unqualified
+      LB.qualified = 0;
+      for (i=0; i < MAX_HITS; i++) {
+         if (fc->hit_times[i].event == event) {
+            LB.hits++;
+            fc->hit_times[i].report = report; // this hit has been reported, it can now be cleared on ACK
+         }
+      }
+   } else {
+      // there is an expose and conceal time, we're qualified 
+      LB.qualified = 1;
+      for (i=0; i < MAX_HITS; i++) {
+         if (fc->hit_times[i].event == event &&
+             compTime(fc->event_starts[event], fc->hit_times[i].time) <= 0 &&
+             compTime(fc->event_ends[event], fc->hit_times[i].time) >= 0) {
+            // time between expose and conceal times, count hit
+            LB.hits++;
+            fc->hit_times[i].report = report; // this hit has been reported, it can now be cleared on ACK
+         }
+      }
+   }
+
+   // send if we found hits
+   if (LB.hits > 0) {
+      set_crc8(&LB);
+      queueMsg(fc, &LB, RF_size(LBC_EVENT_REPORT));
+      return mark_rfWrite;
+   } else {
+      return doNothing;
+   }
+#endif
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
 }
 
 int send_STATUS_RESP(fasit_connection_t *fc) {
    int retval = doNothing, i;
    
    // build up current response
-   LB_status_resp_ext_t s;
+   LB_status_resp_t s;
    DDCMSG(D_RF|D_VERY,RED, "send_STATUS_RESP(%08X)", fc);
-   D_memset(&s, 0, sizeof(LB_status_resp_ext_t));
-   s.hits = max(0,min(fc->hits_per_event[fc->current_event], 127)); // cap upper/lower bounds
+   D_memset(&s, 0, sizeof(LB_status_resp_t));
+   //s.hits = max(0,min(fc->hit_event_sum[fc->current_event], 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
       DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       s.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
@@ -420,7 +622,14 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    // we don't know if they received the last response, so send everything every time
    // copy current status to last status and send it
    fc->last_status = s;
-   retval = send_STATUS_RESP_EXT(fc);
+   // finish filling in message and send
+   fc->last_status.cmd = LBC_STATUS_RESP;
+   fc->last_status.addr = fc->id & 0x7FF; // source address (always to basestation)
+
+   // set crc and send
+   set_crc8(&fc->last_status);
+   queueMsg(fc, &fc->last_status, RF_size(LBC_STATUS_RESP));
+   retval = mark_rfWrite;
 
 #if 0
    DDCMSG(D_MEGA, BLACK, "\n============================\nNew values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\nOld values: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\nf2102 vals: %i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i\n============================\n",
@@ -469,69 +678,9 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    SR_end:
    fc->hit_hit = last_hh;
 #endif
+   // send an appropriate number of event reports if I have any hits
+   retval |= send_EVENT_REPORTs(fc);
    return retval;
-}
-
-int send_STATUS_RESP_LIFTER(fasit_connection_t *fc) {
-   // create message from parts of fc->last_status
-   LB_status_resp_mover_t bdy;
-   DDCMSG(D_RF|D_VERY,RED, "send_STATUS_RESP_LIFTER(%08X)", fc);
-   bdy.cmd = LBC_STATUS_RESP_LIFTER;
-   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
-   bdy.hits = fc->last_status.hits;
-   bdy.expose = fc->last_status.expose;
-
-   DDCMSG(D_RF|D_VERY, BLACK, "send_STATUS_RESP_LIFTER hits: %i from %i", bdy.hits, fc->last_status.hits);
-
-   // set crc and send
-   set_crc8(&bdy);
-   queueMsg(fc, &bdy, RF_size(LBC_STATUS_RESP_LIFTER));
-   return mark_rfWrite;
-}
-
-int send_STATUS_RESP_MOVER(fasit_connection_t *fc) {
-   // create message from parts of fc->last_status
-   LB_status_resp_mover_t bdy;
-   DDCMSG(D_RF|D_VERY,RED, "send_STATUS_RESP_MOVER(%08X)", fc);
-   bdy.cmd = LBC_STATUS_RESP_MOVER;
-   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
-   bdy.hits = fc->last_status.hits;
-   bdy.expose = fc->last_status.expose;
-   bdy.speed = fc->last_status.speed;
-   bdy.move = fc->last_status.move;
-   bdy.location = fc->last_status.location;
-
-   DDCMSG(D_RF|D_VERY, BLACK, "send_STATUS_RESP_MOVER hits: %i from %i", bdy.hits, fc->last_status.hits);
-
-   // set crc and send
-   set_crc8(&bdy);
-   queueMsg(fc, &bdy, RF_size(LBC_STATUS_RESP_MOVER));
-   return mark_rfWrite;
-}
-
-int send_STATUS_RESP_EXT(fasit_connection_t *fc) {
-   DDCMSG(D_RF|D_VERY,RED, "send_STATUS_RESP_EXT(%08X)", fc);
-   // finish filling in message and send
-   fc->last_status.cmd = LBC_STATUS_RESP_EXT;
-   fc->last_status.addr = fc->id & 0x7FF; // source address (always to basestation)
-
-   DDCMSG(D_RF|D_VERY, BLACK, "send_STATUS_RESP_EXT hits: %i", fc->last_status.hits);
-
-   // set crc and send
-   set_crc8(&fc->last_status);
-   queueMsg(fc, &fc->last_status, RF_size(LBC_STATUS_RESP_EXT));
-   return mark_rfWrite;
-}
-
-int send_STATUS_NO_RESP(fasit_connection_t *fc) {
-   // create message and send
-   LB_status_no_resp_t bdy;
-   DDCMSG(D_RF|D_VERY,RED, "send_STATUS_NO_RESP(%08X)", fc);
-   bdy.cmd = LBC_STATUS_NO_RESP;
-   bdy.addr = fc->id & 0x7FF; // source address (always to basestation)
-   set_crc8(&bdy);
-   queueMsg(fc, &bdy, RF_size(LBC_STATUS_NO_RESP));
-   return mark_rfWrite;
 }
 
 int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
@@ -575,6 +724,7 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
 
    // change event
    fc->current_event = pkt->event;
+   log_ResetHits_All(fc); // clear out everything for this event
    clock_gettime(CLOCK_MONOTONIC,&fc->event_starts[fc->current_event]);
    if (pkt->expose) {
       fc->future_exp = 90;
@@ -617,7 +767,7 @@ int handle_MOVE(fasit_connection_t *fc, int start, int end) {
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
    LB_configure_t *pkt = (LB_configure_t *)(fc->rf_ibuf + start);
    int retval = doNothing;
-   int hit_temp = -1;
+   int hit_temp = 555; // "do-nothing" number
    DDCMSG(D_RF|D_VERY,RED, "handle_CONFIGURE_HIT(%8p, %i, %i)", fc, start, end);
 
    // check for thermal control only
@@ -633,7 +783,8 @@ int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end) {
          break;
       case 1:
          // reset to zero
-         hit_temp = 0;
+         //  hit_temp = 0; -- NO!!! don't listen to SmartRange/TRACR
+         hit_temp = 555; // we'll leave it alone if it's setting it to zero and handle resets on our own
          break;
       case 2:
          // incriment by one
@@ -820,7 +971,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    DDCMSG(D_RF|D_MEGA, BLACK, "Going to pass devid: %02X:%02X:%02X:%02X", (bdy.devid & 0xff000000) >> 24, (bdy.devid & 0xff0000) >> 16, (bdy.devid & 0xff00) >> 8, bdy.devid & 0xff);
 
    // status block
-   bdy.hits = max(0,min(fc->hits_per_event[fc->current_event], 127)); // cap upper/lower bounds
+   //bdy.hits = max(0,min(fc->hit_event_sum[fc->current_event], 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
       DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       bdy.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
@@ -839,7 +990,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    bdy.tokill = fc->hit_tokill;
    
    // copy this info to last sent status
-   fc->last_status.hits = bdy.hits;
+   //fc->last_status.hits = bdy.hits;
    fc->last_status.expose = bdy.expose;
    fc->last_status.speed = bdy.speed;
    fc->last_status.move = bdy.move;
@@ -884,7 +1035,7 @@ int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end) {
    DDCMSG(D_RF, RED, "SLAVEBOSS Registered as %i for %08X", fc->id, fc);
    // reset hit event log
    for (fc->current_event = MAX_HIT_EVENTS - 1; fc->current_event >= 0; fc->current_event--) {
-      log_ResetHits(fc);
+      log_ResetHits_All(fc);
    } // should end on fc->current_event of -1
    fc->current_event = 0; // ... make it a 0 again
    return doNothing;

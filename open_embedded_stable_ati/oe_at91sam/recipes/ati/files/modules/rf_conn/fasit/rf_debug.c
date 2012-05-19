@@ -42,24 +42,9 @@ void debug_PYRO_FIRE(int color, LB_packet_t *pkt) {
    DCMSG(color, "LBC_PYRO_FIRE: cmd: %i, addr: %i, zone: %i, crc: %02X", p->cmd, p->addr, p->zone, p->crc);
 }
 
-void debug_STATUS_RESP_LIFTER(int color, LB_packet_t *pkt) {
-   LB_status_resp_lifter_t *p = (LB_status_resp_lifter_t *)pkt;
-   DCMSG(color, "LBC_STATUS_RESP_LIFTER: cmd: %i, addr: %i, hits: %i, expose: %i, crc: %02X", p->cmd, p->addr, p->hits, p->expose, p->crc);
-}
-
-void debug_STATUS_RESP_MOVER(int color, LB_packet_t *pkt) {
-   LB_status_resp_mover_t *p = (LB_status_resp_mover_t*)pkt;
-   DCMSG(color, "LBC_STATUS_RESP_MOVER: cmd: %i, addr: %i, hits: %i, expose: %i, speed: %i, move: %i, location: %i, crc: %02X", p->cmd, p->addr, p->hits, p->expose, p->speed, p->move, p->location, p->crc);
-}
-
-void debug_STATUS_RESP_EXT(int color, LB_packet_t *pkt) {
-   LB_status_resp_ext_t *p = (LB_status_resp_ext_t*)pkt;
-   DCMSG(color, "LBC_STATUS_RESP_EXT: cmd: %i, addr: %i, hits: %i, expose: %i, speed: %i, move: %i, react: %i, location: %i, hitmode: %i, tokill: %i, sensitivity: %i, timehits: %i, fault: %i, crc: %02X", p->cmd, p->addr, p->hits, p->expose, p->speed, p->move, p->react, p->location, p->hitmode, p->tokill, p->sensitivity, p->timehits, p->fault, p->crc);
-}
-
-void debug_STATUS_NO_RESP(int color, LB_packet_t *pkt) {
-   LB_status_no_resp_t *p = (LB_status_no_resp_t*)pkt;
-   DCMSG(color, "LBC_STATUS_NO_RESP: cmd: %i, addr: %i, crc: %02X", p->cmd, p->addr, p->crc);
+void debug_STATUS_RESP(int color, LB_packet_t *pkt) {
+   LB_status_resp_t *p = (LB_status_resp_t*)pkt;
+   DCMSG(color, "LBC_STATUS_RESP: cmd: %i, addr: %i, expose: %i, speed: %i, move: %i, react: %i, location: %i, hitmode: %i, tokill: %i, sensitivity: %i, timehits: %i, fault: %i, crc: %02X", p->cmd, p->addr, p->expose, p->speed, p->move, p->react, p->location, p->hitmode, p->tokill, p->sensitivity, p->timehits, p->fault, p->crc);
 }
 
 void debug_QEXPOSE(int color, LB_packet_t *pkt) {
@@ -92,11 +77,6 @@ void debug_REQUEST_NEW(int color, LB_packet_t *pkt) {
    DCMSG(color, "LBC_REQUEST_NEW: cmd: %i, forget_addr: %8x, low_dev: %x, slottime: %i, crc: %02X", p->cmd, p->forget_addr, p->low_dev, p->slottime, p->crc);
 }
 
-void debug_REPORT_REQ(int color, LB_packet_t *pkt) {
-   LB_report_req_t *p = (LB_report_req_t*)pkt;
-   DCMSG(color, "LBC_REPORT_REQ: cmd: %i, addr: %i, event: %i, crc: %02X", p->cmd, p->addr, p->event, p->crc);
-}
-
 void debug_EVENT_REPORT(int color, LB_packet_t *pkt) {
    LB_event_report_t *p = (LB_event_report_t*)pkt;
    DCMSG(color, "LBC_EVENT_REPORT: cmd: %i, addr: %i, event: %i, hits: %i, crc: %02X", p->cmd, p->addr, p->event, p->hits, p->crc);
@@ -111,6 +91,8 @@ void debug_ASSIGN_ADDR(int color, LB_packet_t *pkt) {
 void debugRF(int color, char *packet, int len) {
    int start = 0;
    if (!(verbose & D_MEGA)) { return; }
+   DDpacket(packet, len);
+   return;
    while (start < len) {
       LB_packet_t *pkt = (LB_packet_t*)(packet+start);
       DCMSG(color, "RF msg buffer size: %i", len);
@@ -133,14 +115,8 @@ void debugRF(int color, char *packet, int len) {
             debug_POWER_CONTROL(color,pkt); break;
          case LBC_PYRO_FIRE:
             debug_PYRO_FIRE(color,pkt); break;
-         case LBC_STATUS_RESP_LIFTER:
-            debug_STATUS_RESP_LIFTER(color,pkt); break;
-         case LBC_STATUS_RESP_MOVER:
-            debug_STATUS_RESP_MOVER(color,pkt); break;
-         case LBC_STATUS_RESP_EXT:
-            debug_STATUS_RESP_EXT(color,pkt); break;
-         case LBC_STATUS_NO_RESP:
-            debug_STATUS_NO_RESP(color,pkt); break;
+         case LBC_STATUS_RESP:
+            debug_STATUS_RESP(color,pkt); break;
          case LBC_QEXPOSE:
             debug_QEXPOSE(color,pkt); break;
          case LBC_BURST:
@@ -153,8 +129,6 @@ void debugRF(int color, char *packet, int len) {
             debug_DEVICE_REG(color,pkt); break;
          case LBC_REQUEST_NEW:
             debug_REQUEST_NEW(color,pkt); break;
-         case LBC_REPORT_REQ:
-            debug_REPORT_REQ(color,pkt); break;
          case LBC_EVENT_REPORT:
             debug_EVENT_REPORT(color,pkt); break;
          case LBC_ASSIGN_ADDR:

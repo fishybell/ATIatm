@@ -24,6 +24,8 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
    long elapsed_tenths;
    int result,force_stat_req=0;
+   int i;
+   report_memory_t *this_r; // a pointer to use with the report memory chain
    LB_packet_t         LB_buf;
    LB_status_req_t     *LB_status_req;
    /***   what we do is use the minion's state_timer to determine how long to wait
@@ -38,7 +40,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
 #if 1
    timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);
-   DDCMSG(D_TIME,CYAN,"MINION %d: Begin timer updates at %6ld.%09ld timestamp, delta=%1ld.%09ld"
+   DDCMSG(D_TIME,CYAN,"MINION %i: Begin timer updates at %6li.%09li timestamp, delta=%1li.%09li"
           ,minion->mID,mt->elapsed_time.tv_sec, mt->elapsed_time.tv_nsec,mt->delta_time.tv_sec, mt->delta_time.tv_nsec);
 
    elapsed_tenths = mt->elapsed_time.tv_sec*10+(mt->elapsed_time.tv_nsec/100000000L);
@@ -75,7 +77,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
    if (!minion->S.state_timer)  { // timer reached zero
       //   We should only do the section if the next timer is really up, and
       //   not just if another fd was ready about the same time
-      DDCMSG(D_MSTATE,RED,"MINION %d: timer update.   rf_t.flags/timer=0x%x/%i   exp.flags/timer=0x%x/%i   event.flags/timer=0x%x/%i",
+      DDCMSG(D_MSTATE,RED,"MINION %i: timer update.   rf_t.flags/timer=0x%x/%i   exp.flags/timer=0x%x/%i   event.flags/timer=0x%x/%i",
              minion->mID,minion->S.rf_t.flags,minion->S.rf_t.timer,minion->S.exp.flags,minion->S.exp.timer,minion->S.event.flags,minion->S.event.timer);
 
 
@@ -85,7 +87,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
          if (minion->S.rf_t.timer>elapsed_tenths){
             minion->S.rf_t.timer-=elapsed_tenths;   // not timed out.  but decrement out timer
-            DDCMSG(D_MSTATE,RED,"MINION %d: not timed out.   S.rf_t.timer=%d   S.rf_t.timer=%d",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
+            DDCMSG(D_MSTATE,RED,"MINION %i: not timed out.   S.rf_t.timer=%i   S.rf_t.timer=%i",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
 
          } else {    // timed out,  move to the next state, do what it should.
 
@@ -93,7 +95,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                case F_rf_t_waiting_short:
 
 #if 1
-                  DDCMSG(D_MSTATE,RED,"*&#$*&#$\n*&#$*&#$\nMINION %d: Would time out  and disconnect.   S.rf_t.timer=%d   S.rf_t.timer=%d",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
+                  DDCMSG(D_MSTATE,RED,"*&#$*&#$\n*&#$*&#$\nMINION %i: Would time out  and disconnect.   S.rf_t.timer=%i   S.rf_t.timer=%i",minion->mID,minion->S.rf_t.timer,minion->S.rf_t.timer);
 #else
                   // break connection to FASIT server
                   close(minion->rcc_sock); // close FASIT
@@ -107,7 +109,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   minion->status = S_closed;
                   LB_buf.cmd = LBC_ILLEGAL; // send an illegal packet, which makes mcp forget me
                   // now send it to the MCP master
-                  DDCMSG(D_PACKET,BLUE,"Minion %d:  LBC_ILLEGAL cmd=%d", minion->mID,LB_buf.cmd);
+                  DDCMSG(D_PACKET,BLUE,"Minion %i:  LBC_ILLEGAL cmd=%i", minion->mID,LB_buf.cmd);
                   result= psend_mcp(minion,&LB_buf);
                   close(minion->mcp_sock); // close mcp
                   exit(0); // exit the forked minion
@@ -135,7 +137,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
          if (minion->S.exp.timer>elapsed_tenths){
             minion->S.exp.timer-=elapsed_tenths;    // not timed out.  but decrement out timer
-            DDCMSG(D_MSTATE,RED,"MINION %d: not timed out.   S.exp.timer=%d   S.exp.timer=%d",minion->mID,minion->S.exp.timer,minion->S.exp.timer);
+            DDCMSG(D_MSTATE,RED,"MINION %i: not timed out.   S.exp.timer=%i   S.exp.timer=%i",minion->mID,minion->S.exp.timer,minion->S.exp.timer);
 
          } else {    // timed out,  move to the next state, do what it should.
 
@@ -149,7 +151,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   minion->S.exp.data=45;  // make the current positon in movement
                   minion->S.exp.flags=F_exp_expose_B;     // something has to happen
                   minion->S.exp.timer=100;  // it should happen in this many deciseconds
-                  DDCMSG(D_MSTATE,MAGENTA,"exp_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+                  DDCMSG(D_MSTATE,MAGENTA,"exp_A %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
@@ -168,7 +170,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   minion->S.exp.data=90;  // make the current positon in movement
                   minion->S.exp.flags=F_exp_expose_C;     // we have reached the exposed position, now ask for an update
                   minion->S.exp.timer=15; // 1.5 second later
-                  DDCMSG(D_MSTATE,MAGENTA,"exp_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+                  DDCMSG(D_MSTATE,MAGENTA,"exp_B %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
@@ -199,7 +201,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   minion->S.exp.data=45;  // make the current positon in movement
                   minion->S.exp.flags=F_exp_conceal_B;    // something has to happen
                   minion->S.exp.timer=50;  // it should happen in this many deciseconds
-                  DDCMSG(D_MSTATE,MAGENTA,"conceal_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+                  DDCMSG(D_MSTATE,MAGENTA,"conceal_A %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
@@ -217,7 +219,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   minion->S.exp.data=0;   // make the current positon in movement
                   minion->S.exp.flags=F_exp_conceal_C;    // we have reached the concealed position, ask for status update again in one second
                   minion->S.exp.timer=15; // 1.5 second later
-                  DDCMSG(D_MSTATE,MAGENTA,"conceal_B %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n"
+                  DDCMSG(D_MSTATE,MAGENTA,"conceal_B %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
@@ -247,7 +249,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
       // if there is an move  flag set, we then need to pretend we are moving
       if (minion->S.move.flags) {
          
-         DDCMSG(D_MSTATE,GREEN,"**********\n***MINION %d:  move.flags=0x%x move.timer=%i move.data=%d",
+         DDCMSG(D_MSTATE,GREEN,"**********\n***MINION %i:  move.flags=0x%x move.timer=%i move.data=%i",
                 minion->mID,minion->S.move.flags, minion->S.move.timer, minion->S.move.data);
 
          if (minion->S.move.timer>elapsed_tenths){
@@ -280,10 +282,10 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                      if (minion->S.position.data>2) minion->S.position.data-=2;
                   }
                   
-                  DDCMSG(D_MSTATE,GREEN,"**********\n***MINION %d:  need to push up a status2102   move.flags=0x%x move.timer=%i move.data=%d",
+                  DDCMSG(D_MSTATE,GREEN,"**********\n***MINION %i:  need to push up a status2102   move.flags=0x%x move.timer=%i move.data=%i",
                          minion->mID,minion->S.move.flags, minion->S.move.timer, minion->S.move.data);
 
-//                  DDCMSG(D_MSTATE,MAGENTA,"exp_A %06ld.%1d   elapsed_tenths=%ld 2102 simulated %d \n" ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
+//                  DDCMSG(D_MSTATE,MAGENTA,"exp_A %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n" ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
                   sendStatus2102(0,mb->header,minion); // forces sending of a 2102
 
                   break;
@@ -296,21 +298,21 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             }
          }
          
-         DDCMSG(D_MSTATE,GREEN,"**********\n---MINION %d:  send a lbc status_req   move.flags=0x%x move.timer=%i move.data=%d",
+         DDCMSG(D_MSTATE,GREEN,"**********\n---MINION %i:  send a lbc status_req   move.flags=0x%x move.timer=%i move.data=%i",
                 minion->mID,minion->S.move.flags, minion->S.move.timer, minion->S.move.data);
 
          force_stat_req=1;         // send out a request for actual position
          
          // try to calculate how long it will take to go 2 meters.
          minion->S.move.timer=minion->S.speed.data/.5;  // it should happen in this many deciseconds
-         DDCMSG(D_PACKET,GREEN,"Minion %d:  \n\n**********\n    setting move timer=%d", minion->mID,minion->S.move.timer);
+         DDCMSG(D_PACKET,GREEN,"Minion %i:  \n\n**********\n    setting move timer=%i", minion->mID,minion->S.move.timer);
 
       } // end of move.flags
 
 
       // if there is an event flag set, we then need to do something
       if (minion->S.event.flags) {
-         DDCMSG(D_MSTATE,RED,"MINION %d:----- event.flags=0x%x event.timer=%i",minion->mID,minion->S.event.flags, minion->S.event.timer);
+         DDCMSG(D_MSTATE,RED,"MINION %i:----- event.flags=0x%x event.timer=%i",minion->mID,minion->S.event.flags, minion->S.event.timer);
 
          if (minion->S.event.timer>elapsed_tenths){
             minion->S.event.timer-=elapsed_tenths;  // not timed out.  but decrement out timer
@@ -350,7 +352,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          LB_status_req_t *L=(LB_status_req_t *)&LB_buf;
          L->cmd=LBC_STATUS_REQ;          // start filling in the packet
          L->addr=minion->RF_addr;
-         DDCMSG(D_MSTATE,GREEN,"Minion %d:   build and send L LBC_STATUS_REQ", minion->mID);
+         DDCMSG(D_MSTATE,GREEN,"Minion %i:   build and send L LBC_STATUS_REQ", minion->mID);
          result= psend_mcp(minion,&LB_buf);
          force_stat_req=0;
          minion->S.event.flags=F_waiting_for_report;
@@ -364,13 +366,12 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
    if (!minion->S.state_timer)  { // timer reached zero
       //   We should only do the section if the next timer is really up, and
       //   not just if another fd was ready about the same time
-      DDCMSG(D_MSTATE,RED,"MINION %d: state timers update:\nfast flags/timer=%i/%i\nslow flags/timer=%i/%i\nexpose flags/timer=%i/%i\nconceal flags/timer=%i/%i\nmove flags/timer=%i/%i\nevent flags/timer=%i/%i", minion->mID,
+      DDCMSG(D_MSTATE,RED,"MINION %i: state timers update:\nfast flags/timer=%i/%i\nslow flags/timer=%i/%i\nexpose flags/timer=%i/%i\nconceal flags/timer=%i/%i\nmove flags/timer=%i/%i", minion->mID,
                minion->S.rf_t.fast_flags, minion->S.rf_t.fast_timer,
                minion->S.rf_t.slow_flags, minion->S.rf_t.slow_timer,
                minion->S.exp.exp_flags, minion->S.exp.exp_timer,
                minion->S.exp.con_flags, minion->S.exp.con_timer,
-               minion->S.move.flags, minion->S.move.timer,
-               minion->S.event.flags, minion->S.event.timer);
+               minion->S.move.flags, minion->S.move.timer);
 
       // macro to send a status request
       #define SEND_STATUS_REQUEST { \
@@ -378,7 +379,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          LB_status_req_t *L=(LB_status_req_t *)&LB_buf; \
          L->cmd=LBC_STATUS_REQ;          /* start filling in the packet */ \
          L->addr=minion->RF_addr; \
-         DDCMSG(D_MSTATE,GREEN,"Minion %d:   build and send L LBC_STATUS_REQ", minion->mID); \
+         DDCMSG(D_MSTATE,GREEN,"Minion %i:   build and send L LBC_STATUS_REQ", minion->mID); \
          result= psend_mcp(minion,&LB_buf); \
       }
 
@@ -524,36 +525,33 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          }
       ); // end of CHECK_TIMER for move state timer
 
-      CHECK_TIMER (minion->S.event, timer, flags, 
-         DDCMSG(D_MSTATE, BLACK, "Now checking event timer flags: %i", minion->S.event.flags);
-         switch (minion->S.event.flags) {
-            case F_event_start: {
-               // shouldn't get here unless we missed
-               // incriment miss number and check against max
-               if (++minion->S.event.missed > EVENT_MAX_MISS) {
-                  setTimerTo(minion->S.event, timer, flags, EVENT_RESPONSE_TIME, F_event_end); // disconnect later to give a slight chance to the response coming in
-               } else {
-                  // send another request
-                  LB_report_req_t L;
+      this_r = minion->S.report_chain;
+      while (this_r != NULL) {
+         // check to see if this one is looking to send an ack back now
+         CHECK_TIMER (this_r->s, timer, flags, 
+            DDCMSG(D_MSTATE, BLACK, "Now checking this_r(%p) timer flags: %i", this_r, this_r->s.flags);
+            switch (this_r->s.flags) {
+               case F_event_ack: {
+                  // we received a report, send an ack
+                  LB_report_ack_t L;
 
-                  L.cmd=LBC_REPORT_REQ;
+                  L.cmd=LBC_REPORT_ACK;
                   L.addr=minion->RF_addr;
-                  L.event=minion->S.exp.last_event; // use saved event number
+                  L.report = this_r->report;
+                  L.event = this_r->event;
+                  L.hits = this_r->hits;
 
-                  DDCMSG(D_PACKET,BLUE,"Minion %d:  LB_report_req cmd=%d", minion->mID,L.cmd);
+                  DDCMSG(D_PACKET,BLUE,"Minion %i:  LB_report_req cmd=%i", minion->mID,L.cmd);
                   psend_mcp(minion,&L);
-                  setTimerTo(minion->S.event, timer, flags, EVENT_RESPONSE_TIME, F_event_start); // try again
+                  stopTimer(this_r->s, timer, flags); // one ack per received report
+               } break;
+               default: {
+                  DDCMSG(D_MSTATE, RED, "Default reached in this_r(%p) flags: %i", this_r, this_r->s.flags);
                }
-            } break;
-            case F_event_end: {
-               // we missed too many times
-               DISCONNECT;
-            } break;
-            default: {
-               DDCMSG(D_MSTATE, RED, "Default reached in event flags: %i", minion->S.event.flags);
             }
-         }
-      ); // end of CHECK_TIMER for event state timer
+         ); // end of CHECK_TIMER for this_r state timer
+         this_r = this_r->next;
+      } // end of while loop for report memory chain
 
    } // ...end of timer reached zero
    
@@ -564,12 +562,16 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
    // if arg is >0 and <timer, it is the new timer
    Set_Timer(minion->S.exp.exp_timer); // timer for expose state
    Set_Timer(minion->S.exp.con_timer); // timer for conceal state
-   Set_Timer(minion->S.event.timer); // timer for event response
+   this_r = minion->S.report_chain;
+   while (this_r != NULL) {
+      Set_Timer(this_r->s.timer); // timer for event response
+      this_r = this_r->next;
+   }
    Set_Timer(minion->S.rf_t.fast_timer); // timer for fast status check
    Set_Timer(minion->S.rf_t.slow_timer); // timer for slow status check
    Set_Timer(minion->S.move.timer); // timer for movement state
 
-   DDCMSG(D_MSTATE,GRAY,"\nMinion %d:   Set_Timer=%d   exp.exp=%d exp.con=%d event=%d rf_t.fast=%d ft_t.slow=%d move=%d",
-          minion->mID,minion->S.state_timer, minion->S.exp.exp_timer, minion->S.exp.con_timer, minion->S.event.timer, minion->S.rf_t.fast_timer, minion->S.rf_t.slow_timer, minion->S.move.timer);
+   DDCMSG(D_MSTATE,GRAY,"\nMinion %i:   Set_Timer=%i   exp.exp=%i exp.con=%i rf_t.fast=%i ft_t.slow=%i move=%i (or event timer)",
+          minion->mID,minion->S.state_timer, minion->S.exp.exp_timer, minion->S.exp.con_timer, minion->S.rf_t.fast_timer, minion->S.rf_t.slow_timer, minion->S.move.timer);
 
 }

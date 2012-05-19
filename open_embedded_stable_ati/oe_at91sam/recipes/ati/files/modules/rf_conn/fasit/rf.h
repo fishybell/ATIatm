@@ -20,7 +20,6 @@
 
 #include "mcp.h"
 
-
 #define min(a, b) ( a > b ? b : a )
 #define max(a, b) ( a > b ? a : b )
 
@@ -72,7 +71,7 @@ void print_verbosity_bits(void);
 //     that is probably bit-packed
 
 //  the command ID's
-#define LBC_ILLEGAL                     0
+#define LBC_ILLEGAL                     0 /* illegal command will cause minion to be disconnected by mcp */
 #define LBC_EXPOSE                      1
 #define LBC_MOVE                        2
 #define LBC_CONFIGURE_HIT               3
@@ -82,17 +81,15 @@ void print_verbosity_bits(void);
 
 #define LBC_PYRO_FIRE                   7
 
-#define LBC_STATUS_RESP_LIFTER          8
-#define LBC_STATUS_RESP_MOVER           9
-#define LBC_STATUS_RESP_EXT             10
-#define LBC_STATUS_NO_RESP              11
+#define LBC_STATUS_RESP                 10
 
 #define LBC_RESET                       12
 
 #define LBC_QEXPOSE                     16
 #define LBC_QCONCEAL                    17
 #define LBC_STATUS_REQ                  18
-#define LBC_REPORT_REQ                  19
+#define LBC_ILLEGAL_CANCEL              19 /* illegal command will cause minion's status requests to be cancelled on mcp and RFmaster */
+
 
 #define LBC_EVENT_REPORT                20
 #define LBC_REPORT_ACK                  21
@@ -124,67 +121,27 @@ typedef struct LB_status_req_t {
    uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_status_req_t;
 
-//                                               LBC_STATUS_RESP_LIFTER packet
-// LBC_STATUS_RESP_LIFTER packet
-typedef struct LB_status_resp_lifter_t {
-   // 1 * 32 bytes = 1 long - padding = 4 bytes
-   uint32 cmd:5 __attribute__ ((packed));
-   uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
-   uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
-   uint32 expose:1 __attribute__ ((packed));
-   uint32 crc:8 __attribute__ ((packed));
-} __attribute__ ((packed))  LB_status_resp_lifter_t;
-
-//                                              LBC_STATUS_RESP_MOVER packet
-// LBC_STATUS_RESP_MOVER packet
-typedef struct LB_status_resp_mover_t {
-   // 2 * 32 bytes = 2 long - padding = 8 bytes
-   uint32 cmd:5 __attribute__ ((packed));
-   uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
-   uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
-   uint32 expose:1 __attribute__ ((packed));
-   uint32 pad:8 __attribute__ ((packed));
-
-   uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
-   uint32 move:2 __attribute__ ((packed)); // 0 = stop, 1 = away from home, 2 = towards home
-   uint32 location:11 __attribute__ ((packed)); // meters from home
-   uint32 crc:8 __attribute__ ((packed));
-} __attribute__ ((packed))  LB_status_resp_mover_t;
-
-// LBC_STATUS_RESP_EXT packet
+// LBC_STATUS_RESP packet
 //
-typedef struct LB_status_resp_ext_t {
-   // 3 * 32 bytes = 3 long - padding = 11 bytes
+typedef struct LB_status_resp_t {
+   // 3 * 32 bytes = 3 long - padding = 9 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
-   uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
-   uint32 expose:1 __attribute__ ((packed));
-   uint32 pad:8 __attribute__ ((packed));
-
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
    uint32 move:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
    uint32 react:3 __attribute__ ((packed));
-   uint32 location:11 __attribute__ ((packed)); // meters from home
+
+   uint32 location:10 __attribute__ ((packed)); // meters from home
+   uint32 expose:1 __attribute__ ((packed));
    uint32 hitmode:1 __attribute__ ((packed));
    uint32 tokill:4 __attribute__ ((packed));
-
    uint32 sensitivity:4 __attribute__ ((packed));
    uint32 timehits:4 __attribute__ ((packed));
    uint32 fault:8 __attribute__ ((packed));
-   uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:8 __attribute__ ((packed));
-} __attribute__ ((packed))  LB_status_resp_ext_t;
 
-// LBC_STATUS_NO_RESP packet
-//
-typedef struct LB_status_no_resp_t {
-   // 1 * 32 bytes = 1 long - padding = 3 bytes
-   uint32 cmd:5 __attribute__ ((packed));
-   uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:8 __attribute__ ((packed));
-} __attribute__ ((packed))  LB_status_no_resp_t;
-
+   uint32 padding:24 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_status_resp_t;
 
 // LBC_REQUEST_NEW packet
 typedef struct LB_request_new_t {
@@ -204,28 +161,24 @@ typedef struct LB_request_new_t {
 // since this packet happens so seldom I see no good reason to try and
 // bit pack smaller than this
 typedef struct LB_device_reg_t {
-   // 13 bytes
+   // 3 * 32 bits = 3 long - padding = 12 bytes
    uint32 cmd:5 __attribute__ ((packed));   
    uint32 pad:3 __attribute__ ((packed));
    uint32 devid:24 __attribute__ ((packed));
    
-   uint32 dev_type:8 __attribute__ ((packed));
-   uint32 hits:7 __attribute__ ((packed)); // up to 127 hits
-   uint32 expose:1 __attribute__ ((packed));
-
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
    uint32 move:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
    uint32 react:3 __attribute__ ((packed));
-   uint32 location:11 __attribute__ ((packed)); // meters from home
+   uint32 location:10 __attribute__ ((packed)); // meters from home
+   uint32 expose:1 __attribute__ ((packed));
    uint32 hitmode:1 __attribute__ ((packed));
    uint32 tokill:4 __attribute__ ((packed));
 
+   uint32 dev_type:8 __attribute__ ((packed));
    uint32 sensitivity:4 __attribute__ ((packed));
    uint32 timehits:4 __attribute__ ((packed));
    uint32 fault:8 __attribute__ ((packed));
-
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:16 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_device_reg_t;
 
 // LBC_ASSIGN_ADDR packet
@@ -245,6 +198,7 @@ typedef struct LB_assign_addr_t {
    uint32 crc:8 __attribute__ ((packed));
    uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed)) LB_assign_addr_t;
+
 
 //                                                LBC_EXPOSE
 // LBC_EXPOSE
@@ -283,32 +237,20 @@ typedef struct LB_qconceal {
    uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_qconceal_t;
 
-//                                                  LBC_REPORT_REQ packet
-//   LBC_REPORT_REQ packet
-typedef struct LB_report_req {
-   // 5 bytes
-   uint32 cmd:5 __attribute__ ((packed));
-   uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
-   uint32 event:13 __attribute__ ((packed));
-   uint32 pad:3 __attribute__ ((packed));
-
-   uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:24 __attribute__ ((packed));
-
-} __attribute__ ((packed))  LB_report_req_t;
-
 //                                                  LBC_EVENT_REPORT packet
 //   LBC_EVENT_REPORT packet
 typedef struct LB_event_report {
-   // 6 bytes
+   // 7 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
-   uint32 event:13 __attribute__ ((packed));
-   uint32 pad:3 __attribute__ ((packed));
+   uint32 hits:8 __attribute__ ((packed)); // hits I know are correct (inbetween expose/conceal)
+   uint32 report:8 __attribute__ ((packed)); // the report number (0-255, then wraps back to 0)
 
-   uint32 hits:8 __attribute__ ((packed));
+   uint32 event:13 __attribute__ ((packed));
+   uint32 qualified:1 __attribute__ ((packed)); // I know hits are correct (inbetween expose/conceal) vs. unknown (target still exposed)
+   uint32 pad:2 __attribute__ ((packed));
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:16 __attribute__ ((packed));
+   uint32 padding:8 __attribute__ ((packed));
 
 } __attribute__ ((packed))  LB_event_report_t;
 
@@ -316,25 +258,27 @@ typedef struct LB_event_report {
 //                                                  LBC_REPORT_ACK packet
 //   LBC_REPORT_ACK packet
 typedef struct LB_report_ack {
-   // 5 bytes
+   // 7 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+   uint32 hits:8 __attribute__ ((packed)); // hits I know are correct (inbetween expose/conceal)
+   uint32 report:8 __attribute__ ((packed)); // the report number (0-255, then wraps back to 0)
+
    uint32 event:13 __attribute__ ((packed));
    uint32 pad:3 __attribute__ ((packed));
-
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:24 __attribute__ ((packed));
+   uint32 padding:8 __attribute__ ((packed));
 
 } __attribute__ ((packed))  LB_report_ack_t;
 
 // LBC_MOVE
 //    we still have 4 more bits
 typedef struct LB_move {
-   // 2 * 32 bytes = 2 long - padding = 5 bytes
+   // 2 * 32 bytes = 2 long - padding = 6 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
    uint32 pad:3 __attribute__ ((packed));
-   uint32 move:2 __attribute__ ((packed));       // switched it to two bits - and re-arranged so it is slightly more readable in hex
+   uint32 move:2 __attribute__ ((packed));       // 0=stop, 1=Move a direction, 2=Move other direction, 3=continuous
    uint32 speed:11 __attribute__ ((packed));
 
    uint32 crc:8 __attribute__ ((packed));

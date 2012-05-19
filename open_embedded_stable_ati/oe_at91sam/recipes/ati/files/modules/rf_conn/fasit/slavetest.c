@@ -29,7 +29,7 @@ void setblocking(int sock) {
    // disable Nagle's algorithm so we send messages as discrete packets
 //   if (setsockopt(sock, SOL_SOCKET, TCP_NODELAY, &yes, sizeof(int)) == -1) {
 //      DCMSG(RED, "Could not disable Nagle's algorithm\n");
-//      perror("setsockopt(TCP_NODELAY)");
+//      PERROR("setsockopt(TCP_NODELAY)");
 //   }
 
    // generic file descriptor setup
@@ -49,7 +49,7 @@ void setnonblocking(int sock, int keep) {
    // disable Nagle's algorithm so we send messages as discrete packets
 //   if (setsockopt(sock, SOL_SOCKET, TCP_NODELAY, &yes, sizeof(int)) == -1) {
 //      DCMSG(RED, "Could not disable Nagle's algorithm\n");
-//      perror("setsockopt(TCP_NODELAY)");
+//      PERROR("setsockopt(TCP_NODELAY)");
 //   }
 
    if (keep) { // only do this once
@@ -371,11 +371,11 @@ int main(int argc, char **argv) {
             raddr.sin_port = htons(atoi(optarg));
             break;
          case ':':
-            fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+            EMSG("Error - Option `%c' needs a value\n\n", optopt);
             print_help(1);
             break;
          case '?':
-            fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+            EMSG("Error - No such option: `%c'\n\n", optopt);
             print_help(1);
             break;
       }

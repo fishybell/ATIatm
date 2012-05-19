@@ -285,6 +285,14 @@ typedef struct FASIT_14110 {
 } FASIT_14110;
 
 /********************************************/
+/* 16000 - Configure Positive Hit Indicator    */
+/********************************************/
+typedef struct FASIT_16000 {
+   __uint16_t hits PCKD; // each of these hits occurred...
+   __uint32_t msecs PCKD; // ...X milliseconds in the past
+} FASIT_16000;
+
+/********************************************/
 /* 14112 - Muzzle Positive Hit Indicator Status    */
 /********************************************/
 typedef struct FASIT_14112b { // body

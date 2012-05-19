@@ -6,16 +6,29 @@
 
 #define MAX_CONNECTIONS 16
 #define MAX_GROUPS 32
-#define MAX_HIT_EVENTS 8192
 #define MAX_HITS 1024
 
 #define FASIT_BUF_SIZE 4096
 #define RF_BUF_SIZE 1024
 
 typedef struct hit_event {
-   int event;
-   struct timespec time;
+   int event; // the event number
+   struct timespec time; // the time the hit occurred (real, not delta)
+   int report; // what report this hit was been reported in (-1 for none)
 } hit_event_t;
+
+typedef struct hit_event_report_link {
+   int report;
+   int event;
+   LB_event_report_t pkt;
+   struct hit_event_report_link *next;
+} hit_event_link_t;
+
+typedef struct hit_event_summary {
+   int32 hits:16 __attribute__ ((packed)); // number of hits in this event
+   int32 reported:8 __attribute__ ((packed)); // has this event ever been reported
+   int32 new_report:8 __attribute__ ((packed)); // the last report used with this event
+} hit_event_summary_t;
 
 typedef struct fasit_connection {
    int rf; // the file descriptor to talk low-bandwidth rf on
@@ -54,8 +67,9 @@ typedef struct fasit_connection {
    hit_event_t hit_times[MAX_HITS]; // remember hits that happened at certain times (maximum of 127 hits per event, count as hit 1 is @ index 1, etc. to hit 127)
    struct timespec event_starts[MAX_HIT_EVENTS]; // rememeber start of events
    struct timespec event_ends[MAX_HIT_EVENTS]; // rememeber end of events
-   int hits_per_event[MAX_HIT_EVENTS]; // number of hits for each event
+   hit_event_summary_t hit_event_sum[MAX_HIT_EVENTS]; // number of hits for each event
    int current_event; // start at event 0 (even without an "expose" command with an event #)
+   int last_report; // the last report used
 
    // cached responses
    rf_target_type_t target_type;
@@ -66,7 +80,7 @@ typedef struct fasit_connection {
    FASIT_2111 f2111_resp;
    FASIT_2112 f2112_resp;
    FASIT_2113 f2113_resp;
-   LB_status_resp_ext_t last_status; 
+   LB_status_resp_t last_status; 
    int last_fault;
    int devid;
    int future_exp;
@@ -123,13 +137,8 @@ void addToFASITBuffer(fasit_connection_t *fc, char *buf, int s);
 
 // rf commands
 int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end);
-int handle_REPORT_REQ(fasit_connection_t *fc, int start, int end);
+int handle_REPORT_ACK(fasit_connection_t *fc, int start, int end);
 int send_STATUS_RESP(fasit_connection_t *fc); // catch-all that finds the right response to send
-int send_STATUS_RESP_LIFTER(fasit_connection_t *fc);
-int send_STATUS_RESP_MOVER(fasit_connection_t *fc);
-int send_STATUS_RESP_EXT(fasit_connection_t *fc);
-int send_STATUS_RESP_FAULT(fasit_connection_t *fc);
-int send_STATUS_NO_RESP(fasit_connection_t *fc);
 int handle_EXPOSE(fasit_connection_t *fc, int start, int end);
 int handle_MOVE(fasit_connection_t *fc, int start, int end);
 int handle_CONFIGURE_HIT(fasit_connection_t *fc, int start, int end);
@@ -140,7 +149,7 @@ int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end);
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end);
 int handle_RESET(fasit_connection_t *fc, int start, int end);
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end);
-int send_EVENT_REPORT(fasit_connection_t *fc, int event);
+int send_EVENT_REPORTs(fasit_connection_t *fc);
 int send_DEVICE_REG(fasit_connection_t *fc);
 int handle_REQUEST_NEW(fasit_connection_t *fc, int start, int end);
 int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end);
@@ -168,7 +177,8 @@ int fasit2rf(fasit_connection_t *fc, char *buf, int s); // mangle one or more fa
 #define add_rfEpoll (1<<7)
 
 // global hit logging routines
-void log_ResetHits(fasit_connection_t *fc);
+void log_ResetHits_All(fasit_connection_t *fc);
+void log_ResetHits_Some(fasit_connection_t *fc, int event, int hits, int report);
 void log_NewHits(fasit_connection_t *fc, int new_hits);
 
 // for some reason we have a ntohs/htons, but no ntohf/htonf

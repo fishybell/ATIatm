@@ -29,6 +29,9 @@
 #define MAX_NUM_Minions 2048
 #define BufSize 1024
 
+// maximum number of events to keep track of
+#define MAX_HIT_EVENTS 8192 /* definined here because it is used almost everywhere */
+
 typedef unsigned char uint8;
 typedef char int8;
 typedef unsigned short uint16;
@@ -42,6 +45,8 @@ typedef struct sockpair {
    int mcp;
    int minion;
 } socketpair_t;
+
+extern const char *__PROGRAM__;
 
 /*   create the structure type to use to store what each minion knows
  *   about himself
@@ -88,16 +93,6 @@ typedef struct state_rf_timeout { /* has both slow state and fast state in singl
    struct timespec elapsed_time;
 } state_rf_timeout_t ;
 
-typedef struct event_timeout {
-   uint8         data;
-   uint8         newdata;
-   uint16        flags;
-   uint16        old_flags;
-   uint16        timer;
-   uint16        old_timer;
-   uint16        missed; // number of missed responses
-} event_timeout_t ;
-
 typedef struct state_u8_item {
    uint8         data;
    uint8         newdata;
@@ -135,6 +130,17 @@ typedef struct state_float_item {
    uint16 old_timer;
 } state_float_item_t;
 
+typedef struct report_memory_item { /* matching reports will be ignored, items in chain will be deleted when we receive a chunk of event reports that does not include this report */
+   int report;
+   int event;
+   int hits;
+   int unreported; // keep track of how many times this one wasn't re-reported, then vacuum when it gets too big
+   // each remembered report has its own state timers
+   state_u8_item_t s;
+   // we're a chain
+   struct report_memory_item *next;
+} report_memory_t;
+
 
 typedef struct minion_state {
    uint32                       cap;    // actual capability bitfield - u32 to keep alignment    
@@ -146,7 +152,7 @@ typedef struct minion_state {
    state_rf_timeout_t           rf_t;   // rf timeout timer
    state_u8_item_t              status; 
    state_exp_item_t             exp;            // exposure state has more stuff
-   event_timeout_t              event;          // used for timer events
+   report_memory_t              *report_chain;  // used for remembered reports and their timers
    state_u8_item_t              asp;            //  FUTURE FASIT aspect of target
    state_u16_item_t             dir;            //  FUTURE FASIT 0-359 degree angle of target (dir??)
    state_u8_item_t              move;           //  movement direction  0=stopped, 1=forward (away from home), 2=reverse (to home)
@@ -182,6 +188,7 @@ typedef struct minion_state {
 
 } minion_state_t;
 
+// used in RFslave.c
 typedef struct slave_state {
    uint32               cap;    // actual capability bitfield - u32 to keep alignment    
    uint8                dev_type;   // FASIT device type
@@ -283,8 +290,7 @@ enum {
 
 enum {
    F_event_none = 0, /* no state, doing nothing */
-   F_event_start, /* starts event lookup, goes to event start */
-   F_event_end, /* ends event lookup */
+   F_event_ack, /* sends event acks, then nothing else */
 };
 
 
@@ -305,17 +311,18 @@ typedef struct _thread_data_t {
    int seq;             // sequence number for the next packet this minion sends as a fasit message
    int RF_addr; // current RF address 
    uint32 devid;        // mac address of this minion which we got back from the RF
-   minion_state_t S;    // the whol state of this minion
+   minion_state_t S;    // the whole state of this minion
 } thread_data_t;
 
 /* create simple struct to keep track of the address pool */
 typedef struct addr_t {
    uint32 devid;
    int mID;
-   uint32 inuse:1;
-   uint32 something_else:1;
-   uint32 someother_thing:1;
-   uint32 timer:24;
+   uint32 inuse:1 __attribute__ ((packed));
+   uint32 something_else:1 __attribute__ ((packed));
+   uint32 someother_thing:1 __attribute__ ((packed));
+   uint32 pad:5 __attribute__ ((packed));
+   uint32 timer:24 __attribute__ ((packed));
 } addr_t;
 
 //   possible status for thread_data status that we need to deal with
@@ -354,18 +361,21 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 #define C_DEBUG 1
 
-#define DDCMSG(DBG,SC, FMT, ...) { if (((DBG)&verbose)==(DBG)) { fprintf(stdout, "\x1B[3%d;%dm[%04x] " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1,(DBG), ##__VA_ARGS__ ); fflush(stdout);}}
-#define DCMSG(SC, FMT, ...) { if (C_DEBUG) { fprintf(stdout, "\x1B[3%d;%dm      " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ); fflush(stdout);}}
-#define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm      " FMT "\x1B[3%d;%dm\n",SC&7,(SC>>3)&1, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
-#define DCOLOR(SC) { if (C_DEBUG){ fprintf(stdout, "\x1B[3%d;%dm",SC&7,(SC>>3)&1); fflush(stdout);}}
+#define DDCMSG(DBG,SC, FMT, ...) { if (((DBG)&verbose)==(DBG)) { fprintf(stdout, "\x1B[3%i;%im%s[%04x] " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1,__PROGRAM__,(DBG), ##__VA_ARGS__ ); fflush(stdout);}}
+#define DCMSG(SC, FMT, ...) { if (C_DEBUG) { fprintf(stdout, "\x1B[3%i;%im%s      " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1,__PROGRAM__, ##__VA_ARGS__ ); fflush(stdout);}}
+#define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ fprintf(stdout, "\x1B[3%i;%im%s      " FMT "\x1B[3%i;%im\n",SC&7,(SC>>3)&1,__PROGRAM__, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
+#define DCOLOR(SC) { if (C_DEBUG){ fprintf(stdout, "\x1B[3%i;%im",SC&7,(SC>>3)&1); fflush(stdout);}}
+
+#define EMSG(FMT, ...) { fprintf(stderr, "%s      " FMT " @ %s:%i" , __PROGRAM__ , ##__VA_ARGS__ , __FILE__, __LINE__); fflush(stderr);}
+#define PERROR(FMT, ...) { fprintf(stderr, "%s      " FMT "@ %s:%i :" , __PROGRAM__ , ##__VA_ARGS__ , __FILE__, __LINE__); perror(""); fflush(stderr);}
 
 //  here are two usage examples of DCMSG
-//DCMSG(RED,"example of DCMSG macro  with arguments  enum = %d  biff=0x%x",ghdr->cmd,biff) ;
+//DCMSG(RED,"example of DCMSG macro  with arguments  enum = %i  biff=0x%x",ghdr->cmd,biff) ;
 //DCMSG(blue,"example of DCMSG macro with no args") ;   
 //   I always like to include the trailing ';' so my editor can indent automatically
 
 #define CPRINT_HEXB(SC,data, size)  { if (C_DEBUG) {{ \
-                                       fprintf(stdout, "DEBUG:\x1B[3%d;%dm     ",(SC)&7,((SC)>>3)&1); \
+                                       fprintf(stdout, "DEBUG:\x1B[3%i;%im     ",(SC)&7,((SC)>>3)&1); \
                                        char *_data = (char*)data; \
                                        fprintf(stdout, "          "); \
                                        for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
@@ -375,7 +385,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 
 #define DCMSG_HEXB(SC,hbuf,data, size)  { if (C_DEBUG) {{ \
-                                           fprintf(stdout, "\x1B[3%d;%dm      %s",(SC)&7,((SC)>>3)&1,hbuf); \
+                                           fprintf(stdout, "\x1B[3%i;%im%s      %s",(SC)&7,((SC)>>3)&1,__PROGRAM__,hbuf); \
                                            char *_data = (char*)data; \
                                            fprintf(stdout, "          "); \
                                            for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
@@ -384,7 +394,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 //  this one prints the hex dump on next line, and prefixs the second line with [dbg]
 #define DDCMSG2_HEXB(DBG,SC,hbuf,data, size)  { if ((verbose&(DBG))==(DBG)) {{ \
-                                                 fprintf(stdout, "\x1B[3%d;%dm[%04x] %s\n",(SC)&7,((SC)>>3)&1,(DBG),hbuf); \
+                                                 fprintf(stdout, "\x1B[3%i;%im%s[%04x] %s\n",(SC)&7,((SC)>>3)&1,__PROGRAM__,(DBG),hbuf); \
                                                  char *_data = (char*)data; \
                                                  fprintf(stdout, "[%04x]    ", (DBG)); \
                                                  for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
@@ -394,7 +404,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 //  this one prints the hex dump on the same line as 'hbuf'
 #define DDCMSG_HEXB(DBG,SC,hbuf,data, size)  { if ((verbose&(DBG))==(DBG)) {{ \
-                                                fprintf(stdout, "\x1B[3%d;%dm[%04x] %s",(SC)&7,((SC)>>3)&1,(DBG),hbuf); \
+                                                fprintf(stdout, "\x1B[3%i;%im%s[%04x] %s",(SC)&7,((SC)>>3)&1,__PROGRAM__,(DBG),hbuf); \
                                                 char *_data = (char*)data; \
                                                 fprintf(stdout, "  "); \
                                                 for (int _i=0; _i<size; _i++) fprintf(stdout, "%02x.", (__uint8_t)_data[_i]); \
@@ -485,12 +495,11 @@ typedef enum rf_target_type {
 // common timer values
 #define FAST_SOON_TIME        7   /* 7/10 second */
 #define FAST_TIME             25  /* 2 1/2 seconds */
-#define FAST_RESPONSE_TIME    40  /* 3 seconds */
+#define FAST_RESPONSE_TIME    40  /* 4 seconds */
 #define SLOW_SOON_TIME        9   /* 9/10 second */
 #define SLOW_TIME             250 /* 25 seconds */
-#define SLOW_RESPONSE_TIME    40  /* 3 seconds */
+#define SLOW_RESPONSE_TIME    40  /* 4 seconds */
 #define EVENT_SOON_TIME       7   /* 7/10 second */
-#define EVENT_RESPONSE_TIME   15  /* 1 1/2 seconds */
 #define TRANSITION_START_TIME 4   /* 4/10 second */
 #define TRANSITION_TIME       4   /* 4/10 second */
 
@@ -498,6 +507,7 @@ typedef enum rf_target_type {
 #define FAST_TIME_MAX_MISS 15 /* maximum value of the "missed message" counter */
 #define SLOW_TIME_MAX_MISS 10 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_MISS 20 /* maximum value of the "missed message" counter */
+#define EVENT_MAX_UNREPORT (4*15) /* max number of reports per burst * max number of non-reports before vacuum */
 
 // common complex timer starts
 #define START_EXPOSE_TIMER(S) { \
@@ -558,7 +568,7 @@ typedef enum rf_target_type {
    minion->status = S_closed; \
    LB_buf.cmd = LBC_ILLEGAL; /* send an illegal packet, which makes mcp forget me */ \
    /* now send it to the MCP master */ \
-   DDCMSG(D_PACKET,BLUE,"Minion %d:  LBC_ILLEGAL cmd=%d", minion->mID,LB_buf.cmd); \
+   DDCMSG(D_PACKET,BLUE,"Minion %i:  LBC_ILLEGAL cmd=%i", minion->mID,LB_buf.cmd); \
    result= psend_mcp(minion,&LB_buf); \
    fsync(minion->mcp_sock); /* make sure the data gets written to the mcp before we close */ \
    close(minion->mcp_sock); /* close this half of the connection to mcp */ \

@@ -3,6 +3,8 @@
 #include "fasit_c.h"
 #include "rf.h"
 
+const char *__PROGRAM__ = "MCP ";
+
 #ifdef ATMEL_ARM
    #define EPOLLRDHUP EPOLLHUP /* redefine EPOLLRDHUP as we don't have it on the arm board */
 #endif
@@ -184,12 +186,12 @@ int main(int argc, char **argv) {
             break;
 
          case ':':
-            fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+            EMSG("Error - Option `%c' needs a value\n\n", optopt);
             print_help(1);
             break;
 
          case '?':
-            fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+            EMSG("Error - No such option: `%c'\n\n", optopt);
             print_help(1);
 
             break;
@@ -229,7 +231,7 @@ int main(int argc, char **argv) {
 
    RF_sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
    if(RF_sock < 0)   {
-      perror("socket() failed");
+      PERROR("socket() failed");
    }
 
    // use the RF_addr structure that was set by default or option arguments
@@ -259,7 +261,7 @@ int main(int argc, char **argv) {
    // listen to the RFmaster
    ev.data.fd = RF_sock; // indicates listener fd
    if (epoll_ctl(fds, EPOLL_CTL_ADD, RF_sock, &ev) < 0) {
-      perror("MCP: epoll RF_sock insertion error:\n");
+      PERROR("MCP: epoll RF_sock insertion error:\n");
       EXIT(-1);
    }
 
@@ -447,7 +449,7 @@ int main(int argc, char **argv) {
                       addr_pool[addr_cnt].mID > 0 &&
                       minions[addr_pool[addr_cnt].mID].status==S_open) {
                      // we already have this devID, so reconnect because the RFslave probably rebooted or something
-                     LB_status_resp_ext_t lbsr;
+                     LB_status_resp_t lbsr;
                      DCMSG(GRAY,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
 
                      // create a message to send to the already initiliazed minion
@@ -504,7 +506,7 @@ int main(int argc, char **argv) {
 
                         /* open a bidirectional pipe for communication with the minion  */
                         if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &minions[mID].mcp_sock))){
-                           perror("opening stream socket pair");
+                           PERROR("opening stream socket pair");
                            minions[mID].status=S_closed;
                         } else {
                            minions[mID].status=S_open;
@@ -550,9 +552,9 @@ int main(int argc, char **argv) {
                               break;
                         }
 
-                        ////////  iniiialize the rest of the minion state from what was reported in the registration packet
+                        ////////  initialize the rest of the minion state from what was reported in the registration packet
 
-                        minions[mID].S.hit.data = LB_devreg->hits;
+                        minions[mID].S.hit.data = 0;
                         minions[mID].S.exp.data = LB_devreg->expose?90:0;
                         DCMSG(RED, "****************\nFound expose: exp.data=%i, LB_devreg->expose=%i\n**************** @ %i", minions[mID].S.exp.data, LB_devreg->expose, __LINE__);
                         minions[mID].S.speed.data = LB_devreg->speed*100.0;
@@ -575,7 +577,7 @@ int main(int argc, char **argv) {
                         // maybe there should also be stuff for MFS (NES?) MGS MILES and GPS in the device_reg packet
 
                         /*   fork a minion */    
-                        if ((child = fork()) == -1) perror("fork");
+                        if ((child = fork()) == -1) PERROR("fork");
 
                         if (child) {
                            /* This is the parent. */
@@ -600,7 +602,7 @@ int main(int argc, char **argv) {
                         ev.data.ptr = (void *) &minions[mID]; 
 
                         if (epoll_ctl(fds, EPOLL_CTL_ADD, minions[mID].minion, &ev) < 0) {
-                           perror("MCP: epoll set insertion error: \n");
+                           PERROR("MCP: epoll set insertion error: \n");
                            EXIT(-1);
                         }
 
@@ -624,14 +626,14 @@ int main(int argc, char **argv) {
                   LB_addr->devid=addr_pool[addr_cnt].devid;     // get what might have been given out earlier
                   LB_addr->new_addr=addr_cnt;                   // the actual slot is the perm address
 
-                  DDCMSG(D_RF|D_VERY,RED,"MCP: regX Build a LB device addr packet to assign the address slot %4d %4d"
+                  DDCMSG(D_RF|D_VERY,RED,"MCP: regX Build a LB device addr packet to assign the address slot %4i %4i"
                          ,addr_cnt,LB_addr->new_addr);
 
                   // calculates the correct CRC and adds it to the end of the packet payload
                   // also fills in the length field
                   set_crc8(LB_addr);
                   if (verbose&D_RF){    // don't do the sprintf if we don't need to
-                     sprintf(hbuf,"MCP: regX LB packet: RF_addr=%4d new_addr=%d cmd=%2d msglen=%d",
+                     sprintf(hbuf,"MCP: regX LB packet: RF_addr=%4i new_addr=%d cmd=%2i msglen=%d",
                              addr_cnt,LB_addr->new_addr,LB_addr->cmd,RF_size(LB_addr->cmd));
                      DDCMSG2_HEXB(D_RF,BLUE,hbuf,LB_addr,7);
                   }     
@@ -667,7 +669,7 @@ int main(int argc, char **argv) {
                   LB=(LB_packet_t *)buf;
                   if (addr_pool[LB->addr].inuse && minions[addr_pool[LB->addr].mID].status != S_closed) {
                      if (verbose&D_RF){ // don't do the sprintf if we don't need to
-                        sprintf(hbuf,"MCP: passing RF packet from RF_addr %d on to Minion %d (fd=%d).   cmd=%2d  length=%d msglen=%d"
+                        sprintf(hbuf,"MCP: passing RF packet from RF_addr %d on to Minion %d (fd=%d).   cmd=%2i  length=%d msglen=%d"
                                 ,LB->addr,addr_pool[LB->addr].mID,minions[addr_pool[LB->addr].mID].minion,LB->cmd,RF_size(LB->cmd),msglen);
                         DDCMSG2_HEXB(D_RF,RED,hbuf,LB,RF_size(LB->cmd));
                      }
@@ -722,7 +724,7 @@ DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\
                }
                LB=(LB_packet_t *)buf;
                if (verbose&D_RF){       // don't do the sprintf if we don't need to
-                  sprintf(hbuf,"MCP:    read Minion %2d's LB packet(s). address=%2d  cmd=%2d  length=%2d msglen=%2d  -}"
+                  sprintf(hbuf,"MCP:    read Minion %2i's LB packet(s). address=%2i  cmd=%2i  length=%2i msglen=%2i  -}"
                           ,minion->mID,LB->addr,LB->cmd,RF_size(LB->cmd),msglen);
                   DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,msglen);
                }
@@ -759,7 +761,7 @@ DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\
                      EXIT(-1);
                   }
                   if (verbose&D_RF){    // don't do the sprintf if we don't need to
-                     sprintf(hbuf,"MCP: passing Minion %2d's LB packet(s) to RF_addr=%2d cmd=%2d length=%2d result=%2d  -}"
+                     sprintf(hbuf,"MCP: passing Minion %2i's LB packet(s) to RF_addr=%2i cmd=%2i length=%2i result=%2i  -}"
                              ,minion->mID,LB->addr,LB->cmd,msglen,result);
                      DDCMSG_HEXB(D_RF,BLUE,hbuf,buf,result);
                   }

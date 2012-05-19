@@ -129,7 +129,7 @@ int fasitRead(int fd, char *dest, int *dests) {
    // did we read nothing?
    if (*dests <= 0) {
       DDCMSG(D_PACKET,CYAN, "FASIT ERROR: %i", err);
-      perror("Error: ");
+      PERROR("Error: ");
       if (err == EAGAIN) {
          // try again later
          *dests = 0;
@@ -137,7 +137,7 @@ int fasitRead(int fd, char *dest, int *dests) {
       } else {
          // connection dead, remove it
          *dests = 0;
-perror("FASIT Died because ");
+PERROR("FASIT Died because ");
 DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
@@ -171,7 +171,7 @@ int fasitWrite(fasit_connection_t *fc) {
          return doNothing;
       } else {
          // connection dead, remove it
-perror("FASIT Died because ");
+PERROR("FASIT Died because ");
 DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
@@ -182,13 +182,13 @@ DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
       // change to blocking from non-blocking
       opts = fcntl(fc->fasit, F_GETFL); // grab existing flags
       if (opts < 0) {
-perror("FASIT Died because ");
+PERROR("FASIT Died because ");
 DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
       opts = (opts ^ O_NONBLOCK); // remove nonblock from existing flags
       if (fcntl(fc->fasit, F_SETFL, opts) < 0) {
-perror("FASIT Died because ");
+PERROR("FASIT Died because ");
 DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
@@ -198,7 +198,7 @@ DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          int ns = write(fc->fasit, fc->fasit_obuf + (sizeof(char) * s), fc->fasit_olen - s);
          if (ns < 0 && err != EAGAIN) {
             // connection dead, remove it
-perror("FASIT Died because ");
+PERROR("FASIT Died because ");
 DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
             return rem_fasitEpoll;
          }
@@ -208,7 +208,7 @@ DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
       // change to non-blocking from blocking
       opts = (opts | O_NONBLOCK); // add nonblock back into existing flags
       if (fcntl(fc->fasit, F_SETFL, opts) < 0) {
-perror("FASIT Died because ");
+PERROR("FASIT Died because ");
 DDCMSG(D_PACKET,CYAN, "FASIT Dead at %s:%i", __FILE__, __LINE__);
          return rem_fasitEpoll;
       }
@@ -471,9 +471,9 @@ int send_2100_conf_hit(fasit_connection_t *fc, int on, int hit, int react, int t
    fc->hit_on = on;
    DDCMSG(D_PACKET, RED, "Setting Hits to %i", hit);
    if (hit > 0) {
-      log_NewHits(fc, hit);
+      // these fake hits will get logged when the 2102 message comes back -- log_NewHits(fc, hit);
    } else if (hit == 0) {
-// TODO -- reset when we get the event ack for the given event --      log_ResetHits(fc);
+      // only reset when we get the event ack for the given event -- log_ResetHits(fc);
    }
    fc->hit_react = react;
    fc->hit_tokill = tokill;
