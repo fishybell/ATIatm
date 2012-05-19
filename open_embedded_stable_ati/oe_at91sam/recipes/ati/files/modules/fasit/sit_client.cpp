@@ -1283,6 +1283,7 @@ void SIT_Client::getAcc_C(struct accessory_conf *acc_c) {
 
 // change received hits to "num" (usually to 0 for reset)
 void SIT_Client::doHits(int num) {
+    if (num == 555) { return; } // fake number used to do nothing
 
     DCOLOR(CYAN) ; // change color
     FUNCTION_START("SIT_Client::doHits(int num)");
