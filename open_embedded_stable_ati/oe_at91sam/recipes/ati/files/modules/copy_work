@@ -1,60 +1,113 @@
 #!/usr/bin/tclsh
+
+# remember expect string for doing the ssh/scp session
+set dossh {
+    while 1 {
+        expect {
+            -re {.*word:.*} {
+                send "shoot\r"
+            }
+            -re {.*yes/no.*} {
+                send "yes\r"
+            }
+            eof {
+                break
+            }
+        }
+    }
+}
+
 package require Expect
 package require Tclx
 fconfigure stdin -blocking 1            ;#expect bug?
 
-if  {$argc == 1} {
-    set num [lindex $argv 0]
+set hosts {}
+if  {$argc != 0} {
+    foreach host $argv {
+        if {[string is integer $host]} {
+            set host "sam$host"
+        }
+        lappend hosts $host
+    }
 } else {
-    puts -nonewline "which one (1-9, a-f)? "
+    puts -nonewline "which one(s)? "
     flush stdout
-    gets stdin num
-}
-
-# increase delays for wireless devices
-set delay 5
-if {[string match -nocase *w* $num]} {
-    set delay 10
-}
-
-# grab the host by default via samXX or avahi host or cpe
-set host sam$num
-if {$num == {av}} {
-    set f [open "|avahi-resolve-host-name -n server.local | cut -f2" r]
-    set host [lindex [split [read $f] \n] 0]
-    close $f
-} elseif {[string match -nocase cpe* $num]} {
-    set host $num
-}
-
-system sed -i -e "s/^sam$num.*//" ~/.ssh/known_hosts
-eval spawn scp user_conn bit_button fasit_conn event_conn bcast_server bcast_client root@$host:/usr/bin
-set timeout $delay
-while 1 {
-    expect {
-        -re {.*word:.*} {
-            send "shoot\r"
+    gets stdin num1
+    if {[llength $num1] > 1} {
+        foreach host $num1 {
+            if {[string is integer $host]} {
+                set host "sam$host"
+            }
+            lappend hosts $host
         }
-        -re {.*yes/no.*} {
-            send "yes\r"
+    } else {
+        set num1 "sam$num1"
+        set num2 $num1
+
+        # find list of targets
+        if {![string match sam* $num1] || ![string match sam* $num2]} {
+            puts "invalid sam numbers: $num1 $num2"
+            exit
         }
-        eof {
-            break
+        scan [string trimleft $num1 samw] %x n1 ;# cut out sam or samw from start, convert from hex
+        scan [string trimleft $num2 samw] %x n2 ;# cut out sam or samw from start, convert from hex
+        if {$n1 > $n2} {
+            # we're reversed, flip order
+            set n3 $n2
+            set n2 $n1
+            set n1 $n3
+            set num3 $num2
+            set num2 $num1
+            set num1 $num3
+        }
+        set w1 [string match samw* $num1] ;# remember if I was a samw
+        set w2 [string match samw* $num2] ;# remember if I was a samw
+        if {[expr $w1 + $w2] == 1} {
+            puts "can't count from $num1 to $num2"
+            exit
+        }
+        set sam "sam"
+        if {$w1} {set sam "samw"}
+
+        # debug, put out list of targets
+        #for {set i $n1} {$i <= $n2} {incr i} {
+        #    puts "$sam[format %x $i]" 
+        #}
+        #exit
+
+        # copy to each target in order
+        for {set i $n1} {$i <= $n2} {incr i} {
+            lappend hosts "$sam[format %x $i]"
         }
     }
 }
-eval spawn scp [glob *.ko] root@$host:/home/root
-set timeout $delay
-while 1 {
-    expect {
-        -re {.*word:.*} {
-            send "shoot\r"
-        }
-        -re {.*yes/no.*} {
-            send "yes\r"
-        }
-        eof {
-            break
-        }
-    }
+
+# copy to each host individually
+foreach host $hosts {
+    puts "####################################################################"
+    puts "# Copying to $host"
+    puts "####################################################################"
+
+    # clear out of remembered key
+    system sed -i -e "s/^$host.*//" ~/.ssh/known_hosts
+
+    # ssh over, stop, exit ssh
+    spawn ssh root@$host /usr/bin/stop
+    eval $dossh
+
+    # copy ati
+    eval spawn scp [glob *.arm] bit_button fasit_conn event_conn bcast_server bcast_client root@$host:/usr/bin
+    eval $dossh
+    eval spawn scp [glob *.ko] root@$host:/home/root
+    eval $dossh
+    eval spawn scp user_conn root@$host:/usr/bin/user_conn.new
+    eval $dossh
+    spawn ssh root@$host "/bin/mv /usr/bin/user_conn.new /usr/bin/user_conn"
+    eval $dossh
+
+    # ssh over, start, exit ssh
+    #spawn ssh root@$host /usr/bin/start
+    #eval $dossh
+
 }
+
