@@ -446,76 +446,79 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                }
             }  // end of while loop to build the Tx packet
 
+            if (packets > 0) {
+               // build burst header and put in front of transmission (always, even if only one message is being sent)
+               LBb.cmd = LBC_BURST;
+               LBb.number=packets&0x7f; // max of 7 bits for number of packets
+               set_crc8(&LBb);
+               QueuePush(Tx, &LBb, RF_size(LBb.cmd));
 
-            // build burst header and put in front of transmission (always, even if only one message is being sent)
-            LBb.cmd = LBC_BURST;
-            LBb.number=packets&0x7f; // max of 7 bits for number of packets
-            set_crc8(&LBb);
-            QueuePush(Tx, &LBb, RF_size(LBb.cmd));
+               /***********    Send the RF burst
+                ***********
+                ***********/
 
-            /***********    Send the RF burst
-             ***********
-             ***********/
+               DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%d]",Queue_Depth(Tx));
+               DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %d %d", remaining_time, inittime);
+               remaining_time += (inittime*2) + (364*2); // add initial delay time (for beginning and end) and DTXM measured delaya (for beggining and end)
 
-            DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%d]",Queue_Depth(Tx));
-            DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %d %d", remaining_time, inittime);
-            remaining_time += (inittime*2) + (364*2); // add initial delay time (for beginning and end) and DTXM measured delaya (for beggining and end)
+               if (Queue_Depth(Tx)){  // if we have something to Tx, Tx it.
+                  TIMESTAMP_NOW;
+                  DDCMSG(D_TIME, YELLOW, "TX @ Remaining time: %d %d, Elapsed time: %5ld.%03ld ", remaining_time, slottime, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
 
-            if (Queue_Depth(Tx)){  // if we have something to Tx, Tx it.
-               TIMESTAMP_NOW;
-               DDCMSG(D_TIME, YELLOW, "TX @ Remaining time: %d %d, Elapsed time: %5ld.%03ld ", remaining_time, slottime, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
-
-               // when we're sending, we're busy, tell the Radio Interface client
-               if (*riclient > 0) {
-                  char ri_buf[128];
-                  snprintf(ri_buf, 128, "B %i\n", (5 * (Queue_Depth(Tx)) / 3) + 37 + remaining_time); // number of bytes * baud rate = milliseconds (9600 baud / 2 for overhead => 600 bytes a second => 5/3 second for 1000 bytes) + transmit delays
-                  DDCMSG(D_RF|D_VERY, BLACK, "writing riclient %s", ri_buf);
-                  result=write(*riclient, ri_buf, strnlen(ri_buf, 128));
-                  // add radio interface client socket to epoll
-                  memset(&ev, 0, sizeof(ev));
-                  ev.events = EPOLLIN; // only for reading to start
-                  ev.data.fd = *riclient; // remember for later
-               }
-
-               setblocking(RFfd);
-               result=write(RFfd,Tx->head,Queue_Depth(Tx));
-               setnonblocking(RFfd);
-               if (result<0){
-                  strerror_r(errno,buf,200);                
-                  DCMSG(RED,"write Tx queue to RF error %s",buf);
-               } else {
-                  if (!result){
-                     DCMSG(RED,"write Tx queue to RF returned 0");
+                  // when we're sending, we're busy, tell the Radio Interface client
+                  if (*riclient > 0) {
+                     char ri_buf[128];
+                     snprintf(ri_buf, 128, "B %i\n", (5 * (Queue_Depth(Tx)) / 3) + 37 + remaining_time); // number of bytes * baud rate = milliseconds (9600 baud / 2 for overhead => 600 bytes a second => 5/3 second for 1000 bytes) + transmit delays
+                     DDCMSG(D_RF|D_VERY, BLACK, "writing riclient %s", ri_buf);
+                     result=write(*riclient, ri_buf, strnlen(ri_buf, 128));
+                     // add radio interface client socket to epoll
+                     memset(&ev, 0, sizeof(ev));
+                     ev.events = EPOLLIN; // only for reading to start
+                     ev.data.fd = *riclient; // remember for later
                   }
-                  if (verbose&D_RF){
-                        sprintf(buf,"[%03d] %4ld.%03ld  ->RF [%2i] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
-                        printf("%s",buf);
-                        printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
-                        if(result>1){
-                           for (int i=0; i<result-1; i++) printf("%02x.", (uint8) Tx->head[i]);
-                        }
-                        printf("%02x\n", (uint8) Tx->head[result-1]);
-                  }  
-                  if (verbose&D_PARSE){
-                     DDpacket(Tx->head,result);
+
+                  setblocking(RFfd);
+                  result=write(RFfd,Tx->head,Queue_Depth(Tx));
+                  setnonblocking(RFfd);
+                  if (result<0){
+                     strerror_r(errno,buf,200);                
+                     DCMSG(RED,"write Tx queue to RF error %s",buf);
                   } else {
-                     DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF", result);
+                     if (!result){
+                        DCMSG(RED,"write Tx queue to RF returned 0");
+                     }
+                     if (verbose&D_RF){
+                           sprintf(buf,"[%03d] %4ld.%03ld  ->RF [%2i] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
+                           printf("%s",buf);
+                           printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                           if(result>1){
+                              for (int i=0; i<result-1; i++) printf("%02x.", (uint8) Tx->head[i]);
+                           }
+                           printf("%02x\n", (uint8) Tx->head[result-1]);
+                     }  
+                     if (verbose&D_PARSE){
+                        DDpacket(Tx->head,result);
+                     } else {
+                        DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF", result);
+                     }
                   }
+                  //DeQueue(Tx,Queue_Depth(Tx));
+                  ClearQueue(Tx);
+
                }
-               //DeQueue(Tx,Queue_Depth(Tx));
-               ClearQueue(Tx);
-
+               TIMESTAMP_NOW;
+               // adjust dwait_time to the time to nothing, as we haven't waited anything yet
+               dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
+               DDCMSG(D_NEW,CYAN,"Just might have Tx'ed to RF   at %5ld.%03ld timestamp, delta=%5ld.%03ld, dwait=%5ld.%03ld"
+                      ,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l, delta_time.tv_sec, delta_time.tv_nsec/1000000l, dwait_time.tv_sec, dwait_time.tv_nsec/1000000l);
+               /*****    this stuff below isn't really tested  *****/              
+               rfcount+=MsgSize;
+               cps=(double) rfcount/(double)elapsed_time.tv_sec;
+               DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
+            } else {
+               DDCMSG(D_NEW,GREEN,"Failed to send any messages from Rx buffer of size %i", Queue_Depth(Rx));
+               DDCMSG_HEXB(D_NEW,GREEN,"Rx buffer: ",Rx->head,Queue_Depth(Rx));
             }
-            TIMESTAMP_NOW;
-            // adjust dwait_time to the time to nothing, as we haven't waited anything yet
-            dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
-            DDCMSG(D_NEW,CYAN,"Just might have Tx'ed to RF   at %5ld.%03ld timestamp, delta=%5ld.%03ld, dwait=%5ld.%03ld"
-                   ,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l, delta_time.tv_sec, delta_time.tv_nsec/1000000l, dwait_time.tv_sec, dwait_time.tv_nsec/1000000l);
-            /*****    this stuff below isn't really tested  *****/              
-            rfcount+=MsgSize;
-            cps=(double) rfcount/(double)elapsed_time.tv_sec;
-            DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
-
          }
          // if we timed out to process MCP messages
          if (mcpbuf_len > 0) {
@@ -673,6 +676,12 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             size=RF_size(LB->cmd);
             crc=(size > 2) ? crc8(LB) : 1; // only calculate crc if we have a valid size
             if (!crc) {
+               if (LB->cmd == LBC_DEVICE_REG) {
+                  DDCMSG(D_NEW,GRAY,"clearing what we think the queue contains for %i %p", LB->addr, Queue_Contains[LB->addr]);
+                  // clear out what we think the queue contains when we have a device register itself
+                  LB_device_reg_t *reg = (LB_device_reg_t*)Rstart;
+                  Queue_Contains[LB->addr] = 0;
+               }
                queueMsg(mcpbuf, &mcpbuf_len, Rstart, size); // queue for transmission later
                #if 0 /* start of old, pre-queue, method */
                result=write(MCPsock,Rstart,size);

@@ -4,6 +4,7 @@
 #include "../../defaults.h"
 
 int verbose, RFfd;
+const char *__PROGRAM__ = "dtxm_edit ";
 
 // a small delay that we inject into the reading/writing portions of the code
 //#define SMALL_DELAY usleep(100); DCMSG(RED, ".%i", __LINE__);

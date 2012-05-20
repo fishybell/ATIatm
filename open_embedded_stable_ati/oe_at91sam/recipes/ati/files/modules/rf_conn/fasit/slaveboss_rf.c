@@ -331,9 +331,11 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
 }
 
 int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
+   LB_status_req_t *pkt = (LB_status_req_t *)(fc->rf_ibuf + start);
    DDCMSG(D_RF|D_VERY,RED, "handle_STATUS_REQ(%8p, %i, %i)", fc, start, end);
    // wait 'til we have the most up-to-date information to send
    fc->waiting_status_resp = 1;
+   fc->waiting_status_seq = pkt->sequence;
    DDCMSG(D_RF|D_MEGA, BLACK, "#######################################\nWaiting: %i, Epoll: %i\n#######################################", fc->waiting_status_resp, added_rf_to_epoll);
    return send_2100_status_req(fc); // gather latest information
 }
@@ -372,9 +374,11 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
    hit_event_link_t **head =  &this;
    hit_event_link_t *temp = NULL; // a temporary reference to possibly prevent looking through chain twice
    hit_event_link_t *last = NULL; // the last this
+   struct timespec tsn;
+   clock_gettime(CLOCK_MONOTONIC,&tsn);
 
    // don't remember the new report between report sending times
-   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i @ %3i.%03i", __FILE__, __LINE__, tsn.tv_sec, tsn.tv_nsec/1000000l);
    for (i=0; i < MAX_HIT_EVENTS; i++) {
       fc->hit_event_sum[i].new_report = -1;
    }
@@ -384,6 +388,10 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
    for (i=0; i < MAX_HITS; i++) {
       if (!(fc->hit_times[i].time.tv_sec == 0 && fc->hit_times[i].time.tv_nsec == 0l)) {
    DDCMSG(D_POINTER, GREEN, "Looking @ %s:%i with %i", __FILE__, __LINE__, i);
+   DDCMSG(D_POINTER, GREEN, "...found hit @ time %3i.%03i event %i, report %i, event reported: %i, event new rpt: %i",
+         fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l,
+         fc->hit_times[i].event, fc->hit_times[i].report,
+         fc->hit_event_sum[fc->hit_times[i].event].reported, fc->hit_event_sum[fc->hit_times[i].event].new_report);
          int found = 0; // have we found a link for this hits event/report combo
          int event = fc->hit_times[i].event; // shortcut to the current event
          this = *head;
@@ -392,17 +400,17 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
             if (event == this->event &&
                 fc->hit_times[i].report != -1 &&
                 fc->hit_times[i].report == this->report) {
-   DDCMSG(D_POINTER, GREEN, "Found @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+   DDCMSG(D_POINTER, GREEN, "Found link @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
                // matched event and (valid) report
                found = 1; // will re-report (adding on to this reports count)
             } else {
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
                if (event == this->event) {
-   DDCMSG(D_POINTER, GREEN, "Partial @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+   DDCMSG(D_POINTER, GREEN, "Partial link @ %s:%i with %i:%p as evt %i:%i rpt %i:%i", __FILE__, __LINE__, i, this, event, this->event, fc->hit_times[i].report, this->report);
                   found = 2; // we found a report that matched my event; we'll have to keep looking and might have to come back to this report
                   if (fc->hit_event_sum[event].new_report != -1 &&
                       this->report == fc->hit_event_sum[event].new_report) {
-   DDCMSG(D_POINTER, GREEN, "Temp @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+   DDCMSG(D_POINTER, GREEN, "Temp link @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
                      // we found the latest report for this event, remember it for later (should only be one match)
                      temp = this;
                   }
@@ -416,7 +424,7 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
 
          // partial match? we need to either use the newly created report for this event or create a new one
          if (found == 2) {
-   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p %i:%i:%i", __FILE__, __LINE__, i, this, fc->hit_times[i].report, fc->hit_event_sum[event].reported, fc->hit_event_sum[event].new_report);
             // check to see if I want to use the found report or not
             if (fc->hit_times[i].report == -1 && fc->hit_event_sum[event].reported == 0) {
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
@@ -425,6 +433,7 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
                   // we found the correct link to use before
                   this = temp;
+                  fc->hit_times[i].report = temp->report; // assign correct report number to hit
                   found = 1;
                } else {
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
@@ -483,16 +492,18 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
          
          // "this" is now a correct match, count the hit
          if (this->pkt.qualified == 0) {
-   DDCMSG(D_POINTER, GREEN, "Count unqual @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
             // unqualified packets count everything
             this->pkt.hits++;
+   DDCMSG(D_POINTER, GREEN, "Count unqual @ %s:%i with %i:%p as hit %i in evt %i rpt %i", __FILE__, __LINE__, i, this, this->pkt.hits, this->event, this->report);
          } else {
    DDCMSG(D_POINTER, GREEN, "Check qual @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
             // qualified packets require correct time
             if (compTime(fc->event_starts[event], fc->hit_times[i].time) <= 0 &&
                 compTime(fc->event_ends[event], fc->hit_times[i].time) >= 0) {
-   DDCMSG(D_POINTER, GREEN, "Count qual @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
                this->pkt.hits++;
+   DDCMSG(D_POINTER, GREEN, "Count qual @ %s:%i with %i:%p as hit %i in evt %i rtp %i", __FILE__, __LINE__, i, this, this->pkt.hits, this->event, this->report);
+            } else {
+   DDCMSG(D_POINTER, GREEN, "Fail qual @ %s:%i with %i:%p es:%3i.%03i ee:%3i.%03i ht:%3i.%03i", __FILE__, __LINE__, i, this, fc->event_starts[event].tv_sec, fc->event_starts[event].tv_nsec/1000000l, fc->event_ends[event].tv_sec, fc->event_ends[event].tv_nsec/1000000l, fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l);
             }
          }
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
@@ -505,7 +516,7 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
    while (this != NULL) {
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
       if (this->pkt.hits > 0) {
-   DDCMSG(D_POINTER, GREEN, "Sending @ %s:%i with %p", __FILE__, __LINE__, this);
+   DDCMSG(D_POINTER, GREEN, "Sending @ %s:%i with %p %i %i %i", __FILE__, __LINE__, this, this->pkt.event, this->pkt.report,this->pkt.hits);
          // finish and send
          set_crc8(&this->pkt);
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
@@ -615,6 +626,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.timehits = fc->hit_burst;
    s.fault = fc->last_fault;
    s.tokill = fc->hit_tokill;
+   s.sequence = fc->waiting_status_seq; // just use whatever number is the last one we've seen
    DDCMSG(D_RF|D_VERY,BLACK, "Fault encountered: %04X %02X", fc->last_fault, s.fault);
    if (s.fault) {
       fc->last_fault = 0; // clear out fault

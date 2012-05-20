@@ -153,13 +153,13 @@ void print_verbosity_bits(void){
 int RF_size(int cmd){
    // set LB_size  based on which command it is
    switch (cmd){
-      case  LBC_STATUS_REQ:
       case  LBC_QEXPOSE:
       case  LBC_BURST:
       case  LBC_RESET:
       case  LBC_ILLEGAL_CANCEL:
          return (3);
 
+      case  LBC_STATUS_REQ:
       case  LBC_POWER_CONTROL:
       case  LBC_PYRO_FIRE:
          return (4);
@@ -183,7 +183,7 @@ int RF_size(int cmd){
          return (8);
 
       case  LBC_STATUS_RESP:
-         return (9);
+         return (10);
 
       case  LBC_DEVICE_REG:
          return (12);
@@ -270,9 +270,12 @@ void DDpacket(uint8 *buf,int len){
          break;
 
          case LBC_STATUS_REQ:
+         {
+            LB_status_req_t *L=(LB_status_req_t *)LB;
             strcpy(cmdname,"Status_Req");
-            sprintf(hbuf,"RFaddr=%3d",LB->addr);
-            break;
+            sprintf(hbuf,"RFaddr=%3d seq=%2d",L->addr, L->sequence);
+         }
+         break;
 
          case LBC_REPORT_ACK:
          {
@@ -336,7 +339,7 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_status_resp_t *L=(LB_status_resp_t *)LB;
             strcpy(cmdname,"Status_Resp_Ext");
-            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->addr,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
+            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d seq=%2d",L->addr,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault,L->sequence);
             color=MAGENTA;
          }
             break;

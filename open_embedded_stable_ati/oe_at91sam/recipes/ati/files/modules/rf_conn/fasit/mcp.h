@@ -64,6 +64,7 @@ enum {
 typedef struct state_exp_item { /* has both expose state and conceal state in single item */
    uint8         data;     // current exposure value (0/45/90)
    uint8         newdata;  // destination exposure value (0/90)
+   uint8         lastdata; // last exposure value sent (0/45/90)
    uint16        event;
    uint16        last_event; // for retrying event request even if we've moved on to a different event
    uint16        exp_flags;
@@ -74,7 +75,8 @@ typedef struct state_exp_item { /* has both expose state and conceal state in si
    uint16        con_timer;
    uint16        old_exp_timer;
    uint16        old_con_timer;
-   struct timespec elapsed_time;
+   struct timespec elapsed_time[MAX_HIT_EVENTS];
+   struct timespec end_time[MAX_HIT_EVENTS];
 } state_exp_item_t ;
 
 typedef struct state_rf_timeout { /* has both slow state and fast state in single item */
@@ -96,6 +98,7 @@ typedef struct state_rf_timeout { /* has both slow state and fast state in singl
 typedef struct state_u8_item {
    uint8         data;
    uint8         newdata;
+   uint8         lastdata;
    uint16        _pad1;
    uint16        flags;
    uint16        old_flags;
@@ -115,6 +118,7 @@ typedef struct state_s16_item {
 typedef struct state_u16_item {
    uint16 data;
    uint16 newdata;
+   uint16 lastdata;
    uint16 flags;
    uint16 old_flags;
    uint16 timer;
@@ -124,6 +128,7 @@ typedef struct state_u16_item {
 typedef struct state_float_item {
    float data;
    float newdata;
+   float lastdata;
    uint16 flags;
    uint16 old_flags;
    uint16 timer;
@@ -311,6 +316,7 @@ typedef struct _thread_data_t {
    int seq;             // sequence number for the next packet this minion sends as a fasit message
    int RF_addr; // current RF address 
    uint32 devid;        // mac address of this minion which we got back from the RF
+   uint8 s_sequence;      // rolling status request sequence number
    minion_state_t S;    // the whole state of this minion
 } thread_data_t;
 
@@ -493,13 +499,13 @@ typedef enum rf_target_type {
 }
 
 // common timer values
-#define FAST_SOON_TIME        7   /* 7/10 second */
+#define FAST_SOON_TIME        2   /* 2/10 second */
 #define FAST_TIME             25  /* 2 1/2 seconds */
 #define FAST_RESPONSE_TIME    40  /* 4 seconds */
-#define SLOW_SOON_TIME        9   /* 9/10 second */
+#define SLOW_SOON_TIME        2   /* 2/10 second */
 #define SLOW_TIME             250 /* 25 seconds */
 #define SLOW_RESPONSE_TIME    40  /* 4 seconds */
-#define EVENT_SOON_TIME       7   /* 7/10 second */
+#define EVENT_SOON_TIME       2   /* 2/10 second */
 #define TRANSITION_START_TIME 4   /* 4/10 second */
 #define TRANSITION_TIME       4   /* 4/10 second */
 
