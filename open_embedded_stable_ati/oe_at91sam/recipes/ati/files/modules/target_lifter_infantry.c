@@ -397,6 +397,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 	if (atomic_read(&movement_atomic) ==  LIFTER_MOVEMENT_UP)
 		{
 	delay_printk("%s - %s() ignoring...\n",TARGET_NAME, __func__);
+      sensor_timeout_leave_stop(); // we didn't timeout, we're obviously moving
 		return IRQ_HANDLED;
 		}
 
@@ -453,6 +454,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 	if (atomic_read(&movement_atomic) ==  LIFTER_MOVEMENT_DOWN)
 		{
 	delay_printk("%s - %s() ignoring...\n",TARGET_NAME, __func__);
+      sensor_timeout_leave_stop(); // we didn't timeout, we're obviously moving
 		return IRQ_HANDLED;
 		}
 
