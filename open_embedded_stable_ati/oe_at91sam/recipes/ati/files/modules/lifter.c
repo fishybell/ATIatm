@@ -700,7 +700,6 @@ void do_kill_internal(void) {
 		switch (atomic_read(&after_kill)) {
 			case 0: /* fall */
 			case 1: /* kill -- TODO -- find out difference between fall and kill */
-				// put down
                 enable_battery_check(0); // disable battery checking while motor is on
 				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
 				break;
@@ -876,7 +875,7 @@ static void hit_enable_change(struct work_struct * work) {
             // new calibration
             switch (enable_at) {
                 case BLANK_ON_CONCEALED:
-                    if (lifter_position_get() == LIFTER_POSITION_DOWN) {
+                    if (lifter_position_get() == LIFTER_POSITION_DOWN || lifter_position_get() == LIFTER_POSITION_MOVING) {
                         // down, so blank
                         hit_blanking_on();
                     } else {
@@ -886,6 +885,10 @@ static void hit_enable_change(struct work_struct * work) {
                     break;
                 case ENABLE_ALWAYS:
                     // blanking off == sensor enabled
+
+
+
+
                     hit_blanking_off();
                     break;
                 case BLANK_ALWAYS:
