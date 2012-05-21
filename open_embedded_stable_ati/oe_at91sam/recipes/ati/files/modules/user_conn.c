@@ -1814,18 +1814,18 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                switch (cmd[arg1]) { /* second letter */
                   case 'A': case 'a':	  // Reads and sets the full flash version
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "J A %s\n", writeEeprom(FLASH_VERSION_LOC, arg3, FLASH_VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "J A %s\n", writeEeprom(MAJOR_VERSION_LOC, arg3, MAJOR_VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "J A %s\n", readEeprom(FLASH_VERSION_LOC, FLASH_VERSION_SIZE)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "J A %s\n", readEeprom(MAJOR_VERSION_LOC, MAJOR_VERSION_SIZE)); // reads and prints out what it read
                      }
                      break;
                }
                switch (cmd[arg1]) { 
                   case 'B': case 'b':	  // Reads and sets the partial flash version
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "J B %s\n", writeEeprom(PARTIAL_VERSION_LOC, arg3, PARTIAL_VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "J B %s\n", writeEeprom(MINOR_VERSION_LOC, arg3, MINOR_VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "J B %s\n", readEeprom(PARTIAL_VERSION_LOC, PARTIAL_VERSION_SIZE)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "J B %s\n", readEeprom(MINOR_VERSION_LOC, MINOR_VERSION_SIZE)); // reads and prints out what it read
                      }
                      break;
                }
