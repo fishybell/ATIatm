@@ -1807,6 +1807,30 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                }
                write(client, wbuf, strnlen(wbuf,1024));
                break;
+           case 'J': case 'j':
+               arg1 = cmd[1] == ' ' ? 2 : 1; // find index of second argument
+               arg2 = cmd[arg1+1] == ' ' ? arg1+2 : arg1+1; // find index of third argument
+               arg3 = strlen(cmd+arg2)+1; // size value, add 1 for null terminator 
+               switch (cmd[arg1]) { /* second letter */
+                  case 'A': case 'a':	  // Reads and sets the full flash version
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "J A %s\n", writeEeprom(FLASH_VERSION_LOC, arg3, FLASH_VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "J A %s\n", readEeprom(FLASH_VERSION_LOC, FLASH_VERSION_SIZE)); // reads and prints out what it read
+                     }
+                     break;
+               }
+               switch (cmd[arg1]) { 
+                  case 'B': case 'b':	  // Reads and sets the partial flash version
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "J B %s\n", writeEeprom(PARTIAL_VERSION_LOC, arg3, PARTIAL_VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "J B %s\n", readEeprom(PARTIAL_VERSION_LOC, PARTIAL_VERSION_SIZE)); // reads and prints out what it read
+                     }
+                     break;
+               }
+               write(client, wbuf, strnlen(wbuf,1024));
+               break;
             case '#':
                 if (sscanf(cmd+1, "%i", &arg1) == 1) {
                    epoll_ctl(efd, EPOLL_CTL_DEL, nl_fd, NULL);
@@ -1848,17 +1872,17 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'A': case 'a':
                                 snprintf(wbuf, 1024, "Get/Set address location\nFormat: I A <address location>\n");
                                 break;
-			    case 'B': case 'b':
-                          	snprintf(wbuf, 1024, "Get/Set board type\nFormat: I B <HSAT>, <LSAT>, <MAT>, <MIT>, <SES>, <SIT>, <BASE>, <HHC>\n");
-				break;
-			    case 'D': case 'd':
-                        	snprintf(wbuf, 1024, "Get/Set comm type\nFormat: I D <local>, <network>, <radio>, <wifi>, <wimax>\n");
-				break;
-			    case 'I': case 'i':
-                        	snprintf(wbuf, 1024, "Get/Set current IP address\nFormat: I P <ip>\n");			
-				break;
-			    case 'C': case 'c':
-                        	snprintf(wbuf, 1024, "Get/Set connect port number\nFormat: I C <cport>\n");		
+			                case 'B': case 'b':
+                          	    snprintf(wbuf, 1024, "Get/Set board type\nFormat: I B <HSAT>, <LSAT>, <MAT>, <MIT>, <SES>, <SIT>, <BASE>, <HHC>\n");
+				                break;
+			                case 'D': case 'd':
+                        	    snprintf(wbuf, 1024, "Get/Set comm type\nFormat: I D <local>, <network>, <radio>, <wifi>, <wimax>\n");
+				                break;
+			                case 'I': case 'i':
+                        	    snprintf(wbuf, 1024, "Get/Set current IP address\nFormat: I P <ip>\n");			
+				                break;
+			                case 'C': case 'c':
+                        	    snprintf(wbuf, 1024, "Get/Set connect port number\nFormat: I C <cport>\n");		
                                 break;
                             case 'E': case 'e':
                                 snprintf(wbuf, 1024, "Request battery/mover defaults\nFormat I E (SIT|SAT|SES|MIT|MAT|TYPE_MIT|REVERSE_MIT|TYPE_MAT|REVERSE_MAT)\nChange battery/mover defaults\nFormat I E (1-SIT|2-SAT|3-SES|4-MIT|5-MAT|6-MIT Mover Type|7-MIT Reverse|8-MAT Mover Type|9-MAT Reverse) (default)\n");
@@ -1877,57 +1901,70 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 break;
                             case 'K': case 'k':
                                 snprintf(wbuf, 1024, "Request SMK defaults\nFormat: I K\nChange SMK defaults\nFormat: I K (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
-				break;
-			    case 'L': case 'l':
-                        	snprintf(wbuf, 1024, "Get/Set listen port number\nFormat: I L <lport>\n");		
-				break;
-			    case 'M': case 'm':   
-                        	snprintf(wbuf, 1024, "Get/Set current mac address\nFormat: I M <mac>\n");	
+				                break;
+			                case 'L': case 'l':
+                        	    snprintf(wbuf, 1024, "Get/Set listen port number\nFormat: I L <lport>\n");		
+				                break;
+			                case 'M': case 'm':   
+                        	    snprintf(wbuf, 1024, "Get/Set current mac address\nFormat: I M <mac>\n");	
                                 break;	
                             case 'N': case 'n':
                                 snprintf(wbuf, 1024, "Request MFS defaults\nFormat: I N\nChange MFS defaults\nFormat: I N (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3 (0|1)mode single_or_burst\n");
-				break;
-                case 'O': case 'o':
-                   snprintf(wbuf, 1024, "Get/Set Bob Style\nFormat: I O (0|1)fasit_bob_at_hit_or_ats_bob_at_kill\n");	
-                   break;
-                case 'P': case 'p':
-                   snprintf(wbuf, 1024, "Request PHI defaults\nFormat: I P\nChange PHI defaults\nFormat: I P (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
-				   break;
-                case 'Q': case 'q':
-                   snprintf(wbuf, 1024, "Docking Station Defaults\nFormat I Q (0|1|2|3) home_end_sendtohome_sendtoend\n");
-                   break;
-			    case 'R': case 'r':
-                   snprintf(wbuf, 1024, "Reboot\nFormat: I R reboot\n");			
-				   break;
-                case 'S': case 's':
-                   snprintf(wbuf, 1024, "Request hit sensor type\nFormat: I S\nChange hit sensor type\nFormat: I S (0|1|2)mechanical_or_nchs_or_miles (0|1)invert_input_line\n");
-                   break;
-                case 'T': case 't':
-                   snprintf(wbuf, 1024, "Request THM defaults\nFormat: I T\nChange THM defaults\nFormat: I T (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite (#)number_of_thermal_devices ex2 ex3\n");
-		           break;
-                case 'U': case 'u':
-                   snprintf(wbuf, 1024, "Request Radio Frequency\nFormat: I U\nChange Radio Frequency\nFormat: I U <xxx.xxx>\n");
-                   break;
-                case 'V': case 'v':
-                   snprintf(wbuf, 1024, "Request Radio Power Low\nFormat: I V\nChange Radio Power Low\nFormat: I V <power>\n");
-                   break;
-                case 'W': case 'w':
-                   snprintf(wbuf, 1024, "Request Radio Power High\nFormat: I W\nChange Radio Power High\nFormat: I W <power>\n");
-                   break;
-                case 'X': case 'x':
-                   snprintf(wbuf, 1024, "Request Serial Number\nFormat: I X\nChange Serial Number\nFormat: I X <xxxxx-x-x>\n");
-                   break;
-                case 'Y': case 'y':
-                   snprintf(wbuf, 1024, "Request MSD defaults\nFormat: I Y\nChange MSD defaults\nFormat: I Y (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite (1-330)playerID (00-36)code (00-FF)ammo\n");
-			       break;
-                case 'Z': case 'z':
-                   snprintf(wbuf, 1024, "Home End Defaults\nFormat I Z (0|1) left_right\n");
-                   break;
-                default:
-                   snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI J: SES defaults\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI O: Bob type\nI P: PHI defaults\nI Q: Docking Station Default\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI U: Radio Frequency\nI V: Radio Power Low\nI W: Radio Power High\nI X: Serial Number\nI Y: MSD Defaults\nI Z: Mover Home End Defaults\n");
-                    break;
-				}
+				                break;
+                            case 'O': case 'o':
+                                snprintf(wbuf, 1024, "Get/Set Bob Style\nFormat: I O (0|1)fasit_bob_at_hit_or_ats_bob_at_kill\n");	
+                                break;
+                            case 'P': case 'p':
+                                snprintf(wbuf, 1024, "Request PHI defaults\nFormat: I P\nChange PHI defaults\nFormat: I P (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
+				                break;
+                            case 'Q': case 'q':
+                                snprintf(wbuf, 1024, "Docking Station Defaults\nFormat I Q (0|1|2|3) home_end_sendtohome_sendtoend\n");
+                                break;
+			                case 'R': case 'r':
+                                snprintf(wbuf, 1024, "Reboot\nFormat: I R reboot\n");			
+				                break;
+                            case 'S': case 's':
+                                snprintf(wbuf, 1024, "Request hit sensor type\nFormat: I S\nChange hit sensor type\nFormat: I S (0|1|2)mechanical_or_nchs_or_miles (0|1)invert_input_line\n");
+                                break;
+                            case 'T': case 't':
+                                snprintf(wbuf, 1024, "Request THM defaults\nFormat: I T\nChange THM defaults\nFormat: I T (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite (#)number_of_thermal_devices ex2 ex3\n");
+		                        break;
+                            case 'U': case 'u':
+                                snprintf(wbuf, 1024, "Request Radio Frequency\nFormat: I U\nChange Radio Frequency\nFormat: I U <xxx.xxx>\n");
+                                break;
+                            case 'V': case 'v':
+                                snprintf(wbuf, 1024, "Request Radio Power Low\nFormat: I V\nChange Radio Power Low\nFormat: I V <power>\n");
+                                break;
+                            case 'W': case 'w':
+                                snprintf(wbuf, 1024, "Request Radio Power High\nFormat: I W\nChange Radio Power High\nFormat: I W <power>\n");
+                                break;
+                            case 'X': case 'x':
+                                snprintf(wbuf, 1024, "Request Serial Number\nFormat: I X\nChange Serial Number\nFormat: I X <xxxxx-x-x>\n");
+                                break;
+                            case 'Y': case 'y':
+                                snprintf(wbuf, 1024, "Request MSD defaults\nFormat: I Y\nChange MSD defaults\nFormat: I Y (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite (1-330)playerID (00-36)code (00-FF)ammo\n");
+			                    break;
+                            case 'Z': case 'z':
+                                snprintf(wbuf, 1024, "Home End Defaults\nFormat I Z (0|1) left_right\n");
+                                break;
+                            default:
+                                snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI J: SES defaults\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI O: Bob type\nI P: PHI defaults\nI Q: Docking Station Default\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI U: Radio Frequency\nI V: Radio Power Low\nI W: Radio Power High\nI X: Serial Number\nI Y: MSD Defaults\nI Z: Mover Home End Defaults\n");
+                                break;
+				        }
                         break; 
+                    case 'J': case 'j':
+                        switch (cmd[arg2]) { /* second letter */
+                            case 'A': case 'a':
+                                snprintf(wbuf, 1024, "Get/Set Full Flash Version\nFormat: J A <flash version>\n");
+                                break;
+                            case 'B': case 'b':
+                                snprintf(wbuf, 1024, "Get/Set Partial Flash Version\nFormat: J B <flash version>\n");
+                                break;
+                            default:
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ B: Partial Flash Version\n");
+                                break;
+                        }
+                        break;
                     case 'K': case 'k':
                         snprintf(wbuf, 1024, "Shutdown device\nFormat: K\n");
                         break;
@@ -1968,7 +2005,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Request knob value\nFormat: Z\n");
                         break;
                     default: // print default help
-                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nI: Eeprom\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nU: Faults\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob\n");
+                        snprintf(wbuf, 1024, "A: Position\nB: Battery\nC: Conceal\nD: Hit Data\nE: Expose\nF: Fall\nG: GPS\nH: HITS\nI: Eeprom\nJ: Eeprom Cont.\nK: Shutdown\nL: Hit Calibration\nM: Movement\nO: Mode\nP: Sleep\nQ: Accessory\nS: Exposure Status\nT: Toggle\nU: Faults\nV: Event\nX: Emergency Stop\nY: Hit Sensor Type\nZ: Knob\n");
                         break;
                 }
                 write(client, wbuf, strnlen(wbuf,1024));
