@@ -502,6 +502,16 @@
 #define HOME_END_LOC 0x560
 #define HOME_END_SIZE 0x4
 
+// Flash Version
+#define FLASH_VERSION 00/00/0000
+#define FLASH_VERSION_LOC 0x564
+#define FLASH_VERSION_SIZE 0x40
+
+// Parial Flash Version
+#define PARTIAL_VERSION 00/00/0000
+#define PARTIAL_VERSION_LOC 0x5A4
+#define PARTIAL_VERSION_SIZE 0x40
+
 
 // ,.. defaults
 
