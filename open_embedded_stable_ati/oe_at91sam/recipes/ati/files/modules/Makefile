@@ -25,7 +25,7 @@ ifeq (${CURD},modules)
 endif
 
 BFILES :=bit_button user_conn fasit_conn event_conn bcast_server bcast_client
-default: ${BFILES} rf
+default: ${BFILES} rf atifirmware
 	make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- -C ${KDIR} SUBDIRS=${PWD}  modules
 	
 user_conn: user_conn.c netlink_shared.h netlink_user.h
@@ -46,6 +46,11 @@ bcast_client: ${EC_DIR}/bcast_client.c ${EC_DIR}/bcast.h
 bcast_server: ${EC_DIR}/bcast_server.c ${EC_DIR}/bcast.h
 	${CC} ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -I${EC_DIR} ${EC_DIR}/bcast_server.c -o bcast_server
 
+atifirmware: 
+	tar -cvzf atifirmware.tar *.ko *.arm ${BFILES}
+	cat extract.sh atifirmware.tar > atifirmware.sh
+	chmod +x atifirmware.sh
+
 rf:
 	${MAKE} -C rf_conn/fasit
 	${MAKE} -C rf_conn/radio_edit
@@ -53,7 +58,7 @@ rf:
 	cp rf_conn/radio_edit/*.arm .
 
 clean:
-	${RM} .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers ${BFILES}
+	${RM} .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers atifirmware.tar atifirmware.sh ${BFILES}
 	${MAKE} -C fasit clean
 	${MAKE} -C connector clean
 	${MAKE} -C rf_conn/fasit clean
