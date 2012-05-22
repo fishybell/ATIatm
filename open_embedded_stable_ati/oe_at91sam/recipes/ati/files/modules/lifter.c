@@ -40,8 +40,9 @@ static int error_mfh(struct sk_buff *skb, void *msg) {
 }
 static void sendUserConnMsg( char *fmt, ...){
     va_list ap;
+    char *msg;
     va_start(ap, fmt);
-     char *msg = kmalloc(256, GFP_KERNEL);
+     msg = kmalloc(256, GFP_KERNEL);
      if (msg){
          vsnprintf(msg, 256, fmt, ap);
          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
@@ -86,6 +87,13 @@ atomic_t driver_id = ATOMIC_INIT(-1);
 // This atomic variable is use to hold what we told userspace last time
 //---------------------------------------------------------------------------
 atomic_t last_sent = ATOMIC_INIT(0);
+
+//---------------------------------------------------------------------------
+// This atomic variables used to hold what we received from below last time
+//   and what we were lass commanded to by userspace (to see down-up-downs)
+//---------------------------------------------------------------------------
+atomic_t last_lift_event = ATOMIC_INIT(EVENT_ERROR);
+atomic_t last_lift_cmd = ATOMIC_INIT(EXPOSURE_REQ);
 
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space of a position
@@ -149,21 +157,29 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
                     // was up, go down
                     lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
                     atomic_set(&toggle_last, CONCEAL); // remember toggle direction
+                    atomic_set(&last_lift_cmd, CONCEAL);
+                    atomic_set(&last_lift_event, EVENT_ERROR); // no event
                 } else if (lifter_position_get() == LIFTER_POSITION_DOWN) {
                     // was down, go up
                     lifter_position_set(LIFTER_POSITION_UP); // expose now
                     atomic_set(&toggle_last, EXPOSE); // remember toggle direction
 		              atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+                    atomic_set(&last_lift_cmd, EXPOSE);
+                    atomic_set(&last_lift_event, EVENT_ERROR); // no event
                 } else { // moving or error
                     // otherwise go opposite of last direction
                     if (atomic_read(&toggle_last) == EXPOSE) {
                         // went up last time, go down now
                         lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
                         atomic_set(&toggle_last, CONCEAL); // remember toggle direction
+                        atomic_set(&last_lift_cmd, CONCEAL);
+                        atomic_set(&last_lift_event, EVENT_ERROR); // no event
                     } else { // assume conceal last
                         // went down last time, go up now
                         lifter_position_set(LIFTER_POSITION_UP); // expose now
                         atomic_set(&toggle_last, EXPOSE); // remember toggle direction
+                        atomic_set(&last_lift_cmd, EXPOSE);
+                        atomic_set(&last_lift_event, EVENT_ERROR); // no event
                     }
                 }
                 rc = -1; // we'll be going later
@@ -171,6 +187,8 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
 
             case EXPOSE:
                 enable_battery_check(0); // disable battery checking while motor is on
+                atomic_set(&last_lift_cmd, EXPOSE);
+                atomic_set(&last_lift_event, EVENT_ERROR); // no event
                 // do expose
                 if (lifter_position_get() != LIFTER_POSITION_UP) {
                     lifter_position_set(LIFTER_POSITION_UP); // expose now
@@ -185,6 +203,8 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
 
             case CONCEAL:
                 enable_battery_check(0); // disable battery checking while motor is on
+                atomic_set(&last_lift_cmd, CONCEAL);
+                atomic_set(&last_lift_event, EVENT_ERROR); // no event
                 // do conceal
                 if (lifter_position_get() != LIFTER_POSITION_DOWN) {
                     lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
@@ -911,6 +931,7 @@ static void hit_enable_change(struct work_struct * work) {
 static void position_change(struct work_struct * work) {
     int lifterPosition = LIFTER_POSITION_ERROR_NEITHER;
     u8 pos_data;
+    int last_event = atomic_read(&last_lift_event);
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
@@ -927,8 +948,28 @@ static void position_change(struct work_struct * work) {
       return;
     }
 
+    // check for fast up-down-up and down-up-down so we can send an extra netlink message to userspace
+    switch (atomic_read(&last_lift_cmd)) {
+        case CONCEAL:
+            // tried to go down, but came back up?
+            if (last_event == EVENT_RAISE || last_event == EVENT_UP) {
+                // we will skip sending the "concealed" step below, so do it now
+                pos_data = CONCEAL;
+                send_nl_message_multi(&pos_data, pos_mfh, NL_C_EXPOSE);
+            }
+            break;
+        case EXPOSE:
+            // tried to go up, but went back down?
+            if (last_event == EVENT_LOWER || last_event == EVENT_DOWN) {
+                // we will skip sending the "exposed" step below, so do it now
+                pos_data = EXPOSE;
+                send_nl_message_multi(&pos_data, pos_mfh, NL_C_EXPOSE);
+            }
+            break;
+    }
+
     // notify netlink userspace
-    switch (lifter_position_get()) { // map internal to external values
+    switch (lifterPosition) { // map internal to external values
         case LIFTER_POSITION_DOWN: pos_data = CONCEAL; break;
         case LIFTER_POSITION_UP: pos_data = EXPOSE; break;
         case LIFTER_POSITION_MOVING: pos_data = LIFTING; break;
@@ -974,9 +1015,19 @@ void lift_event_internal(int etype, bool upload) {
             enable_battery_check(1); // enable battery checking while motor is off
             // fall through
 		case EVENT_RAISE:
-		case EVENT_LOWER:
 		case EVENT_UP:
+            if (atomic_read(&last_lift_cmd) == CONCEAL) {
+                // remember going the wrong way
+                atomic_set(&last_lift_event, etype);
+            }
+			schedule_work(&position_work);
+            break;
+		case EVENT_LOWER:
 		case EVENT_DOWN:
+            if (atomic_read(&last_lift_cmd) == EXPOSE) {
+                // remember going the wrong way
+                atomic_set(&last_lift_event, etype);
+            }
 			schedule_work(&position_work);
 			break;
 	}
