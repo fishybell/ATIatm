@@ -535,15 +535,15 @@ static int hardware_motor_on(int direction)
     // turn on directional lines
     if (DIRECTIONAL_H_BRIDGE[mover_type])
         {
-        // H-bridge handling
-        // de-assert the neg inputs to the h-bridge
-        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-
         // we always turn both signals off first to ensure that both don't ever get turned
         // on at the same time
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+
+        // H-bridge handling
+        // de-assert the neg inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         }
     else
         {
@@ -596,6 +596,7 @@ static int hardware_motor_on(int direction)
 #ifndef DEBUG_PID
           //send_nl_message_multi("Reverse contacter on!", error_mfh, NL_C_FAILURE);
 #endif
+            at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
             at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
@@ -620,6 +621,7 @@ static int hardware_motor_on(int direction)
 #ifndef DEBUG_PID
           //send_nl_message_multi("Forward contacter on!", error_mfh, NL_C_FAILURE);
 #endif
+            at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
             at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         }
 
@@ -684,12 +686,12 @@ static int hardware_motor_off(void)
 #ifndef DEBUG_PID
           //send_nl_message_multi("Directional contacters off!", error_mfh, NL_C_FAILURE);
 #endif
-        // de-assert the all inputs to the h-bridge
-        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+
+        // de-assert the all inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         }
     else
         {
@@ -1701,13 +1703,14 @@ static int hardware_init(void)
 
     // always put the H-bridge circuitry in the right state from the beginning
     if (DIRECTIONAL_H_BRIDGE[mover_type]) {
-        // de-assert the neg inputs to the h-bridge
-        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-
         // configure motor gpio for output and set initial output
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+
+        // de-assert the neg inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+
     } else {
         // if we don't use the H-bridge for direction, turn on motor controller
         //  (via h-bridge, so de-assert negatives first, then assert power line)
@@ -1778,13 +1781,14 @@ static int hardware_exit(void)
 
     // always put the H-bridge circuitry in the right state on shutdown
     if (DIRECTIONAL_H_BRIDGE[mover_type]) {
-        // de-assert the neg inputs to the h-bridge
-        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-
         // configure motor gpio for output and set initial output
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+
+        // de-assert the neg inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+
     } else {
         // if we don't use the H-bridge for direction, turn off motor controller
         //  (via h-bridge, so de-assert negatives first, then de-assert power line)
@@ -2404,15 +2408,15 @@ static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const
     __raw_writel(value, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
     // turn on directional lines
     if (DIRECTIONAL_H_BRIDGE[mover_type]) {
-        // H-bridge handling
-        // de-assert the neg inputs to the h-bridge
-        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
-
         // we always turn both signals off first to ensure that both don't ever get turned
         // on at the same time
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_REVERSE_POS, !OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
+
+        // H-bridge handling
+        // de-assert the neg inputs to the h-bridge
+        at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
     } else {
         // forward for non-h-bridge
         // reverse off, forward on
@@ -2424,6 +2428,7 @@ static ssize_t ra_store(struct device *dev, struct device_attribute *attr, const
     if (PWM_H_BRIDGE[mover_type]) {
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_NEG, OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
     } else if (DIRECTIONAL_H_BRIDGE[mover_type]) {
+        at91_set_gpio_output(OUTPUT_MOVER_REVERSE_NEG, !OUTPUT_MOVER_MOTOR_NEG_ACTIVE_STATE);
         at91_set_gpio_output(OUTPUT_MOVER_FORWARD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE);
     }
 
