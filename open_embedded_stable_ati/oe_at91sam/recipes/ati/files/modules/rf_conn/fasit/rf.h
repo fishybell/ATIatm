@@ -114,34 +114,34 @@ typedef struct LB_packet_tag {
 //                                                  LBC_STATUS_REQ packet
 //   LBC_STATUS_REQ packet
 typedef struct LB_status_req_t {
-   // 1 * 32 bits = 4 bytes
+   // 1 * 32 bits = 1 long - padding = 3 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
-   uint32 sequence:8 __attribute__ ((packed)); // rolling status request sequence number
    uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_status_req_t;
 
 // LBC_STATUS_RESP packet
 //
 typedef struct LB_status_resp_t {
-   // 3 * 32 bits = 3 long - padding = 10 bytes
+   // 3 * 32 bits = 3 long - padding = 9 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
-   uint32 move:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
+   uint32 move:1 __attribute__ ((packed)); // 0 = towards home, 1 = away from home
+   uint32 did_exp_cmd:1 __attribute__ ((packed)); // 0 = didn't change exposure between last command and now, 1 = did
    uint32 react:3 __attribute__ ((packed));
 
    uint32 location:10 __attribute__ ((packed)); // meters from home
-   uint32 expose:1 __attribute__ ((packed));
+   uint32 expose:1 __attribute__ ((packed)); // current state of exposure, 0 = concealed, 1 = exposed
    uint32 hitmode:1 __attribute__ ((packed));
    uint32 tokill:4 __attribute__ ((packed));
    uint32 sensitivity:4 __attribute__ ((packed));
    uint32 timehits:4 __attribute__ ((packed));
    uint32 fault:8 __attribute__ ((packed));
 
-   uint32 sequence:8 __attribute__ ((packed)); // rolling status request sequence number
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:16 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_status_resp_t;
 
 // LBC_REQUEST_NEW packet
@@ -168,7 +168,8 @@ typedef struct LB_device_reg_t {
    uint32 devid:24 __attribute__ ((packed));
    
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
-   uint32 move:2 __attribute__ ((packed)); // 0 = stop, 1 = towards home, 2 = away from home
+   uint32 move:1 __attribute__ ((packed)); // 0 = towards home, 1 = away from home
+   uint32 pad2:1 __attribute__ ((packed));
    uint32 react:3 __attribute__ ((packed));
    uint32 location:10 __attribute__ ((packed)); // meters from home
    uint32 expose:1 __attribute__ ((packed));

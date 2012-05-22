@@ -532,7 +532,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
          fc->target_type = RF_Type_SES;
          break;
    }
-   DCMSG(RED, "****************\nFound expose: fc->f2102_resp.body.exp=%i\n****************", fc->f2102_resp.body.exp);
+   DCMSG(GRAY, "Found 2102 expose: fc->f2102_resp.body.exp=%i", fc->f2102_resp.body.exp);
    // remember hit sensing settings
    fc->hit_on = fc->f2102_resp.body.hit_conf.on;
    fc->hit_react = fc->f2102_resp.body.hit_conf.react;
@@ -557,6 +557,22 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    // remember fault status, but don't clear out existing faults unless there is a new one
    if (htons(fc->f2102_resp.body.fault)) {
       fc->last_fault = htons(fc->f2102_resp.body.fault);
+   }
+
+   // check to see if we have accomplished our exposure task and then switched back, all without a new command
+   if (fc->did_exp_cmd == 0 && fc->f2102_resp.body.exp == 45) {
+      // first step
+      DDCMSG(D_NEW, MAGENTA, "MISSION 1/2 ACCOMPLISHED: %i", fc->future_exp);
+      fc->did_exp_cmd = 1; // task half-way there, next 2102 should be the final part if everything goes well
+   } else if (fc->did_exp_cmd == 1  && fc->f2102_resp.body.exp == fc->future_exp) {
+      // second step
+      DDCMSG(D_NEW, MAGENTA, "MISSION ACCOMPLISHED: %i", fc->future_exp);
+      fc->did_exp_cmd = 2; // task accomplished, now look to see if we go back to the other way
+   } else if (fc->did_exp_cmd == 2  && ((fc->f2102_resp.body.exp == 0 && fc->future_exp == 90) ||
+                                 (fc->f2102_resp.body.exp == 90 && fc->future_exp == 0))) {
+      // third, and final, step
+      DDCMSG(D_NEW, MAGENTA, "MISSION OVER-ACCOMPLISHED: %i", fc->future_exp);
+      fc->did_exp_cmd = 3; // task over-accomplished, subsequent changes in exposure will not effect this until a new command is issued
    }
 
    // check to see if we're waiting to send the information back

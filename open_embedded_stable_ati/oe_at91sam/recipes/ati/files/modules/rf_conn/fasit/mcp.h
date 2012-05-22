@@ -65,6 +65,7 @@ typedef struct state_exp_item { /* has both expose state and conceal state in si
    uint8         data;     // current exposure value (0/45/90)
    uint8         newdata;  // destination exposure value (0/90)
    uint8         lastdata; // last exposure value sent (0/45/90)
+   int           recv_dec; // we've received a "did_exp_cmd" message
    uint16        event;
    uint16        last_event; // for retrying event request even if we've moved on to a different event
    uint16        exp_flags;
@@ -316,7 +317,6 @@ typedef struct _thread_data_t {
    int seq;             // sequence number for the next packet this minion sends as a fasit message
    int RF_addr; // current RF address 
    uint32 devid;        // mac address of this minion which we got back from the RF
-   uint8 s_sequence;      // rolling status request sequence number
    minion_state_t S;    // the whole state of this minion
 } thread_data_t;
 

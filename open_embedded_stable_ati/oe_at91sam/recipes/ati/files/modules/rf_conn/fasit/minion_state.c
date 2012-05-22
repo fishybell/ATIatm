@@ -379,7 +379,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          LB_status_req_t *L=(LB_status_req_t *)&LB_buf; \
          L->cmd=LBC_STATUS_REQ;          /* start filling in the packet */ \
          L->addr=minion->RF_addr; \
-         L->sequence=++minion->s_sequence; /* move forward sequence number */ \
          DDCMSG(D_MSTATE,GREEN,"Minion %i:   build and send L LBC_STATUS_REQ", minion->mID); \
          result= psend_mcp(minion,&LB_buf); \
       }

@@ -83,12 +83,12 @@ typedef struct fasit_connection {
    LB_status_resp_t last_status; 
    int last_fault;
    int devid;
-   int future_exp;
+   int did_exp_cmd; // remember if we've transitioned from state a to b and back to a between rf status responses...
+   int future_exp;  //...via did_exp_cmd as the flag, future_exp as the check
    int doing_reset;
 
    // Data for RF handling
    int waiting_status_resp;
-   int waiting_status_seq;
    int groups[MAX_GROUPS]; // a list of group ids to listen for in addition to the main id
    int groups_disabled[MAX_GROUPS]; // a list of group ids that are disabled for me
    

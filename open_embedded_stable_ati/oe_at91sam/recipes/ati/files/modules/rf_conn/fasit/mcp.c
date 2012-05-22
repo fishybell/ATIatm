@@ -556,7 +556,7 @@ int main(int argc, char **argv) {
 
                         minions[mID].S.hit.data = 0;
                         minions[mID].S.exp.data = LB_devreg->expose?90:0;
-                        DCMSG(RED, "****************\nFound expose: exp.data=%i, LB_devreg->expose=%i\n**************** @ %i", minions[mID].S.exp.data, LB_devreg->expose, __LINE__);
+                        DCMSG(GRAY, "Found REG expose: exp.data=%i, LB_devreg->expose=%i @ %i", minions[mID].S.exp.data, LB_devreg->expose, __LINE__);
                         minions[mID].S.speed.data = LB_devreg->speed*100.0;
                         minions[mID].S.move.data = LB_devreg->move;
                         minions[mID].S.react.data = LB_devreg->react;

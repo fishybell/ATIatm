@@ -335,7 +335,6 @@ int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
    DDCMSG(D_RF|D_VERY,RED, "handle_STATUS_REQ(%8p, %i, %i)", fc, start, end);
    // wait 'til we have the most up-to-date information to send
    fc->waiting_status_resp = 1;
-   fc->waiting_status_seq = pkt->sequence;
    DDCMSG(D_RF|D_MEGA, BLACK, "#######################################\nWaiting: %i, Epoll: %i\n#######################################", fc->waiting_status_resp, added_rf_to_epoll);
    return send_2100_status_req(fc); // gather latest information
 }
@@ -616,7 +615,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    } else {
       s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
    }
-   DCMSG(RED, "****************\nFound expose: s.expose=%i, fc->f2102_resp.body.exp=%i\n**************** @ %i", s.expose, fc->f2102_resp.body.exp, __LINE__);
+   DCMSG(GRAY, "RESP with expose: s.expose=%i, fc->f2102_resp.body.exp=%i @ %i", s.expose, fc->f2102_resp.body.exp, __LINE__);
    s.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
    s.move = fc->f2102_resp.body.move & 0x3;
    s.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
@@ -626,7 +625,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.timehits = fc->hit_burst;
    s.fault = fc->last_fault;
    s.tokill = fc->hit_tokill;
-   s.sequence = fc->waiting_status_seq; // just use whatever number is the last one we've seen
+   s.did_exp_cmd = fc->did_exp_cmd == 3 ? 1 : 0; // only fully-over-finished task counts
    DDCMSG(D_RF|D_VERY,BLACK, "Fault encountered: %04X %02X", fc->last_fault, s.fault);
    if (s.fault) {
       fc->last_fault = 0; // clear out fault
@@ -734,6 +733,19 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
       }
    }
 
+   // end previous event if we're not exposing
+   if (!pkt->expose) {
+      DDCMSG(D_NEW, CYAN, "EXPOSE (%i) Changing event_ends[%i] from %3i.%03i (start:%3i.%03i + %i)",
+             pkt->expose, fc->current_event,
+             fc->event_ends[fc->current_event].tv_sec, fc->event_ends[fc->current_event].tv_nsec/1000000l,
+             fc->event_starts[fc->current_event].tv_sec, fc->event_starts[fc->current_event].tv_nsec/1000000l);
+      clock_gettime(CLOCK_MONOTONIC,&fc->event_ends[fc->current_event]);
+      DDCMSG(D_NEW, CYAN, "EXPOSE (%i) Changed event_ends[%i] to %3i.%03i",
+             pkt->expose, fc->current_event,
+             fc->event_ends[fc->current_event].tv_sec, fc->event_ends[fc->current_event].tv_nsec/1000000l);
+   }
+
+
    // change event
    fc->current_event = pkt->event;
    log_ResetHits_All(fc); // clear out everything for this event
@@ -741,6 +753,7 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
    if (pkt->expose) {
       fc->future_exp = 90;
    }
+   fc->did_exp_cmd = 0; // haven't accomplished command yet (count as a command even if we're not changing exposure)
    DCMSG(BLACK, "||||||||||||||||\nSETTING FUTURE: %i\n||||||||||||||||", fc->future_exp);
 
    // send configure hit sensing
@@ -938,6 +951,8 @@ int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end) {
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
    DDCMSG(D_RF|D_VERY,RED, "handle_QEXPOSE(%8p, %i, %i)", fc, start, end);
    // send exposure request
+   fc->future_exp = 90;
+   fc->did_exp_cmd = 0; // haven't accomplished command yet
    return send_2100_exposure(fc, 90); // 90^ = exposed
 }
 
@@ -953,12 +968,17 @@ int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
    int uptime_sec;
    int uptime_dsec;
    LB_qconceal_t *pkt = (LB_qconceal_t *)(fc->rf_ibuf + start);
-   fc->future_exp = 90;
+   fc->future_exp = 0;
+   fc->did_exp_cmd = 0; // haven't accomplished command yet
    DDCMSG(D_RF|D_VERY,RED, "handle_QCONCEAL(%8p, %i, %i)", fc, start, end);
    // pre-calculate uptime into seconds and deciseconds
    uptime_sec = pkt->uptime / 10; // everything above 10, divided by 10
    uptime_dsec = pkt->uptime % 10; // everything below 10
    // remember end time (not now, but the actual end time based on the "up" time)
+   DDCMSG(D_NEW, CYAN, "QCONCEAL Changing event_ends[%i] from %3i.%03i (start:%3i.%03i)",
+          fc->current_event,
+          fc->event_ends[fc->current_event].tv_sec, fc->event_ends[fc->current_event].tv_nsec/1000000l,
+          fc->event_starts[fc->current_event].tv_sec, fc->event_starts[fc->current_event].tv_nsec/1000000l);
    tv = &fc->event_ends[fc->current_event]; // for convenience sake, use a pointer
    *tv = fc->event_starts[fc->current_event]; // start with a copy
    tv->tv_sec += uptime_sec;
@@ -967,6 +987,9 @@ int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
       tv->tv_nsec -= 1000000000L;
       tv->tv_sec++;
    }
+   DDCMSG(D_NEW, CYAN, "QCONCEAL Changed event_ends[%i] to %3i.%03i",
+          fc->current_event,
+          fc->event_ends[fc->current_event].tv_sec, fc->event_ends[fc->current_event].tv_nsec/1000000l);
 
    // send exposure request
    return send_2100_exposure(fc, 0); // 0^ = concealed
@@ -991,8 +1014,20 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
       bdy.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
    }
    bdy.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
-   DCMSG(RED, "****************\nFound expose: bdy.expose=%i, fc->f2102_resp.body.exp=%i\n**************** @ %i", bdy.expose, fc->f2102_resp.body.exp, __LINE__);
-   bdy.move = fc->f2102_resp.body.move & 0x3;
+   DCMSG(GRAY, "REG with expose: bdy.expose=%i, fc->f2102_resp.body.exp=%i @ %i", bdy.expose, fc->f2102_resp.body.exp, __LINE__);
+   switch (fc->f2102_resp.body.move) {
+      case 0:
+      default:
+         bdy.speed = 0.0;
+         bdy.move = 0; // default to towards home if stopped
+         break;
+      case 1:
+         bdy.move = 0; // convert fasit to rf
+         break;
+      case 2:
+         bdy.move = 1; // convert fasit to rf
+         break;
+   }
    bdy.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
    bdy.hitmode = fc->hit_mode;
    bdy.react = fc->hit_react;
