@@ -69,6 +69,11 @@ atomic_t full_init = ATOMIC_INIT(FALSE);
 atomic_t sleep_atomic = ATOMIC_INIT(0); // not sleeping
 
 //---------------------------------------------------------------------------
+// This atomic variable is used to see up-down-up movements
+//---------------------------------------------------------------------------
+atomic_t going_to_raise = ATOMIC_INIT(-1); // 0 = will conceal, 1 = ...expose
+
+//---------------------------------------------------------------------------
 // This atomic variable is use to store the current movement
 // As the infantry motor always spins the same direction, we only stop
 // moving when we hit the correct position (unlike the armor) or timeout
@@ -307,10 +312,16 @@ static int hardware_motor_on(int direction)
 	if (direction == LIFTER_POSITION_UP)
 		{
 		atomic_set(&movement_atomic, LIFTER_MOVEMENT_UP);
+      if (atomic_read(&going_to_raise) == -1) { // check that we're not going anywhere
+         atomic_set(&going_to_raise, 1); // ... and then go up
+      }
 		}
 	else if (direction == LIFTER_POSITION_DOWN)
 		{
 		atomic_set(&movement_atomic, LIFTER_MOVEMENT_DOWN);
+      if (atomic_read(&going_to_raise) == -1) { // check that we're not going anywhere
+         atomic_set(&going_to_raise, 0); // ... and then go down
+      }
 		}
 
 	// with the infantry lifter we don't care about direction,
@@ -398,6 +409,12 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 		{
 	delay_printk("%s - %s() ignoring...\n",TARGET_NAME, __func__);
       sensor_timeout_leave_stop(); // we didn't timeout, we're obviously moving
+      // look to see if we've passed the sensor we were originally going to, if we have, report it
+      if (at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT) != INPUT_LIFTER_POS_ACTIVE_STATE && atomic_read(&going_to_raise) == 0) {
+         // reached the down sensor on the way up, report it
+         do_event(EVENT_DOWN); // first down
+         do_event(EVENT_RAISE); // then going back up
+      }
 		return IRQ_HANDLED;
 		}
 
@@ -415,6 +432,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
         // signal an event
         do_event(EVENT_DOWN); // finished lowering
+        atomic_set(&going_to_raise, -1); // not going to anything any more
 
         // signal that the operation has finished
         atomic_set(&operating_atomic, FALSE);
@@ -429,7 +447,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
          }
 
         }
-    else
+    else if (atomic_read(&movement_atomic) ==  LIFTER_MOVEMENT_NONE)
     {
        // signal an event
        do_event(EVENT_RAISE); //BDR  It started moving for some reason, so we must report it.
@@ -455,6 +473,12 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 		{
 	delay_printk("%s - %s() ignoring...\n",TARGET_NAME, __func__);
       sensor_timeout_leave_stop(); // we didn't timeout, we're obviously moving
+      // look to see if we've passed the sensor we were originally going to, if we have, report it
+      if (at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT) != INPUT_LIFTER_POS_ACTIVE_STATE && atomic_read(&going_to_raise) == 1) {
+         // reached the up sensor on the way down, report it
+         do_event(EVENT_UP); // first up
+         do_event(EVENT_LOWER); // then going back down
+      }
 		return IRQ_HANDLED;
 		}
 
@@ -472,6 +496,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
         // signal an event
         do_event(EVENT_UP); // finished raising
+        atomic_set(&going_to_raise, -1); // not going to anything any more
 
         // signal that the operation has finished
     	atomic_set(&operating_atomic, FALSE);
@@ -479,7 +504,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         // notify user-space
         schedule_work(&position_work);
         }
-    else
+    else if (atomic_read(&movement_atomic) ==  LIFTER_MOVEMENT_NONE)
     	{
        // signal an event
 	   do_event(EVENT_LOWER); // BDR   It started moving for some reason, we must report it
