@@ -16,6 +16,10 @@ echo "Changing Owner and Group"
 echo ""
 chown root *
 chgrp root *
+chmod +x *
+chown root ati2/files/*
+chgrp root ati2/files/*
+chmod +x ati2/files/*
 
 echo "Copying files"
 echo ""
@@ -32,6 +36,9 @@ mv /usr/bin/fasit_conn /usr/bin/fasit_conn.old
 mv fasit_conn /usr/bin
 mv /usr/bin/user_conn /usr/bin/user_conn.old
 mv user_conn /usr/bin
+mv ati2/files/* /usr/bin
+/usr/bin/be_major_version
+/usr/bin/be_minor_version
 
 echo "Finished Copying Files"
 echo ""

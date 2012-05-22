@@ -1,0 +1,4 @@
+echo -n "Is there a Dock (0-yes on left, 1-yes on right, 2-no on left, 3-no on right)?: "
+read dck
+size=$(echo $dck | wc -c)
+echo -n $dck | /usr/bin/eeprom_rw write -addr 0x55C -size $size -blank 0x03

@@ -47,7 +47,17 @@ bcast_server: ${EC_DIR}/bcast_server.c ${EC_DIR}/bcast.h
 	${CC} ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -I${EC_DIR} ${EC_DIR}/bcast_server.c -o bcast_server
 
 atifirmware: 
-	tar -cvzf atifirmware.tar *.ko *.arm ${BFILES}
+	tar -cvzf atifirmware.tar *.ko *.arm ${BFILES} \
+			../../../ati2/files/be_* \
+			../../../ati2/files/has_* \
+			../../../ati2/files/is_* \
+			../../../ati2/files/load_network \
+			../../../ati2/files/MAT \
+			../../../ati2/files/MIT \
+			../../../ati2/files/SAT \
+			../../../ati2/files/SES \
+			../../../ati2/files/SIT \
+			../../../ati2/files/TTMT
 	cat extract.sh atifirmware.tar > atifirmware.sh
 	chmod +x atifirmware.sh
 

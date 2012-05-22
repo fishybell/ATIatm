@@ -1,0 +1,2 @@
+/usr/bin/eeprom_rw read -addr 0x564 -size 0x04
+echo
