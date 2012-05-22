@@ -54,8 +54,8 @@ atifirmware:
 rf:
 	${MAKE} -C rf_conn/fasit
 	${MAKE} -C rf_conn/radio_edit
-	cp rf_conn/fasit/*.arm .
-	cp rf_conn/radio_edit/*.arm .
+	cp -v rf_conn/fasit/*.arm .
+	cp -v rf_conn/radio_edit/*.arm .
 
 clean:
 	${RM} .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers atifirmware.tar atifirmware.sh ${BFILES}
