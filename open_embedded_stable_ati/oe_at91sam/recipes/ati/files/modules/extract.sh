@@ -37,11 +37,17 @@ mv fasit_conn /usr/bin
 mv /usr/bin/user_conn /usr/bin/user_conn.old
 mv user_conn /usr/bin
 mv ati2/files/* /usr/bin
-/usr/bin/be_major_version
-/usr/bin/be_minor_version
 
 echo "Finished Copying Files"
 echo ""
+
+echo "Changing Version"
+echo ""
+sleep 5
+
+
+/usr/bin/be_major_version
+/usr/bin/be_minor_version
 
 echo "Restarting Device"
 echo ""

@@ -25,7 +25,7 @@ ifeq (${CURD},modules)
 endif
 
 BFILES :=bit_button user_conn fasit_conn event_conn bcast_server bcast_client
-default: ${BFILES} rf atifirmware
+default: ${BFILES} rf
 	make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- -C ${KDIR} SUBDIRS=${PWD}  modules
 	
 user_conn: user_conn.c netlink_shared.h netlink_user.h
