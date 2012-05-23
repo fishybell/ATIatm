@@ -7,6 +7,8 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
+using System.IO;
 
 namespace EepromGUI
 {
@@ -17,6 +19,7 @@ namespace EepromGUI
         Eeprom conn;
         Eeprom bconn;
         String boardType = "";
+        String lastMAC = "";
         List<Control> changedList = new List<Control>();
         List<String> ipList = new List<String>();
         //Eeprom listener;
@@ -103,6 +106,8 @@ namespace EepromGUI
                 errorLBL.Text = "";
                 showAllButton.Enabled = true;
                 setBoardType();
+                setMAC();
+                setVersion();
                 conn.StartProcess(machine);
             }
             else
@@ -281,6 +286,32 @@ namespace EepromGUI
             {
                 conn.sendMessage("I B");
                 logSent("I B");
+            }
+        }
+
+        /***********************************************
+        * Set the board type as soon as a connection happens
+        * ********************************************/
+        private void setMAC()
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I M");
+                logSent("I M");
+            }
+        }
+
+        /***********************************************
+        * Set the version as soon as a connection happens
+        * ********************************************/
+        private void setVersion()
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("J A");
+                logSent("J A");
+                conn.sendMessage("J B");
+                logSent("J B");
             }
         }
 
@@ -570,12 +601,7 @@ namespace EepromGUI
 
         private void accCB0_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (conn != null)
-            {
-                String acc = Convert.ToString(accCB0.SelectedItem);
-                conn.sendMessage("Q " + acc);
-                logSent("Q " + acc);
-            }
+
         }
 
         /******************************************************
@@ -593,8 +619,12 @@ namespace EepromGUI
             String acc9 = accTB3.Text;
             String acc10 = accTB4.Text;
             String acc11 = accTB5.Text;
+            String acc12 = accTB6.Text;
+            String acc13 = accTB7.Text;
+            String acc14 = accTB8.Text;
             String message = "Q " + acc1 + " " + acc3 + " " + acc4 + " " + acc5 + " " + acc6
-                + " " + acc7 + " " + acc8 + " " + acc9 + " " + acc10 + " " + acc11;
+                + " " + acc7 + " " + acc8 + " " + acc9 + " " + acc10 + " " + acc11 + " " + acc12
+                + " " + acc13 + " " + acc14;
             if (conn != null)
             {
                 conn.sendMessage(message);
@@ -899,6 +929,8 @@ namespace EepromGUI
          * ************************************************/
         private void clearFields()
         {
+            deviceTB.Text = "";
+            macOTB.Text = "";
             moveTB.Text = "";
             sleepCB.SelectedIndex = -1;
             hitDTB.Text = "";
@@ -935,7 +967,114 @@ namespace EepromGUI
             accTB3.Text = "";
             accTB4.Text = "";
             accTB5.Text = "";
+            accTB6.Text = "";
+            accTB7.Text = "";
+            accTB8.Text = "";
             errorTB.Text = "";
+            clearDefaults();
+        }
+
+        /******************************************
+         * Clears all the fields in the default tab
+         * ****************************************
+         */
+        private void clearDefaults()
+        {
+            fallDTB.Text = "";
+            fallDCB.SelectedIndex = -1;
+            bobDCB.SelectedIndex = -1;
+            sensorDCB.SelectedIndex = -1;
+            sensorD2CB.SelectedIndex = -1;
+            hitcDTB1.Text = "";
+            hitcDTB2.Text = "";
+            hitcDTB3.Text = "";
+            hitcCB4.SelectedIndex = -1;
+            serialDTB.Text = "";
+            addressDTB.Text = "";
+            DockDCB.SelectedIndex = -1;
+            HomeDCB.SelectedIndex = -1;
+            sitBTB.Text = "";
+            satBTB.Text = "";
+            sesBTB.Text = "";
+            mitBTB.Text = "";
+            matBTB.Text = "";
+            mitTTB.Text = "";
+            mitRTB.Text = "";
+            matTTB.Text = "";
+            matRTB.Text = "";
+            mfsCheck.Checked = false;
+            mfsCB1.SelectedIndex = -1;
+            mfsCB2.SelectedIndex = -1;
+            mfsCB3.SelectedIndex = -1;
+            mfsCB4.SelectedIndex = -1;
+            mfsTB1.Text = "";
+            mfsTB2.Text = "";
+            mfsTB3.Text = "";
+            mfsTB4.Text = "";
+            mfsTB5.Text = "";
+            mfsTB6.Text = "";
+            mglCheck.Checked = false;
+            mglCB1.SelectedIndex = -1;
+            mglCB2.SelectedIndex = -1;
+            mglCB3.SelectedIndex = -1;
+            mglCB4.SelectedIndex = -1;
+            mglTB1.Text = "";
+            mglTB2.Text = "";
+            mglTB3.Text = "";
+            mglTB4.Text = "";
+            mglTB5.Text = "";
+            mglTB6.Text = "";
+            phiCheck.Checked = false;
+            phiCB1.SelectedIndex = -1;
+            phiCB2.SelectedIndex = -1;
+            phiCB3.SelectedIndex = -1;
+            phiCB4.SelectedIndex = -1;
+            phiTB1.Text = "";
+            phiTB2.Text = "";
+            phiTB3.Text = "";
+            phiTB4.Text = "";
+            phiTB5.Text = "";
+            phiTB6.Text = "";
+            smkCheck.Checked = false;
+            smkCB1.SelectedIndex = -1;
+            smkCB2.SelectedIndex = -1;
+            smkCB3.SelectedIndex = -1;
+            smkCB4.SelectedIndex = -1;
+            smkTB1.Text = "";
+            smkTB2.Text = "";
+            smkTB3.Text = "";
+            smkTB4.Text = "";
+            smkTB5.Text = "";
+            smkTB6.Text = "";
+            thmCheck.Checked = false;
+            thmCB1.SelectedIndex = -1;
+            thmCB2.SelectedIndex = -1;
+            thmCB3.SelectedIndex = -1;
+            thmCB4.SelectedIndex = -1;
+            thmTB1.Text = "";
+            thmTB2.Text = "";
+            thmTB3.Text = "";
+            thmTB4.Text = "";
+            thmTB5.Text = "";
+            thmTB6.Text = "";
+            msdCheck.Checked = false;
+            msdTab.SelectedIndex = -1;
+            msdCB2.SelectedIndex = -1;
+            msdCB3.SelectedIndex = -1;
+            msdCB4.SelectedIndex = -1;
+            msdTB1.Text = "";
+            msdTB2.Text = "";
+            msdTB3.Text = "";
+            msdTB4.Text = "";
+            msdTB5.Text = "";
+            msdTB6.Text = "";
+            msdTB7.Text = "";
+            msdTB8.Text = "";
+            freqTB.Text = "";
+            lpTB.Text = "";
+            hpTB.Text = "";
+            versionLBL.Text = "";
+            version2LBL.Text = "";
         }
 
         /****************************************************
@@ -956,7 +1095,11 @@ namespace EepromGUI
         {
             // is message an ip address
             // the first 4 characters are ###.
-            if (Char.IsDigit(message[0]) && Char.IsDigit(message[1]) && Char.IsDigit(message[2]) && message[3] == '.')
+            if (message.Length < 4)
+            {
+                return;
+            }
+            if (Char.IsDigit(message[0]) && Char.IsDigit(message[1]) && Char.IsDigit(message[2]) && message[3] == '.') // crashes here when show defaults tab
             {
                 if (!targetCB.Items.Contains(message))
                 {
@@ -1071,6 +1214,9 @@ namespace EepromGUI
                     accTB3.Text = accSplit[8];
                     accTB4.Text = accSplit[9];
                     accTB5.Text = accSplit[10];
+                    accTB6.Text = accSplit[11];
+                    accTB7.Text = accSplit[12];
+                    accTB8.Text = accSplit[13];
                     break;
                 case 'S':   // concealed or exposed status
                     expSTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
@@ -1203,6 +1349,7 @@ namespace EepromGUI
                             mglTB3.Text = mglSplit[7];
                             mglTB4.Text = mglSplit[8];
                             mglTB5.Text = mglSplit[9];
+                            mglTB6.Text = mglSplit[10];
                             mglCheck.ForeColor = System.Drawing.SystemColors.WindowText;
                             mglCB1.ForeColor = System.Drawing.SystemColors.WindowText;
                             mglCB2.ForeColor = System.Drawing.SystemColors.WindowText;
@@ -1213,6 +1360,7 @@ namespace EepromGUI
                             mglTB3.ForeColor = System.Drawing.SystemColors.WindowText;
                             mglTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             mglTB5.ForeColor = System.Drawing.SystemColors.WindowText;
+                            mglTB6.ForeColor = System.Drawing.SystemColors.WindowText;
                             break;
                         case 'H':   // Hit calibration defaults
                             String[] calDSplit = getMessageValue(message, 4).Split(' ');
@@ -1240,6 +1388,7 @@ namespace EepromGUI
                             smkTB3.Text = smkSplit[7];
                             smkTB4.Text = smkSplit[8];
                             smkTB5.Text = smkSplit[9];
+                            smkTB6.Text = smkSplit[10];
                             smkCheck.ForeColor = System.Drawing.SystemColors.WindowText;
                             smkCB1.ForeColor = System.Drawing.SystemColors.WindowText;
                             smkCB2.ForeColor = System.Drawing.SystemColors.WindowText;
@@ -1250,6 +1399,7 @@ namespace EepromGUI
                             smkTB3.ForeColor = System.Drawing.SystemColors.WindowText;
                             smkTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             smkTB5.ForeColor = System.Drawing.SystemColors.WindowText;
+                            smkTB6.ForeColor = System.Drawing.SystemColors.WindowText;
                             break;
                         case 'L':   // listen port
                             listenTB.Text = getMessageValue(message, 4);
@@ -1265,6 +1415,8 @@ namespace EepromGUI
                             {
                                 macTB.Text = valid;
                                 passwordPanel.Visible = false;
+                                // Get last 4 characters of MAC to display
+                                macOTB.Text = valid.Substring(12, 5);
                             }
                             break;
                         case 'N':   // MFS defaults
@@ -1279,6 +1431,7 @@ namespace EepromGUI
                             mfsTB3.Text = mfsSplit[7];
                             mfsTB4.Text = mfsSplit[8];
                             mfsTB5.Text = mfsSplit[9];
+                            mfsTB6.Text = mfsSplit[10];
                             mfsCheck.ForeColor = System.Drawing.SystemColors.WindowText;
                             mfsCB1.ForeColor = System.Drawing.SystemColors.WindowText;
                             mfsCB2.ForeColor = System.Drawing.SystemColors.WindowText;
@@ -1289,11 +1442,15 @@ namespace EepromGUI
                             mfsTB3.ForeColor = System.Drawing.SystemColors.WindowText;
                             mfsTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             mfsTB5.ForeColor = System.Drawing.SystemColors.WindowText;
+                            mfsTB6.ForeColor = System.Drawing.SystemColors.WindowText;
                             break;
                         case 'O':   // Bob defaults
                             String[] bobSplit = getMessageValue(message, 4).Split(' ');
-                            bobDCB.SelectedIndex = Convert.ToInt32(bobSplit[0]);
-                            bobDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            if (bobSplit[0].Length == 1)
+                            {
+                                bobDCB.SelectedIndex = Convert.ToInt32(bobSplit[0]);   // crashes here when doing show all in defaults
+                                bobDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            }
                             break;
                         case 'P':   // PHI defaults
                             String[] phiSplit = getMessageValue(message, 4).Split(' ');
@@ -1307,6 +1464,7 @@ namespace EepromGUI
                             phiTB3.Text = phiSplit[7];
                             phiTB4.Text = phiSplit[8];
                             phiTB5.Text = phiSplit[9];
+                            phiTB6.Text = phiSplit[10];
                             phiCheck.ForeColor = System.Drawing.SystemColors.WindowText;
                             phiCB1.ForeColor = System.Drawing.SystemColors.WindowText;
                             phiCB2.ForeColor = System.Drawing.SystemColors.WindowText;
@@ -1317,6 +1475,15 @@ namespace EepromGUI
                             phiTB3.ForeColor = System.Drawing.SystemColors.WindowText;
                             phiTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             phiTB5.ForeColor = System.Drawing.SystemColors.WindowText;
+                            phiTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            break;
+                        case 'Q':   // Docking end defaults
+                            String[] dockSplit = getMessageValue(message, 4).Split(' ');
+                            if (dockSplit[0].Length == 1)
+                            {
+                                DockDCB.SelectedIndex = Convert.ToInt32(dockSplit[0]);
+                                DockDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            }
                             break;
                         case 'S':   // Hit sensor defaults
                             String[] hitSplit = getMessageValue(message, 4).Split(' ');
@@ -1337,6 +1504,7 @@ namespace EepromGUI
                             thmTB3.Text = thmSplit[7];
                             thmTB4.Text = thmSplit[8];
                             thmTB5.Text = thmSplit[9];
+                            thmTB6.Text = thmSplit[10];
                             thmCheck.ForeColor = System.Drawing.SystemColors.WindowText;
                             thmCB1.ForeColor = System.Drawing.SystemColors.WindowText;
                             thmCB2.ForeColor = System.Drawing.SystemColors.WindowText;
@@ -1347,10 +1515,69 @@ namespace EepromGUI
                             thmTB3.ForeColor = System.Drawing.SystemColors.WindowText;
                             thmTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             thmTB5.ForeColor = System.Drawing.SystemColors.WindowText;
+                            thmTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            break;
+                        case 'U':   // Radio Frequency Default
+                            freqTB.Text = getMessageValue(message, 4);
+                            freqTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            break;
+                        case 'V':   // Radio Low Power Default
+                            lpTB.Text = getMessageValue(message, 4);
+                            lpTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            break;
+                        case 'W':   // Radio Frequency Default
+                            hpTB.Text = getMessageValue(message, 4);
+                            hpTB.ForeColor = System.Drawing.SystemColors.WindowText;
                             break;
                         case 'X':   // Serial Number
                             serialDTB.Text = getMessageValue(message, 4);
                             serialDTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            break;
+                        case 'Y':   // MSD defaults
+                            String[] msdSplit = getMessageValue(message, 4).Split(' ');
+                            msdCheck.Checked = Convert.ToBoolean(Convert.ToInt32(msdSplit[0]));
+                            msdCB1.SelectedIndex = Convert.ToInt32(msdSplit[1]);
+                            msdCB2.SelectedIndex = Convert.ToInt32(msdSplit[2]);
+                            msdCB3.SelectedIndex = Convert.ToInt32(msdSplit[3]);
+                            msdCB4.SelectedIndex = Convert.ToInt32(msdSplit[4]);
+                            msdTB1.Text = msdSplit[5];
+                            msdTB2.Text = msdSplit[6];
+                            msdTB3.Text = msdSplit[7];
+                            msdTB4.Text = msdSplit[8];
+                            msdTB5.Text = msdSplit[9];
+                            msdTB6.Text = msdSplit[10];
+                            msdTB7.Text = msdSplit[11];
+                            msdTB8.Text = msdSplit[12];
+                            msdCheck.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdTab.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdCB2.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdCB3.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdCB4.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdTB1.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdTB2.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdTB3.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdTB4.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdTB5.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            break;
+                        case 'Z':   // Home end defaults
+                            String[] homeSplit = getMessageValue(message, 4).Split(' ');
+                            if (homeSplit[0].Length == 1)
+                            {
+                                HomeDCB.SelectedIndex = Convert.ToInt32(homeSplit[0]);
+                                HomeDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            }
+                            break;
+                    }
+                    break;
+                case 'J':   // eeprom board settings
+                    switch (second)
+                    {
+                        case 'A':   // Major Flash Version
+                            versionLBL.Text = getMessageValue(message, 4) + ".";
+                            break;
+                        case 'B':   // Minor Flash Version
+                            version2LBL.Text = getMessageValue(message, 4);
                             break;
                     }
                     break;
@@ -1390,6 +1617,8 @@ namespace EepromGUI
                 errorLBL.Text = "";
                 showAllButton.Enabled = true;
                 setBoardType();
+                setMAC();
+                setVersion();
                 conn.StartProcess(machine);
                 Console.WriteLine("Connected");
                 timer1.Stop();
@@ -1400,424 +1629,563 @@ namespace EepromGUI
          * Events for all text changes in texboxes or
          * index changes for combo boxes in the default tab
          * ***********************************************/
-        private void sitBTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(sitBTB);
-            sitBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void satBTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(satBTB);
-            satBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void sesBTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(sesBTB);
-            sesBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void mitBTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(mitBTB);
-            mitBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void matBTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(matBTB);
-            matBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void mitTTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(mitTTB);
-            mitTTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void mitRTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(mitRTB);
-            mitRTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void matTTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(matTTB);
-            matTTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void matRTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(matRTB);
-            matRTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void serialDTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(serialDTB);
-            serialDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void addressDTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(addressDTB);
-            addressDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void fallDTB_TextChanged(object sender, EventArgs e)
-        {
-            changedList.Add(fallDTB);
-            fallDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void fallDCB_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            changedList.Add(fallDCB);
-            fallDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void bobDCB_SelectedIndexChanged(object sender, EventArgs e)
+        private void bobDCB_Click(object sender, EventArgs e)
         {
             changedList.Add(bobDCB);
             bobDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void sensorDCB_SelectedIndexChanged(object sender, EventArgs e)
+
+        private void fallDCB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(fallDCB);
+            fallDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void fallDTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(fallDTB);
+            fallDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void sensorDCB_Click(object sender, EventArgs e)
         {
             changedList.Add(sensorDCB);
             sensorDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void sensorD2CB_SelectedIndexChanged(object sender, EventArgs e)
+        private void sensorD2CB_Click(object sender, EventArgs e)
         {
             changedList.Add(sensorD2CB);
             sensorD2CB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void hitcDTB1_TextChanged(object sender, EventArgs e)
+        private void hitcDTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(hitcDTB1);
             hitcDTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void hitcDTB2_TextChanged(object sender, EventArgs e)
+        private void hitcDTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(hitcDTB2);
             hitcDTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void hitcDTB3_TextChanged(object sender, EventArgs e)
+        private void hitcDTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(hitcDTB3);
             hitcDTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void hitcCB4_SelectedIndexChanged(object sender, EventArgs e)
+        private void hitcCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(hitcCB4);
             hitcCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsCheck_CheckedChanged(object sender, EventArgs e)
+        private void serialDTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(serialDTB);
+            serialDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void addressDTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(addressDTB);
+            addressDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void sitBTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(sitBTB);
+            sitBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void satBTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(satBTB);
+            satBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void sesBTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(sesBTB);
+            sesBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void mitBTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(mitBTB);
+            mitBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void matBTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(matBTB);
+            matBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void DockDCB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(DockDCB);
+            DockDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void HomeDCB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(HomeDCB);
+            HomeDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void mitTTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(mitTTB);
+            mitTTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void mitRTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(mitRTB);
+            mitRTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void matTTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(matTTB);
+            matTTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void matRTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(matRTB);
+            matRTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void mfsCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCheck);
             mfsCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsCB1_SelectedIndexChanged(object sender, EventArgs e)
+        private void mfsCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCB1);
             mfsCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsCB2_SelectedIndexChanged(object sender, EventArgs e)
+        private void mfsCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCB2);
             mfsCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsCB3_SelectedIndexChanged(object sender, EventArgs e)
+        private void mfsCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCB3);
             mfsCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsCB4_SelectedIndexChanged(object sender, EventArgs e)
+        private void mfsCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCB4);
             mfsCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsTB1_TextChanged(object sender, EventArgs e)
+        private void mfsTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB1);
             mfsTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsTB2_TextChanged(object sender, EventArgs e)
+        private void mfsTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB2);
             mfsTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsTB3_TextChanged(object sender, EventArgs e)
+        private void mfsTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB3);
             mfsTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsTB4_TextChanged(object sender, EventArgs e)
+        private void mfsTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB4);
             mfsTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mfsTB5_TextChanged(object sender, EventArgs e)
+        private void mfsTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB5);
             mfsTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglCheck_CheckedChanged(object sender, EventArgs e)
+        private void mfsTB6_Click(object sender, EventArgs e)
+        {
+            changedList.Add(mfsTB6);
+            mfsTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void mglCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCheck);
             mglCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglCB1_SelectedIndexChanged(object sender, EventArgs e)
+        private void mglCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCB1);
             mglCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglCB2_SelectedIndexChanged(object sender, EventArgs e)
+        private void mglCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCB2);
             mglCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglCB3_SelectedIndexChanged(object sender, EventArgs e)
+        private void mglCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCB3);
             mglCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglCB4_SelectedIndexChanged(object sender, EventArgs e)
+        private void mglCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCB4);
             mglCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglTB1_TextChanged(object sender, EventArgs e)
+        private void mglTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB1);
             mglTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglTB2_TextChanged(object sender, EventArgs e)
+        private void mglTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB2);
             mglTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglTB3_TextChanged(object sender, EventArgs e)
+        private void mglTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB3);
             mglTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglTB4_TextChanged(object sender, EventArgs e)
+        private void mglTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB4);
             mglTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mglTB5_TextChanged(object sender, EventArgs e)
+        private void mglTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB5);
             mglTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiCheck_CheckedChanged(object sender, EventArgs e)
+        private void mglTB6_Click(object sender, EventArgs e)
+        {
+            changedList.Add(mglTB6);
+            mglTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void phiCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCheck);
             phiCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiCB1_SelectedIndexChanged(object sender, EventArgs e)
+        private void phiCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCB1);
             phiCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiCB2_SelectedIndexChanged(object sender, EventArgs e)
+        private void phiCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCB2);
             phiCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiCB3_SelectedIndexChanged(object sender, EventArgs e)
+        private void phiCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCB3);
             phiCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiCB4_SelectedIndexChanged(object sender, EventArgs e)
+        private void phiCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCB4);
             phiCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiTB1_TextChanged(object sender, EventArgs e)
+        private void phiTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB1);
             phiTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiTB2_TextChanged(object sender, EventArgs e)
+        private void phiTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB2);
             phiTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiTB3_TextChanged(object sender, EventArgs e)
+        private void phiTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB3);
             phiTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiTB4_TextChanged(object sender, EventArgs e)
+        private void phiTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB4);
             phiTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void phiTB5_TextChanged(object sender, EventArgs e)
+        private void phiTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB5);
             phiTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkCheck_CheckedChanged(object sender, EventArgs e)
+        private void phiTB6_Click(object sender, EventArgs e)
+        {
+            changedList.Add(phiTB6);
+            phiTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void smkCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCheck);
             smkCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkCB1_SelectedIndexChanged(object sender, EventArgs e)
+        private void smkCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCB1);
             smkCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkCB2_SelectedIndexChanged(object sender, EventArgs e)
+        private void smkCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCB2);
             smkCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkCB3_SelectedIndexChanged(object sender, EventArgs e)
+        private void smkCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCB3);
             smkCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkCB4_SelectedIndexChanged(object sender, EventArgs e)
+        private void smkCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCB4);
             smkCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkTB1_TextChanged(object sender, EventArgs e)
+        private void smkTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB1);
             smkTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkTB2_TextChanged(object sender, EventArgs e)
+        private void smkTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB2);
             smkTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkTB3_TextChanged(object sender, EventArgs e)
+        private void smkTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB3);
             smkTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkTB4_TextChanged(object sender, EventArgs e)
+        private void smkTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB4);
             smkTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void smkTB5_TextChanged(object sender, EventArgs e)
+        private void smkTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB5);
             smkTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmCheck_CheckedChanged(object sender, EventArgs e)
+        private void smkTB6_Click(object sender, EventArgs e)
+        {
+            changedList.Add(smkTB6);
+            smkTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void thmCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCheck);
             thmCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmCB1_SelectedIndexChanged(object sender, EventArgs e)
+        private void thmCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCB1);
             thmCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmCB2_SelectedIndexChanged(object sender, EventArgs e)
+        private void thmCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCB2);
             thmCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmCB3_SelectedIndexChanged(object sender, EventArgs e)
+        private void thmCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCB3);
             thmCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmCB4_SelectedIndexChanged(object sender, EventArgs e)
+        private void thmCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCB4);
             thmCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmTB1_TextChanged(object sender, EventArgs e)
+        private void thmTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB1);
             thmTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmTB2_TextChanged(object sender, EventArgs e)
+        private void thmTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB2);
             thmTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmTB3_TextChanged(object sender, EventArgs e)
+        private void thmTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB3);
             thmTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmTB4_TextChanged(object sender, EventArgs e)
+        private void thmTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB4);
             thmTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void thmTB5_TextChanged(object sender, EventArgs e)
+        private void thmTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB5);
             thmTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void thmTB6_Click(object sender, EventArgs e)
+        {
+            changedList.Add(thmTB6);
+            thmTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdCheck_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdCheck);
+            msdCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdCB1_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdTab);
+            msdTab.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdCB2_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdCB2);
+            msdCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdCB3_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdCB3);
+            msdCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdCB4_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdCB4);
+            msdCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdTB1_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdTB1);
+            msdTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdTB2_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdTB2);
+            msdTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdTB3_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdTB3);
+            msdTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdTB4_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdTB4);
+            msdTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdTB5_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdTB5);
+            msdTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdTB6_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdTB6);
+            msdTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdTB7_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdTB7);
+            msdTB7.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void msdTB8_Click(object sender, EventArgs e)
+        {
+            changedList.Add(msdTB8);
+            msdTB8.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void freqTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(freqTB);
+            freqTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void lpTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(lpTB);
+            lpTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
+        private void hpTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(hpTB);
+            hpTB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
         /**************************************************
@@ -1864,11 +2232,26 @@ namespace EepromGUI
                         case "matRTB":
                             batDefaults(9, textValue);
                             break;
+                        case "DockDCB":
+                            dockDefault(DockDCB.SelectedIndex);
+                            break;
+                        case "HomeDCB":
+                            homeDefault(HomeDCB.SelectedIndex);
+                            break;
                         case "serialDTB":
                             serialDefault(textValue);
                             break;
                         case "addressDTB":
                             addressDefault(textValue);
+                            break;
+                        case "freqTB":
+                            freqDefault(textValue);
+                            break;
+                        case "lpTB":
+                            lpDefault(textValue);
+                            break;
+                        case "hpTB":
+                            hpDefault(textValue);
                             break;
                         case "fallDTB":
                             fallDefault(textValue, fallDCB.SelectedIndex);
@@ -1899,203 +2282,259 @@ namespace EepromGUI
                             break;
                         case "mfsCheck":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mfsCB1":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mfsCB2":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mfsCB3":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mfsCB4":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mfsTB1":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mfsTB2":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mfsTB3":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mfsTB4":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mfsTB5":
                             mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text);
+                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
                             break;
                         case "mglCheck":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mfsTB6.Text);
                             break;
                         case "mglCB1":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
                             break;
                         case "mglCB2":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
                             break;
                         case "mglCB3":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
                             break;
                         case "mglCB4":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
                             break;
                         case "mglTB1":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
                             break;
                         case "mglTB2":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
                             break;
                         case "mglTB3":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
                             break;
                         case "mglTB4":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
                             break;
                         case "mglTB5":
                             mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text);
+                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
                             break;
                         case "phiCheck":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "phiCB1":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "phiCB2":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "phiCB3":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "phiCB4":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "phiTB1":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "phiTB2":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "phiTB3":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "phiTB4":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "phiTB5":
                             phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text);
+                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
                             break;
                         case "smkCheck":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "smkCB1":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "smkCB2":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "smkCB3":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "smkCB4":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "smkTB1":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "smkTB2":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "smkTB3":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "smkTB4":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "smkTB5":
                             smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text);
+                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
                             break;
                         case "thmCheck":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "thmCB1":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "thmCB2":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "thmCB3":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "thmCB4":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "thmTB1":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "thmTB2":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "thmTB3":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "thmTB4":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "thmTB5":
                             thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text);
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                            break;
+                        case "thmTB6":
+                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                            break;
+                        case "msdCheck":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdCB1":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdCB2":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdCB3":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdCB4":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdTB1":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdTB2":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdTB3":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdTB4":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdTB5":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdTB6":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdTB7":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                            break;
+                        case "msdTB8":
+                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         default:
                             break;
@@ -2130,9 +2569,15 @@ namespace EepromGUI
                 conn.sendMessage("I N");
                 conn.sendMessage("I O");
                 conn.sendMessage("I P");
+                conn.sendMessage("I Q");
                 conn.sendMessage("I S");
                 conn.sendMessage("I T");
+                conn.sendMessage("I U");
+                conn.sendMessage("I V");
+                conn.sendMessage("I W");
                 conn.sendMessage("I X");
+                conn.sendMessage("I Y");
+                conn.sendMessage("I Z");
                 logSent("I E SIT");
                 logSent("I E SAT");
                 logSent("I E SES");
@@ -2188,6 +2633,42 @@ namespace EepromGUI
         }
 
         /**************************************************
+        * Sends default radio frequncy message
+        * ***********************************************/
+        public void freqDefault(string frequency)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I U " + frequency);
+                logSent("I U " + frequency);
+            }
+        }
+
+        /**************************************************
+         * Sends default radio low power message
+        * ***********************************************/
+        public void lpDefault(string low_power)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I V " + low_power);
+                logSent("I V " + low_power);
+            }
+        }
+
+        /**************************************************
+        * Sends default radio high power message
+        * ***********************************************/
+        public void hpDefault(string high_power)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I W " + high_power);
+                logSent("I W " + high_power);
+            }
+        }
+
+        /**************************************************
          * Sends default fall parameters message
          * ***********************************************/
         public void fallDefault(String fall1, int fall2)
@@ -2196,6 +2677,30 @@ namespace EepromGUI
             {
                 conn.sendMessage("I F " + fall1 + " " + Convert.ToString(fall2));
                 logSent("I F " + fall1 + " " + Convert.ToString(fall2));
+            }
+        }
+
+        /**************************************************
+        * Sends default docking end message
+        * ***********************************************/
+        public void dockDefault(int dock)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I Q " + Convert.ToString(dock));
+                logSent("I Q " + Convert.ToString(dock));
+            }
+        }
+
+        /**************************************************
+        * Sends default home end message
+        * ***********************************************/
+        public void homeDefault(int dock)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I Z " + Convert.ToString(dock));
+                logSent("I Z " + Convert.ToString(dock));
             }
         }
 
@@ -2239,14 +2744,14 @@ namespace EepromGUI
          * Sends default MFS message
          * ***********************************************/
         public void mfsDefault(bool mfs1, int mfs2, int mfs3, int mfs4, int mfs5, string mfs6, string mfs7, string mfs8, string mfs9,
-                               string mfs10)
+                               string mfs10, string mfs11)
         {
             if (conn != null)
             {
                 conn.sendMessage("I N " + Convert.ToInt32(mfs1) + " " + mfs2 + " " + mfs3 + " " + mfs4 + " " + mfs5 + " " + mfs6 + " " +
-                    " " + mfs7 + " " + mfs8 + " " + mfs9 + " " + mfs10);
+                    mfs7 + " " + mfs8 + " " + mfs9 + " " + mfs10 + " " + mfs11 + " " + "0" + " " + "0");
                 logSent("I N " + Convert.ToInt32(mfs1) + " " + mfs2 + " " + mfs3 + " " + mfs4 + " " + mfs5 + " " + mfs6 + " " +
-                    " " + mfs7 + " " + mfs8 + " " + mfs9 + " " + mfs10);
+                    mfs7 + " " + mfs8 + " " + mfs9 + " " + mfs10 + " " + mfs11 + " " + "0" + " " + "0");
             }
         }
 
@@ -2254,14 +2759,14 @@ namespace EepromGUI
          * Sends default MGL message
          * ***********************************************/
         public void mglDefault(bool mgl1, int mgl2, int mgl3, int mgl4, int mgl5, string mgl6, string mgl7, string mgl8, string mgl9,
-                       string mgl10)
+                       string mgl10, string mgl11)
         {
             if (conn != null)
             {
-                conn.sendMessage("I N " + Convert.ToInt32(mgl1) + " " + mgl2 + " " + mgl3 + " " + mgl4 + " " + mgl5 + " " + mgl6 + " " +
-                    " " + mgl7 + " " + mgl8 + " " + mgl9 + " " + mgl10);
-                logSent("I N " + Convert.ToInt32(mgl1) + " " + mgl2 + " " + mgl3 + " " + mgl4 + " " + mgl5 + " " + mgl6 + " " +
-                    " " + mgl7 + " " + mgl8 + " " + mgl9 + " " + mgl10);
+                conn.sendMessage("I G " + Convert.ToInt32(mgl1) + " " + mgl2 + " " + mgl3 + " " + mgl4 + " " + mgl5 + " " + mgl6 + " " +
+                    mgl7 + " " + mgl8 + " " + mgl9 + " " + mgl10 + " " + mgl11 + " " + "0" + " " + "0");
+                logSent("I G " + Convert.ToInt32(mgl1) + " " + mgl2 + " " + mgl3 + " " + mgl4 + " " + mgl5 + " " + mgl6 + " " +
+                    mgl7 + " " + mgl8 + " " + mgl9 + " " + mgl10 + " " + mgl11 + " " + "0" + " " + "0");
             }
         }
 
@@ -2269,14 +2774,14 @@ namespace EepromGUI
          * Sends default PHI message
          * ***********************************************/
         public void phiDefault(bool phi1, int phi2, int phi3, int phi4, int phi5, string phi6, string phi7, string phi8, string phi9,
-                       string phi10)
+                       string phi10, string phi11)
         {
             if (conn != null)
             {
-                conn.sendMessage("I N " + Convert.ToInt32(phi1) + " " + phi2 + " " + phi3 + " " + phi4 + " " + phi5 + " " + phi6 + " " +
-                    " " + phi7 + " " + phi8 + " " + phi9 + " " + phi10);
-                logSent("I N " + Convert.ToInt32(phi1) + " " + phi2 + " " + phi3 + " " + phi4 + " " + phi5 + " " + phi6 + " " +
-                    " " + phi7 + " " + phi8 + " " + phi9 + " " + phi10);
+                conn.sendMessage("I P " + Convert.ToInt32(phi1) + " " + phi2 + " " + phi3 + " " + phi4 + " " + phi5 + " " + phi6 + " " +
+                    phi7 + " " + phi8 + " " + phi9 + " " + phi10 + " " + phi11 + " " + "0" + " " + "0");
+                logSent("I P " + Convert.ToInt32(phi1) + " " + phi2 + " " + phi3 + " " + phi4 + " " + phi5 + " " + phi6 + " " +
+                    phi7 + " " + phi8 + " " + phi9 + " " + phi10 + " " + phi11 + " " + "0" + " " + "0");
             }
         }
 
@@ -2284,14 +2789,14 @@ namespace EepromGUI
          * Sends default SMK message
          * ***********************************************/
         public void smkDefault(bool smk1, int smk2, int smk3, int smk4, int smk5, string smk6, string smk7, string smk8, string smk9,
-                       string smk10)
+                       string smk10, string smk11)
         {
             if (conn != null)
             {
-                conn.sendMessage("I N " + Convert.ToInt32(smk1) + " " + smk2 + " " + smk3 + " " + smk4 + " " + smk5 + " " + smk6 + " " +
-                    " " + smk7 + " " + smk8 + " " + smk9 + " " + smk10);
-                logSent("I N " + Convert.ToInt32(smk1) + " " + smk2 + " " + smk3 + " " + smk4 + " " + smk5 + " " + smk6 + " " +
-                    " " + smk7 + " " + smk8 + " " + smk9 + " " + smk10);
+                conn.sendMessage("I K " + Convert.ToInt32(smk1) + " " + smk2 + " " + smk3 + " " + smk4 + " " + smk5 + " " + smk6 + " " +
+                    smk7 + " " + smk8 + " " + smk9 + " " + smk10 + " " + smk11 + " " + "0" + " " + "0");
+                logSent("I K " + Convert.ToInt32(smk1) + " " + smk2 + " " + smk3 + " " + smk4 + " " + smk5 + " " + smk6 + " " +
+                    smk7 + " " + smk8 + " " + smk9 + " " + smk10 + " " + smk11 + " " + "0" + " " + "0");
             }
         }
 
@@ -2299,14 +2804,29 @@ namespace EepromGUI
          * Sends default THM message
          * ***********************************************/
         public void thmDefault(bool thm1, int thm2, int thm3, int thm4, int thm5, string thm6, string thm7, string thm8, string thm9,
-                       string thm10)
+                       string thm10, string thm11)
         {
             if (conn != null)
             {
-                conn.sendMessage("I N " + Convert.ToInt32(thm1) + " " + thm2 + " " + thm3 + " " + thm4 + " " + thm5 + " " + thm6 + " " +
-                    " " + thm7 + " " + thm8 + " " + thm9 + " " + thm10);
-                logSent("I N " + Convert.ToInt32(thm1) + " " + thm2 + " " + thm3 + " " + thm4 + " " + thm5 + " " + thm6 + " " +
-                    " " + thm7 + " " + thm8 + " " + thm9 + " " + thm10);
+                conn.sendMessage("I T " + Convert.ToInt32(thm1) + " " + thm2 + " " + thm3 + " " + thm4 + " " + thm5 + " " + thm6 + " " +
+                    thm7 + " " + thm8 + " " + thm9 + " " + thm10 + " " + thm11 + " " + "0" + " " + "0");
+                logSent("I T " + Convert.ToInt32(thm1) + " " + thm2 + " " + thm3 + " " + thm4 + " " + thm5 + " " + thm6 + " " +
+                    thm7 + " " + thm8 + " " + thm9 + " " + thm10 + " " + thm11 + " " + "0" + " " + "0");
+            }
+        }
+
+        /**************************************************
+        * Sends default MSD message
+        * ***********************************************/
+        public void msdDefault(bool msd1, int msd2, int msd3, int msd4, int msd5, string msd6, string msd7, string msd8, string msd9,
+                       string msd10, string msd11, string msd12, string msd13)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I Y " + Convert.ToInt32(msd1) + " " + msd2 + " " + msd3 + " " + msd4 + " " + msd5 + " " + msd6 + " " +
+                    msd7 + " " + msd8 + " " + msd9 + " " + msd10 + " " + msd11);
+                logSent("I Y " + Convert.ToInt32(msd1) + " " + msd2 + " " + msd3 + " " + msd4 + " " + msd5 + " " + msd6 + " " +
+                    msd7 + " " + msd8 + " " + msd9 + " " + msd10 + " " + msd11 + " " + msd12 + " " + msd13);
             }
         }
 
@@ -2321,5 +2841,57 @@ namespace EepromGUI
            targetCB.Items.Clear();
         }
 
+        private void VersionViewButton_Click(object sender, EventArgs e)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("J A");
+                conn.sendMessage("J B");
+                logSent("J A");
+                logSent("J B");
+            }
+        }
+
+        private void firmButton_Click(object sender, EventArgs e)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo();
+            OpenFileDialog fileDialog = new OpenFileDialog();
+            FolderBrowserDialog browserDialog = new FolderBrowserDialog();
+            
+            // Grab the file info
+            if (browserDialog.ShowDialog() == DialogResult.OK)
+            {
+                String shellFile = "atifirmware.sh";
+                String batFile = "C:\\Program Files (x86)\\Action Target\\PMA\\atifirmwarecopy.bat";
+
+                psi.FileName = batFile;
+                psi.Arguments = machine + " \"" + browserDialog.SelectedPath + "\\" + shellFile + "\""; 
+
+                // Hides the console window that would pop up
+                //psi.WindowStyle = ProcessWindowStyle.Hidden;
+
+                // Create new process and set the starting information
+                Process p = new Process();
+                p.StartInfo = psi;
+
+                // Lets you know when the process has been completed
+                p.EnableRaisingEvents = true;
+                p.Start();
+
+                // Wait until the process has completed
+                while (!p.HasExited)
+                {
+                    System.Threading.Thread.Sleep(1000);
+                }
+                // Check to see what the exit code was
+                if (p.ExitCode != 0)
+                {
+                    Console.WriteLine("There was an error with the file.");
+                }
+                setVersion();
+            }
+
+
+        }
     }
 }

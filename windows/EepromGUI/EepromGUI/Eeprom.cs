@@ -208,7 +208,18 @@ namespace EepromGUI
             items[1] = status;
 
             //call the delegate
-            _synch.Invoke(_status, items);
+            try
+            {
+                _synch.Invoke(_status, items);
+            }
+            catch (ObjectDisposedException e)
+            {
+                Console.WriteLine("ObjectDisposedException: {0}", e);
+            }
+            catch (InvalidOperationException e)
+            {
+                Console.WriteLine("InvalidOperationException: {0}", e);
+            }
         }
 
         /******************************************
@@ -243,6 +254,10 @@ namespace EepromGUI
             catch (SocketException e)
             {
                 Console.WriteLine("SocketException: {0}", e);
+            }
+            catch (IOException e)
+            {
+                Console.WriteLine("IOException: {0}", e);
             }
             return answer;
         }
