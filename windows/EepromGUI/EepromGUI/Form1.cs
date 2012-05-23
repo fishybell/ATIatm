@@ -2862,7 +2862,8 @@ namespace EepromGUI
             if (browserDialog.ShowDialog() == DialogResult.OK)
             {
                 String shellFile = "atifirmware.sh";
-                String batFile = "C:\\Program Files (x86)\\Action Target\\PMA\\atifirmwarecopy.bat";
+                //String batFile = Directory.GetCurrentDirectory() + "\\atifirmwarecopy.bat";
+                String batFile = ".\\atifirmwarecopy.bat";
 
                 psi.FileName = batFile;
                 psi.Arguments = machine + " \"" + browserDialog.SelectedPath + "\\" + shellFile + "\""; 
