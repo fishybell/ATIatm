@@ -76,7 +76,7 @@ int Ptype(char *buf){
 
    LB=(LB_packet_t *)buf;
    if (LB->cmd==LBC_ILLEGAL) return(0);    
-   if (LB->cmd==LBC_ILLEGAL_CANCEL) return(0);    
+//   if (LB->cmd==LBC_ILLEGAL_CANCEL) return(0);    
    crc=crc8(buf);
    if (!crc){ // there seemed to be a good command
       if (LB->cmd==LBC_REQUEST_NEW) return(1);
@@ -156,7 +156,7 @@ int RF_size(int cmd){
       case  LBC_QEXPOSE:
       case  LBC_BURST:
       case  LBC_RESET:
-      case  LBC_ILLEGAL_CANCEL:
+/*      case  LBC_ILLEGAL_CANCEL: */
       case  LBC_STATUS_REQ:
          return (3);
 
@@ -183,7 +183,7 @@ int RF_size(int cmd){
          return (8);
 
       case  LBC_STATUS_RESP:
-         return (9);
+         return (11);
 
       case  LBC_DEVICE_REG:
          return (12);
@@ -339,7 +339,7 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_status_resp_t *L=(LB_status_resp_t *)LB;
             strcpy(cmdname,"Status_Resp_Ext");
-            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d did_exp_cmd=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->addr,L->expose,L->speed,L->did_exp_cmd,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
+            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d did_exp_cmd=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d event=%d",L->addr,L->expose,L->speed,L->did_exp_cmd,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault,L->event);
             color=MAGENTA;
          }
             break;

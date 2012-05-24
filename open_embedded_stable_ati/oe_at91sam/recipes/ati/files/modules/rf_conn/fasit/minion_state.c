@@ -40,8 +40,8 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
 #if 1
    timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);
-   DDCMSG(D_TIME,CYAN,"MINION %i: Begin timer updates at %6li.%09li timestamp, delta=%1li.%09li"
-          ,minion->mID,mt->elapsed_time.tv_sec, mt->elapsed_time.tv_nsec,mt->delta_time.tv_sec, mt->delta_time.tv_nsec);
+   DDCMSG(D_TIME,CYAN,"MINION %i: Begin timer updates at %3i.%03i timestamp, delta=%3i.%03i"
+          ,minion->mID, DEBUG_TS(mt->elapsed_time), DEBUG_TS(mt->delta_time));
 
    elapsed_tenths = mt->elapsed_time.tv_sec*10+(mt->elapsed_time.tv_nsec/100000000L);
 
@@ -153,7 +153,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   minion->S.exp.timer=100;  // it should happen in this many deciseconds
                   DDCMSG(D_MSTATE,MAGENTA,"exp_A %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
-                  sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+                  sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102
 
                   force_stat_req=1;
                   
@@ -172,7 +172,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   minion->S.exp.timer=15; // 1.5 second later
                   DDCMSG(D_MSTATE,MAGENTA,"exp_B %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
-                  sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+                  sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102
 
                   break;
 
@@ -203,7 +203,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   minion->S.exp.timer=50;  // it should happen in this many deciseconds
                   DDCMSG(D_MSTATE,MAGENTA,"conceal_A %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
-                  sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+                  sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102
 
                   force_stat_req=1;
                   // I'm expecting a response within 3 seconds
@@ -221,7 +221,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   minion->S.exp.timer=15; // 1.5 second later
                   DDCMSG(D_MSTATE,MAGENTA,"conceal_B %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n"
                          ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
-                  sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+                  sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102
 
                   break;
 
@@ -286,7 +286,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                          minion->mID,minion->S.move.flags, minion->S.move.timer, minion->S.move.data);
 
 //                  DDCMSG(D_MSTATE,MAGENTA,"exp_A %06li.%1i   elapsed_tenths=%li 2102 simulated %i \n" ,mt->elapsed_time.tv_sec, (int)(mt->elapsed_time.tv_sec/100000000L),elapsed_tenths,minion->S.exp.data);
-                  sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+                  sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102
 
                   break;
 
@@ -478,7 +478,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking expose timer flags: %i", minion->S.exp.exp_flags);
          switch (minion->S.exp.exp_flags) {
             case F_exp_start_transition: {
-               sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+               sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102
                setTimerTo(minion->S.exp, exp_timer, exp_flags, TRANSITION_TIME, F_exp_end_transition);
             } break;
             case F_exp_end_transition: {
@@ -495,7 +495,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking conceal timer flags: %i", minion->S.exp.con_flags);
          switch (minion->S.exp.con_flags) {
             case F_con_start_transition: {
-               sendStatus2102(0,mb->header,minion); // forces sending of a 2102
+               sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102
                setTimerTo(minion->S.exp, con_timer, con_flags, TRANSITION_TIME, F_con_end_transition);
             } break;
             case F_con_end_transition: {

@@ -35,3 +35,21 @@ void timestamp(struct timespec *elapsed_time, struct timespec *istart_time, stru
     last_time.tv_nsec=current_time.tv_nsec;	// update our time
 
 }
+
+int ts2ms(struct timespec *ts) {
+   return (ts->tv_sec * 1000) + (ts->tv_nsec/1000000l);
+}
+
+void ms2ts(int ms, struct timespec *ts) {
+   ts->tv_sec = (ms / 1000);
+   ts->tv_nsec = (ms % 1000) * 1000000l;
+}
+
+void ts_minus_ts(struct timespec *in1, struct timespec *in2, struct timespec *out) {
+   int ms1, ms2, ms3;
+   ms1 = ts2ms(in1);
+   ms2 = ts2ms(in2);
+   ms3 = ms1 - ms2;
+   ms2ts(ms3, out);
+}
+

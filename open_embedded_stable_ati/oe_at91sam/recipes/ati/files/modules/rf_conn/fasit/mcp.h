@@ -1,10 +1,10 @@
 #ifndef __MCP_H__
 #define __MCP_H__
 
-#undef CLOCK_MONOTONIC
-#define CLOCK_MONOTONIC CLOCK_REALTIME
-#undef CLOCK_MONOTONIC_RAW
-#define CLOCK_MONOTONIC_RAW CLOCK_REALTIME
+//#undef CLOCK_MONOTONIC
+//#define CLOCK_MONOTONIC CLOCK_REALTIME
+//#undef CLOCK_MONOTONIC_RAW
+//#define CLOCK_MONOTONIC_RAW CLOCK_REALTIME
 
 #include <netinet/tcp.h>
 #include <sys/types.h>
@@ -76,8 +76,10 @@ typedef struct state_exp_item { /* has both expose state and conceal state in si
    uint16        con_timer;
    uint16        old_exp_timer;
    uint16        old_con_timer;
-   struct timespec elapsed_time[MAX_HIT_EVENTS];
-   struct timespec end_time[MAX_HIT_EVENTS];
+   int           log_start_time[MAX_HIT_EVENTS]; // time FASIT server would have logged start of exposure
+   int           cmd_start_time[MAX_HIT_EVENTS]; // time we sent exposure over RF
+   int           log_end_time[MAX_HIT_EVENTS];   // time FASIT server would have logged end of exposure
+   int           cmd_end_time[MAX_HIT_EVENTS];   // time we sent conceal over RF (or told it to end over RF)
 } state_exp_item_t ;
 
 typedef struct state_rf_timeout { /* has both slow state and fast state in single item */
@@ -208,7 +210,6 @@ typedef struct slave_state {
    uint16               position;       // MIT/MAT rail position
    uint8                move;           //  MIT/MAT movement direction  0=stopped, 1=forward (away from home), 2=reverse (to home)
    uint16               speed;          //  speed in 0 to 20 MPH   integer (11 bits) 0-2047 it is the floating speed *100     2047 means emergency stop
-   uint32               start_time;     // might not be used anymore
    //           hit configuration (aka sensor)
    uint8                on;
    uint16               hit;
@@ -303,6 +304,11 @@ enum {
 uint64 htonll( uint64 id);
 int open_port(char *sport, int blocking);
 void timestamp(struct timespec *elapsed_time, struct timespec *istart_time, struct timespec *time_diff);
+int ts2ms(struct timespec *ts); // convert timespec to milliseconds
+void ms2ts(int ms, struct timespec *ts); // convert milliseconds to timespec
+void ts_minus_ts(struct timespec *in1, struct timespec *in2, struct timespec *out); // out = in1 - in2, sub-ms precision is lost
+#define DEBUG_TS(ts) ts.tv_sec, ts.tv_nsec/1000000l /* useful for doing a printf("%3i.%03i", DEBUG_TS(x)) */
+#define DEBUG_MS(ms) (ms / 1000), (ms % 1000)       /* useful for doing a printf("%3i.%03i", DEBUG_MS(x)) */
 
 /* create thread argument struct for thr_func() */
 typedef struct _thread_data_t {
@@ -582,6 +588,6 @@ typedef enum rf_target_type {
 }
 
 
-void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion);
+void sendStatus2102(int force, FASIT_header *hdr, thread_data_t *minion, minion_time_t *mt);
 
 #endif

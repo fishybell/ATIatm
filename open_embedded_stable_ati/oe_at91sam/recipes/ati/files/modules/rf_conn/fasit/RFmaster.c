@@ -517,7 +517,13 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
             } else {
                DDCMSG(D_NEW,GREEN,"Failed to send any messages from Rx buffer of size %i", Queue_Depth(Rx));
-               DDCMSG_HEXB(D_NEW,GREEN,"Rx buffer: ",Rx->head,Queue_Depth(Rx));
+               if (D_NEW&verbose==D_NEW) {
+                  for (int i=0; i<Queue_Depth(Rx); i++) {
+                     LB=(LB_packet_t *)(Rx->head+i);   // map the header in
+                     DCMSG(GREEN, "Looking at char %i -> %i:", i, i+RF_size(LB->cmd));
+                     DDpacket(Rx->head+i, Queue_Depth(Rx) - i); // parse everything via this offset to see what it looks like
+                  }
+               }
             }
          }
          // if we timed out to process MCP messages
@@ -897,6 +903,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                   }
                } else if (ptype==0) {
                   DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %i %i (%p)", __FILE__, __LINE__, LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+#if 0 /* bad idea, poorly implimented...don't clear status requests, just let the process work as designed */
                   // type 0 messages are Always rejected from the queue, and they may remove others as well
                   if (LB->cmd == LBC_ILLEGAL_CANCEL && (Queue_Contains[LB->addr] & (1<<LBC_STATUS_REQ))) {
                   DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
@@ -927,6 +934,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                   DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
                   }
                   DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
+#endif /* ... end of bad idea */
                } else {
                   Rx->tail+=RF_size(LB->cmd);  // add on the new length
                }

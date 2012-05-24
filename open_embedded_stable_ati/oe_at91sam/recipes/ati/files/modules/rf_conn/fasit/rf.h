@@ -88,7 +88,7 @@ void print_verbosity_bits(void);
 #define LBC_QEXPOSE                     16
 #define LBC_QCONCEAL                    17
 #define LBC_STATUS_REQ                  18
-#define LBC_ILLEGAL_CANCEL              19 /* illegal command will cause minion's status requests to be cancelled on mcp and RFmaster */
+//#define LBC_ILLEGAL_CANCEL              19 /* illegal command will cause minion's status requests to be cancelled on mcp and RFmaster */
 
 
 #define LBC_EVENT_REPORT                20
@@ -124,7 +124,7 @@ typedef struct LB_status_req_t {
 // LBC_STATUS_RESP packet
 //
 typedef struct LB_status_resp_t {
-   // 3 * 32 bits = 3 long - padding = 9 bytes
+   // 3 * 32 bits = 3 long - padding = 11 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
@@ -140,8 +140,10 @@ typedef struct LB_status_resp_t {
    uint32 timehits:4 __attribute__ ((packed));
    uint32 fault:8 __attribute__ ((packed));
 
+   uint32 event:13 __attribute__ ((packed));
+   uint32 pad:3 __attribute__ ((packed));
    uint32 crc:8 __attribute__ ((packed));
-   uint32 padding:24 __attribute__ ((packed));
+   uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_status_resp_t;
 
 // LBC_REQUEST_NEW packet

@@ -500,12 +500,24 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
             if (compTime(fc->event_starts[event], fc->hit_times[i].time) <= 0 &&
                 compTime(fc->event_ends[event], fc->hit_times[i].time) >= 0) {
                this->pkt.hits++;
-   DDCMSG(D_POINTER, GREEN, "Count qual @ %s:%i with %i:%p as hit %i in evt %i rtp %i", __FILE__, __LINE__, i, this, this->pkt.hits, this->event, this->report);
+   DDCMSG(D_POINTER, GREEN, "Count qual @ %s:%i with %i:%p es:%3i.%03i ee:%3i.%03i ht:%3i.%03i", __FILE__, __LINE__, i, this, fc->event_starts[event].tv_sec, fc->event_starts[event].tv_nsec/1000000l, fc->event_ends[event].tv_sec, fc->event_ends[event].tv_nsec/1000000l, fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l);
             } else {
    DDCMSG(D_POINTER, GREEN, "Fail qual @ %s:%i with %i:%p es:%3i.%03i ee:%3i.%03i ht:%3i.%03i", __FILE__, __LINE__, i, this, fc->event_starts[event].tv_sec, fc->event_starts[event].tv_nsec/1000000l, fc->event_ends[event].tv_sec, fc->event_ends[event].tv_nsec/1000000l, fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l);
             }
          }
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+      } else if (fc->hit_times[i].event || fc->hit_times[i].report) {
+   DDCMSG(D_POINTER, GREEN, "Didn't look @ %s:%i with %i", __FILE__, __LINE__, i);
+   DDCMSG(D_POINTER, GREEN, "...skipped hit @ time %3i.%03i event %i, report %i, event reported: %i, event new rpt: %i",
+         fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l,
+         fc->hit_times[i].event, fc->hit_times[i].report,
+         fc->hit_event_sum[fc->hit_times[i].event].reported, fc->hit_event_sum[fc->hit_times[i].event].new_report);
+      } else if (i < 10) {
+//   DDCMSG(D_POINTER, GREEN, "Completely ignored @ %s:%i with %i", __FILE__, __LINE__, i);
+//   DDCMSG(D_POINTER, GREEN, "...ignored hit @ time %3i.%03i event %i, report %i, event reported: %i, event new rpt: %i",
+//         fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l,
+//         fc->hit_times[i].event, fc->hit_times[i].report,
+//         fc->hit_event_sum[fc->hit_times[i].event].reported, fc->hit_event_sum[fc->hit_times[i].event].new_report);
       }
    }
 
@@ -626,6 +638,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.fault = fc->last_fault;
    s.tokill = fc->hit_tokill;
    s.did_exp_cmd = fc->did_exp_cmd == 3 ? 1 : 0; // only fully-over-finished task counts
+   s.event = fc->current_event;
    DDCMSG(D_RF|D_VERY,BLACK, "Fault encountered: %04X %02X", fc->last_fault, s.fault);
    if (s.fault) {
       fc->last_fault = 0; // clear out fault
@@ -733,9 +746,13 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
       }
    }
 
-   // end previous event if we're not exposing
-   if (!pkt->expose) {
-      DDCMSG(D_NEW, CYAN, "EXPOSE (%i) Changing event_ends[%i] from %3i.%03i (start:%3i.%03i + %i)",
+   // end previous event if we're not exposing or if the previous event didn't end
+   if (!pkt->expose || (fc->current_event >= 0 && /* not currently exposing or (has a current event and ... */
+                        !(fc->event_starts[fc->current_event].tv_sec == 0 && /* ... event has started and ...*/
+                          fc->event_starts[fc->current_event].tv_nsec == 0l) &&
+                        fc->event_ends[fc->current_event].tv_sec == 0 && /* ... hasn't ended) */
+                        fc->event_ends[fc->current_event].tv_nsec == 0l)) {
+      DDCMSG(D_NEW, CYAN, "EXPOSE (%i) Changing event_ends[%i] from %3i.%03i (start:%3i.%03i)",
              pkt->expose, fc->current_event,
              fc->event_ends[fc->current_event].tv_sec, fc->event_ends[fc->current_event].tv_nsec/1000000l,
              fc->event_starts[fc->current_event].tv_sec, fc->event_starts[fc->current_event].tv_nsec/1000000l);
@@ -747,9 +764,11 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
 
 
    // change event
-   fc->current_event = pkt->event;
-   log_ResetHits_All(fc); // clear out everything for this event
-   clock_gettime(CLOCK_MONOTONIC,&fc->event_starts[fc->current_event]);
+   if (fc->current_event != pkt->event) { // only reset hits on changed event (very likely on when expose == 1)
+      fc->current_event = pkt->event;
+      log_ResetHits_All(fc); // clear out everything for this event
+      clock_gettime(CLOCK_MONOTONIC,&fc->event_starts[fc->current_event]);
+   }
    if (pkt->expose) {
       fc->future_exp = 90;
    }
@@ -975,10 +994,11 @@ int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
    uptime_sec = pkt->uptime / 10; // everything above 10, divided by 10
    uptime_dsec = pkt->uptime % 10; // everything below 10
    // remember end time (not now, but the actual end time based on the "up" time)
-   DDCMSG(D_NEW, CYAN, "QCONCEAL Changing event_ends[%i] from %3i.%03i (start:%3i.%03i)",
+   DDCMSG(D_NEW, CYAN, "QCONCEAL Changing event_ends[%i] from %3i.%03i (start:%3i.%03i + %i ds)",
           fc->current_event,
           fc->event_ends[fc->current_event].tv_sec, fc->event_ends[fc->current_event].tv_nsec/1000000l,
-          fc->event_starts[fc->current_event].tv_sec, fc->event_starts[fc->current_event].tv_nsec/1000000l);
+          fc->event_starts[fc->current_event].tv_sec, fc->event_starts[fc->current_event].tv_nsec/1000000l,
+          pkt->uptime);
    tv = &fc->event_ends[fc->current_event]; // for convenience sake, use a pointer
    *tv = fc->event_starts[fc->current_event]; // start with a copy
    tv->tv_sec += uptime_sec;

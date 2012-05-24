@@ -154,11 +154,13 @@ void sendStatus16000(thread_data_t *minion, int hits, int time) {
 }
 
 // create and send a status message to the FASIT server
-void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion) {
+void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion, minion_time_t *mt) {
    struct iovec iov[2];
    FASIT_header rhdr;
    FASIT_2102 msg;
    int result;
+   timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);
+   DDCMSG(D_POINTER|D_NEW, YELLOW, "sendStatus2102 (%i) called @ %3i.%03i", minion->S.exp.data, DEBUG_TS(mt->elapsed_time));
 
    // sets the sequence number and other data    
    defHeader(&rhdr,2102,minion->seq++, sizeof(FASIT_2102));
@@ -356,9 +358,13 @@ int psend_mcp(thread_data_t *minion,void *Lc){
    return result;
 }
 
-void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expose) {
+void send_LB_exp(thread_data_t *minion, int expose, minion_time_t *mt) {
    char qbuf[32];      // more packet buffers
    LB_expose_t *LB_exp;
+
+   timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);
+   DDCMSG(D_POINTER|D_NEW, black, "send_LB_exp (%i) called @ %3i.%03i\n____________________________________", expose, DEBUG_TS(mt->elapsed_time));
+
    LB_exp =(LB_expose_t *)qbuf;       // make a pointer to our buffer so we can use the bits right
    LB_exp->cmd=LBC_EXPOSE;
    LB_exp->addr=minion->RF_addr;
@@ -368,12 +374,12 @@ void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expos
    LB_exp->event=++minion->S.exp.event;  // fill in the event
    minion->S.exp.flags=F_exp_expose_A;   // start (faking FASIT) moving to expose
    minion->S.exp.timer=5;
-   minion->S.exp.elapsed_time.tv_sec =elapsed_time->tv_sec;
-   minion->S.exp.elapsed_time.tv_nsec=elapsed_time->tv_nsec;
+   minion->S.exp.start_time.tv_sec =mt->elapsed_time.tv_sec;
+   minion->S.exp.start_time.tv_nsec=mt->elapsed_time.tv_nsec;
 #endif /* end of old state timer code */
 
    // new state timer code
-   if (minion->S.exp.data == 45) {
+   if (minion->S.exp.data == 45 && expose) {
       // if we are sending a new command before receiving an update, send status back to SR now
       if (minion->S.exp.newdata == 90) {
          minion->S.exp.lastdata = 0; // force sending of status by messing with cache
@@ -383,9 +389,11 @@ void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expos
          minion->S.exp.data = 90; // we're now exposed
       }
       DCMSG(GRAY, "Sending fake 2102 expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
-      sendStatus2102(0, NULL,minion);
-      // change event numbers on the target (no this won't recurse more than once)
-      send_LB_exp(minion, elapsed_time, 0); // don't expose, just change events and state (switches exp.newdata = 45, fix if necessary below)
+                        DDCMSG(D_POINTER|D_NEW, YELLOW, "calling sendStatus2102(%i) @ %i", minion->S.exp.data, __LINE__);
+      sendStatus2102(0, NULL,minion, mt);
+      // end old event on the target (no this won't recurse more than once)
+                        DDCMSG(D_POINTER|D_NEW, black, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\ncalling send_LB_exp @ %i", __LINE__);
+      send_LB_exp(minion, 0, mt); // don't expose, just change events and state (switches exp.newdata = 45, fix if necessary below)
       // we'll change to transistioning again below
    }
    // change state
@@ -393,13 +401,17 @@ void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expos
    minion->S.exp.recv_dec = 0;
    if (expose) {
       LB_exp->event=++minion->S.exp.event;  // fill in the event/move to next event
+      // reset our times (we'll set our start time when we receive our first status response)
+      minion->S.exp.cmd_start_time[minion->S.exp.event] = ts2ms(&mt->elapsed_time); // set command start time
+      minion->S.exp.log_start_time[minion->S.exp.event] = 0; // reset log start time
+      minion->S.exp.cmd_end_time[minion->S.exp.event] = 0; // reset cmd end time
+      minion->S.exp.log_end_time[minion->S.exp.event] = 0; // reset log end time
    } else {
       LB_exp->event=minion->S.exp.event;  // just fill in the event
+      // change our event end to match the event times on the target (delay notwithstanding)
+      DDCMSG(D_POINTER, GREEN, "Expose (0) changing end to %3i.%03i from %3i.%03i)", DEBUG_MS(minion->S.exp.cmd_end_time[minion->S.exp.event]), DEBUG_TS(mt->elapsed_time));
+      minion->S.exp.cmd_end_time[minion->S.exp.event] = ts2ms(&mt->elapsed_time);
    }
-   minion->S.exp.elapsed_time[minion->S.exp.event].tv_sec =elapsed_time->tv_sec; // remember "up" time for event
-   minion->S.exp.elapsed_time[minion->S.exp.event].tv_nsec=elapsed_time->tv_nsec;
-   minion->S.exp.end_time[minion->S.exp.event].tv_sec = 0; // reset end time
-   minion->S.exp.end_time[minion->S.exp.event].tv_nsec = 0l;
    minion->S.exp.data=45;  // make the current positon in movement
    DCMSG(GRAY, "Sending LB expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
    START_EXPOSE_TIMER(minion->S); // new state timer code
@@ -421,7 +433,7 @@ void send_LB_exp(thread_data_t *minion, struct timespec *elapsed_time, int expos
  ********   timestamp is sent in too.
  ********/
 
-int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct timespec *elapsed_time){
+int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time_t *mt){
 
    int result,psize;
    char hbuf[100];
@@ -585,7 +597,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                DDCMSG(D_PACKET,BLUE,"Minion %i: CID_Status_Request   send 2102 status  hdr->num=%i, hdr->seq=%i",minion->mID,
                       htons(header->num),htonl(header->seq));
 
-               sendStatus2102(1,header,minion); // forces sending of a 2102
+                        DDCMSG(D_POINTER|D_NEW, YELLOW, "calling sendStatus2102(%i) @ %i", minion->S.exp.data, __LINE__);
+               sendStatus2102(1,header,minion,mt); // forces sending of a 2102
                // AND/OR? send 2115 MILES shootback status if supported
                //                           if (acc_conf.acc_type == ACC_NES_MFS){
                //                               DCMSG(BLUE,"we also seem to have a MFS Muzzle Flash Simulator - TODO send 2112 status eventually") ; 
@@ -625,16 +638,19 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                if (message_2100->exp==90){
                   DDCMSG(D_PACKET,BLUE,"Minion %i:  going up (exp=%i)",minion->mID,message_2100->exp);
                   DDCMSG(D_PACKET,BLACK,"Minion %i: we seem to work here******************* &LB_buf=%p",minion->mID,&LB_buf);
-                  send_LB_exp(minion, elapsed_time, 1); // do an expose, don't just change states and send "event" message
+                        DDCMSG(D_POINTER|D_NEW, black, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\ncalling send_LB_exp @ %i", __LINE__);
+                  send_LB_exp(minion, 1, mt); // do an expose, don't just change states and send "event" message
                } else {
                   int uptime;
                   DDCMSG(D_PACKET,BLACK,"Minion %i: going down(exp=%i)",minion->mID,message_2100->exp);
 
-                  // we must assume that it is a 'conceal' that followed the last expose.
+                  // we must assume that this 'conceal' followed the last expose.
                   //        so now the event is over and we need to send the qconceal command
                   //        and the termination of the event time and stuff
-                  uptime=(elapsed_time->tv_sec - minion->S.exp.elapsed_time[minion->S.exp.event].tv_sec)*10; //  find uptime in tenths of a second
-                  uptime+=(elapsed_time->tv_nsec - minion->S.exp.elapsed_time[minion->S.exp.event].tv_nsec)/100000000L;      //  find uptime in tenths of a second
+                  // calculate uptime based on the time between commands
+                  // TODO -- fix uptime based on something smarter than "difference from now" ???
+                  uptime=(mt->elapsed_time.tv_sec - (minion->S.exp.cmd_start_time[minion->S.exp.event]%1000))*10; //  find uptime in tenths of a second
+                  uptime+=(mt->elapsed_time.tv_nsec - (minion->S.exp.cmd_start_time[minion->S.exp.event]*1000000l))/100000000L;      //  find uptime in tenths of a second
 
                   if (uptime>0x7FF){
                      uptime=0x7ff;              // set time to max (204.7 seconds) if it was too long
@@ -649,11 +665,12 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                   //         only assume that the unqualified hits we receive will be logged
                   //         correctly when we use them
                   // log the information on when we sent the conceal message to the target
-                  minion->S.exp.end_time[minion->S.exp.event].tv_sec = elapsed_time->tv_sec;
-                  minion->S.exp.end_time[minion->S.exp.event].tv_nsec = elapsed_time->tv_nsec;
+                  DDCMSG(D_POINTER, GREEN, "CID_expose_request changing end to %3i.%03i from %3i.%03i)", DEBUG_MS(minion->S.exp.cmd_end_time[minion->S.exp.event]), DEBUG_TS(mt->elapsed_time));
+                  minion->S.exp.cmd_end_time[minion->S.exp.event] = ts2ms(&mt->elapsed_time);
 
                   DDCMSG(D_VERY,BLACK,"Minion %i: uptime=%i",minion->mID,uptime);
 
+#if 0 // probably shouldn't send here as it won't change event numbers, just end the existing one
                   if (minion->S.exp.data == 45) {
                      // if we are sending a new command before receiving an update, send status back to SR now
                      if (minion->S.exp.newdata == 90) {
@@ -664,11 +681,12 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
                         minion->S.exp.data = 90; // we're now exposed
                      }
                      DCMSG(GRAY, "Sending fake 2102 expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
-                     sendStatus2102(0, NULL,minion);
+                     sendStatus2102(0, NULL,minion,&mt);
                      // change event numbers on the target
-                     send_LB_exp(minion, elapsed_time, 0); // don't expose, just change events and state (switches exp.newdata = 45, fix if necessary below)
+                     send_LB_exp(minion, 0, &mt); // don't expose, just change events and state (switches exp.newdata = 45, fix if necessary below)
                      // we'll change to transistioning again below
                   }
+#endif // probably shouldn't send here as it won't change event numbers, just end the existing one
                   minion->S.exp.newdata=0; // moving to concealed
                   minion->S.exp.recv_dec = 0;
 #if 0 /* start of old state timer code */
@@ -906,7 +924,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
 
                // send 2102 status or change the hit count (which will send the 2102 later)
                if (1 /*hits == htons(message_2100->hit)*/) {
-                  sendStatus2102(1,header,minion);  // sends a 2102 as we won't if we didn't change the the hit count
+                        DDCMSG(D_POINTER|D_NEW, YELLOW, "calling sendStatus2102(%i) @ %i", minion->S.exp.data, __LINE__);
+                  sendStatus2102(1,header,minion,mt);  // sends a 2102 as we won't if we didn't change the the hit count
                   DDCMSG(D_PACKET,BLUE,"Minion %i: We will send 2102 status in response to the config hit sensor command",minion->mID);
 
                } else {
@@ -984,7 +1003,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen,struct times
             //doMFS(msg->on,msg->mode,msg->idelay,msg->rdelay);
             // when the didMFS happens fill in the 2112, force a 2112 message to be sent
             sendStatus2112(1,header,minion); // forces sending of a 2112
-            //                      sendStatus2102(0,header,minion); // forces sending of a 2102
+            //                      sendStatus2102(0,header,minion,&mt); // forces sending of a 2102
             //sendMFSStatus = 1; // force
          } else {
             send_2101_ACK(header,'F',minion);  // no muzzle flash capability, so send a negative ack
@@ -1096,7 +1115,7 @@ void *minion_thread(thread_data_t *minion){
 
    minion->S.state_timer=900;   // every 10.0 seconds, worst case
 
-   clock_gettime(CLOCK_MONOTONIC_RAW,&mt.istart_time);  // get the intial current time
+   clock_gettime(CLOCK_MONOTONIC,&mt.istart_time);  // get the intial current time
    minion->rcc_sock=-1; // mark the socket so we know to open again
    while(!close_nicely) {
 
@@ -1148,15 +1167,15 @@ void *minion_thread(thread_data_t *minion){
 
       timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);
 
-      DDCMSG(D_TIME,CYAN,"Minion %i: before Select... state_timer=%i (%i.%03i) at %li.%03liet",
-             minion->mID,minion->S.state_timer,(int)mt.timeout.tv_sec,(int)mt.timeout.tv_usec,mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L);
+      DDCMSG(D_TIME,CYAN,"Minion %i: before Select... state_timer=%i (%i.%03i) at %i.%03iet",
+             minion->mID,minion->S.state_timer,(int)mt.timeout.tv_sec,(int)mt.timeout.tv_usec/1000,DEBUG_TS(mt.elapsed_time));
 
       sock_ready=select(FD_SETSIZE,&rcc_or_mcp,(fd_set *) 0,(fd_set *) 0, &mt.timeout); 
       // if we are running on linux, mt.timeout wll have a remaining time left in it if one of the file descriptors was ready.
       // we are going to use that for now
 
       oldtimer=minion->S.state_timer;           // copy our old time for debugging
-      minion->S.state_timer=(mt.timeout.tv_sec*10)+(mt.timeout.tv_usec/100000L);
+      minion->S.state_timer=(mt.timeout.tv_sec*10)+(mt.timeout.tv_usec/100000L); // convert to deciseconds
 
       if (sock_ready<0){
          PERROR("NOTICE!  select error : ");
@@ -1164,9 +1183,9 @@ void *minion_thread(thread_data_t *minion){
       }
 
       timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);
-      DDCMSG(D_TIME,CYAN,"Minion %i: After Select: sock_ready=%i FD_ISSET(mcp)=%i FD_ISSET(rcc)=%i oldtimer=%i state_timer=%i at %li.%03liet, delta=%li.%03li",
+      DDCMSG(D_TIME,CYAN,"Minion %i: After Select: sock_ready=%i FD_ISSET(mcp)=%i FD_ISSET(rcc)=%i oldtimer=%i state_timer=%i at %i.%03iet, delta=%i.%03i",
              minion->mID,sock_ready,FD_ISSET(minion->mcp_sock,&rcc_or_mcp),FD_ISSET(minion->rcc_sock,&rcc_or_mcp),oldtimer,minion->S.state_timer,
-             mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L,mt.delta_time.tv_sec, mt.delta_time.tv_nsec/100000L);
+             DEBUG_TS(mt.elapsed_time), DEBUG_TS(mt.delta_time));
 
 
       //check to see if the MCP has any commands for us
@@ -1243,8 +1262,9 @@ void *minion_thread(thread_data_t *minion){
 
                   //DCMSG(RED, "****************\nFound expose: before:exp.data=%i, after:exp.newdata=%i\n**************** @ %i", minion->S.exp.data, minion->S.exp.newdata, __LINE__);
                   //minion->S.exp.data = minion->S.exp.newdata; // finish transition
-                  //sendStatus2102(0, NULL,minion);
+                  //sendStatus2102(0, NULL,minion,&mt);
 
+#if 0 /* bad idea, poorly implimented...don't clear status requests, just let the process work as designed */
                   // clear status requests ...
                   DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
                   ib.cmd = LBC_ILLEGAL_CANCEL;
@@ -1266,26 +1286,28 @@ void *minion_thread(thread_data_t *minion){
                      setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start);
                      minion->S.rf_t.fast_missed = 0;
                   }
+#endif /* ...end of bad idea code */
 
                   // new state timer code
                   // find existing report
                   this_r = minion->S.report_chain;
                   while (this_r != NULL) {
-                     DDCMSG(D_POINTER, GREEN, "Checking existing...%s:%i with %p r:%i:%i e:%i:%i", __FILE__, __LINE__, this_r, this_r->report, L->report, this_r->event, L->event);
+//                     DDCMSG(D_POINTER, GREEN, "Checking existing...%s:%i with %p r:%i:%i e:%i:%i", __FILE__, __LINE__, this_r, this_r->report, L->report, this_r->event, L->event);
                      if (this_r->report == L->report &&
-                         this_r->event == L->event) {
+                         this_r->event == L->event &&
+                         this_r->hits == L->hits) { /* if we didn't actually send the hits before -- for instance, unqualified turning into qualified -- we set this_r->hits to 0, so this won't match and we'll send 16000 below */
                         DDCMSG(D_POINTER, GREEN, "Exists...%s:%i with %p", __FILE__, __LINE__, this_r);
                         break; // found it!
                      }
                      last_r = this_r;
                      this_r = this_r->next;
-                     DDCMSG(D_POINTER, GREEN, "Next...%s:%i with %p", __FILE__, __LINE__, this_r);
+//                     DDCMSG(D_POINTER, GREEN, "Next...%s:%i with %p", __FILE__, __LINE__, this_r);
                   }
-                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
+//                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
 
                   // did I find one? then don't send hit time message to FASIT server
                   if (this_r == NULL) {
-                     int start_time_m, end_time_m, delta_m; // times in milliseconds for easy calculations
+                     int now_m, start_time_m, end_time_m, delta_m; // times in milliseconds for easy calculations
                      int send_hit = 0;
                      DDCMSG(D_POINTER, GREEN, "Allocing...%s:%i", __FILE__, __LINE__);
                      // none found, create one ...
@@ -1299,21 +1321,29 @@ void *minion_thread(thread_data_t *minion){
                         // is head of chain
                         minion->S.report_chain = this_r;
                      }
-                     // calculate time
+
+                     // find start time and end times (calculate using when the FASIT server logged the times)
+                     if (minion->S.exp.log_start_time[L->event] == 0) {
+                        // this implies we never logged the start time on the FASIT server...which is bad
+                        minion->S.exp.log_start_time[L->event] = minion->S.exp.cmd_start_time[L->event];
+                        DDCMSG(D_POINTER, GREEN, "Start time never got logged...bad juju");
+                     }
                      timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);      
-                     start_time_m = (minion->S.exp.elapsed_time[minion->S.exp.event].tv_sec*1000) + (minion->S.exp.elapsed_time[minion->S.exp.event].tv_sec/1000000l);
+                     now_m = ts2ms(&mt.elapsed_time);
+                     start_time_m = minion->S.exp.log_start_time[L->event];
+                     DDCMSG(D_POINTER, GREEN, "Now time ...%s:%i (changing %3i.%03i to %i)", __FILE__, __LINE__, DEBUG_TS(mt.elapsed_time), now_m);
+                     DDCMSG(D_POINTER, GREEN, "Start time ...%s:%i (changing %3i.%03i to %i)", __FILE__, __LINE__, DEBUG_MS(minion->S.exp.log_start_time[L->event]), start_time_m);
                      if (L->qualified) {
-                        DDCMSG(D_POINTER, GREEN, "Qual hit...%s:%i", __FILE__, __LINE__);
                         // qualified hits occured between valid expose and conceal commands, use those times
-                        end_time_m = (minion->S.exp.end_time[minion->S.exp.event].tv_sec*1000) + (minion->S.exp.end_time[minion->S.exp.event].tv_sec/1000000l);
+                        end_time_m = minion->S.exp.cmd_end_time[L->event];
+                        DDCMSG(D_POINTER, GREEN, "Qual hit...%s:%i cmd end time (changing %3i.%03i to %i)", __FILE__, __LINE__, DEBUG_MS(minion->S.exp.cmd_end_time[L->event]), end_time_m);
                         send_hit = 1; // yes, send the hit time message
                      } else {
                         DDCMSG(D_POINTER, GREEN, "Checking qual...%s:%i", __FILE__, __LINE__);
                         // unqualified hits occurred after a valid expose, but the conceal hasn't been sent yet...
-                        end_time_m = 0; // don't need an end time for unqualified, as we won't use it
+                        end_time_m = now_m; // end time for unqualified is now
                         // ... or has it? if it has, don't do anything now...wait for the hit to change to qualified
-                        if (minion->S.exp.end_time[minion->S.exp.event].tv_sec == 0 &&
-                            minion->S.exp.end_time[minion->S.exp.event].tv_nsec == 0l) {
+                        if (minion->S.exp.cmd_end_time[L->event] == 0) {
                            DDCMSG(D_POINTER, GREEN, "Unqual hit...%s:%i", __FILE__, __LINE__);
                            // no conceal sent, this hit is now qualified
                            send_hit = 1;
@@ -1323,13 +1353,27 @@ void *minion_thread(thread_data_t *minion){
                            send_hit = 0;
                         }
                      }
+
+                     // change start/end times to deltas from now
+                     DDCMSG(D_NEW, GREEN, "Minion %i: Non-hit time: s:%3i.%03i event:%i", minion->mID, DEBUG_MS(minion->S.exp.cmd_start_time[L->event]), L->event);
+                     DDCMSG(D_NEW, GREEN, "Minion %i: Hit times: n:%i s:%i e:%i", minion->mID, now_m, start_time_m, end_time_m);
+                     start_time_m = now_m - start_time_m;
+                     end_time_m = now_m - end_time_m;
+                     DDCMSG(D_NEW, GREEN, "Minion %i: Hit times: n:%i s:%i e:%i", minion->mID, now_m, start_time_m, end_time_m);
+
+                     // send if good hit
                      if (send_hit) {
                         if (L->qualified) {
-                           delta_m = (end_time_m-start_time_m)/2; // half way between start and end...
-                           delta_m = min(1000, delta_m); // max out at 1 second before the end of the event
+                           // half way between original start and end...
+                           //        (which are now reversed in size as they are "time since now,"
+                           //         and start happened further away from now)
+                           // ... which is the end delta + the average of the two deltas
+                           delta_m = end_time_m + (start_time_m-end_time_m)/2;
                         } else {
+                           // unqualified with send_hit set = we're still up, count as "now"
                            delta_m = 0;
                         }
+                        DDCMSG(D_NEW, GREEN, "Minion %i: Hit times: n:%i s:%i e:%i d:%i", minion->mID, now_m, start_time_m, end_time_m, delta_m);
                         // send hit time message
                         sendStatus16000(minion, L->hits, delta_m);
                         DDCMSG(D_NEW, GREEN, "Minion %i: Sent %i hits", minion->mID, L->hits);
@@ -1338,7 +1382,7 @@ void *minion_thread(thread_data_t *minion){
                         L->hits = 0; // don't "ack" these hits
                      }
                   }
-                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
+//                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
                   
                   // set data, reset the counters
                   this_r->report = L->report;
@@ -1358,10 +1402,10 @@ void *minion_thread(thread_data_t *minion){
                   //              any report message as there will be a maximum number per burst
                   this_r = minion->S.report_chain;
                   while (this_r != NULL) {
-                  DDCMSG(D_POINTER, GREEN, "Incr...%s:%i with %p", __FILE__, __LINE__, this_r);
+//                  DDCMSG(D_POINTER, GREEN, "Incr...%s:%i with %p", __FILE__, __LINE__, this_r);
                      // check to see if this link needs to be vacuumed
                      if (++this_r->unreported >= EVENT_MAX_UNREPORT) {
-                  DDCMSG(D_POINTER, GREEN, "Too much...%s:%i with %p", __FILE__, __LINE__, this_r);
+//                  DDCMSG(D_POINTER, GREEN, "Too much...%s:%i with %p", __FILE__, __LINE__, this_r);
                         // connect the chain links and free the memory of the old one
                         report_memory_t *temp = this_r->next;
                         free(this_r);
@@ -1371,9 +1415,9 @@ void *minion_thread(thread_data_t *minion){
                      // move to next link in chain
                      last_r = this_r;
                      this_r = this_r->next;
-                  DDCMSG(D_POINTER, GREEN, "Next...%s:%i with %p", __FILE__, __LINE__, this_r);
+//                  DDCMSG(D_POINTER, GREEN, "Next...%s:%i with %p", __FILE__, __LINE__, this_r);
                   }
-                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %p", __FILE__, __LINE__, this_r);
+//                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %p", __FILE__, __LINE__, this_r);
                }
                break;
 
@@ -1402,20 +1446,31 @@ void *minion_thread(thread_data_t *minion){
 #if 0 /* start of old state timer code */
                   minion->S.exp.flags=F_exp_ok;
 #endif /* end of old state timer code */
+                  // is this our first response for our current event? this is when the FASIT server logged the start time
+                  timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);      
+                  if (minion->S.exp.log_start_time[L->event] == 0) {
+                     DDCMSG(D_POINTER|D_NEW, YELLOW, "Getting around to starting event %i @ %3i.%03i", L->event, DEBUG_TS(mt.elapsed_time));
+                     // change our event start to match the event times on the target (delay notwithstanding)
+                     minion->S.exp.log_start_time[L->event] = ts2ms(&mt.elapsed_time); // remember "up" time for event
+                  }
+
                   if (L->did_exp_cmd && !minion->S.exp.recv_dec) {
                      DDCMSG(D_NEW, MAGENTA, "Abnormal status response...doing abnormal stuff...%i %i %i", minion->S.exp.data, minion->S.exp.newdata, L->expose);
                      // abnormal message, let's no abnormal stuff
-                     send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state (switches exp.newdata = 45, fix if necessary below)
+                        DDCMSG(D_POINTER|D_NEW, black, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\ncalling send_LB_exp @ %i", __LINE__);
+                     send_LB_exp(minion, 0, &mt); // don't expose, just end current event and state (switches exp.newdata = 45, fix if necessary below)
                      if (L->expose == 1) { /* ended up exposed */
                         // we transitioned up-down-up or down-up-down-up...etc.
                         // send "down" status to FASIT server and do standard "down" stuff, standard "up" stuff is below, and will happen after our next status response
                         minion->S.exp.lastdata = 90; // force sending of status by messing with cache
                         minion->S.exp.data = 0; // we're now exposed
                         DCMSG(GRAY, "Sending fake 2102 expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
-                        sendStatus2102(0, NULL,minion);
+                        DDCMSG(D_POINTER|D_NEW, YELLOW, "calling sendStatus2102(%i) @ %i", minion->S.exp.data, __LINE__);
+                        sendStatus2102(0, NULL,minion,&mt);
                         minion->S.exp.data = 45; // we're concealing again
                         DCMSG(GRAY, "Sending fake 2102 expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
-                        sendStatus2102(0, NULL,minion);
+                        DDCMSG(D_POINTER|D_NEW, YELLOW, "calling sendStatus2102(%i) @ %i", minion->S.exp.data, __LINE__);
+                        sendStatus2102(0, NULL,minion,&mt);
                         if (minion->S.rf_t.fast_flags) {
                            // we're down, change state to going slow
                            minion->S.rf_t.slow_flags = F_fast_once;
@@ -1433,10 +1488,12 @@ void *minion_thread(thread_data_t *minion){
                         minion->S.exp.lastdata = 0; // force sending of status by messing with cache
                         minion->S.exp.data = 90; // we're now concealed
                         DCMSG(GRAY, "Sending fake 2102 expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
-                        sendStatus2102(0, NULL,minion);
+                        DDCMSG(D_POINTER|D_NEW, YELLOW, "calling sendStatus2102(%i) @ %i", minion->S.exp.data, __LINE__);
+                        sendStatus2102(0, NULL,minion,&mt);
                         minion->S.exp.data = 45; // we're exposing again
                         DCMSG(GRAY, "Sending fake 2102 expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
-                        sendStatus2102(0, NULL,minion);
+                        DDCMSG(D_POINTER|D_NEW, YELLOW, "calling sendStatus2102(%i) @ %i", minion->S.exp.data, __LINE__);
+                        sendStatus2102(0, NULL,minion,&mt);
                         // set timer to come back soon
                         stopTimer(minion->S.rf_t, fast_timer, fast_flags);
                         setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start);
@@ -1448,8 +1505,9 @@ void *minion_thread(thread_data_t *minion){
                      DDCMSG(D_NEW, MAGENTA, "Normal status response...doing normal stuff...%i %i %i", minion->S.exp.data, minion->S.exp.newdata, L->expose);
                      // normal message, let's do normal stuff
                      if (minion->S.exp.data == 0 && L->expose) {
-                        // random movement from down to up, should send "up" command to start event
-                        send_LB_exp(minion, &mt.elapsed_time, 0); // don't expose, just change events and state
+                        // random movement from down to up, should send "up" command and start new event
+                        DDCMSG(D_POINTER|D_NEW, black, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\ncalling send_LB_exp @ %i", __LINE__);
+                        send_LB_exp(minion, 0, &mt); // don't expose, just end current event and state
                      } else if (!L->expose && minion->S.rf_t.fast_flags) {
                         // we're down, change state to going slow
                         START_CONCEAL_TIMER(minion->S);
@@ -1476,7 +1534,8 @@ void *minion_thread(thread_data_t *minion){
                      minion->S.fault.data = L->fault;
                      DDCMSG(D_PARSE,YELLOW,"Minion %i: (Rf_addr=%i) parsed response. location=%i fault=%02X sending 2102 status",
                             minion->mID,minion->RF_addr,L->location,L->fault);
-                     sendStatus2102(0, NULL,minion);
+                        DDCMSG(D_POINTER|D_NEW, YELLOW, "calling sendStatus2102(%i) @ %i", minion->S.exp.data, __LINE__);
+                     sendStatus2102(0, NULL,minion,&mt);
                   }
                }
 
@@ -1507,8 +1566,8 @@ void *minion_thread(thread_data_t *minion){
          }
 
          timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);    
-         DDCMSG(D_TIME,CYAN,"Minion %i: End of MCP Parse at %li.%03liet, delta=%li.%03li"
-                ,minion->mID,mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L,mt.delta_time.tv_sec, mt.delta_time.tv_nsec/1000000L);
+         DDCMSG(D_TIME,CYAN,"Minion %i: End of MCP Parse at %i.%03iet, delta=%i.%03i"
+                ,minion->mID, DEBUG_TS(mt.elapsed_time), DEBUG_TS(mt.delta_time));
       }
 
       /**********************************    end of reading and processing the mcp command  ***********************/
@@ -1531,9 +1590,9 @@ void *minion_thread(thread_data_t *minion){
             // loop until result reaches 0
             while((result>=length)&&(length>0)) {
                timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);      
-               DDCMSG(D_TIME,CYAN,"Minion %i:  Packet %i recieved at %li.%03liet, delta=%li.%03li"
-                      ,minion->mID,htons(mb.header->num),mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L,mt.delta_time.tv_sec, mt.delta_time.tv_nsec/1000000L);
-               handle_FASIT_msg(minion,tbuf,length,&mt.elapsed_time);
+               DDCMSG(D_TIME,CYAN,"Minion %i:  Packet %i recieved at %i.%03iet, delta=%i.%03i"
+                      ,minion->mID,htons(mb.header->num), DEBUG_TS(mt.elapsed_time), DEBUG_TS(mt.delta_time));
+               handle_FASIT_msg(minion,tbuf,length,&mt);
                result-=length;                  // reset the length to handle a possible next message in this packet
                tbuf+=length;                    // step ahead to next message
                mb.header = (FASIT_header*)(tbuf);       // find out how long of message we have
@@ -1551,8 +1610,8 @@ void *minion_thread(thread_data_t *minion){
 
          }
          timestamp(&mt.elapsed_time,&mt.istart_time,&mt.delta_time);    
-         DDCMSG(D_TIME,CYAN,"Minion %i: End of RCC Parse at %li.%03liet, delta=%li.%03li"
-                ,minion->mID,mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000L,mt.delta_time.tv_sec, mt.delta_time.tv_nsec/1000000L);
+         DDCMSG(D_TIME,CYAN,"Minion %i: End of RCC Parse at %i.%03iet, delta=%i.%03i"
+                ,minion->mID, DEBUG_TS(mt.elapsed_time), DEBUG_TS(mt.delta_time));
       }
       /**************   end of rcc command parsing   ****************/
       /**  first we just update our counter, and if less then a tenth of a second passed,

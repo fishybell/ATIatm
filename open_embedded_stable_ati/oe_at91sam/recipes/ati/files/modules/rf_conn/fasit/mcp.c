@@ -773,7 +773,7 @@ DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\
                      tempslot = slottime;
                   }
                   timeout+=tempslot; // we now need to wait for this packet to respond
-                  DDCMSG(D_NEW, MAGENTA, "Minion %i caused increase of timeout by %i to %i (timeout-delta=%i)",minion->mID, tempslot, timeout, timeout-delta);
+                  DDCMSG(D_TIME, MAGENTA, "Minion %i caused increase of timeout by %i to %i (timeout-delta=%i)",minion->mID, tempslot, timeout, timeout-delta);
                }
 
             } // it is from a minion

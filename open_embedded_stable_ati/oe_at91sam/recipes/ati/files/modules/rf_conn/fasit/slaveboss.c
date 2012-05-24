@@ -16,7 +16,7 @@ fasit_connection_t fconns[MAX_CONNECTIONS];
 // global hit logging routines
 void log_ResetHits_All(fasit_connection_t *fc) { // clear all hits for the current event
    int i;
-//   DDCMSG(D_PACKET, RED, "Reset hits for %i", fc->current_event);
+   DDCMSG(D_POINTER, BLACK, "Reset hits for %i", fc->current_event);
    for (i = 0; i < MAX_HITS; i++) {
       if (fc->hit_times[i].event == fc->current_event) {
          D_memset(&fc->hit_times[i], 0, sizeof(hit_event_t));
