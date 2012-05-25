@@ -509,7 +509,7 @@
 
 // Parial Flash Version
 #define MINOR_VERSION 00/00/0000
-#define MINOR_VERSION_LOC 0x568
+#define MINOR_VERSION_LOC 0x56C
 #define MINOR_VERSION_SIZE 0x8
 
 
