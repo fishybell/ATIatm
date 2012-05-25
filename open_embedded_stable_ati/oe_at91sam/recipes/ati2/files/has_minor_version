@@ -1,2 +1,2 @@
-/usr/bin/eeprom_rw read -addr 0x568 -size 0x04
+/usr/bin/eeprom_rw read -addr 0x56C -size 0x08
 echo
