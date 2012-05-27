@@ -51,13 +51,21 @@ atifirmware:
 			../../../ati2/files/be_* \
 			../../../ati2/files/has_* \
 			../../../ati2/files/is_* \
-			../../../ati2/files/load_network \
+			../../../ati2/files/load_* \
+			../../../ati2/files/unload \
+			../../../ati2/files/start \
+			../../../ati2/files/stop \
+			../../../ati2/files/restart \
 			../../../ati2/files/MAT \
 			../../../ati2/files/MIT \
 			../../../ati2/files/SAT \
 			../../../ati2/files/SES \
 			../../../ati2/files/SIT \
-			../../../ati2/files/TTMT
+			../../../ati2/files/EIM \
+			../../../ati2/files/BASE \
+			../../../ati2/files/HHC \
+			../../../ati2/files/TTMT \
+			../../../sysvinit/sysvinit/inittab
 	cat extract.sh atifirmware.tar > atifirmware.sh
 	chmod +x atifirmware.sh
 
