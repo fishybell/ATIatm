@@ -7,6 +7,9 @@ SKIP=`awk '/^__TARFILE_FOLLOWS__/ { print NR + 2; exit 0; }' $0`
 
 THIS=`pwd`/$0
 
+# stop everything we can to make stuff smoother
+/usr/bin/stop
+
 echo "Extracting Files"
 echo ""
 
@@ -23,7 +26,10 @@ chmod +x ati2/files/*
 
 echo "Copying files"
 echo ""
-mv *.arm /usr/bin
+ls *.arm | while read i ; do
+   mv /usr/bin/$i /usr/bin/$i.old
+   mv $i /usr/bin
+done
 mv /usr/bin/bcast_client /usr/bin/bcast_client.old
 mv bcast_client /usr/bin
 mv /usr/bin/bcast_server /usr/bin/bcast_server.old
@@ -37,21 +43,14 @@ mv fasit_conn /usr/bin
 mv /usr/bin/user_conn /usr/bin/user_conn.old
 mv user_conn /usr/bin
 mv ati2/files/* /usr/bin
+mv sysvinit/sysvinit/inittab /etc
 
 echo "Finished Copying Files"
 echo ""
 
-echo "Changing Version"
-echo ""
-sleep 5
-
-
-/usr/bin/be_major_version
-/usr/bin/be_minor_version
-
 echo "Restarting Device"
 echo ""
-sleep 1
+sleep 5
 init 6
 exit 0
 
