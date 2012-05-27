@@ -166,10 +166,12 @@ int RF_size(int cmd){
 
       case  LBC_MOVE:
       case  LBC_GROUP_CONTROL:
+      case  LBC_HIT_BLANKING:
          return (5);
 
       case  LBC_AUDIO_CONTROL:
       case  LBC_CONFIGURE_HIT:
+      case  LBC_ACCESSORY:
          return (6);
 
       case  LBC_REPORT_ACK:
@@ -227,7 +229,7 @@ int gather_rf(int fd, char *tail,int max){
    return ready;
 }
 
-void DDpacket(uint8 *buf,int len){
+void DDpacket_internal(const char *program, uint8 *buf,int len){
    uint8 *buff;
    char cmdname[32],hbuf[100],qbuf[200];
    LB_packet_t *LB;
@@ -264,7 +266,7 @@ void DDpacket(uint8 *buf,int len){
          {
             LB_device_reg_t *L=(LB_device_reg_t *)LB;
             strcpy(cmdname,"Device_Reg");
-            sprintf(hbuf,"devid=%3x devtype=%d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->devid,L->dev_type,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
+            sprintf(hbuf,"devid=%3x devtype=%d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->devid,L->dev_type,L->expose,L->speed,L->move,L->react,L->location-512,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
             color=MAGENTA;
          }
          break;
@@ -335,11 +337,25 @@ void DDpacket(uint8 *buf,int len){
             sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
             break;
 
+         case LBC_ACCESSORY: {
+                                DDCMSG(D_NEW,RED,"What what?");
+            LB_accessory_t *L=(LB_accessory_t*)LB;
+            strcpy(cmdname,"Accessory");
+            sprintf(hbuf,"RFaddr=%3d on=%d type=%d rdelay=%d idelay=%d",L->addr,L->on,L->type,L->rdelay,L->idelay);
+         }  break;
+
+         case LBC_HIT_BLANKING: {
+                                DDCMSG(D_NEW,RED,"What what!");
+            LB_hit_blanking_t *L=(LB_hit_blanking_t*)LB;
+            strcpy(cmdname,"Hit_Blanking");
+            sprintf(hbuf,"RFaddr=%3d blanking=%d",L->addr,L->blanking);
+         }  break;
+
          case LBC_STATUS_RESP:
          {
             LB_status_resp_t *L=(LB_status_resp_t *)LB;
             strcpy(cmdname,"Status_Resp_Ext");
-            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d did_exp_cmd=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d event=%d",L->addr,L->expose,L->speed,L->did_exp_cmd,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault,L->event);
+            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d did_exp_cmd=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d event=%d",L->addr,L->expose,L->speed,L->did_exp_cmd,L->move,L->react,L->location-512,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault,L->event);
             color=MAGENTA;
          }
             break;
@@ -392,7 +408,7 @@ void DDpacket(uint8 *buf,int len){
 
       }
 
-      sprintf(qbuf,"  %2d:  %s  %s  ",pnum,cmdname,hbuf);
+      sprintf(qbuf,"%s %2d:  %s  %s  ", program, pnum, cmdname, hbuf);
       printf("\x1B[3%d;%dm%s",(color)&7,((color)>>3)&1,qbuf);
       for (i=0; i<plen-1; i++) printf("%02x.", buff[i]);
       printf("%02x\n", buff[plen-1]);

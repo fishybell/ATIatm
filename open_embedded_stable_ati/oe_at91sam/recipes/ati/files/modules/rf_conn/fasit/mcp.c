@@ -14,6 +14,8 @@ struct sockaddr_in fasit_addr;
 int verbose;
 int slottime,total_slots,inittime;
 int low_dev,high_dev;
+int steps_translation[] = {0, 45, 90, 45, -1}; /* translate a trans_step_t value into an exposure angle */
+const char *step_words[] = {"TS_concealed", "TS_con_to_exp", "TS_exposed", "TS_exp_to_con", "TS_too_far"};
 
 void print_help(int exval) {
    printf("mcp [-h] [-v num] [-f ip] [-p port] [-r ip] [-m port] [-n minioncount]\n\n");
@@ -282,7 +284,7 @@ int main(int argc, char **argv) {
       delta = (dwait_time.tv_sec*1000)+(dwait_time.tv_nsec/1000000);
 
       // wait for data from either the RFmaster or from a minion
-      DDCMSG(D_NEW,RED,"MCP: epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld, delta=%i, timeout-delta=%i", timeout, slave_hunting, low, hunttime, dwait_time.tv_sec, dwait_time.tv_nsec, delta, timeout-delta);
+      DDCMSG(D_TIME,RED,"MCP: epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld, delta=%i, timeout-delta=%i", timeout, slave_hunting, low, hunttime, dwait_time.tv_sec, dwait_time.tv_nsec, delta, timeout-delta);
 
       ready_fd_count = epoll_wait(fds, events, MAX_NUM_Minions, max(0,timeout-delta));
       DDCMSG(D_POLL,RED,"MCP: epoll_wait over   ready_fd_count = %d",ready_fd_count);
@@ -297,7 +299,7 @@ int main(int argc, char **argv) {
          dwait_time.tv_nsec-=1000000000L;
       }
       delta = (dwait_time.tv_sec*1000)+(dwait_time.tv_nsec/1000000);
-      DDCMSG(D_NEW,YELLOW,"MCP: after epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld, delta=%i, timeout-delta=%i", timeout, slave_hunting, low, hunttime, dwait_time.tv_sec, dwait_time.tv_nsec, delta, timeout-delta);
+      DDCMSG(D_TIME,YELLOW,"MCP: after epoll_wait with timeout=%d  slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld, delta=%i, timeout-delta=%i", timeout, slave_hunting, low, hunttime, dwait_time.tv_sec, dwait_time.tv_nsec, delta, timeout-delta);
       if (close_nicely) {break;}
 
 
@@ -333,7 +335,7 @@ int main(int argc, char **argv) {
          // adjust dwait_time to the time to nothing, as we haven't waited anything yet
          dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
 
-         DDCMSG(D_NEW,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld",timeout,slave_hunting,low,hunttime, dwait_time.tv_sec, dwait_time.tv_nsec);
+         DDCMSG(D_RF,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld",timeout,slave_hunting,low,hunttime, dwait_time.tv_sec, dwait_time.tv_nsec);
          /***  we need to use the range we were invoked with
           ***  we need to handle a range greater than 32
           ***  the forget_addr needs to be set by looking at the addr_pool
@@ -375,7 +377,9 @@ int main(int argc, char **argv) {
                   LB=(LB_packet_t *)buf;   // map the header in
                   msglen+=read(RF_sock, (buf+1), RF_size(LB->cmd)-1); // grab the rest, but leave the rest to be read again later
                   DDCMSG(D_RF, RED, "MCP %i read bytes with %i cmd", msglen, LB->cmd);
-                  DDpacket(buf,msglen);
+                  if (verbose&D_RF) {
+                     DDpacket(buf,msglen);
+                  }
                }
                if (msglen<0) {
                   strerror_r(errno,buf,BufSize);
@@ -450,7 +454,7 @@ int main(int argc, char **argv) {
                       minions[addr_pool[addr_cnt].mID].status==S_open) {
                      // we already have this devID, so reconnect because the RFslave probably rebooted or something
                      LB_status_resp_t lbsr;
-                     DCMSG(GRAY,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
+                     DDCMSG(D_POINTER, GRAY,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
 
                      // create a message to send to the already initiliazed minion
 #if 0
@@ -556,7 +560,7 @@ int main(int argc, char **argv) {
 
                         minions[mID].S.hit.data = 0;
                         minions[mID].S.exp.data = LB_devreg->expose?90:0;
-                        DCMSG(GRAY, "Found REG expose: exp.data=%i, LB_devreg->expose=%i @ %i", minions[mID].S.exp.data, LB_devreg->expose, __LINE__);
+                        DDCMSG(D_MEGA, GRAY, "Found REG expose: exp.data=%i, LB_devreg->expose=%i @ %i", minions[mID].S.exp.data, LB_devreg->expose, __LINE__);
                         minions[mID].S.speed.data = LB_devreg->speed*100.0;
                         minions[mID].S.move.data = LB_devreg->move;
                         minions[mID].S.react.data = LB_devreg->react;
@@ -565,14 +569,6 @@ int main(int argc, char **argv) {
                         minions[mID].S.burst.newdata = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
 
                         minions[mID].S.fault.data = LB_devreg->fault;
-
-                        // new state timer code
-                        // initialize state of expose or conceal timer
-                        if (LB_devreg->expose) {
-                           START_EXPOSE_TIMER(minions[mID].S);
-                        } else {
-                           START_CONCEAL_TIMER(minions[mID].S);
-                        }
 
                         // maybe there should also be stuff for MFS (NES?) MGS MILES and GPS in the device_reg packet
 

@@ -402,6 +402,9 @@ int main(int argc, char **argv) {
    DDCMSG(D_MEGA, GREEN,"ADDING rf:%i fasit:%i TO fconns[%i]: %08X", fconns[i].rf, fconns[i].fasit, i, &fconns[i]);
                      fconns[i].target_type = RF_Type_Unknown; // unknown target type
                      fconns[i].last_report = -1; // no report used
+                     fconns[i].mfsSDelay = -1; // no delay found yet
+                     fconns[i].mfsRDelay = -1; // no delay found yet
+                     fconns[i].last_mfs_s = 1; // default to single mode
 
                      // are we the last slot?
                      if ((last_slot + 1) == index) {

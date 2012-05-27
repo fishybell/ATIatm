@@ -47,6 +47,8 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          case LBC_CONFIGURE_HIT:
          case LBC_AUDIO_CONTROL:
          case LBC_PYRO_FIRE:
+         case LBC_ACCESSORY:
+         case LBC_HIT_BLANKING:
          case LBC_DEVICE_REG:
          case LBC_ASSIGN_ADDR:
          case LBC_STATUS_REQ:
@@ -522,7 +524,23 @@ int t2s_handle_POWER_CONTROL(rf_connection_t *rc, int start, int end) {
 int t2s_handle_PYRO_FIRE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(rc->tty_ibuf + start);
-   DDCMSG(D_RF, CYAN, "t2s_handle_PYRO_FIRE(%8p, %i, %i)", rc, start, end);
+   DDCMSG(D_NEW, CYAN, "t2s_handle_PYRO_FIRE(%8p, %i, %i)", rc, start, end);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   return doNothing;
+} 
+
+int t2s_handle_ACCESSORY(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_accessory_t *pkt = (LB_accessory_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_NEW, CYAN, "t2s_handle_ACCESSORY(%8p, %i, %i)", rc, start, end);
+   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   return doNothing;
+} 
+
+int t2s_handle_HIT_BLANKING(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_hit_blanking_t *pkt = (LB_hit_blanking_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_NEW, CYAN, "t2s_handle_HIT_BLANKING(%8p, %i, %i)", rc, start, end);
    // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
    return doNothing;
 } 
@@ -601,6 +619,8 @@ int tty2sock(rf_connection_t *rc) {
          t2s_HANDLE_RF (AUDIO_CONTROL); // keep track of ids? no
          t2s_HANDLE_RF (POWER_CONTROL); // keep track of ids? no
          t2s_HANDLE_RF (PYRO_FIRE); // keep track of ids? no
+         t2s_HANDLE_RF (ACCESSORY); // keep track of ids? no
+         t2s_HANDLE_RF (HIT_BLANKING); // keep track of ids? no
          t2s_HANDLE_RF (QEXPOSE); // keep track of ids? no
          t2s_HANDLE_RF (QCONCEAL); // keep track of ids? no
          t2s_HANDLE_RF (REQUEST_NEW); // keep track of devids

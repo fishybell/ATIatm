@@ -61,11 +61,25 @@ enum {
    BLANK_ALWAYS,           /* hit sensor disabled blank */
 };
 
+// the steps a lifter goes through with lifting (can start on exposed or concealed, but then moves through in order)
+typedef enum transition_steps {
+   TS_concealed,
+   TS_con_to_exp,
+   TS_exposed,
+   TS_exp_to_con,
+   TS_too_far, /* used to tell if we've gone too far and need to start over */
+} trans_step_t;
+
+extern int steps_translation[];
+extern const char *step_words[];
+
 typedef struct state_exp_item { /* has both expose state and conceal state in single item */
    uint8         data;     // current exposure value (0/45/90)
    uint8         newdata;  // destination exposure value (0/90)
    uint8         lastdata; // last exposure value sent (0/45/90)
    int           recv_dec; // we've received a "did_exp_cmd" message
+   int           data_uc_count; // count the number of times we've received&ignored unchanged data
+   int           data_uc;       // the data value for checking whether the received data is unchanged or not
    uint16        event;
    uint16        last_event; // for retrying event request even if we've moved on to a different event
    uint16        exp_flags;
@@ -80,7 +94,8 @@ typedef struct state_exp_item { /* has both expose state and conceal state in si
    int           cmd_start_time[MAX_HIT_EVENTS]; // time we sent exposure over RF
    int           log_end_time[MAX_HIT_EVENTS];   // time FASIT server would have logged end of exposure
    int           cmd_end_time[MAX_HIT_EVENTS];   // time we sent conceal over RF (or told it to end over RF)
-} state_exp_item_t ;
+   trans_step_t last_step; // the last transition step we took
+} state_exp_item_t;
 
 typedef struct state_rf_timeout { /* has both slow state and fast state in single item */
    uint8         data; // ignored
@@ -372,9 +387,20 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 #include "colors.h"
 
 #define C_DEBUG 1
-
-#define DDCMSG(DBG,SC, FMT, ...) { if (((DBG)&verbose)==(DBG)) { fprintf(stdout, "\x1B[3%i;%im%s[%04x] " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1,__PROGRAM__,(DBG), ##__VA_ARGS__ ); fflush(stdout);}}
+#define DEBUG_DCMSG 1
+#if DEBUG_DCMSG
+#define DCMSG(SC, FMT, ...) { if (C_DEBUG) { fprintf(stdout, "\x1B[3%i;%im%s      " FMT "\x1B[30;0m @ %s:%i\n",SC&7,(SC>>3)&1,__PROGRAM__, ##__VA_ARGS__, __FILE__, __LINE__); fflush(stdout);}}
+#else
 #define DCMSG(SC, FMT, ...) { if (C_DEBUG) { fprintf(stdout, "\x1B[3%i;%im%s      " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1,__PROGRAM__, ##__VA_ARGS__ ); fflush(stdout);}}
+#endif
+
+#define DEBUG_DDCMSG 1
+#if DEBUG_DDCMSG
+#define DDCMSG(DBG,SC, FMT, ...) { if (((DBG)&verbose)==(DBG)) { fprintf(stdout, "\x1B[3%i;%im%s[%04x] " FMT "\x1B[30;0m @ %s:%i\n",SC&7,(SC>>3)&1,__PROGRAM__,(DBG), ##__VA_ARGS__, __FILE__, __LINE__); fflush(stdout);}}
+#else
+#define DDCMSG(DBG,SC, FMT, ...) { if (((DBG)&verbose)==(DBG)) { fprintf(stdout, "\x1B[3%i;%im%s[%04x] " FMT "\x1B[30;0m\n",SC&7,(SC>>3)&1,__PROGRAM__,(DBG), ##__VA_ARGS__ ); fflush(stdout);}}
+#endif
+
 #define DCCMSG(SC, EC, FMT, ...) {if (C_DEBUG){ fprintf(stdout, "\x1B[3%i;%im%s      " FMT "\x1B[3%i;%im\n",SC&7,(SC>>3)&1,__PROGRAM__, ##__VA_ARGS__ ,EC&7,(EC>>3)&1); fflush(stdout);}}
 #define DCOLOR(SC) { if (C_DEBUG){ fprintf(stdout, "\x1B[3%i;%im",SC&7,(SC>>3)&1); fflush(stdout);}}
 
@@ -562,10 +588,22 @@ typedef enum rf_target_type {
    setTimerTo(S.move, timer, flags, TRANSITION_START_TIME, F_move_start_movement); \
 }
 #define START_STANDARD_LOOKUP(S) {\
-   /* start fast once, if needed */ \
-   if (S.rf_t.slow_flags != F_slow_none) { \
-      stopTimer(S.rf_t, slow_timer, slow_flags); /* will be resumed later */ \
-      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_once); \
+   /* ensure we're doing some sort of slow lookup */ \
+   if (S.rf_t.slow_flags == F_slow_none) { \
+      /* wasn't going slow, so either it was going fast and we should change it, or it is already doing the fast lookup */ \
+      if (!(S.rf_t.fast_flags == F_fast_once || \
+            S.rf_t.fast_flags == F_fast_end)) { \
+         /* wasn't already going slow and wasn't doing fast lookup, go slow, but first time fast */ \
+         stopTimer(S.rf_t, fast_timer, fast_flags); \
+         setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_once); \
+         DDCMSG(D_MSTATE, GRAY, "Started lookup timer: rf_t.fast=%i.%i rf_t.slow=%i.%i", S.rf_t.fast_timer, S.rf_t.fast_flags, S.rf_t.slow_timer, S.rf_t.slow_flags); \
+      } else { \
+         /* is already doing fast lookup .... will be slow soon */ \
+         DDCMSG(D_MSTATE, GRAY, "Didn't do anything with lookup timers because fast: rf_t.fast=%i.%i rf_t.slow=%i.%i", S.rf_t.fast_timer, S.rf_t.fast_flags, S.rf_t.slow_timer, S.rf_t.slow_flags); \
+      } \
+   } else { \
+      /* is already going slow... */ \
+      DDCMSG(D_MSTATE, GRAY, "Didn't do anything with lookup timers because slow: rf_t.fast=%i.%i rf_t.slow=%i.%i", S.rf_t.fast_timer, S.rf_t.fast_flags, S.rf_t.slow_timer, S.rf_t.slow_flags); \
    } \
 }
 
@@ -589,5 +627,7 @@ typedef enum rf_target_type {
 
 
 void sendStatus2102(int force, FASIT_header *hdr, thread_data_t *minion, minion_time_t *mt);
+void change_states(thread_data_t *minion, minion_time_t *mt, trans_step_t step, int force);
+void inform_state(thread_data_t *minion, minion_time_t *mt, FASIT_header *hdr);
 
 #endif

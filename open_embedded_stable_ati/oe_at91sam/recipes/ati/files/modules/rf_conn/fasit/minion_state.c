@@ -14,6 +14,8 @@
 #undef CLOCK_MONOTONIC_RAW 
 #define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
 
+#define __PROGRAM__ "MINION "
+
 extern int verbose;
 extern struct sockaddr_in fasit_addr;
 extern int close_nicely;
@@ -385,12 +387,15 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
       // check each timer, running its state code if it is needed, moving its timer otherwise
       #define CHECK_TIMER(S, T, F, CODE) { \
-         if (!S.F) { \
+         if (S.F) { \
+            DDCMSG(D_MSTATE, GREEN, "Checking timer " #F ": %i/%i @ %s.%i", S.T, S.F, __FILE__, __LINE__); \
             if (S.T>elapsed_tenths) { \
-               S.T-=elapsed_tenths;   /* not timed out.  but decrement out timer */ \
+               S.T-=elapsed_tenths;   /* not timed out yet.  but decrement out timer */ \
+               DDCMSG(D_MSTATE, MAGENTA, "Altered timer " #F ": %i/%i @ %s.%i", S.T, S.F, __FILE__, __LINE__); \
+            } else { \
+            DDCMSG(D_MSTATE, YELLOW, "Running timer " #F ": %i/%i @ %s.%i", S.T, S.F, __FILE__, __LINE__); \
+               CODE \
             } \
-         } else { \
-            CODE \
          } \
       }
 
@@ -478,7 +483,9 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking expose timer flags: %i", minion->S.exp.exp_flags);
          switch (minion->S.exp.exp_flags) {
             case F_exp_start_transition: {
-               sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102
+               // sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102 -- removed in favor of change_states()
+               DDCMSG(D_POINTER|D_NEW, YELLOW, "calling change_states(%s) @ %s:%i", step_words[TS_con_to_exp], __FILE__, __LINE__);
+               change_states(minion, mt, TS_con_to_exp, 0);
                setTimerTo(minion->S.exp, exp_timer, exp_flags, TRANSITION_TIME, F_exp_end_transition);
             } break;
             case F_exp_end_transition: {
@@ -495,7 +502,9 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking conceal timer flags: %i", minion->S.exp.con_flags);
          switch (minion->S.exp.con_flags) {
             case F_con_start_transition: {
-               sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102
+               // sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102 -- removed in favor of change_states()
+               DDCMSG(D_POINTER|D_NEW, YELLOW, "calling change_states(%s) @ %s:%i", step_words[TS_exp_to_con], __FILE__, __LINE__);
+               change_states(minion, mt, TS_exp_to_con, 0);
                setTimerTo(minion->S.exp, con_timer, con_flags, TRANSITION_TIME, F_con_end_transition);
             } break;
             case F_con_end_transition: {
@@ -571,7 +580,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
    Set_Timer(minion->S.rf_t.slow_timer); // timer for slow status check
    Set_Timer(minion->S.move.timer); // timer for movement state
 
-   DDCMSG(D_MSTATE,GRAY,"\nMinion %i:   Set_Timer=%i   exp.exp=%i exp.con=%i rf_t.fast=%i ft_t.slow=%i move=%i (or event timer)",
+   DDCMSG(D_MSTATE,GRAY,"Minion %i:   Set_Timer=%i   exp.exp=%i exp.con=%i rf_t.fast=%i rt_t.slow=%i move=%i (or event timer)",
           minion->mID,minion->S.state_timer, minion->S.exp.exp_timer, minion->S.exp.con_timer, minion->S.rf_t.fast_timer, minion->S.rf_t.slow_timer, minion->S.move.timer);
 
 }

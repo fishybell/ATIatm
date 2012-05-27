@@ -50,8 +50,6 @@ int Ptype(char *buf);
 
 void print_verbosity_bits(void);
 
-//}
-
 
 // definitions of the low-bandwith RF packets
 // they are bit-packed and between 3 and whatever (up to 35) bytes long
@@ -78,8 +76,9 @@ void print_verbosity_bits(void);
 #define LBC_GROUP_CONTROL               4
 #define LBC_AUDIO_CONTROL               5
 #define LBC_POWER_CONTROL               6
-
 #define LBC_PYRO_FIRE                   7
+#define LBC_ACCESSORY                   8
+#define LBC_HIT_BLANKING                9
 
 #define LBC_STATUS_RESP                 10
 
@@ -88,7 +87,7 @@ void print_verbosity_bits(void);
 #define LBC_QEXPOSE                     16
 #define LBC_QCONCEAL                    17
 #define LBC_STATUS_REQ                  18
-//#define LBC_ILLEGAL_CANCEL              19 /* illegal command will cause minion's status requests to be cancelled on mcp and RFmaster */
+#define LBC_QUICK_GROUP                 19 /* automatically created group for repeat messages to multiple targets */
 
 
 #define LBC_EVENT_REPORT                20
@@ -132,7 +131,7 @@ typedef struct LB_status_resp_t {
    uint32 did_exp_cmd:1 __attribute__ ((packed)); // 0 = didn't change exposure between last command and now, 1 = did
    uint32 react:3 __attribute__ ((packed));
 
-   uint32 location:10 __attribute__ ((packed)); // meters from home
+   uint32 location:10 __attribute__ ((packed)); // meters from home (actual loc = location - 512, ex. 512 = 0, 513 = 1 meter)
    uint32 expose:1 __attribute__ ((packed)); // current state of exposure, 0 = concealed, 1 = exposed
    uint32 hitmode:1 __attribute__ ((packed));
    uint32 tokill:4 __attribute__ ((packed));
@@ -173,7 +172,7 @@ typedef struct LB_device_reg_t {
    uint32 move:1 __attribute__ ((packed)); // 0 = towards home, 1 = away from home
    uint32 pad2:1 __attribute__ ((packed));
    uint32 react:3 __attribute__ ((packed));
-   uint32 location:10 __attribute__ ((packed)); // meters from home
+   uint32 location:10 __attribute__ ((packed)); // meters from home (actual loc = location - 512, ex. 512 = 0, 513 = 1 meter)
    uint32 expose:1 __attribute__ ((packed));
    uint32 hitmode:1 __attribute__ ((packed));
    uint32 tokill:4 __attribute__ ((packed));
@@ -224,6 +223,53 @@ typedef struct LB_expose {
    uint32 crc:8 __attribute__ ((packed));
    uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_expose_t;
+
+typedef struct LB_quick_group_chunk {
+   uint32 addr1:11 __attribute__ ((packed));
+   uint32 addr2:11 __attribute__ ((packed));
+   uint32 addr3_1:10 __attribute__ ((packed));
+
+   uint32 addr3_2:1 __attribute__ ((packed));
+   uint32 addr4:11 __attribute__ ((packed));
+   uint32 addr5:11 __attribute__ ((packed));
+   uint32 addr6_1:9 __attribute__ ((packed));
+
+   uint32 addr6_2:2 __attribute__ ((packed));
+   uint32 addr7:11 __attribute__ ((packed));
+   uint32 addr8:11 __attribute__ ((packed));
+   uint32 addr9_1:8 __attribute__ ((packed));
+
+   uint32 addr9_2:3 __attribute__ ((packed));
+   uint32 addr10:11 __attribute__ ((packed));
+   uint32 addr11:11 __attribute__ ((packed));
+   uint32 addr12_1:7 __attribute__ ((packed));
+
+   uint32 addr12_2:5 __attribute__ ((packed));
+   uint32 addr14:11 __attribute__ ((packed));
+   uint32 addr15:11 __attribute__ ((packed));
+   uint32 number:4 __attribute__ ((packed)); // number of addresses in this chunk used (max 15)
+   uint32 padding:1 __attribute__ ((packed));
+} __attribute__ ((packed)) LB_quick_group_chunk_t;
+
+//                                                LBC_QUICK_GROUP
+// LBC_QUICK_GROUP
+//    
+typedef struct LB_quick_group {
+   // 165 byte message
+   // 4 bytes...
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 event:13 __attribute__ ((packed));      // rolling event sequence number
+   uint32 temp_addr:11 __attribute__ ((packed));  // address to use -- this burst only -- as a group for these targets
+   uint32 number:3 __attribute__ ((packed));      // number of groups used given below
+
+   // ...plus 8 * 20 bytes...
+   LB_quick_group_chunk_t addresses[8];                     // the addresses to use this group
+
+   // ...plus 1 byte
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
+
+} __attribute__ ((packed))  LB_quick_group_t;
 
 //                                                LBC_QCONCEAL
 // LBC_QCONCEAL
@@ -281,8 +327,8 @@ typedef struct LB_move {
    // 2 * 32 bits = 2 long - padding = 6 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
-   uint32 pad:3 __attribute__ ((packed));
-   uint32 move:2 __attribute__ ((packed));       // 0=stop, 1=Move a direction, 2=Move other direction, 3=continuous
+   uint32 pad:2 __attribute__ ((packed));
+   uint32 move:3 __attribute__ ((packed));       // 0=stop, 1=Move a direction, 2=Move other direction, 3=continuous, 4 = dock, 5 = go home
    uint32 speed:11 __attribute__ ((packed));
 
    uint32 crc:8 __attribute__ ((packed));
@@ -290,7 +336,6 @@ typedef struct LB_move {
 } __attribute__ ((packed))  LB_move_t;
 
 // LBC_CONFIGURE_HIT
-//    we have 2 too many or 6 short
 typedef struct LB_configure {
    // 2 * 32 bits = 2 long - padding = 6 bytes
    uint32 cmd:5 __attribute__ ((packed));
@@ -308,7 +353,6 @@ typedef struct LB_configure {
 } __attribute__ ((packed))  LB_configure_t;
 
 // LBC_GROUP_CONTROL
-//    we have 11 short
 typedef struct LB_group_control {
    // 2 * 32 bits = 2 long - padding = 5 bytes
    uint32 cmd:5 __attribute__ ((packed));
@@ -322,7 +366,6 @@ typedef struct LB_group_control {
 } __attribute__ ((packed))  LB_group_control_t;
 
 // LBC_AUDIO_CONTROL
-//    we have 5 short
 typedef struct LB_audio_control {
    // 2 * 32 bits = 2 long - padding = 6 bytes
    uint32 cmd:5 __attribute__ ((packed));
@@ -338,7 +381,6 @@ typedef struct LB_audio_control {
 } __attribute__ ((packed))  LB_audio_control_t;
 
 // LBC_POWER_CONTROL
-//    we have 6 short
 typedef struct LB_power_control {
    // 1 * 32 bits = 1 long - padding = 4 bytes
    uint32 cmd:5 __attribute__ ((packed));
@@ -349,7 +391,6 @@ typedef struct LB_power_control {
 } __attribute__ ((packed))  LB_power_control_t;
 
 // LBC_PYRO_FIRE
-//    we have 5 short
 typedef struct LB_pyro_fire {
    // 1 * 32 bits = 1 long - padding = 4 bytes
    uint32 cmd:5 __attribute__ ((packed));
@@ -358,6 +399,31 @@ typedef struct LB_pyro_fire {
    uint32 pad:6 __attribute__ ((packed));
    uint32 crc:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_pyro_fire_t;
+
+// LBC_ACCESSORY
+typedef struct LB_accessory {
+   // 2 * 32 bits = 2 long - padding = 6 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+   uint32 on:1 __attribute__ ((packed));
+   uint32 type:7 __attribute__ ((packed)); // 0=mfs,1=phi,2=mgl,3=msdh,4=
+   uint32 rdelay:8 __attribute__ ((packed)); // repeat delay
+
+   uint32 idelay:8 __attribute__ ((packed)); // initial delay
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:16 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_accessory_t;
+
+// LBC_HIT_BLANKING
+typedef struct LB_hit_blanking {
+   // 2 * 32 bits = 2 long - padding = 5 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+   uint32 blanking:16 __attribute__ ((packed)); // repeat delay
+
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_hit_blanking_t;
 
 // LBC_BURST
 //    this message is intended to let slave devices know how many messages to expect in a burst (they were parsing and responding based on the only part of a burst, then receiving the rest)
@@ -388,7 +454,9 @@ int RF_size(int cmd);
 uint32 getDevID (void);
 int gather_rf(int fd, char *pos, int max);
 void print_verbosity(void);
-void DDpacket(uint8 *buf,int len);
+void DDpacket_internal(const char *program, uint8 *buf,int len);
+
+#define DDpacket(B, L) { DDpacket_internal(__PROGRAM__, B, L); }
 
 
 

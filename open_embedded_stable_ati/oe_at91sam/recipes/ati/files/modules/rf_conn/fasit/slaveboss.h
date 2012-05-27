@@ -74,6 +74,10 @@ typedef struct fasit_connection {
    // cached responses
    rf_target_type_t target_type;
    int has_MFS;
+   int last_mfs;
+   int last_mfs_s; // remember single of burst mode
+   int mfsSDelay;
+   int mfsRDelay;
    FASIT_2005 f2005_resp;
    FASIT_2101 f2101_resp;
    FASIT_2102 f2102_resp;
@@ -124,12 +128,14 @@ int send_2110(fasit_connection_t *fc, int on, int mode, int idelay, int rdelay);
 int handle_2111(fasit_connection_t *fc, int start, int end);
 int handle_2112(fasit_connection_t *fc, int start, int end);
 int handle_2113(fasit_connection_t *fc, int start, int end);
-int send_2114(fasit_connection_t *fc);
+int send_2114(fasit_connection_t *fc, int on, int delay);
 int handle_2115(fasit_connection_t *fc, int start, int end);
-int send_13110(fasit_connection_t *fc);
+int send_13110(fasit_connection_t *fc, int on);
 int handle_13112(fasit_connection_t *fc, int start, int end);
 int send_14110(fasit_connection_t *fc, int on);
 int handle_14112(fasit_connection_t *fc, int start, int end);
+int send_15110(fasit_connection_t *fc, int on);
+int handle_15112(fasit_connection_t *fc, int start, int end);
 int send_14200(fasit_connection_t *fc, int blank);
 int send_14400(fasit_connection_t *fc, int cid, int length, char *data);
 int handle_14401(fasit_connection_t *fc, int start, int end);
@@ -147,6 +153,8 @@ int handle_GROUP_CONTROL(fasit_connection_t *fc, int start, int end);
 int handle_AUDIO_CONTROL(fasit_connection_t *fc, int start, int end);
 int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end);
 int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end);
+int handle_ACCESSORY(fasit_connection_t *fc, int start, int end);
+int handle_HIT_BLANKING(fasit_connection_t *fc, int start, int end);
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end);
 int handle_RESET(fasit_connection_t *fc, int start, int end);
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end);

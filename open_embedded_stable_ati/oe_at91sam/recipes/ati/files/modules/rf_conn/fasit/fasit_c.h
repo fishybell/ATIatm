@@ -136,6 +136,10 @@ enum {
    CID_Shutdown = 177,			/* not a standard FASIT value */
    CID_Sleep = 178,			/* not a standard FASIT value */
    CID_Wake = 179,			/* not a standard FASIT value */
+   CID_Dock = 180,         /* not a standard FASIT value */
+   CID_Continuous_Move_Request = 181,/* not a standard FASIT value */
+   CID_Hit_Count_Reset = 182,/* not a standard FASIT value */
+   CID_Gohome = 183,/* not a standard FASIT value */
 };
 
 /********************************************/
@@ -285,23 +289,43 @@ typedef struct FASIT_14110 {
 } FASIT_14110;
 
 /********************************************/
-/* 16000 - Configure Positive Hit Indicator    */
+/* 14112 - Muzzle Positive Hit Indicator Status    */
+/********************************************/
+typedef struct FASIT_14112b { // body
+   __uint8_t  on;
+} FASIT_14112b;
+typedef struct FASIT_14112 {
+   FASIT_RESPONSE response;
+   FASIT_14112b body;
+} FASIT_14112;
+
+/********************************************/
+/* 15110 - Configure Thermals    */
+/********************************************/
+typedef struct FASIT_15110 {
+   __uint8_t  on;  // 0 = n/a, 1 = on, 2 = off
+ //__uint8_t  num;
+} FASIT_15110;
+
+/********************************************/
+/* 15112 - Thermal Status    */
+/********************************************/
+typedef struct FASIT_15112b { // body
+   __uint8_t  on;
+ //__uint8_t  num;
+} FASIT_15112b;
+typedef struct FASIT_15112 {
+   FASIT_RESPONSE response;
+   FASIT_15112b body;
+} FASIT_15112;
+
+/********************************************/
+/* 16000 - Hit time message    */
 /********************************************/
 typedef struct FASIT_16000 {
    __uint16_t hits PCKD; // each of these hits occurred...
    __uint32_t msecs PCKD; // ...X milliseconds in the past
 } FASIT_16000;
-
-/********************************************/
-/* 14112 - Muzzle Positive Hit Indicator Status    */
-/********************************************/
-typedef struct FASIT_14112b { // body
-	__uint8_t  on;
-} FASIT_14112b;
-typedef struct FASIT_14112 {
-	FASIT_RESPONSE response;
-	FASIT_14112b body;
-} FASIT_14112;
 
 /********************************************/
 /* 14200 - Configure Hit Blanking           */

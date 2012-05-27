@@ -247,6 +247,8 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_CONFIGURE_HIT:
          case LBC_AUDIO_CONTROL:
          case LBC_PYRO_FIRE:
+         case LBC_ACCESSORY:
+         case LBC_HIT_BLANKING:
          case LBC_DEVICE_REG:
          case LBC_ASSIGN_ADDR:
          case LBC_STATUS_REQ:
@@ -315,6 +317,8 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
                HANDLE_RF (AUDIO_CONTROL);
                HANDLE_RF (POWER_CONTROL);
                HANDLE_RF (PYRO_FIRE);
+               HANDLE_RF (ACCESSORY);
+               HANDLE_RF (HIT_BLANKING);
                HANDLE_RF (QEXPOSE);
                HANDLE_RF (RESET);
                HANDLE_RF (QCONCEAL);
@@ -629,7 +633,19 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    }
    DCMSG(GRAY, "RESP with expose: s.expose=%i, fc->f2102_resp.body.exp=%i @ %i", s.expose, fc->f2102_resp.body.exp, __LINE__);
    s.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
-   s.move = fc->f2102_resp.body.move & 0x3;
+   switch (fc->f2102_resp.body.move) {
+      case 0:
+      default:
+         s.speed = 0.0;
+         s.move = 0; // default to towards home if stopped
+         break;
+      case 1:
+         s.move = 0; // convert fasit to rf
+         break;
+      case 2:
+         s.move = 1; // convert fasit to rf
+         break;
+   }
    s.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
    s.hitmode = fc->hit_mode;
    s.react = fc->hit_react;
@@ -710,18 +726,20 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
 int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
    LB_expose_t *pkt = (LB_expose_t *)(fc->rf_ibuf + start);
    int retval = doNothing;
-   static int mfsSDelay = -1;
-   static int mfsRDelay = -1;
    DDCMSG(D_RF|D_VERY,RED, "handle_EXPOSE(%8p, %i, %i)", fc, start, end);
 
    // read, once, the eeprom values for start and repeat delays
-   if (mfsSDelay == -1) {
-      mfsSDelay = ReadEeprom_int(MFS_START_DELAY_LOC, MFS_START_DELAY_SIZE, MFS_START_DELAY);
-      mfsRDelay = ReadEeprom_int(MFS_REPEAT_DELAY_LOC, MFS_REPEAT_DELAY_SIZE, MFS_REPEAT_DELAY);
+   if (fc->mfsSDelay == -1) {
+      fc->mfsSDelay = ReadEeprom_int(MFS_START_DELAY_LOC, MFS_START_DELAY_SIZE, MFS_START_DELAY);
+      fc->mfsRDelay = ReadEeprom_int(MFS_REPEAT_DELAY_LOC, MFS_REPEAT_DELAY_SIZE, MFS_REPEAT_DELAY);
    }
 
    // send mfs configuration
    if (fc->has_MFS) {
+      if (pkt->mfs) {
+         fc->last_mfs_s = pkt->mfs; // remember single vs. burst vs. random
+      }
+      fc->last_mfs = pkt->mfs;
       switch (pkt->mfs) {
          case 0:
             // off
@@ -729,18 +747,18 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
             break;
          case 1:
             // single
-            retval |= send_2110(fc, 1, 0, mfsSDelay, mfsRDelay);
+            retval |= send_2110(fc, 1, 0, fc->mfsSDelay, fc->mfsRDelay);
             break;
          case 2:
             // burst
-            retval |= send_2110(fc, 1, 1, mfsSDelay, mfsRDelay);
+            retval |= send_2110(fc, 1, 1, fc->mfsSDelay, fc->mfsRDelay);
             break;
          case 3:
             // simulate single or burst randomly
             if (rand() % 2) {
-               retval |= send_2110(fc, 1, 0, mfsSDelay, mfsRDelay);
+               retval |= send_2110(fc, 1, 0, fc->mfsSDelay, fc->mfsRDelay);
             } else {
-               retval |= send_2110(fc, 1, 1, mfsSDelay, mfsRDelay);
+               retval |= send_2110(fc, 1, 1, fc->mfsSDelay, fc->mfsRDelay);
             }
             break;
       }
@@ -963,8 +981,73 @@ int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end) {
    LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(fc->rf_ibuf + start);
    DDCMSG(D_RF|D_VERY,RED, "handle_PYRO_FIRE(%8p, %i, %i)", fc, start, end);
    // send pyro fire request (will handle "set" and "fire" commands to BES)
-   send_2000(fc, pkt->zone);
-   return doNothing;
+   return send_2000(fc, pkt->zone);
+}
+
+int handle_ACCESSORY(fasit_connection_t *fc, int start, int end) {
+   LB_accessory_t *pkt = (LB_accessory_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_NEW,RED, "handle_ACCESSORY(%8p, %i, %i)", fc, start, end);
+   DDpacket((char*)pkt, RF_size(pkt->cmd));
+   int retval = doNothing;
+   switch (pkt->type) {
+      case 0:
+         // muzzle flash simulator
+         fc->mfsRDelay = pkt->rdelay;
+         fc->mfsSDelay = pkt->idelay;
+         if (!pkt->on) {
+            fc->last_mfs = 0;
+         } else if (fc->last_mfs == 0) {
+            fc->last_mfs = fc->last_mfs_s;
+         }
+         switch (fc->last_mfs) {
+            case 0:
+               // off
+               retval |= send_2110(fc, 0, 0, 0, 0);
+               break;
+            case 1:
+               // single
+               retval |= send_2110(fc, 1, 0, fc->mfsSDelay, fc->mfsRDelay);
+               break;
+            case 2:
+               // burst
+               retval |= send_2110(fc, 1, 1, fc->mfsSDelay, fc->mfsRDelay);
+               break;
+            case 3:
+               // simulate single or burst randomly
+               if (rand() % 2) {
+                  retval |= send_2110(fc, 1, 0, fc->mfsSDelay, fc->mfsRDelay);
+               } else {
+                  retval |= send_2110(fc, 1, 1, fc->mfsSDelay, fc->mfsRDelay);
+               }
+               break;
+         }
+         break;
+      case 1:
+         // positive hit indicator
+         retval |= send_14110(fc, pkt->on);
+         break;
+      case 2:
+         // moon glow
+         retval |= send_13110(fc, pkt->on);
+         break;
+      case 3:
+         // miles shootback device holder
+         retval |= send_2114(fc, pkt->on, pkt->idelay);
+         break;
+      case 4:
+         // thermals
+         retval |= send_15110(fc, pkt->on);
+         break;
+   }
+   return retval;
+}
+
+int handle_HIT_BLANKING(fasit_connection_t *fc, int start, int end) {
+   LB_hit_blanking_t *pkt = (LB_hit_blanking_t *)(fc->rf_ibuf + start);
+   DDCMSG(D_NEW,RED, "handle_HIT_BLANKING(%8p, %i, %i)", fc, start, end);
+   DDpacket((char*)pkt, RF_size(pkt->cmd));
+   // send hit blanking command
+   return send_14200(fc, pkt->blanking);
 }
 
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
