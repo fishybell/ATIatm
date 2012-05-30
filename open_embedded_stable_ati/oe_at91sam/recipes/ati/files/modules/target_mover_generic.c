@@ -28,7 +28,7 @@
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
 //#define DEBUG_PRINT
-#define DEBUG_SEND
+//#define DEBUG_SEND
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -903,6 +903,10 @@ static int mover_speed_set(int speed) {
       if (speed > 10) {
          atomic_set(&find_dock_atomic, 0); // if moving fast do not ignore sensors
       }
+   } else {
+      // Stop mover if speed is 0
+      mover_speed_stop();
+      return speed;
    }
 
    last_pid_speed = 0;
@@ -1416,10 +1420,17 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
        do_event(EVENT_DOCK_LIMIT); // triggered on dock limit
        do_fault(ERR_stop_dock_limit); // triggered on dock limit
        mover_speed_stop();
-       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
+//       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
        atomic_set(&find_dock_atomic, 0);
        enable_battery_check(1);
        battery_check_is_docked(1);
+    } else {
+       // Not on dock
+       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+       do_event(EVENT_UNDOCKED);
+       battery_check_is_docked(0);
+       enable_battery_check(0);
+       do_fault(ERR_left_dock_limit);
     }
 //    atomic_set(&continuous_speed, 0);
 

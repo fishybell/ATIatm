@@ -21,7 +21,7 @@
 
 // various timer timeouts
 #define CHECK_CHARGING_IN_SECONDS   600
-#define TIMEOUT_IN_SECONDS				20	// 1 minutes
+#define TIMEOUT_IN_SECONDS				120	// 2 minutes
 #define ADC_READ_DELAY_IN_MSECONDS		20
 #define LED_BLINK_ON_IN_MSECONDS		100
 #define LED_BLINK_COUNT					3
@@ -293,7 +293,7 @@ void battery_check_is_docked(int dockval) {
    docked =  dockval;
    if (docked) {
       chargingCheckStep = 0;
-      check_charging_start(60);
+      check_charging_start(1);
    } else {
       check_charging_stop();
    }
@@ -456,6 +456,13 @@ static void check_charging_fire(unsigned long data) {
    int fault;
     // check/don't check adc line
     check_charging_stop();
+   if( !isDeviceAtDock()) {
+   // If not at dock do not perform checks
+      at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+      fault = ERR_notcharging_battery;
+      send_nl_message_multi(&fault, bat_mfh, NL_C_FAULT);
+      return;
+   }
    if (chargingCheckStep == 0){
       // Turn off charging and wait 10 seconds
      chargingCheckStep ++;
@@ -489,7 +496,7 @@ static void check_charging_fire(unsigned long data) {
          fault = ERR_notcharging_battery;
          send_nl_message_multi(&fault, bat_mfh, NL_C_FAULT);
       }
-      check_charging_start(60);
+      check_charging_start(0);
    }
 }
 
@@ -517,9 +524,6 @@ irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
         // we're connected, start the timer and turn off the led
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
         mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_OFF_IN_MSECONDS*HZ)/1000));
-         int isDeviceAtDock(void){
-            at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
-         }
         }
     else
         {
@@ -626,9 +630,6 @@ static int hardware_adc_init(void)
 	__raw_writel(CH_EN, adc_base + ADC_CHER);     		// Enable ADC Channels we are using
 	__raw_writel(CH_DIS, adc_base + ADC_CHDR);    		// Disable ADC Channels we are not using
 
-   if (isDeviceAtDock()){
-      at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
-   }
 	return 0;
     }
 
@@ -679,8 +680,9 @@ static int hardware_init(void)
     atomic_set(&blink_count, LED_BLINK_COUNT);
     mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
 
-    // check the value for the first time after 10 second
-    mod_timer(&timeout_timer_list, jiffies+(10*HZ));
+    // check the value for the first time after 90 second
+    mod_timer(&timeout_timer_list, jiffies+(90*HZ));
+    check_charging_start(1);
 
     // configure interrupt
     // if we disabled the charging pin, don't handle
