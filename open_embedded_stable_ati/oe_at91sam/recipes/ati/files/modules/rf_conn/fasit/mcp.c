@@ -701,7 +701,7 @@ int main(int argc, char **argv) {
                minion=(thread_data_t *)events[ready_fd].data.ptr;
                minion_fd=minion->minion;                    
                //mID=minion->mID; don't overwrite this value, we are keeping track of stuff elsewhere with it
-DDCMSG(D_POINTER, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\tEPOLLERR:%i\tEPOLLHUP:%i", minion->mID, (events[ready_fd].events&EPOLLIN)!=0, (events[ready_fd].events&EPOLLPRI)!=0, (events[ready_fd].events&EPOLLRDHUP)!=0, (events[ready_fd].events&EPOLLERR)!=0, (events[ready_fd].events&EPOLLHUP)!=0);
+DDCMSG(D_POINTER|D_MEGA, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\tEPOLLERR:%i\tEPOLLHUP:%i", minion->mID, (events[ready_fd].events&EPOLLIN)!=0, (events[ready_fd].events&EPOLLPRI)!=0, (events[ready_fd].events&EPOLLRDHUP)!=0, (events[ready_fd].events&EPOLLERR)!=0, (events[ready_fd].events&EPOLLHUP)!=0);
                DDCMSG(D_POLL,RED,"MCP: events[ready_fd=%d] minion->minion=%d for minion %d ready  [RF_addr=%d]  -}",
                       ready_fd,minion_fd,minion->mID,minion->RF_addr);             
 

@@ -29,6 +29,7 @@
 // so I can print fixed point a little easier
 #define DOTD(T) (T)/1000,(T)%1000
 
+#if 0 /* old queue stuff */
 typedef struct queue_tag {
    char *tail;          //  end of queue - insertion point
    char *head;          // start of queue - we remove fifo usually
@@ -44,9 +45,38 @@ void EnQueue(queue_t *M, void *ptr,int count); // queue in back
 void QueuePush(queue_t *M, void *ptr,int count); // "queue" in front
 
 int QueuePtype(queue_t *M);
-int Ptype(char *buf);
-
 #define Queue_Depth(M) ((int)((M)->tail - (M)->head))
+
+#endif /* end of queue stuff */
+
+/* new queue stuff */
+typedef struct queue_item {
+   struct queue_item *prev; 
+   struct queue_item *next;
+
+   char *msg;          // message payload
+
+
+   int size;           // so we don't have to recalculate
+   int cmd;         // so we don't have to re-look at message
+   int addr;        // so we don't have to re-look at message
+   int ptype;       // so we don't have to re-look at message
+   int sequence;    // the address-unique sequence number
+} queue_item_t;
+void newItem(queue_item_t *prev, queue_item_t *next, char *msg); // creates a new, linked item
+void enQueue(queue_item_t *qi, char *msg, int sequence); // queue a new RF message on the back of an existing queue
+void reQueue(queue_item_t *into, queue_item_t *from, queue_item_t *until); // put the queue between "from" and "until" into the front of the "into" queue (from, until are linked at end, into item remains head of queue)
+void removeItem(queue_item_t *qi, char *buf, int *bsize); // frees memory, unlinks, fills buf with a "removed" response message (bsize should come filled in with the size of buf, and after return contains size of data in buf)
+void sentItem(queue_item_t *qi, char *buf, int *bsize); // same as removeItem(...), but response message is "sent" (bsize should come filled in with the size of buf, and after return contains size of data in buf)
+// future -- collateCmd(...) -- takes all messages of the given command with the same (except addr) data and creates a single message in the queue, removing all others as necessary (no "removed" messages sent, as the original message is still in queue, just collated
+int queueLength(queue_item_t *qi); // finds the total length of message data in the queue -- future -- to see if we should try collating or not
+int queueSize(queue_item_t *qi); // finds the total number items in the queue
+int queuePtype(queue_item_t *qi); // peeks at queue and returns message type
+void clearQueue(queue_item_t *qi); // assuming qi is the head of the queue, this deallocates the memory and unlinks the whole queue, leaving the head unlinked but otherwise intact (no "removed" or "sent" messages are created)
+void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *remaining_time, int slottime); // create a burst message to be sent from the Rx queue. all items put in the burst are put in the Tx queue for manual removal and sending of "sent" messages after actual send. if send is unsuccessful, items can be requeued to Rx by linking Tx's tail to Rx's head, then Rx's head becomes Tx's head. (bsize should come filled in with the size of buf, and after return contains size of data in buf)
+queue_item_t *queueTail(queue_item_t* qi); // find the tail of a queue
+
+int Ptype(char *buf);
 
 void print_verbosity_bits(void);
 
@@ -68,7 +98,7 @@ void print_verbosity_bits(void);
 // bytes 0 to 31 are the command specific payload
 //     that is probably bit-packed
 
-//  the command ID's
+//  the low-bandwidth command ID's
 #define LBC_ILLEGAL                     0 /* illegal command will cause minion to be disconnected by mcp */
 #define LBC_EXPOSE                      1
 #define LBC_MOVE                        2
@@ -94,6 +124,12 @@ void print_verbosity_bits(void);
 #define LBC_REPORT_ACK                  21
 
 #define LBC_BURST                   25
+
+/* low-bandwidth control messages from minion/mcp to/from RFmaster, never sent over to air */
+#define LB_CONTROL_QUEUE                26 /* minion/mcp to RFmaster telling it to queue next message for sending */
+#define LB_CONTROL_SENT                 27 /* RFmaster to minion/mcp telling it that the message was sent */
+#define LB_CONTROL_REMOVED              28 /* RFmaster to minion/mcp telling it that the message was not sent */
+/* end of control messages */
 
 #define LBC_DEVICE_REG                  29
 #define LBC_REQUEST_NEW                 30
@@ -446,6 +482,42 @@ typedef struct LB_reset {
    uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_reset_t;
 
+//                                                  LB_CONTROL_QUEUE packet
+//   LB_CONTROL_QUEUE packet
+typedef struct LB_control_queue {
+   // 2 * 32 bits = 2 long - padding = 5 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+   uint32 sequence:16 __attribute__ ((packed)); // the next command's, unique to this addr, sequence number
+
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_control_queue_t;
+
+//                                                  LB_CONTROL_SENT packet
+//   LB_CONTROL_SENT packet
+typedef struct LB_control_sent {
+   // 2 * 32 bits = 2 long - padding = 5 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+   uint32 sequence:16 __attribute__ ((packed)); // the next command's, unique to this addr, sequence number
+
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_control_sent_t;
+
+//                                                  LB_CONTROL_REMOVED packet
+//   LB_CONTROL_REMOVED packet
+typedef struct LB_control_removed {
+   // 2 * 32 bits = 2 long - padding = 5 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
+   uint32 sequence:16 __attribute__ ((packed)); // the next command's, unique to this addr, sequence number
+
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_control_removed_t;
+
 
 
 void set_crc8(void *buf);
@@ -454,9 +526,12 @@ int RF_size(int cmd);
 uint32 getDevID (void);
 int gather_rf(int fd, char *pos, int max);
 void print_verbosity(void);
-void DDpacket_internal(const char *program, uint8 *buf,int len);
+void DDpacket_internal(const char *program, uint8 *buf,int len); // print debug output for entire buffer of messages
+void DDqueue_internal(const char *qn, int v, queue_item_t *qi, const char *f, int line, char *fmt, ...); // print debug output for the given queue if verbose as bit "v"
 
-#define DDpacket(B, L) { DDpacket_internal(__PROGRAM__, B, L); }
+int __ptype(int cmd);
+#define DDpacket(B, L) { DDpacket_internal(__PROGRAM__, B, L); } /* auto add PROGRAM to output */
+#define DDqueue(V, Q, FMT, ...) { DDqueue_internal(#Q, V, Q, __FILE__, __LINE__, FMT, ##__VA_ARGS__); } /* auto add FILE/LINE to output */
 
 
 

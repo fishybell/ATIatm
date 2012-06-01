@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
 
     xmit=0;
     verbose=0;
-    hardflow=0;
+    hardflow=6; // default is hardware flow control on and blocking
     strcpy(ttyport,"/dev/ttyS1");
     
     while((opt = getopt(argc, argv, "hv:f:t:x:")) != -1) {

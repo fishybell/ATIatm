@@ -164,7 +164,6 @@ typedef struct report_memory_item { /* matching reports will be ignored, items i
    struct report_memory_item *next;
 } report_memory_t;
 
-
 typedef struct minion_state {
    uint32                       cap;    // actual capability bitfield - u32 to keep alignment    
    uint8                        dev_type;   // FASIT device type
@@ -208,6 +207,9 @@ typedef struct minion_state {
    state_u8_item_t              mgs_on;
    // PHI
    state_u8_item_t              phi_on;
+
+   struct sequence_tracker *tracker;
+   int last_sequence_sent;
 
 } minion_state_t;
 
@@ -382,6 +384,19 @@ typedef struct minion_bufs {
 
 void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
+// command tracking to do stuff (whatever stuff really) when a packet is actually sent from the radio
+typedef void (*tracker_callback)(thread_data_t*, char*, void*);
+typedef struct sequence_tracker {
+   char *pkt; // copy of message (up to 48 byte messages at least) that we're tracking
+   tracker_callback sent_callback; // a function to call when we've received the response to this command
+   tracker_callback removed_callback; // a function to call when we've received the response to this command
+   void *data; // random data pointer that is passed to do_func
+   int sequence; // the sequence we're tracking
+   int missed; // a count-down value for how many times we can "miss" either sending or removing this sequence (to prevent stale values remaining allocated forever)
+
+   // we're a chain
+   struct sequence_tracker *next;
+} sequence_tracker_t;
 
 //  colors for the DCMSG  
 #include "colors.h"
@@ -531,20 +546,20 @@ typedef enum rf_target_type {
 }
 
 // common timer values
-#define FAST_SOON_TIME        2   /* 2/10 second */
-#define FAST_TIME             25  /* 2 1/2 seconds */
-#define FAST_RESPONSE_TIME    40  /* 4 seconds */
-#define SLOW_SOON_TIME        2   /* 2/10 second */
+#define FAST_SOON_TIME        5   /* 1/2 second */
+#define FAST_TIME             40  /* 4 seconds */
+#define FAST_RESPONSE_TIME    90  /* 9 seconds */
+#define SLOW_SOON_TIME        5   /* 1/2 second */
 #define SLOW_TIME             250 /* 25 seconds */
-#define SLOW_RESPONSE_TIME    40  /* 4 seconds */
-#define EVENT_SOON_TIME       2   /* 2/10 second */
+#define SLOW_RESPONSE_TIME    90  /* 9 seconds */
+#define EVENT_SOON_TIME       5   /* 1/2 second */
 #define TRANSITION_START_TIME 4   /* 4/10 second */
 #define TRANSITION_TIME       4   /* 4/10 second */
 
 // other state constants
-#define FAST_TIME_MAX_MISS 15 /* maximum value of the "missed message" counter */
-#define SLOW_TIME_MAX_MISS 10 /* maximum value of the "missed message" counter */
-#define EVENT_MAX_MISS 20 /* maximum value of the "missed message" counter */
+#define FAST_TIME_MAX_MISS 8 /* maximum value of the "missed message" counter */
+#define SLOW_TIME_MAX_MISS 4 /* maximum value of the "missed message" counter */
+#define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_UNREPORT (4*15) /* max number of reports per burst * max number of non-reports before vacuum */
 
 // common complex timer starts

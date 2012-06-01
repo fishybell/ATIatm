@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <linux/if.h>
+#include <stdio.h>
 
 #include "mcp.h"
 #include "rf.h"
@@ -8,10 +9,12 @@
 #include <sys/ioctl.h>
 #include <linux/if.h>
 #include <netinet/tcp.h>
+#include <stdarg.h>
 
 extern int verbose;
 
 
+#if 0 /* old queue stuff */
 // the RFmaster may eventually benifit if these are circular buffers, but for now
 //  we just assume that they return to 'empty' often which is easily done by just reseting the pointers
 queue_t *queue_init(int size){
@@ -61,27 +64,8 @@ int QueuePtype(queue_t *M){
    if (depth>=3) { // there are enough bytes for a command
       LB=(LB_packet_t *)M->head;
       if (RF_size(LB->cmd)<=depth){ // there are enough bytes for this command
-         if (LB->cmd==LBC_REQUEST_NEW) return(1);
-         if (LB->cmd==LBC_STATUS_REQ) return(2);
-         return(3);
+         return __ptype(LB->cmd);
       }
-   }
-   return(0);
-}
-
-// does the same as QueuePtype only with a buffer - uses CRC8 to decide if it was complete
-int Ptype(char *buf){
-   int crc;
-   LB_packet_t *LB;
-
-   LB=(LB_packet_t *)buf;
-   if (LB->cmd==LBC_ILLEGAL) return(0);    
-//   if (LB->cmd==LBC_ILLEGAL_CANCEL) return(0);    
-   crc=crc8(buf);
-   if (!crc){ // there seemed to be a good command
-      if (LB->cmd==LBC_REQUEST_NEW) return(1);
-      if (LB->cmd==LBC_STATUS_REQ) return(2);
-      return(3);
    }
    return(0);
 }
@@ -105,6 +89,37 @@ void ReQueue(queue_t *Mdst,queue_t *Msrc,int count){
    memcpy(Mdst->tail,Msrc->head,count); // copy count bytes
    Mdst->tail+=count;                           // increment the tail
    DeQueue(Msrc,count); // and remove from src queue 
+}
+
+#endif /* end of old queue stuff */
+
+// internal ptype function, used by QueuePtype, PType, and queuePtype
+int __ptype(int cmd) {
+   switch (cmd) {
+      case LBC_ILLEGAL: return 0;
+      case LBC_REQUEST_NEW: return 1;
+      case LBC_STATUS_REQ: return 2;
+      case LB_CONTROL_QUEUE: return 4;
+      case LB_CONTROL_SENT: return 4;
+      case LB_CONTROL_REMOVED: return 4;
+      case LBC_QUICK_GROUP: return 5;
+      default: return 3;
+   }
+}
+
+// does the same as QueuePtype only with a buffer - uses CRC8 to decide if it was complete
+int Ptype(char *buf){
+   int crc;
+   LB_packet_t *LB;
+
+   LB=(LB_packet_t *)buf;
+   if (LB->cmd==LBC_ILLEGAL) return(0);    
+//   if (LB->cmd==LBC_ILLEGAL_CANCEL) return(0);    
+   crc=crc8(buf);
+   if (!crc){ // there seemed to be a good command
+      return __ptype(LB->cmd);
+   }
+   return(0);
 }
 
 //  this is a macro
@@ -167,6 +182,9 @@ int RF_size(int cmd){
       case  LBC_MOVE:
       case  LBC_GROUP_CONTROL:
       case  LBC_HIT_BLANKING:
+      case  LB_CONTROL_QUEUE:
+      case  LB_CONTROL_SENT:
+      case  LB_CONTROL_REMOVED:
          return (5);
 
       case  LBC_AUDIO_CONTROL:
@@ -189,6 +207,10 @@ int RF_size(int cmd){
 
       case  LBC_DEVICE_REG:
          return (12);
+
+      case  LBC_QUICK_GROUP:
+         return (165);
+         //return (1);
 
       default:
          return (1);
@@ -253,6 +275,9 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
             break;
          case 3:
             color=GREEN;
+            break;
+         case 4:
+            color=CYAN;
             break;
          default:
             color=RED;
@@ -327,6 +352,11 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
             sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
             break;
 
+         case LBC_QUICK_GROUP:
+            strcpy(cmdname,"Quick Group");
+            sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
+            break;
+
          case LBC_POWER_CONTROL:
             strcpy(cmdname,"Power_Control");
             sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
@@ -338,14 +368,12 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
             break;
 
          case LBC_ACCESSORY: {
-                                DDCMSG(D_NEW,RED,"What what?");
             LB_accessory_t *L=(LB_accessory_t*)LB;
             strcpy(cmdname,"Accessory");
             sprintf(hbuf,"RFaddr=%3d on=%d type=%d rdelay=%d idelay=%d",L->addr,L->on,L->type,L->rdelay,L->idelay);
          }  break;
 
          case LBC_HIT_BLANKING: {
-                                DDCMSG(D_NEW,RED,"What what!");
             LB_hit_blanking_t *L=(LB_hit_blanking_t*)LB;
             strcpy(cmdname,"Hit_Blanking");
             sprintf(hbuf,"RFaddr=%3d blanking=%d",L->addr,L->blanking);
@@ -383,6 +411,30 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
             LB_qconceal_t *L=(LB_qconceal_t *)LB;
             strcpy(cmdname,"Qconceal");
             sprintf(hbuf,"RFaddr=%3d event=%2d uptime=%d dsec",L->addr,L->event,L->uptime);
+         }
+         break;
+
+         case LB_CONTROL_QUEUE:
+         {
+            LB_control_queue_t *L=(LB_control_queue_t *)LB;
+            strcpy(cmdname,"Control*Queue");
+            sprintf(hbuf,"RFaddr=%3d sequence:%i",L->addr,L->sequence);
+         }
+         break;
+
+         case LB_CONTROL_SENT:
+         {
+            LB_control_sent_t *L=(LB_control_sent_t *)LB;
+            strcpy(cmdname,"Control*Sent");
+            sprintf(hbuf,"RFaddr=%3d sequence:%i",L->addr,L->sequence);
+         }
+         break;
+
+         case LB_CONTROL_REMOVED:
+         {
+            LB_control_removed_t *L=(LB_control_removed_t *)LB;
+            strcpy(cmdname,"Control*Removed");
+            sprintf(hbuf,"RFaddr=%3d sequence:%i",L->addr,L->sequence);
          }
          break;
 
@@ -575,3 +627,373 @@ uint8 crc8(void *cbuf) {
    return crc;
 }
 
+// new queue code
+
+
+// finds the total length of message data in the queue -- future -- to see if we should try collating or not
+int queueLength(queue_item_t *qi) {
+   int length = 0;
+   while (qi != NULL) {
+      length += qi->size;
+      qi = qi->next;
+   }
+   return length;
+}
+
+// peeks at queue and returns message type
+int queuePtype(queue_item_t *qi) {
+   if (qi->cmd <= 0 && qi->next != NULL) {
+      // qi is head object that contains no data
+      return qi->next->ptype;
+   } else {
+      // qi is an item
+      return qi->ptype;
+   }
+}
+
+// finds the total number items in the queue
+int queueSize(queue_item_t *qi) {
+   int size = 0;
+   while (qi != NULL) {
+      if (qi->size > 0) {
+         size++;
+      }
+      qi = qi->next;
+   }
+   return size;
+}
+
+// frees memory, unlinks, fills buf with a "removed" response message (bsize should come filled in with the size of
+//   buf, and after return contains size of data in buf)
+void removeItem(queue_item_t *qi, char *buf, int *bsize) {
+   // link previous item to next item
+   if (qi->prev != NULL) {
+      // build message
+      LB_control_removed_t *lcr = (LB_control_removed_t*)buf;
+      if (buf != NULL && bsize != NULL && *bsize >= RF_size(LB_CONTROL_REMOVED) && /* should build message and ... */
+          qi->addr != -1 && qi->sequence != -1) { /* has valid response data set */
+         DDCMSG(D_POINTER, GRAY, "Creating a \"Removed\" message for c:%i a:%i s:%i", qi->cmd, qi->addr, qi->sequence);
+         lcr->cmd = LB_CONTROL_REMOVED;
+         lcr->addr = qi->addr;
+         lcr->sequence = qi->sequence;
+         *bsize = RF_size(lcr->cmd);
+         set_crc8(lcr);
+      } else if (bsize != NULL) {
+         *bsize = 0; // nothing set as was not valid
+      }
+
+      // unlink
+      if (qi->next != NULL) {
+         // stitch previous and next items together
+         qi->next->prev = qi->prev; // remove qi from original queue
+         qi->prev->next = qi->next; // ...
+      } else {
+         // qi was end of queue
+         qi->prev->next = NULL;
+      }
+
+      // free memory
+      free(qi->msg);
+      free(qi);
+   } else {
+      // no previous item, that means we're a head item, which means we won't be doing anything here
+      if (bsize != NULL) {
+         *bsize = 0;
+      }
+   }
+}
+
+// same as removeItem(...), but response message is "sent" (bsize should come filled in with the size of buf,
+//   and after return contains size of data in buf)
+void sentItem(queue_item_t *qi, char *buf, int *bsize) {
+   // link previous item to next item
+   if (qi->prev != NULL) {
+      // build message
+      LB_control_sent_t *lcs = (LB_control_sent_t*)buf;
+      if (buf != NULL && bsize != NULL && *bsize >= RF_size(LB_CONTROL_SENT) && /* should build message and ... */
+          qi->addr != -1 && qi->sequence != -1) { /* has valid response data set */
+         DDCMSG(D_POINTER, GRAY, "Creating a \"Sent\" message for c:%i a:%i s:%i", qi->cmd, qi->addr, qi->sequence);
+         lcs->cmd = LB_CONTROL_SENT;
+         lcs->addr = qi->addr;
+         lcs->sequence = qi->sequence;
+         *bsize = RF_size(lcs->cmd);
+         set_crc8(lcs);
+      } else if (bsize != NULL) {
+         *bsize = 0; // nothing set as was not valid
+      }
+
+      // unlink
+      if (qi->next != NULL) {
+         // stitch previous and next items together
+         qi->next->prev = qi->prev; // remove qi from original queue
+         qi->prev->next = qi->next; // ...
+      } else {
+         // qi was end of queue
+         qi->prev->next = NULL;
+      }
+
+      // free memory
+      DDCMSG(D_POINTER, BLACK, "About to free msg %p and qi %p", qi->msg, qi);
+      free(qi->msg);
+      free(qi);
+   } else {
+      // no previous item, that means we're a head item, which means we won't be doing anything here
+      if (bsize != NULL) {
+         *bsize = 0;
+      }
+   }
+}
+
+// assuming qi is the head of the queue, this deallocates the memory and unlinks the whole queue, leaving the
+//   head unlinked but otherwise intact (no "removed" or "sent" messages are created)
+void clearQueue(queue_item_t *qi) {
+   while (qi != NULL) {
+      queue_item_t *tmp = qi->next;
+      removeItem(qi, NULL, NULL);
+      qi = tmp;
+   }
+}
+
+// queue a new RF message on the back of an existing queue
+void enQueue(queue_item_t *qi, char *msg, int sequence) {
+   queue_item_t *orig = qi;
+   LB_packet_t *pkt = (LB_packet_t*)msg; // map header to message
+   if (qi != NULL) {
+      // create new queue item
+      queue_item_t *new;
+      new = malloc(sizeof(queue_item_t));
+      memset(new, 0, sizeof(queue_item_t));
+
+      // set values
+      new->size = RF_size(pkt->cmd);
+      new->msg = malloc(new->size);
+      memcpy(new->msg, msg, new->size);
+      new->cmd = pkt->cmd & 0x1f;
+      new->addr = pkt->addr & 0x7ff;
+      new->sequence = sequence & 0xffff;
+      new->ptype = __ptype(pkt->cmd);
+
+      // link
+      qi = queueTail(qi);
+      new->prev = qi;
+      qi->next = new;
+      new->next = NULL;
+   }
+}
+
+// put the entire "from" queue into the front of the "into" queue
+void reQueue(queue_item_t *into, queue_item_t *from, queue_item_t *until) {
+   queue_item_t *tail, *ihead, *fhead;
+   if (into == NULL || from == NULL) {
+      return; // nothing to do if we don't have real queues
+   }
+   // find head of into
+   ihead = into->next;
+
+   // find head of from
+   fhead = from->next;
+
+   if (fhead == NULL) {
+      return; // putting a queue with no items to the front of the into queue is now done
+   }
+
+   // find tail of from (or at least last item before until)
+   tail = from;
+   while (tail->next != until) {
+      tail = tail->next;
+   }
+
+   // link into to from head
+   into->next = fhead;
+   fhead->prev = into;
+
+   // link from tail to into head
+   tail->next = ihead;
+   if (ihead != NULL) {
+      ihead->prev = tail;
+   }
+
+   // link from to until
+   from->next = until;
+   if (until != NULL) {
+      until->prev = from;
+   }
+}
+
+// find the tail of a queue
+queue_item_t *queueTail(queue_item_t* qi) {
+   queue_item_t *tail = qi;
+   while (tail->next != NULL) {
+      //DCMSG(YELLOW, "Looking for tail: %p -> %p", tail, tail->next);
+      tail = tail->next;
+   }
+   //DCMSG(YELLOW, "Found tail %p -> %p", tail, tail->next);
+   return tail;
+}
+
+// create a burst message to be sent from the Rx queue. all items put in the burst are put in the Tx queue for
+//   manual removal and sending of "sent" messages after actual send. if send is unsuccessful, items can be
+//   requeued to Rx by linking Tx's tail to Rx's head, then Rx's head becomes Tx's head. (bsize should come
+//   filled in with the size of buf, and after return contains size of data in buf)
+void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *remaining_time, int slottime) {
+   int should_end = 0;
+   queue_item_t *qi = Rx->next; // start at head of Rx
+   queue_item_t *tail = queueTail(Tx), *temp;
+   int bs = *bsize; // remember how much we have left
+   *remaining_time = 50; // reset our remaining_time before we are allowed to Tx again   time needs to be smarter
+#define QI2BUF(qi, buf) {\
+   memcpy(buf, qi->msg, qi->size); \
+   buf += qi->size; \
+   bs -= qi->size; \
+}
+#define MOVE_Q(qi, tail) {\
+   temp = qi->next; /* the next item we will use */ \
+   if (qi->next != NULL) { \
+      /* stitch previous and next items together */ \
+      qi->next->prev = qi->prev; /* remove qi from original queue */ \
+      qi->prev->next = qi->next; /* ... */ \
+   } else { \
+      /* qi was end of queue */ \
+      qi->prev->next = NULL; \
+   } \
+   tail->next = qi; /* move to tail of new queue */ \
+   qi->prev = tail; /* ... */ \
+   qi->next = NULL; /* ... */ \
+   tail = tail->next; /* move tail */ \
+   qi = temp; /* next item in original queue */ \
+}
+   while (should_end != 1 && /* we haven't buffered a request-new message */
+         qi != NULL && /* we still have more messages in the queue */
+         bs > 16) { /* buffer has enough size for another non quick-group message */
+      // look at current packet
+      switch (qi->ptype) {
+         case 0: // illegal
+            // move on
+            break;
+
+         case 1: // request new message
+            // check if we've already gone over our 1 second time limit...
+            if (*remaining_time >= 1000) {
+               // ...and end without queueing this message if we have
+               should_end = 1;
+               continue;
+            }
+            // move timers
+            *remaining_time += (10*slottime); // time for each response: 10 slots = 8 + padding on each end
+            // queue
+            QI2BUF(qi, buf);
+            break;
+
+         case 2: // status request
+            // check if we've already gone over our 1 second time limit...
+            if (*remaining_time >= 1000) {
+               // ...and end without queueing this message if we have
+               should_end = 1;
+               continue;
+            }
+            // move timers
+            *remaining_time +=slottime; // add time for a response to this message
+            // queue
+            QI2BUF(qi, buf);
+            break;
+
+         case 3: // normal
+            // queue
+            QI2BUF(qi, buf);
+            break;
+
+         case 4: // control message
+            // move on
+            break;
+
+         case 5: // quick group
+            should_end = 1; // so we'll end after this whether we add it to the queue or not
+            if (qi->next != NULL && bs >= (qi->size + qi->next->size)) {
+               DCMSG(RED, "\n\n----------------------------\nQueue Quick Group %i %i %i\n--------------------------\n", bs, qi->size, qi->next->size);
+               // find out how many pseudo messages we're looking at
+               LB_quick_group_t *lqg = (LB_quick_group_t*)qi->msg;
+               int num = lqg->number;
+               int pkts = 0;
+               while (num-- > 0) {
+                  pkts += lqg->addresses[num].number;
+               }
+
+               // move timers
+               if (qi->next->ptype == 2) {
+                  // check if we've already gone over our 1 second time limit...
+                  if (*remaining_time >= 1000) {
+                     // ...and end without queueing this message if we have
+                     continue;
+                  }
+                  // quick group for a status request
+                  *remaining_time += (pkts*slottime); // add time for a response to each pseudo message
+               }
+
+               // queue
+               QI2BUF(qi, buf);
+
+               // move on to next item
+               MOVE_Q(qi, tail);
+
+               // queue
+               QI2BUF(qi, buf);
+            } // if we didn't send, the next time a burst is created it will have enough room
+            break;
+      } 
+      // move to back of Tx queue and move on to next item
+      MOVE_Q(qi, tail);
+   } /* end of queue loop */
+   *bsize -= bs; // bsize will now be how many we used
+}
+
+// print debug output for the given queue if verbose as bit "v"
+void DDqueue_internal(const char *qn, int v, queue_item_t *qi, const char *f, int line, char *fmt, ...) {
+   int i = 1;
+   char msg[1024];
+   va_list ap;
+   va_start(ap, fmt);
+   vsnprintf(msg, 1024, fmt, ap);
+   va_end(ap);
+   if ((verbose&v)==v) {
+      DCOLOR(MAGENTA);
+      printf("Q %s @ %s:%i %s: ", qn, f, line, msg);
+      do {
+         printf("(%i) %p ", i++, qi);
+         if (qi == NULL) {
+            break;
+         } else {
+            int color;
+            switch (qi->ptype) {
+               case 1:
+                  color=YELLOW;
+                  break;
+               case 2:
+                  color=BLUE;
+                  break;
+               case 3:
+                  color=GREEN;
+                  break;
+               case 4:
+                  color=CYAN;
+                  break;
+               default:
+                  color=RED;
+                  break;
+            }
+
+            DCOLOR(color);
+            printf("(p:%p, m:%p, s:%i, c:%i, a:%i, sq:%i) ", qi->prev, qi->msg, qi->size, qi->cmd, qi->addr, qi->sequence);
+            DCOLOR(MAGENTA);
+         }
+         if ((i % 3) == 0) {
+            // three in a row == enough for this line, start a new one
+            printf("->\n");
+         } else {
+            printf("-> ");
+         }
+         qi = qi->next;
+      } while (qi != NULL);
+      printf("(nil)\n");
+      DCOLOR(black);
+   }
+}

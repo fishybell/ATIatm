@@ -15,7 +15,10 @@ MCFILES = serial.c timestamp.c htonll.c rf.c
 
 
 #default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm
-default: mcp RFmaster RFmaster.arm RFdump RFdump.arm RFslave.new RFslave.new.arm slaveboss.arm
+default: qtest mcp RFmaster RFmaster.arm RFdump RFdump.arm RFslave.new RFslave.new.arm slaveboss.arm
+
+qtest : qtest.c $(HFILES) $(MCFILES)
+	gcc -lrt -std=gnu99 -o qtest qtest.c $(MCFILES)
 
 mcp : mcp.c minion_state.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion_state.c minion.c $(MCFILES)

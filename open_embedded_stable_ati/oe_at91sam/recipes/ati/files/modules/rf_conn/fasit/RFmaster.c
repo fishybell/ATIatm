@@ -121,7 +121,7 @@ static void queueMsg(char *msgbuf, int *buflen, void *msg, int size) {
 
 void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    struct timespec elapsed_time, start_time, istart_time,delta_time, dwait_time, collect_time;
-   queue_t *Rx,*Tx;
+   queue_item_t *Rx,*Tx,*qi;
    int Queue_Contains[2048]; // used to see what commands the outbound queue contains. max of rf addr 2047, 0 is not used
    int seq=1;           // the packet sequence numbers
 
@@ -138,7 +138,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    int inittime=0,slottime=0,total_slots;
    int low_dev,high_dev;
    int burst,ptype,packets;
-   LB_burst_t LBb;
+   LB_burst_t *LBb;
    char mcpbuf[MCP_BUF_SIZE];
    int mcpbuf_len=0;
    // epoll stuff
@@ -185,11 +185,18 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    Rstart=Rptr;
    gathered=0;
    
+   /* old queue stuff
    Rx=queue_init(Rxsize);       // incoming packet buffer
    Tx=queue_init(Txsize);       // outgoing Tx buffer
+   end of old queue stuff */
+   Rx = malloc(sizeof(queue_item_t));
+   memset(Rx, 0, sizeof(queue_item_t));
+   Tx = malloc(sizeof(queue_item_t));
+   memset(Tx, 0, sizeof(queue_item_t));
 
-   memset(Rstart,0,100);
    memset(Queue_Contains, 0, 2048);
+   DDqueue(D_MEGA|D_POINTER, Rx, "initialized"); 
+   DDqueue(D_MEGA|D_POINTER, Tx, "initialized"); 
 
    remaining_time=100;          //  remaining time before we can transmit (in ms)
 
@@ -249,7 +256,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
 
       TIMESTAMP_NOW;
       DDCMSG(D_TIME,YELLOW,"before select remaining_time=%d  Rx[%d] Tx[%d] @ time %5ld.%03ld"
-             ,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx), elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+             ,remaining_time,queueLength(Rx),queueLength(Tx), elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+      DDqueue(D_MEGA|D_POINTER, Rx, "top of loop"); 
+      DDqueue(D_MEGA|D_POINTER, Tx, "top of loop"); 
 
       // check that we're waiting at least rtime   configurable via command line with the option -r
       if (remaining_time < rtime) { // look at rtime, maximum of collecting_time-cdelta
@@ -266,8 +275,8 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          timeout.tv_usec=(max(collecting_time-cdelta, remaining_time)%1000)*1000;
       }
       // if we don't have anything in the queue, don't timeout
-      bytecount=Queue_Depth(Rx);
-      bytecount2=Queue_Depth(Tx);
+      bytecount=queueLength(Rx);
+      bytecount2=queueLength(Tx);
       TIMESTAMP_NOW;
       if (bytecount <= 0 && mcpbuf_len <= 0) {
          DDCMSG(D_NEW,CYAN,"BEFORE SELECT: in: %i, out: %i, mcp: %i, remaining_t=%d, elapsed_t=%3ld.%03ld, delta_t=%3ld.%03ld, dwait_t=%3ld.%03ld, timeout=INFINITE, ", bytecount, bytecount2, mcpbuf_len, remaining_time, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l, delta_time.tv_sec, delta_time.tv_nsec/1000000l, dwait_time.tv_sec, dwait_time.tv_nsec/1000000l);
@@ -295,7 +304,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
       // find all waiting connections
       ep_rf=-1; ep_mcp=-1; ep_ris=-1; ep_ric=-1; // none marked yet
       for (n = 0; !close_nicely && n < nfds; n++) {
-         DDCMSG(D_NEW, YELLOW, "Looking at %i in events...%i", n, events[n].data.fd);
+         //DDCMSG(D_NEW, YELLOW, "Looking at %i in events...%i", n, events[n].data.fd);
          if (events[n].data.fd == RFfd) { // RFfd is ready...
             ep_rf = n; // ...at index n
          } else if (events[n].data.fd == MCPsock) { // MCPsock is ready...
@@ -337,10 +346,12 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          DDCMSG(D_TIME,CYAN,"delta=%2ims",delta);
 
          DDCMSG(D_TIME,YELLOW,"select timed out  delta=%d remaining_time=%d  Rx[%d] Tx[%d]"
-                ,delta,remaining_time,Queue_Depth(Rx),Queue_Depth(Tx));
+                ,delta,remaining_time,queueLength(Rx),queueLength(Tx));
+         DDqueue(D_MEGA|D_POINTER, Rx, "timed out"); 
+         DDqueue(D_MEGA|D_POINTER, Tx, "timed out"); 
 
          // if we timed out to process an RF transmission
-         bytecount=Queue_Depth(Rx);
+         bytecount=queueLength(Rx);
          if (bytecount <= 0 && mcpbuf_len <= 0) {
             TIMESTAMP_NOW;
             DDCMSG(D_NEW,GRAY,"Timed out, but didn't do anything: elapsed_t=%5ld.%03ld delta_t=%5ld.%03ld, dwait_t=%5ld.%03ld, bytecount: %i, mcpbuf_len: %i"
@@ -391,21 +402,24 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
              ******               meant for us
              ******/
 
-            DDCMSG(D_MEGA,YELLOW,"ptype rx=%d before Rx to Tx.  Rx[%d] Tx[%d]",QueuePtype(Rx),Queue_Depth(Rx),Queue_Depth(Tx));
+            DDCMSG(D_MEGA,YELLOW,"ptype rx=%d before Rx to Tx.  Rx[%d] Tx[%d]",queuePtype(Rx),queueLength(Rx),queueLength(Tx));
+            DDqueue(D_MEGA|D_POINTER, Rx, "before"); 
+            DDqueue(D_MEGA|D_POINTER, Tx, "before"); 
 
             // loop until we are out of complete packets, and place them into the Tx queue
             burst=3;            // remembers if we upt a type2 into the burst
             packets=0;          // remembers the number of packets in a burst
             remaining_time = 50;       // reset our remaining_time before we are allowed to Tx again   time needs to be smarter
 
-            while((ptype=QueuePtype(Rx))&&              /* we have a complete packet */
+#if 0 /* old queue code */
+            while((ptype=queuePtype(Rx))&&              /* we have a complete packet */
                   burst &&                              /* and burst is not 0 (0 forces us to send) */
-                  (Queue_Depth(Tx)<239)&&               /*  room for more */
+                  (queueLength(Tx)<239)&&               /*  room for more */
                   !((ptype==1)&&(burst==2))                           /* and if we are NOT a REQUEST_NEW.   requests get bursted like everything else */
                  ){     
 
 
-               DDCMSG(D_MEGA,CYAN,"in loop.  Rx[%d] Tx[%d]",Queue_Depth(Rx),Queue_Depth(Tx));
+               DDCMSG(D_MEGA,CYAN,"in loop.  Rx[%d] Tx[%d]",queueLength(Rx),queueLength(Tx));
                if (ptype==1){   /*  parse it to get the slottime and devid range, and set burst to 0 */
                   LB_new =(LB_request_new_t *) Rx->head;        // we need to parse out the slottime, high_dev and low_dev from this packet.
                   inittime=LB_new->inittime*5;          // convert passed initial time back to milliseconds
@@ -447,28 +461,44 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             }  // end of while loop to build the Tx packet
 
             if (packets > 0) {
-               // build burst header and put in front of transmission (always, even if only one message is being sent)
-               LBb.cmd = LBC_BURST;
-               LBb.number=packets&0x7f; // max of 7 bits for number of packets
-               set_crc8(&LBb);
-               QueuePush(Tx, &LBb, RF_size(LBb.cmd));
+#endif /* end of old queue code */
+            {
+               char TransBuf[254]; // max size we can reliably send on dtxm radio
+               char *tbuf;
+               int tbuf_size;
+
+               // build burst header into the front of transmission (always, even if only one message is being sent)
+               LBb = (LB_burst_t*)TransBuf;
+               LBb->cmd = LBC_BURST;
+               tbuf = TransBuf + RF_size(LBb->cmd);
+               tbuf_size = 254 - RF_size(LBb->cmd);
+
+               // queue packets into the burst buffer
+               queueBurst(Rx, Tx, tbuf, &tbuf_size, &remaining_time, slottime);
+               DDqueue(D_MEGA|D_POINTER, Rx, "after q burst"); 
+               DDqueue(D_MEGA|D_POINTER, Tx, "after q burst"); 
+
+               // set values for burst header
+               LBb->number=queueSize(Tx)&0x7f; // max of 7 bits for number of packets
+               set_crc8(LBb);
+               tbuf_size = RF_size(LBb->cmd) + queueLength(Tx); // recalculate tbuf_size based on actual size
 
                /***********    Send the RF burst
                 ***********
                 ***********/
 
-               DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%d]",Queue_Depth(Tx));
+               DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%d]", tbuf_size);
                DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %d %d", remaining_time, inittime);
                remaining_time += (inittime*2) + (364*2); // add initial delay time (for beginning and end) and DTXM measured delaya (for beggining and end)
 
-               if (Queue_Depth(Tx)){  // if we have something to Tx, Tx it.
+               if (tbuf_size > RF_size(LBb->cmd)) {  // if we have something to Tx, Tx it.
                   TIMESTAMP_NOW;
                   DDCMSG(D_TIME, YELLOW, "TX @ Remaining time: %d %d, Elapsed time: %5ld.%03ld ", remaining_time, slottime, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
 
                   // when we're sending, we're busy, tell the Radio Interface client
                   if (*riclient > 0) {
                      char ri_buf[128];
-                     snprintf(ri_buf, 128, "B %i\n", (5 * (Queue_Depth(Tx)) / 3) + 37 + remaining_time); // number of bytes * baud rate = milliseconds (9600 baud / 2 for overhead => 600 bytes a second => 5/3 second for 1000 bytes) + transmit delays
+                     snprintf(ri_buf, 128, "B %i\n", (5 * (queueLength(Tx)) / 3) + 37 + remaining_time); // number of bytes * baud rate = milliseconds (9600 baud / 2 for overhead => 600 bytes a second => 5/3 second for 1000 bytes) + transmit delays
                      DDCMSG(D_RF|D_VERY, BLACK, "writing riclient %s", ri_buf);
                      result=write(*riclient, ri_buf, strnlen(ri_buf, 128));
                      // add radio interface client socket to epoll
@@ -478,33 +508,65 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                   }
 
                   setblocking(RFfd);
-                  result=write(RFfd,Tx->head,Queue_Depth(Tx));
+                  result=write(RFfd, TransBuf, tbuf_size);
                   setnonblocking(RFfd);
                   if (result<0){
                      strerror_r(errno,buf,200);                
                      DCMSG(RED,"write Tx queue to RF error %s",buf);
+                     // TODO -- requeue to Rx? die? what?
+                     DDqueue(D_POINTER, Tx, "dead 1"); 
+                  } else if (result == 0) {
+                     DCMSG(RED,"write Tx queue to RF returned 0");
+                     // TODO -- requeue to Rx? die? what?
+                     DDqueue(D_POINTER, Tx, "dead 2"); 
                   } else {
-                     if (!result){
-                        DCMSG(RED,"write Tx queue to RF returned 0");
-                     }
-                     if (verbose&D_RF){
-                           sprintf(buf,"[%03d] %4ld.%03ld  ->RF [%2i] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
-                           printf("%s",buf);
-                           printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
-                           if(result>1){
-                              for (int i=0; i<result-1; i++) printf("%02x.", (uint8) Tx->head[i]);
-                           }
-                           printf("%02x\n", (uint8) Tx->head[result-1]);
-                     }  
-                     if (verbose&D_PARSE){
-                        DDpacket(Tx->head,result);
+                     if (result == tbuf_size) {
+                        if (verbose&D_RF) {
+                              sprintf(buf,"[%03d] %4ld.%03ld  ->RF [%2i] ",D_PACKET,elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l,result);
+                              printf("%s",buf);
+                              printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                              if (result>1) {
+                                 for (int i=0; i<result-1; i++) printf("%02x.", (uint8) TransBuf[i]);
+                              }
+                              printf("%02x\n", (uint8) TransBuf[result-1]);
+                        }
+                        if (verbose&D_PARSE) {
+                           DDCMSG(D_NEW, GREEN, "-> RF:");
+                           DDpacket(TransBuf,result);
+                        } else {
+                           DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF", result);
+                        }
                      } else {
-                        DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF", result);
+                        DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF, but should have transmitted %i", result, tbuf_size);
+                        if (verbose&D_PARSE) {
+                           DDpacket(TransBuf,result);
+                        }
+                        // TODO -- requeue unset packets to Rx? die? what?
+                        DDqueue(D_POINTER, Tx, "dead 3"); 
                      }
                   }
-                  //DeQueue(Tx,Queue_Depth(Tx));
-                  ClearQueue(Tx);
-
+                  // remove items from Tx queue, sending messages back to mcp as needed
+                  DDqueue(D_MEGA|D_POINTER, Tx, "Tx before sentItems...", queueLength(Tx));
+                  qi = Tx->next; // remove from head
+                  //DDCMSG(D_POINTER, BLACK, "Looking at Tx (%p) head %p", Tx, qi);
+                  while (qi != NULL) {
+                     char tbuf[256];
+                     int t=256;
+                     if (qi->ptype == 2 && (Queue_Contains[qi->addr] & (1<<qi->cmd))) {
+                        // no longer in Rx queue; un-mark
+                        DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: %i currently in queue for addr %i (%p)", qi->cmd, qi->addr, Queue_Contains[qi->addr]);
+                        Queue_Contains[qi->addr] ^= (1<<qi->cmd);
+                        DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: %i no longer in queue for addr %i (%p)", qi->cmd, qi->addr, Queue_Contains[qi->addr]);
+                     }
+                     sentItem(qi, tbuf, &t);
+                     if (t > 0) {
+                        DDCMSG_HEXB(D_POINTER,RED,"Writing to MCPsock: ",tbuf,t);
+                        write(MCPsock, tbuf, t);
+                     }
+                     qi = Tx->next; // look at new head
+                     //DDCMSG(D_POINTER, BLACK, "Looking at new Tx (%p) head %p", Tx, qi);
+                  }
+                  DDqueue(D_MEGA|D_POINTER, Tx, "Tx before sentItems...", queueLength(Tx));
                }
                TIMESTAMP_NOW;
                // adjust dwait_time to the time to nothing, as we haven't waited anything yet
@@ -515,16 +577,19 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                rfcount+=MsgSize;
                cps=(double) rfcount/(double)elapsed_time.tv_sec;
                DDCMSG(D_TIME,CYAN,"RFmaster average cps = %f.  max at current duty is %d",cps,maxcps);
+            }
+#if 0 /* old queue code */
             } else {
-               DDCMSG(D_NEW,GREEN,"Failed to send any messages from Rx buffer of size %i", Queue_Depth(Rx));
+               DDCMSG(D_NEW,GREEN,"Failed to send any messages from Rx buffer of size %i", queueLength(Rx));
                if (D_NEW&verbose==D_NEW) {
-                  for (int i=0; i<Queue_Depth(Rx); i++) {
+                  for (int i=0; i<queueLength(Rx); i++) {
                      LB=(LB_packet_t *)(Rx->head+i);   // map the header in
                      DCMSG(GREEN, "Looking at char %i -> %i:", i, i+RF_size(LB->cmd));
-                     DDpacket(Rx->head+i, Queue_Depth(Rx) - i); // parse everything via this offset to see what it looks like
+                     DDpacket(Rx->head+i, queueLength(Rx) - i); // parse everything via this offset to see what it looks like
                   }
                }
             }
+#endif /* end of old queue code */
          }
          // if we timed out to process MCP messages
          if (mcpbuf_len > 0) {
@@ -569,7 +634,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
       if (*riclient > 0 && FD_ISSET(*riclient,&rf_or_mcp))
 #endif /* end of old select method */
       if (*riclient > 0 && ep_ric != -1) {
-         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(riclient)=%i @ time %5ld.%03ld", ep_ric, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+         DDCMSG(D_VERY|D_NEW,BLACK,"RFmaster FD_ISSET(riclient)=%i @ time %5ld.%03ld", ep_ric, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
          int size;
          char buf[128];
          int err;
@@ -593,7 +658,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
       if (FD_ISSET(risock,&rf_or_mcp))
 #endif /* end of old select method */
       if (ep_ris != -1) {
-         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(risock)=%i @ time %5ld.%03ld", ep_ris, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+         DDCMSG(D_VERY|D_NEW,BLACK,"RFmaster FD_ISSET(risock)=%i @ time %5ld.%03ld", ep_ris, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
          int newclient = -1;
          struct sockaddr_in ClntAddr;   /* Client address */
          unsigned int clntLen;               /* Length of client address data structure */
@@ -635,7 +700,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
       if (FD_ISSET(RFfd,&rf_or_mcp))
 #endif /* end of old select method */
       if (ep_rf != -1) {
-         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(RFfd)=%i @ time %5ld.%03ld", ep_rf, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+         DDCMSG(D_VERY|D_NEW,BLACK,"RFmaster FD_ISSET(RFfd)=%i @ time %5ld.%03ld", ep_rf, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
 
          // while gathering RF data, we're busy, tell the Radio Interface client
          if (*riclient > 0) {
@@ -643,7 +708,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             write(*riclient, "B\n", 2);
          }
 
-         DDCMSG(D_MEGA,BLACK,"RFmaster FD_ISSET(RFfd)");
+         DDCMSG(D_VERY|D_NEW,BLACK,"RFmaster FD_ISSET(RFfd)");
          /* Receive message, or continue to recieve message from RF */
          Rptr = Rbuf + Rsize;
          if ((gotrf = gather_rf(RFfd,Rptr,RF_BUF_SIZE-Rsize)) > 0) {
@@ -654,25 +719,26 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          }
 
          if (gotrf <= 0) {
-            DDCMSG(D_NEW,BLACK,"RFmaster RF Received no data: %p %i", riclient, gotrf);
+            DDCMSG(D_NEW,GRAY,"RFmaster RF Received no data: %p %i", riclient, gotrf);
          } else {
-            DDCMSG(D_NEW,BLACK,"RFmaster RF Received %i bytes", gotrf);
+            DDCMSG(D_NEW,GRAY,"RFmaster RF Received %i bytes", gotrf);
          }
+         DDpacket(Rbuf, Rsize);
 
          // after gathering RF data, we're free, tell the Radio Interface client
-         DDCMSG(D_NEW,BLACK,"RFmaster got to here 1...");
+         //DDCMSG(D_NEW,BLACK,"RFmaster got to here 1...");
          if (gotrf <= 0) {
-            DDCMSG(D_NEW,BLACK,"RFmaster got to here 3...");
-            DDCMSG(D_NEW,BLACK,"clowing riclient %i", *riclient);
+            //DDCMSG(D_NEW,BLACK,"RFmaster got to here 3...");
+            //DDCMSG(D_NEW,BLACK,"clowing riclient %i", *riclient);
             close(*riclient);
             *riclient = -1;
             // new epoll method
             epoll_ctl(efd, EPOLL_CTL_DEL, *riclient, NULL);
          } else if (*riclient > 0) {
-            DDCMSG(D_RF|D_VERY, BLACK, "writing riclient %i F\\n", *riclient);
+            //DDCMSG(D_RF|D_VERY, BLACK, "writing riclient %i F\\n", *riclient);
             write(*riclient, "F\n", 2);
          }
-         DDCMSG(D_NEW,BLACK,"RFmaster got to here 2...");
+         //DDCMSG(D_NEW,BLACK,"RFmaster got to here 2...");
 
          /* send valid message(s) to mcp */
          Rstart = Rbuf;
@@ -682,12 +748,14 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             size=RF_size(LB->cmd);
             crc=(size > 2) ? crc8(LB) : 1; // only calculate crc if we have a valid size
             if (!crc) {
+               /* -- this should happen on receipt of an assign addr from the mcp, not a device reg from a device
                if (LB->cmd == LBC_DEVICE_REG) {
-                  DDCMSG(D_NEW,GRAY,"clearing what we think the queue contains for %i %p", LB->addr, Queue_Contains[LB->addr]);
+                  DDCMSG(D_NEW,GRAY,"Can't clear queue_contains because I think the address is %i, but LBC_DEVICE_REG has no addr field...", LB->addr);
                   // clear out what we think the queue contains when we have a device register itself
-                  LB_device_reg_t *reg = (LB_device_reg_t*)Rstart;
-                  Queue_Contains[LB->addr] = 0;
-               }
+                  //LB_device_reg_t *reg = (LB_device_reg_t*)Rstart;
+                  //Queue_Contains[LB->addr] = 0;
+               } -- end of "shouldn't happen here" */
+               DDpacket(Rstart,size);
                queueMsg(mcpbuf, &mcpbuf_len, Rstart, size); // queue for transmission later
                #if 0 /* start of old, pre-queue, method */
                result=write(MCPsock,Rstart,size);
@@ -727,6 +795,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                }
                Rsize = Rptr - Rbuf;
                DDCMSG(D_NEW, BLACK, "After msg cleared from buffer %i, %i, %i, %08x, %08x, %08x", end, size, Rsize, Rbuf, Rstart, Rptr);
+               DDpacket(Rbuf, Rsize);
             } else {
                Rstart++;
             }
@@ -835,10 +904,12 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
       if (FD_ISSET(MCPsock,&rf_or_mcp))
 #endif /* end of old select method */
       if (ep_mcp != -1) {
+         char RecvBuf[1024], *rbuf;
          int err;
-         DDCMSG(D_NEW,BLACK,"RFmaster FD_ISSET(MCPsock)=%i @ time %5ld.%03ld", ep_mcp, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
+         rbuf = RecvBuf; // for now, point to start of receive buffer
+         DDCMSG(D_VERY|D_NEW,BLACK,"RFmaster FD_ISSET(MCPsock)=%i @ time %5ld.%03ld", ep_mcp, elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000l);
          /* Receive message from MCP and read it directly into the Rx buffer */
-         MsgSize = recv(MCPsock, Rx->tail, Rxsize-(Rx->tail-Rx->buf),0);
+         MsgSize = recv(MCPsock, rbuf, 1024, 0);
          err=errno;
 
          if (verbose&D_PACKET){
@@ -846,9 +917,13 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
             printf("%s",buf);
             printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
             if(MsgSize>1){
-               for (int i=0; i<MsgSize-1; i++) printf("%02x.", (uint8) Rx->tail[i]);
+               for (int i=0; i<MsgSize-1; i++) printf("%02x.", (uint8) rbuf[i]);
             }
-            printf("%02x\n", (uint8) Rx->tail[MsgSize-1]);
+            printf("%02x\n", (uint8) rbuf[MsgSize-1]);
+         }
+         if (verbose&D_POINTER) {
+            DDCMSG(D_POINTER, GRAY, "Received %i bytes from MCP...", MsgSize);
+            DDpacket(rbuf, MsgSize);
          }
 
          if (MsgSize<0){
@@ -858,13 +933,17 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          }
          if (!MsgSize){
             DCMSG(RED,"read from MCP returned 0 - MCP closed");
+            clearQueue(Rx);
+            clearQueue(Tx);
+            DDCMSG(D_POINTER, GREEN, "Freeing queue %p", Rx);
             free(Rx);
+            DDCMSG(D_POINTER, GREEN, "Freeing queue %p", Tx);
             free(Tx);
             close(MCPsock);    /* Close socket */    
             return;                     /* go back to the main loop waiting for MCP connection */
          }
 
-         if (MsgSize){
+         if (MsgSize) {
 
             /***************    Sorting is needlessly complicated.
              ***************       Just queue it up in our Rx queue as long as it doesn't
@@ -875,34 +954,27 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
              ***************    there might also need to be some kind of throttle to slow the MCP if we are full.
              ***************    
              ***************    */
+            int last_control_sequence = -1, last_control_addr = -1;
 
             // check against our existing messages in the queue
             while (MsgSize > 0) {
-               LB=(LB_packet_t *)Rx->tail;   // map the header in
-               ptype = Ptype(Rx->tail);
-               if (ptype==2) {
-                  // only type 2 messages can be rejected from queue: they are the only 
-                  //   messages that cause wait time and have only one destination.
-                  //   they are also 100% redundant to have in multiple times.
-                  if (Queue_Contains[LB->addr] & (1<<LB->cmd)) {
-                     // already in queue, remove from Rx buffer
-                     if (RF_size(LB->cmd) < MsgSize) { /* only remove if we're not the end */
-                        char tbuf[RF_BUF_SIZE];
-                        int rs = MsgSize - RF_size(LB->cmd); // move the buffer after this message to the tail
-                        memcpy(tbuf, Rx->tail + RF_size(LB->cmd), rs);
-                        memcpy(Rx->tail, tbuf, rs);
-                     }
-                     DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Rejecting %i from queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
-                     // don't move the tail, as we'll need to check the next message which is now at tail
-                  } else {
-                     // not in queue already, add and mark
-                     Rx->tail+=RF_size(LB->cmd);
-                     DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Going to allow %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
-                     Queue_Contains[LB->addr] |= (1<<LB->cmd);
-                     DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Allowing %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
-                  }
+               LB=(LB_packet_t *)rbuf;   // map the header in
+               ptype = Ptype(rbuf);
+               DDCMSG(D_POINTER, GREEN, "Looking at individual message %i of size %i", LB->cmd, RF_size(LB->cmd));
+               DDpacket(rbuf, RF_size(LB->cmd));
+               if (LB->cmd == LBC_ASSIGN_ADDR) {
+                  // clear out what we think the queue contains when we assign a device an new address
+                  LB_assign_addr_t *laa = (LB_assign_addr_t*)rbuf;
+                  DDCMSG(D_POINTER,GRAY,"Clearing QUEUE_CONTAINS for address %i, as it is new", laa->new_addr);
+                  Queue_Contains[laa->new_addr] = 0;
+               }
+               if (ptype==4) {
+                  // only going to receive LB_CONTROL_QUEUE messages from 
+                  LB_control_queue_t *lcq = (LB_control_queue_t*)LB;
+                  last_control_sequence = lcq->sequence;
+                  last_control_addr = lcq->addr;
+                  DDCMSG(D_POINTER, GRAY, "Found control queue message with addr %i and sequence %i", last_control_addr, last_control_sequence);
                } else if (ptype==0) {
-                  DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %i %i (%p)", __FILE__, __LINE__, LB->cmd, LB->addr, Queue_Contains[LB->addr]);
 #if 0 /* bad idea, poorly implimented...don't clear status requests, just let the process work as designed */
                   // type 0 messages are Always rejected from the queue, and they may remove others as well
                   if (LB->cmd == LBC_ILLEGAL_CANCEL && (Queue_Contains[LB->addr] & (1<<LBC_STATUS_REQ))) {
@@ -919,11 +991,11 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                            // found our culprit, move the queue to engulf it
                            char tbuf[RF_BUF_SIZE];
                            int rs = (Rx->tail + MsgSize) - (ts + RF_size(lb->cmd)); // move entire buffer after the message, not just what's in the queue
-                           DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Removing %i from queue for addr %i (%i-%i...)", lb->cmd, lb->addr, Queue_Depth(Rx), RF_size(lb->cmd)); memcpy(tbuf, ts + RF_size(lb->cmd), rs);
+                           DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Removing %i from queue for addr %i (%i-%i...)", lb->cmd, lb->addr, queueLength(Rx), RF_size(lb->cmd)); memcpy(tbuf, ts + RF_size(lb->cmd), rs);
                            memcpy(ts, tbuf, rs);
                            Rx->tail -= RF_size(lb->cmd); // move the tail down
                            LB=(LB_packet_t *)Rx->tail;   // re-map the header in to the new tail position
-                           DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Removed from queue (...=%i)", Queue_Depth(Rx));
+                           DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Removed from queue (...=%i)", queueLength(Rx));
                            Queue_Contains[LB->addr] ^= (1<<LBC_STATUS_REQ);
                         } else {
                   DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %p", __FILE__, __LINE__, ts);
@@ -936,16 +1008,52 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                   DDCMSG(D_POINTER, GREEN, "Here...%s:%i", __FILE__, __LINE__);
 #endif /* ... end of bad idea */
                } else {
-                  Rx->tail+=RF_size(LB->cmd);  // add on the new length
+                  int add_to_q = 1;
+                  if (ptype==2) {
+                     // only type 2 messages can be rejected from queue: they are the only 
+                     //   messages that cause wait time and have only one destination.
+                     //   they are also 100% redundant to have in multiple times.
+                     if (Queue_Contains[LB->addr] & (1<<LB->cmd)) {
+                        // already in queue, don't add Rx buffer
+                        DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Rejecting %i from queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                        // don't move the tail, as we'll need to check the next message which is now at tail
+                        add_to_q = 0;
+                     } else {
+                        // not in queue already, add and mark
+                        DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Going to allow %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                        Queue_Contains[LB->addr] |= (1<<LB->cmd);
+                        DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Allowing %i in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
+                        add_to_q = 1;
+                     }
+                  }
+                  // add to Rx queue
+                  if (add_to_q) {
+                     qi = queueTail(Rx);
+                     enQueue(qi, rbuf, 0);
+                     qi = queueTail(Rx); // we're the tail item
+                     if (qi->addr == last_control_addr) {
+                        DDCMSG(D_POINTER, GRAY, "Used control sequence %i with message %i", last_control_sequence, qi->cmd);
+                        qi->sequence = last_control_sequence;
+                     } else {
+                        qi->sequence = -1;
+                     }
+                  }
                }
+               // move our pointer on to the next message
+               rbuf+=RF_size(LB->cmd);
                MsgSize-=RF_size(LB->cmd); // we've looked at this message, now look for more
             }
+            if (ptype != 4) {
+               // we've now used our last_control_* variables, so let's reset them
+               last_control_sequence = -1;
+               last_control_addr = -1;
+            }
             // check to see if we're the first of many messages from the mcp
-            if (bytecount == 0 && Queue_Depth(Rx) > 0) {
+            if (bytecount == 0 && queueLength(Rx) > 0) {
                // adjust collect_time to the time to nothing, as we haven't waited anything yet
                collect_time.tv_sec=0; collect_time.tv_nsec=0;
             }
-            bytecount=Queue_Depth(Rx);
+            bytecount=queueLength(Rx);
             DDCMSG(D_QUEUE,YELLOW,"Rx[%d]",bytecount);
          }  // if msgsize was positive
 
@@ -967,6 +1075,13 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    close(risock);
    close(RFfd);
    close(efd);
+
+   clearQueue(Rx);
+   clearQueue(Tx);
+   DDCMSG(D_POINTER, GREEN, "Freeing queue %p", Rx);
+   free(Rx);
+   DDCMSG(D_POINTER, GREEN, "Freeing queue %p", Tx);
+   free(Tx);
 }  // end of handle_RF
 
 
@@ -1118,6 +1233,17 @@ int main(int argc, char **argv) {
 
    //  this section is just used for testing   
    if (xmit){   
+      int i = 0;
+      char obuf[200];
+      memset(obuf, 0, 200);
+      while (!close_nicely) {
+         DCMSG(BLACK, "Transmitting %i...", ++i);
+         write(RFfd, obuf, 200);
+         fsync(RFfd);
+         sleep(3);
+      }
+      exit(-1);
+#if 0
       LB_packet_t LB;
       LB_request_new_t *RQ;
       int result,size,more;
@@ -1218,6 +1344,7 @@ int main(int argc, char **argv) {
          }
 
       }
+#endif
    }  // if xmit testing section over.
 
    //  now Create socket for the incoming connection */

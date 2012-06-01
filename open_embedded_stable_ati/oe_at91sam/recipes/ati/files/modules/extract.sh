@@ -8,7 +8,7 @@ SKIP=`awk '/^__TARFILE_FOLLOWS__/ { print NR + 2; exit 0; }' $0`
 THIS=`pwd`/$0
 
 # stop everything we can to make stuff smoother
-/usr/bin/stop
+#/usr/bin/stop -- no, don't make smooth manually via mv blah blah.old...etc (stop can make movers crash sometimes)
 
 echo "Extracting Files"
 echo ""
