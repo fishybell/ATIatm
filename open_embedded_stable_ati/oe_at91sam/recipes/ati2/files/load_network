@@ -3,8 +3,8 @@
 # procedure start the default programs
 def_progs() {
 
-   # clean up
-   #rm /home/root
+   # clean up old firmware files
+   rm -f /home/root/atifirmware*
 
    # check that our version numbers are up-to-date
    /usr/bin/be_major_version
@@ -28,96 +28,11 @@ def_progs() {
          ;;
    esac
          
-
-   # find auto ip, if necessary
-   if [ "$ip" == "auto" ] ; then
-      # start event_conn early if we're auto-ip
-      case $board in
-         TTMT|MIT|MAT)
-            # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
-            # always start stand-alone (will also act as server)
-            event_conn -S -vv -k -r MOVER &
-            ;;
-         SIT|LSAT|HSAT|SAT)
-            # start stand-alone
-            event_conn -S -vv -k -r LIFTER &
-            ;;
-         EIM|SES)
-            # start stand-alone
-            event_conn -S -vv -k -r SOUND &
-            ;;
-      esac
-
-      # leave it as auto now that the event_conn and fasit_conn can auto-find on their own
-      # ip=`bcast_client`
-
-      # restart event_conn to connect them together
-      killall -q -9 event_conn
-   fi
-
-   # connect event_conns together
-   case $board in
-      TTMT|MIT|MAT)
-         # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
-         # always start stand-alone (will also act as server)
-         event_conn -S -vv -k -r MOVER &
-         ;;
-      SIT|LSAT|HSAT|SAT)
-         if [ "$comm" == "local" ] ; then
-            # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
-            event_conn -i $ip -C -vv -k -r LIFTER &
-         else
-            # start stand-alone
-            event_conn -S -vv -k -r LIFTER &
-         fi
-         ;;
-      EIM|SES)
-         if [ "$comm" == "local" ] ; then
-            # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
-            event_conn -i $ip -C -vv -k -r SOUND &
-         else
-            # start stand-alone
-            event_conn -S -vv -k -r SOUND &
-         fi
-         ;;
-   esac
-
-   # start the non-standard broadcast server on everyone, everytime to help with runtime autodetection of connected computers
-   bcast_server -p 4227 &
-
-   # start auto ip server
-   case $board in
-      TTMT|MAT|MIT)
-         if [ "$comm" != "network" ] ; then
-            bcast_server &
-            # start ping if we're on a wimax network
-            if [ "$comm" == "wimax" ] ; then
-               ping -q $ip &
-            fi
-         fi
-         ;;
-   esac
-
-   # old way
-   # start the radio convertor
-   #BASE=""
-   #case $board in
-   #   HHC|BASE)
-   #      BASE="-b $ip"
-   #      ;;
-   #   RELAY)
-   #      BASE="-s /dev/ttyS2 -r"
-   #      ;;
-   #esac
+   # radio stuff here to ip is always correct later on radio devices
    if [ "$comm" == "radio" ] ; then
-      # old way
-      # listen or connect on the "connect-to" port
-      #radio_conv -p $cport -s /dev/ttyS1 $BASE -vv -k &
-      
-      # new way
       # load radio defaults onto radio
       if [ -f /usr/bin/dtxm_edit.arm ] ; then
-         # this will be very quick if we don't need to change settings, and very slow if we do
+         # this will be very quick if we don't need to change settings, and very slow if we do, but it won't show as booted until afterwards
          /usr/bin/dtxm_edit.arm -v f
       fi
       case $board in
@@ -135,6 +50,77 @@ def_progs() {
       cport=14000
       ip="127.0.0.1"
    fi
+
+
+   # find auto ip, if necessary
+   if [ "$ip" == "auto" ] ; then
+      # start event_conn early if we're auto-ip
+      case $board in
+         TTMT|MIT|MAT)
+            # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
+            # always start stand-alone (will also act as server)
+            event_conn -S -v -k -r MOVER &
+            ;;
+         SIT|LSAT|HSAT|SAT)
+            # start stand-alone
+            event_conn -S -v -k -r LIFTER &
+            ;;
+         EIM|SES)
+            # start stand-alone
+            event_conn -S -v -k -r SOUND &
+            ;;
+      esac
+
+      # leave it as auto now that the event_conn and fasit_conn can auto-find on their own
+      # ip=`bcast_client`
+
+      # restart event_conn to connect them together
+      killall -q -9 event_conn
+   fi
+
+   # connect event_conns together
+   case $board in
+      TTMT|MIT|MAT)
+         # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
+         # always start stand-alone (will also act as server)
+         event_conn -S -v -k -r MOVER &
+         ;;
+      SIT|LSAT|HSAT|SAT)
+         if [ "$comm" == "local" ] ; then
+            # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
+            event_conn -i $ip -C -v -k -r LIFTER &
+         else
+            # start stand-alone
+            event_conn -S -v -k -r LIFTER &
+         fi
+         ;;
+      EIM|SES)
+         if [ "$comm" == "local" ] ; then
+            # TODO -- when attached to a TTMT needs to start multiple event_conn clients (form a triangle of connections)
+            event_conn -i $ip -C -v -k -r SOUND &
+         else
+            # start stand-alone
+            event_conn -S -v -k -r SOUND &
+         fi
+         ;;
+   esac
+
+   # start auto ip server
+   case $board in
+      TTMT|MAT|MIT)
+         if [ "$comm" != "network" ] ; then
+            bcast_server &
+            # start ping if we're on a wimax network
+            if [ "$comm" == "wimax" ] ; then
+               ping -q $ip &
+            fi
+         fi
+         ;;
+   esac
+
+   # start the non-standard broadcast server on every product at the very end to help with runtime autodetection of connected devices
+   bcast_server -p 4227 &
+
    export ip=$ip
    export cport=$cport
 }
