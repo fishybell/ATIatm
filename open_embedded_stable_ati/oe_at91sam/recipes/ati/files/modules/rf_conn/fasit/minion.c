@@ -225,8 +225,8 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion, minion_t
          msg.body.move = minion->S.move.data;
          CACHE_CHECK(minion->S.position);
          msg.body.pos = htons(minion->S.position.data);
-         DDCMSG(D_NEW,MAGENTA,"\n_____________________________________________________\nMinion %i: building 2102 status.   S.position.data=%i msg.body.pos=%i  htons(...)=%i ",
-                minion->mID,minion->S.position.data,msg.body.pos,htons(msg.body.pos));
+//         DDCMSG(D_NEW,MAGENTA,"\n_____________________________________________________\nMinion %i: building 2102 status.   S.position.data=%i msg.body.pos=%i  htons(...)=%i ",
+//                minion->mID,minion->S.position.data,msg.body.pos,htons(msg.body.pos));
          break;
    }
 
@@ -459,7 +459,6 @@ int psend_mcp(thread_data_t *minion,void *Lc){
 
 // now send it to the MCP master and keep track of this message
 int psend_mcp_seq(thread_data_t *minion,void *Lc){
-   static int last_sequence_sent = -1;
    int result;
    char hbuf[100];
    LB_packet_t *L=(LB_packet_t *)Lc;    // so we can call it with different types and not puke.
@@ -467,7 +466,7 @@ int psend_mcp_seq(thread_data_t *minion,void *Lc){
    LB_control_queue_t lcq;
    lcq.cmd = LB_CONTROL_QUEUE; // we want this message to be queued
    lcq.addr = L->addr;
-   lcq.sequence = ++last_sequence_sent;
+   lcq.sequence = ++minion->S.last_sequence_sent;
    set_crc8(&lcq);
 
    // calculates the correct CRC and adds it to the end of the packet payload
@@ -536,7 +535,7 @@ void inform_state(thread_data_t *minion, minion_time_t *mt, FASIT_header *hdr) {
  * will move the current event if necessary
  * will send LB messages to update targets' timers if necessary
  */
-void change_states(thread_data_t *minion, minion_time_t *mt, trans_step_t step, int force) {
+void change_states_internal(thread_data_t *minion, minion_time_t *mt, trans_step_t step, int force) {
    int needsleep = 0;
    int force_send = 0;
 
@@ -679,33 +678,36 @@ void change_states(thread_data_t *minion, minion_time_t *mt, trans_step_t step, 
    //DDCMSG(D_POINTER|D_NEW, YELLOW, "Done...last step=%s", step_words[minion->S.exp.last_step]);
 }
 
-void ExposeSentCallback(thread_data_t *minion, char *msg, void *data) {
+void ExposeSentCallback(thread_data_t *minion, minion_time_t *mt, char *msg, void *data) {
    DDCMSG(D_POINTER, YELLOW, "Hey hey! We've sent the expose command now");
    DDpacket(msg, sizeof(LB_expose_t));
+   START_EXPOSE_TIMER(minion->S); // pretend to start exposing
 }
 
-void ExposeRemovedCallback(thread_data_t *minion, char *msg, void *data) {
+void ExposeRemovedCallback(thread_data_t *minion, minion_time_t *mt, char *msg, void *data) {
    DDCMSG(D_POINTER, YELLOW, "Hey hey! We've removed the expose command now");
    DDpacket(msg, sizeof(LB_expose_t));
 }
 
-void QConcealSentCallback(thread_data_t *minion, char *msg, void *data) {
-   DDCMSG(D_POINTER, YELLOW, "Hey hey! We've sent the expose command now");
+void QConcealSentCallback(thread_data_t *minion, minion_time_t *mt, char *msg, void *data) {
+   DDCMSG(D_POINTER, YELLOW, "Hey hey! We've sent the qconceal command now");
+   DDpacket(msg, sizeof(LB_qconceal_t));
+   START_CONCEAL_TIMER(minion->S); // pretend to start concealing
+}
+
+void QConcealRemovedCallback(thread_data_t *minion, minion_time_t *mt, char *msg, void *data) {
+   DDCMSG(D_POINTER, YELLOW, "Hey hey! We've removed the qconceal command now");
    DDpacket(msg, sizeof(LB_qconceal_t));
 }
 
-void QConcealRemovedCallback(thread_data_t *minion, char *msg, void *data) {
-   DDCMSG(D_POINTER, YELLOW, "Hey hey! We've removed the expose command now");
-   DDpacket(msg, sizeof(LB_qconceal_t));
-}
-
-void MoveSentCallback(thread_data_t *minion, char *msg, void *data) {
-   DDCMSG(D_POINTER, YELLOW, "Hey hey! We've sent the expose command now");
+void MoveSentCallback(thread_data_t *minion, minion_time_t *mt, char *msg, void *data) {
+   DDCMSG(D_POINTER, YELLOW, "Hey hey! We've sent the move command now");
    DDpacket(msg, sizeof(LB_move_t));
+   START_MOVE_TIMER(minion->S); // pretend to start concealing
 }
 
-void MoveRemovedCallback(thread_data_t *minion, char *msg, void *data) {
-   DDCMSG(D_POINTER, YELLOW, "Hey hey! We've removed the expose command now");
+void MoveRemovedCallback(thread_data_t *minion, minion_time_t *mt, char *msg, void *data) {
+   DDCMSG(D_POINTER, YELLOW, "Hey hey! We've removed the move command now");
    DDpacket(msg, sizeof(LB_move_t));
 }
 
@@ -742,6 +744,7 @@ void ClearTracker(thread_data_t *minion, sequence_tracker_t *tracker) {
       free(tracker->pkt);
    }
    if (tracker->data != NULL) {
+      free(tracker->data);
    }
 }
 
@@ -806,7 +809,7 @@ void send_LB_exp(thread_data_t *minion, int expose, minion_time_t *mt) {
    minion->S.exp.data=45;  // make the current positon in movement
    DDCMSG(D_NEW, GRAY, "Sending LB expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
    //DDCMSG(D_POINTER|D_NEW, MAGENTA, "starting exp timer @ %s:%i", __FILE__, __LINE__);
-   START_EXPOSE_TIMER(minion->S); // new state timer code
+   //START_EXPOSE_TIMER(minion->S); // new state timer code
 
    //  really need to fill in with the right stuff
    LB_exp->hitmode = (minion->S.mode.newdata == 2 ? 1 : 0); // burst / single
@@ -1132,7 +1135,26 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                   LB_qcon->uptime=uptime;
                   
                   DDCMSG(D_PACKET,BLUE,"Minion %i:  LB_qcon cmd=%i", minion->mID,LB_qcon->cmd);
-                  psend_mcp_seq(minion,LB_qcon);
+                  {
+                     // keep track of command if it's doing something
+                     sequence_tracker_t *t;
+                     psend_mcp_seq(minion,LB_qcon);
+
+                     // fill in tracker info
+                     t = malloc(sizeof(sequence_tracker_t));
+                     t->sequence = minion->S.last_sequence_sent;
+                     LB_qcon = malloc(sizeof(LB_qconceal_t)); // turn link into allocated data
+                     memcpy(LB_qcon, qbuf, sizeof(LB_qconceal_t));
+                     t->pkt = (char*)LB_qcon;
+                     t->data = NULL;
+                     t->sent_callback = QConcealSentCallback;
+                     t->removed_callback = QConcealRemovedCallback;
+                     t->missed = 50; // after we don't get a callback for this, but for other messages, give up
+
+                     // place at head of chain
+                     t->next = minion->S.tracker;
+                     minion->S.tracker = t;
+                  }
 
                   // we also need a report for this event from the target, so we will have to send a request_rep packet soon.
                   // just go ahead and send the report request now, too
@@ -1162,7 +1184,6 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                   minion->S.exp.data = 45;  // make the current positon in movement
                   DDCMSG(D_NEW, GRAY, "Send 2100 expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
                   //DDCMSG(D_POINTER|D_NEW, MAGENTA, "starting con timer @ %s:%i", __FILE__, __LINE__);
-                  START_CONCEAL_TIMER(minion->S);
                }
 
                // send 2101 ack  (2102's will be generated at start and stop of actuator)
@@ -1277,9 +1298,41 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                      break;
                }
 
+               // set what we're moving towards, as an index
+               if (LB_move->speed != 2047) {
+                  minion->S.speed.towards_index = max(0, min(LB_move->speed / 100, 4)); // SR doesn't send actual speed, it sends the index (TODO -- fix everywhere so TRACR can work)
+               } else {
+                  minion->S.speed.towards_index = 0;
+               }
+
                // now send it to the MCP master
                DDCMSG(D_PACKET,BLUE,"Minion %i:  LB_move cmd=%i", minion->mID,LB_move->cmd);
-               psend_mcp_seq(minion,LB_move);
+               if (LB_move->speed < 2047 && minion->S.move.data == 0) {
+                  // keep track of command if it's doing something
+                  sequence_tracker_t *t;
+                  psend_mcp_seq(minion,LB_move);
+
+                  // fill in tracker info
+                  t = malloc(sizeof(sequence_tracker_t));
+                  t->sequence = minion->S.last_sequence_sent;
+                  LB_move = malloc(sizeof(LB_move_t)); // turn link into allocated data
+                  memcpy(LB_move, &LB_buf, sizeof(LB_move_t));
+                  t->pkt = (char*)LB_move;
+                  t->data = NULL;
+                  t->sent_callback = MoveSentCallback;
+                  t->removed_callback = MoveRemovedCallback;
+                  t->missed = 50; // after we don't get a callback for this, but for other messages, give up
+
+                  // place at head of chain
+                  t->next = minion->S.tracker;
+                  minion->S.tracker = t;
+
+                  // get ready to fake movement
+                  minion->S.last_move_time = -1; // not sent for this movement message
+               } else {
+                  // send changes
+                  psend_mcp(minion,LB_move);
+               }
 
                // send 2101 ack  (2102's will be generated at start and stop of actuator)
                send_2101_ACK(header,'S',minion);    // TRACR Cert complains if these are not there
@@ -1796,13 +1849,11 @@ void *minion_thread(thread_data_t *minion){
             // we received something over RF, so we haven't timed out: reset the rf timers -- TODO -- make this timeout smarter, or at the very least, user configurable
             if (minion->S.rf_t.slow_flags != F_slow_none) {
                // reset the slow timer, if we're doing the slow timer, as we just got a response
-               setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start);
-               minion->S.rf_t.slow_missed = 0;
+               setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_continue);
             }
-            if (minion->S.rf_t.fast_flags != F_fast_none) {
-               // reset the fast timer miss counter, keep going on the same timer interval so they burst
-               minion->S.rf_t.fast_missed = 0;
-            }
+            minion->S.rf_t.slow_missed = 0;
+            // reset the fast timer miss counter, keep going on the same timer interval so they burst
+            minion->S.rf_t.fast_missed = 0;
 
             // we have received a message from the mcp, process it
             // it is either a command, or it is an RF response from our slave
@@ -1814,12 +1865,81 @@ void *minion_thread(thread_data_t *minion){
             switch (LB->cmd){
                case LB_CONTROL_SENT: {
                   LB_control_sent_t *lcs = (LB_control_sent_t*)LB;
+                  sequence_tracker_t *tracker = minion->S.tracker, *tt;
                   DDCMSG(D_POINTER, GRAY, "Apparently sent message %i", lcs->sequence);
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                  // look for things tracking this sequence
+                  while (tracker != NULL) {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                     if (tracker->sequence == lcs->sequence) {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                        // found it
+                        if (tracker->sent_callback != NULL) {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                           tracker->sent_callback(minion, &mt, tracker->pkt, tracker->data);
+                        }
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                        // clear and move on
+                        tt = tracker;
+                        tracker = tracker->next;
+                        ClearTracker(minion, tt);
+                        free(tt);
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                     } else if (--tracker->missed <= 0) {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                        // missed too many times
+                        DDCMSG(D_POINTER, GRAY, "Missed tracker %p for sequence %i too many times...clearing...", tracker, tracker->sequence);
+                        // clear and move on
+                        tt = tracker;
+                        tracker = tracker->next;
+                        ClearTracker(minion, tt);
+                        free(tt);
+                     } else {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                        // not this one
+                        tracker = tracker->next;
+                     }
+                  }
                }  break;
 
                case LB_CONTROL_REMOVED: {
                   LB_control_sent_t *lcs = (LB_control_sent_t*)LB;
+                  sequence_tracker_t *tracker = minion->S.tracker, *tt;
                   DDCMSG(D_POINTER, GRAY, "Apparently removed (and didn't send) message %i", lcs->sequence);
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                  // look for things tracking this sequence
+                  while (tracker != NULL) {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                     if (tracker->sequence == lcs->sequence) {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                        // found it
+                        if (tracker->removed_callback != NULL) {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                           tracker->removed_callback(minion, &mt, tracker->pkt, tracker->data);
+                        }
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                        // clear and move on
+                        tt = tracker;
+                        tracker = tracker->next;
+                        ClearTracker(minion, tt);
+                        free(tt);
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                     } else if (--tracker->missed <= 0) {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                        // missed too many times
+                        DDCMSG(D_POINTER, GRAY, "Missed tracker %p for sequence %i too many times...clearing...", tracker, tracker->sequence);
+                        // clear and move on
+                        tt = tracker;
+                        tracker = tracker->next;
+                        ClearTracker(minion, tt);
+                        free(tt);
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                     } else {
+                  DCMSG(GREEN, "Here with tracker=%p (n:%p s:%i p:%p d:%p)", tracker, tracker!=NULL?tracker->next:NULL, tracker!=NULL?tracker->sequence:-1, tracker!=NULL?tracker->pkt:NULL, tracker!=NULL?tracker->data:NULL);
+                        // not this one...move on
+                        tracker = tracker->next;
+                     }
+                  }
                }  break;
 
                case LBC_REQUEST_NEW:
@@ -1828,6 +1948,7 @@ void *minion_thread(thread_data_t *minion){
 
                   break;
 
+                  /* -- this should only be seen on the target, not the basestation
                case LBC_ASSIGN_ADDR:
                   LB_addr =(LB_assign_addr_t *)(LB);    // map our bitfields in
 
@@ -1838,7 +1959,7 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.fault.data = 0; // clear out fault
                   minion->S.exp.data_uc = -1;
                   minion->S.exp.data_uc_count = 0;
-                  break;
+                  break; */
 
                case LBC_EVENT_REPORT:
                {
@@ -2013,6 +2134,10 @@ void *minion_thread(thread_data_t *minion){
 
                case LBC_STATUS_RESP:
                {
+                  DDCMSG(D_POINTER, YELLOW, "Ignoring all LBC_STATUS_RESP for now...");
+                  DDpacket((char*)LB, RF_size(LBC_STATUS_RESP));
+               }  break;
+#if 0 /* start of temporary removal of status response handling code */
                   LB_status_resp_t *L=(LB_status_resp_t *)(LB); // map our bitfields in
                   // double check that the exposure is correct (it might be an old response coming in later than our exposure command, but before the change in exposure finished)
                   if (minion->S.exp.data == 45 && /* to be ignored we must be currently transistioning... */
@@ -2021,9 +2146,9 @@ void *minion_thread(thread_data_t *minion){
                       L->fault == 0 && /* and have no faults... */
                       ++minion->S.exp.data_uc_count < 3 && /* and we haven't received this message 3 times yet... */
                       !(L->did_exp_cmd && !minion->S.exp.recv_dec)) { /* and not have transitioned completely between status responses */
-                     DDCMSG(D_NEW, MAGENTA, "\n__________________________________________________________\nIgnoring status response with strange exposure value %i (data=%i, dec=%i, rdec=%i, uc=%i, ucc=%i). Should be %i.\n__________________________________________________________",
-                         (L->expose?90:0), minion->S.exp.data, L->did_exp_cmd, minion->S.exp.recv_dec,
-                         minion->S.exp.data_uc, minion->S.exp.data_uc_count, minion->S.exp.newdata);
+//                     DDCMSG(D_NEW, MAGENTA, "\n__________________________________________________________\nIgnoring status response with strange exposure value %i (data=%i, dec=%i, rdec=%i, uc=%i, ucc=%i). Should be %i.\n__________________________________________________________",
+//                         (L->expose?90:0), minion->S.exp.data, L->did_exp_cmd, minion->S.exp.recv_dec,
+//                         minion->S.exp.data_uc, minion->S.exp.data_uc_count, minion->S.exp.newdata);
                      // check again soon
 //                     if (minion->S.rf_t.slow_flags) {
 //                        setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start);
@@ -2048,9 +2173,9 @@ void *minion_thread(thread_data_t *minion){
                       (L->expose == 0 && minion->S.exp.newdata == 90)) && /* or down when we should be up... */
                       L->fault == 0 && /* and have no faults... */
                       !(L->did_exp_cmd && !minion->S.exp.recv_dec)) { /* and not have transitioned completely between status responses */
-                     DDCMSG(D_NEW, RED, "\n__________________________________________________________\nWould have ignored status response with strange exposure value %i (data=%i, dec=%i, rdec=%i, uc=%i, ucc=%i). Should be %i.\n__________________________________________________________",
-                         (L->expose?90:0), minion->S.exp.data, L->did_exp_cmd, minion->S.exp.recv_dec,
-                         minion->S.exp.data_uc, minion->S.exp.data_uc_count, minion->S.exp.newdata);
+//                     DDCMSG(D_NEW, RED, "\n__________________________________________________________\nWould have ignored status response with strange exposure value %i (data=%i, dec=%i, rdec=%i, uc=%i, ucc=%i). Should be %i.\n__________________________________________________________",
+//                         (L->expose?90:0), minion->S.exp.data, L->did_exp_cmd, minion->S.exp.recv_dec,
+//                         minion->S.exp.data_uc, minion->S.exp.data_uc_count, minion->S.exp.newdata);
                   }
 #if 0 /* start of old state timer code */
                   minion->S.exp.flags=F_exp_ok;
@@ -2066,9 +2191,9 @@ void *minion_thread(thread_data_t *minion){
                   }
 #endif /* end of change_states() code removal */
 
-                  DDCMSG(D_NEW, GRAY, "\n__________________________________________________________\nNot ignoring: status response with strange exposure value %i (data=%i, dec=%i, rdec=%i, ls=%s, uc=%i, ucc=%i). Should be %i.\n__________________________________________________________",
-                      (L->expose?90:0), minion->S.exp.data, L->did_exp_cmd, minion->S.exp.recv_dec,
-                      step_words[minion->S.exp.last_step], minion->S.exp.data_uc, minion->S.exp.data_uc_count, minion->S.exp.newdata);
+//                  DDCMSG(D_NEW, GRAY, "\n__________________________________________________________\nNot ignoring: status response with strange exposure value %i (data=%i, dec=%i, rdec=%i, ls=%s, uc=%i, ucc=%i). Should be %i.\n__________________________________________________________",
+//                      (L->expose?90:0), minion->S.exp.data, L->did_exp_cmd, minion->S.exp.recv_dec,
+//                      step_words[minion->S.exp.last_step], minion->S.exp.data_uc, minion->S.exp.data_uc_count, minion->S.exp.newdata);
                   // not ignoring anything again
                   minion->S.exp.data_uc = -1;
                   minion->S.exp.data_uc_count = 0;
@@ -2155,8 +2280,8 @@ void *minion_thread(thread_data_t *minion){
                      //minion->S.position.data = L->location;
                      minion->S.burst.newdata = L->timehits * 5; // convert back
                      minion->S.fault.data = L->fault;
-                     DDCMSG(D_NEW,MAGENTA,"\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMinion %i: (Rf_addr=%i) parsed response. location=%i fault=%02X sending 2102 status",
-                            minion->mID,minion->RF_addr,L->location,L->fault);
+//                     DDCMSG(D_NEW,MAGENTA,"\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMinion %i: (Rf_addr=%i) parsed response. location=%i fault=%02X sending 2102 status",
+//                            minion->mID,minion->RF_addr,L->location,L->fault);
                         //DDCMSG(D_POINTER|D_NEW, YELLOW, "calling change_states(%s) @ %s:%i", step_words[L->expose ? TS_exposed : TS_concealed], __FILE__, __LINE__);
                      // sendStatus2102(0, NULL,minion,&mt);
                      change_states(minion, &mt, L->expose ? TS_exposed : TS_concealed, 0);
@@ -2171,6 +2296,7 @@ void *minion_thread(thread_data_t *minion){
                }
 #endif /* end of old state timer code */
                break;
+#endif /* end of temporary removal of status response handling code */
 
                default:
                   DDCMSG(D_RF,YELLOW,"Minion %i:  recieved a cmd=%i    don't do anything",minion->mID,LB->cmd);

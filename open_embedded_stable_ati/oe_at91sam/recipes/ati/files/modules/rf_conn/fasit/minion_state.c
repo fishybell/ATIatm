@@ -195,13 +195,32 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking expose timer flags: %i", minion->S.exp.exp_flags);
          switch (minion->S.exp.exp_flags) {
             case F_exp_start_transition: {
+               int wait = 0;
+               switch (minion->S.dev_type) {
+                  case Type_BES:
+                  case Type_SES:
+                  default:
+                     wait = TRANSMISSION_TIME; // time it takes to send radio message (about)
+                     break;
+                  case Type_MIT:
+                  case Type_SIT:
+                     wait = SIT_TRANSITION_TIME; // time it takes an infantry lifter to lift
+                     break;
+                  case Type_MAT:
+                  case Type_HSAT:
+                     wait = HSAT_TRANSITION_TIME; // time it takes a heavy armor lifter to lift
+                     break;
+                  case Type_SAT:
+                     wait = SAT_TRANSITION_TIME; // time it takes a light armor lifter to lift
+                     break;
+               }
                // sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102 -- removed in favor of change_states()
                //DDCMSG(D_POINTER|D_NEW, YELLOW, "calling change_states(%s) @ %s:%i", step_words[TS_con_to_exp], __FILE__, __LINE__);
                change_states(minion, mt, TS_con_to_exp, 0);
-               setTimerTo(minion->S.exp, exp_timer, exp_flags, TRANSITION_TIME, F_exp_end_transition);
+               setTimerTo(minion->S.exp, exp_timer, exp_flags, wait, F_exp_end_transition);
             } break;
             case F_exp_end_transition: {
-               // nothing to do here?
+               change_states(minion, mt, TS_exposed, 0);
                stopTimer(minion->S.exp, exp_timer, exp_flags);
             } break;
             default: {
@@ -214,13 +233,32 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking conceal timer flags: %i", minion->S.exp.con_flags);
          switch (minion->S.exp.con_flags) {
             case F_con_start_transition: {
+               int wait = 0;
+               switch (minion->S.dev_type) {
+                  case Type_BES:
+                  case Type_SES:
+                  default:
+                     wait = TRANSMISSION_TIME; // time it takes to send radio message (about)
+                     break;
+                  case Type_MIT:
+                  case Type_SIT:
+                     wait = SIT_TRANSITION_TIME; // time it takes an infantry lifter to lift
+                     break;
+                  case Type_MAT:
+                  case Type_HSAT:
+                     wait = HSAT_TRANSITION_TIME; // time it takes a heavy armor lifter to lift
+                     break;
+                  case Type_SAT:
+                     wait = SAT_TRANSITION_TIME; // time it takes a light armor lifter to lift
+                     break;
+               }
                // sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102 -- removed in favor of change_states()
                //DDCMSG(D_POINTER|D_NEW, YELLOW, "calling change_states(%s) @ %s:%i", step_words[TS_exp_to_con], __FILE__, __LINE__);
                change_states(minion, mt, TS_exp_to_con, 0);
-               setTimerTo(minion->S.exp, con_timer, con_flags, TRANSITION_TIME, F_con_end_transition);
+               setTimerTo(minion->S.exp, con_timer, con_flags, wait, F_con_end_transition);
             } break;
             case F_con_end_transition: {
-               // nothing to do here?
+               change_states(minion, mt, TS_concealed, 0);
                stopTimer(minion->S.exp, con_timer, con_flags);
             } break;
             default: {
@@ -229,22 +267,84 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          }
       ); // end of CHECK_TIMER for conceal state timer
 
+#if 0 /* something in here is broken */
       CHECK_TIMER (minion->S.move, timer, flags, 
          DDCMSG(D_MSTATE, BLACK, "Now checking move timer flags: %i", minion->S.move.flags);
          switch (minion->S.move.flags) {
             case F_move_start_movement: {
-               // TODO -- something here?
-               stopTimer(minion->S.move, timer, flags);
+               // we haven't started moving yet, so let's prepare variables
+               minion->S.speed.lastdata = -1.0; // force cache to be dirty
+               minion->S.speed.data = 0.0; // we're not moving
+               sendStatus2102(0, NULL,minion,mt); // tell FASIT server
+
+               DDCMSG(D_POINTER, GRAY, "Should start fake movement for minion %i", minion->mID);
+               switch (minion->S.dev_type) {
+                  default:
+                  case Type_MIT:
+                     setTimerTo(S.move, timer, flags, MIT_MOVE_START_TIME, F_move_continue_movement);
+                     break;
+                  case Type_MAT:
+                     setTimerTo(S.move, timer, flags, MAT_MOVE_START_TIME, F_move_continue_movement);
+                     break;
+               }
+               timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);      
+               minion->S.last_move_time = ts2ms(&mt->elapsed_time);
+               minion->S.speed.last_index = 0;
+            } break;
+            case F_move_continue_movement: {
+               DDCMSG(D_POINTER, GRAY, "Started fake movement for minion %i", minion->mID);
+               // first and foremost, find out the difference in time
+               int nt, dt; 
+               timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);      
+               nt = ts2ms(&mt->elapsed_time);
+               dt = minion->S.last_move_time - nt; // diff = last - now
+
+               // distance = last distance + last speed * time + acceleration * time * time
+
+               // speed = last speed * acceleration * time
+               
+
+               // tell the good news
+               sendStatus2102(0, NULL,minion,mt); // tell FASIT server
+
+               // and come back later
+               if (minion->S.speed.data <= 0.0) {
+                  switch (minion->S.dev_type) {
+                     default:
+                     case Type_MIT:
+                        setTimerTo(S.move, timer, flags, MIT_MOVE_START_TIME, F_move_end_movement);
+                        break;
+                     case Type_MAT:
+                        setTimerTo(S.move, timer, flags, MAT_MOVE_START_TIME, F_move_end_movement);
+                        break;
+                  }
+               } else {
+                  switch (minion->S.dev_type) {
+                     default:
+                     case Type_MIT:
+                        setTimerTo(S.move, timer, flags, MIT_MOVE_START_TIME, F_move_continue_movement);
+                        break;
+                     case Type_MAT:
+                        setTimerTo(S.move, timer, flags, MAT_MOVE_START_TIME, F_move_continue_movement);
+                        break;
+                  }
+               }
             } break;
             case F_move_end_movement: {
-               // TODO -- something here?
-               stopTimer(minion->S.move, timer, flags);
+               // Clean up movement data
+               minion->S.speed.towards_index = 0;
+               minion->S.speed.last_index = 0;
+               minion->S.speed.data = 0.0;
+               minion->S.speed.newdata = 0.0;
+               sendStatus2102(0, NULL,minion,mt); // tell FASIT server
+               stopTimer(minion->S.move, timer, flags); // don't be coming back now
             } break;
             default: {
                DDCMSG(D_MSTATE, RED, "Default reached in move flags: %i", minion->S.move.flags);
             }
          }
       ); // end of CHECK_TIMER for move state timer
+#endif
 
       this_r = minion->S.report_chain;
       while (this_r != NULL) {

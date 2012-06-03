@@ -17,6 +17,12 @@ int low_dev,high_dev;
 int steps_translation[] = {0, 45, 90, 45, -1}; /* translate a trans_step_t value into an exposure angle */
 const char *step_words[] = {"TS_concealed", "TS_con_to_exp", "TS_exposed", "TS_exp_to_con", "TS_too_far"};
 
+// MIT/MAT speed constants
+int MIT_SPEEDS[] = {0, 695, 1389, 2500, 3611}; // in meters per second (times 1000)
+int MAT_SPEEDS[] = {0, 2912, 4444, 5972, 7912}; // in meters per second (times 1000)
+int MIT_ACCEL[] = {0, 250, 500, 750, 1000};  // in meters per second per second (times 1000) -- guessed
+int MAT_ACCEL[] = {0, 500, 1000, 1500, 2000};  // in meters per second per second (times 1000) -- guessed
+
 void print_help(int exval) {
    printf("mcp [-h] [-v num] [-f ip] [-p port] [-r ip] [-m port] [-n minioncount]\n\n");
    printf("  -h            print this help and exit\n");
@@ -25,6 +31,12 @@ void print_help(int exval) {
    printf("  -r 127.0.0.1  set RFmaster server IP address\n");
    printf("  -m 4004       set RFmaster server port address\n");
    printf("  -t 50         hunttime in seconds.  Time we wait before doing a slave hunt again\n");
+   printf("  -l 10         simulated track length of MITs, in  meters\n");
+   printf("  -L 100        simulated track length of MATs, in  meters\n");
+   printf("  -q 2          simulated home track position of MITs, in meters\n");
+   printf("  -Q 4          simulated home track position of MATs, in meters\n");
+   printf("  -x 8          simulated end track position of MITs, in meters\n");
+   printf("  -X 96         simulated end track position of MATs, in meters\n");
    printf("  -i 250        initial wait time in ms (5ms granules, 1275 ms max\n");
    printf("  -s 150        slottime in ms (5ms granules, 1275 ms max\n");
    printf("  -d 0x20       Lowest devID to find\n");
@@ -33,7 +45,7 @@ void print_help(int exval) {
    exit(exval);
 }
 
-#define RF_MASTER_DELAY 250 /* the amount of time to wait for the RFmaster to receive the data and send it */
+#define RF_MASTER_DELAY 200 /* the amount of time to wait for the RFmaster to receive the data and send it */
 
 #define EXIT(_e) { \
    DCMSG(RED, "\n\nExiting MCP on line %i, current errno: %i", __LINE__, errno); \
@@ -103,6 +115,7 @@ int main(int argc, char **argv) {
    int hunttime,slave_hunting,low,hunt_rotate=0, delta;
    struct timespec elapsed_time, start_time, istart_time,delta_time, dwait_time;
    int tempslot = 0; // keep track if of what we're adding to our timeout based on having the slavehunt not overlap normal commands:requests
+   int mit_length, mat_length, mit_home, mat_home, mit_end, mat_end;
 
    LB_packet_t *LB,LB_buf;
    LB_request_new_t *LB_new;
@@ -131,6 +144,11 @@ int main(int argc, char **argv) {
    slave_hunting=1;     // want to hunt on startup
    hunttime=30;
 
+   // for faking moving stuff
+   mit_length=10; mat_length=100;
+   mit_home=2; mat_home=4;
+   mit_end=8; mat_end=96;
+
    /* start with a clean address structures */
    memset(&fasit_addr, 0, sizeof(struct sockaddr_in));
    fasit_addr.sin_family = AF_INET;
@@ -141,7 +159,7 @@ int main(int argc, char **argv) {
    RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");            // RFmaster server the MCP connects to
    RF_addr.sin_port = htons(4004);                              // RFmaster server port number
 
-   while((opt = getopt(argc, argv, "hv:m:r:i:p:f:s:d:D:t:")) != -1) {
+   while((opt = getopt(argc, argv, "hv:m:r:i:p:f:s:d:D:t:q:Q:l:L:x:X:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
@@ -185,6 +203,30 @@ int main(int argc, char **argv) {
 
          case 'm':
             RF_addr.sin_port = htons(atoi(optarg));
+            break;
+
+         case 'l':
+            mit_length = atoi(optarg);
+            break;
+
+         case 'L':
+            mat_length = atoi(optarg);
+            break;
+
+         case 'q':
+            mit_home = atoi(optarg);
+            break;
+
+         case 'Q':
+            mat_home = atoi(optarg);
+            break;
+
+         case 'x':
+            mit_end = atoi(optarg);
+            break;
+
+         case 'X':
+            mat_end = atoi(optarg);
             break;
 
          case ':':
@@ -569,6 +611,12 @@ int main(int argc, char **argv) {
                         minions[mID].S.burst.newdata = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
 
                         minions[mID].S.fault.data = LB_devreg->fault;
+                        minions[mID].mit_length = mit_length;
+                        minions[mID].mat_length = mat_length;
+                        minions[mID].mit_home = mit_home;
+                        minions[mID].mat_home = mat_home;
+                        minions[mID].mit_end = mit_end;
+                        minions[mID].mat_end = mat_end;
 
                         // maybe there should also be stuff for MFS (NES?) MGS MILES and GPS in the device_reg packet
 

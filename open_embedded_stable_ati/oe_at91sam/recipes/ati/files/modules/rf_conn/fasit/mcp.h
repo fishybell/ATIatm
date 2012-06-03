@@ -144,9 +144,11 @@ typedef struct state_u16_item {
 } state_u16_item_t;
 
 typedef struct state_float_item {
-   float data;
-   float newdata;
-   float lastdata;
+   float data; // what we tell SR
+   float newdata; // what we're going towards
+   float lastdata; // what we last told SR
+   int towards_index; // what we're going towards (as an index 0-4)
+   int last_index; // what we last told SR (as an index 0-4)
    uint16 flags;
    uint16 old_flags;
    uint16 timer;
@@ -180,6 +182,7 @@ typedef struct minion_state {
    state_u8_item_t              move;           //  movement direction  0=stopped, 1=forward (away from home), 2=reverse (to home)
    state_float_item_t           speed;          //  speed in 0 to 20 MPH     at some level 20.47 means emergency stop
    state_u16_item_t             position;       // MIT/MAT rail position  in meters from home
+   int                          last_move_time; // the time we last sent a movement status (to calculate difference on)
    //                                   hit configuration (aka sensor)
    state_u8_item_t              on;             // 4 states of on
    state_u16_item_t             hit;
@@ -294,7 +297,8 @@ enum {
 
 enum {
    F_move_none = 0, /* no state, doing nothing */
-   F_move_start_movement, /* starts movement, goes to start movement */
+   F_move_start_movement, /* starts movement, goes to continue movement */
+   F_move_continue_movement, /* starts movement, goes to start movement */
    F_move_end_movement, /* ends movement */
 };
 
@@ -341,6 +345,12 @@ typedef struct _thread_data_t {
    int RF_addr; // current RF address 
    uint32 devid;        // mac address of this minion which we got back from the RF
    minion_state_t S;    // the whole state of this minion
+   int mit_length;      // length of mit track
+   int mit_home;        // where on mit track home is
+   int mit_end;         // where on mit track end is
+   int mat_length;      // length of mat track
+   int mat_home;        // where on mat track home is
+   int mat_end;         // where on mat track end is
 } thread_data_t;
 
 /* create simple struct to keep track of the address pool */
@@ -385,7 +395,7 @@ typedef struct minion_bufs {
 void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
 
 // command tracking to do stuff (whatever stuff really) when a packet is actually sent from the radio
-typedef void (*tracker_callback)(thread_data_t*, char*, void*);
+typedef void (*tracker_callback)(thread_data_t*, minion_time_t*, char*, void*);
 typedef struct sequence_tracker {
    char *pkt; // copy of message (up to 48 byte messages at least) that we're tracking
    tracker_callback sent_callback; // a function to call when we've received the response to this command
@@ -553,54 +563,37 @@ typedef enum rf_target_type {
 #define SLOW_TIME             250 /* 25 seconds */
 #define SLOW_RESPONSE_TIME    90  /* 9 seconds */
 #define EVENT_SOON_TIME       5   /* 1/2 second */
-#define TRANSITION_START_TIME 4   /* 4/10 second */
-#define TRANSITION_TIME       4   /* 4/10 second */
+#define TRANSMISSION_TIME     4   /* 4/10 second */
+#define SIT_TRANSITION_TIME   4   /* 4/10 second */
+#define SAT_TRANSITION_TIME   90  /* 9 seconds */
+#define HSAT_TRANSITION_TIME  115 /* 11 1/2 second */
+#define MIT_MOVE_START_TIME   5   /* 1/2 second */
+#define MAT_MOVE_START_TIME   5   /* 1/2 second */
 
 // other state constants
-#define FAST_TIME_MAX_MISS 8 /* maximum value of the "missed message" counter */
-#define SLOW_TIME_MAX_MISS 4 /* maximum value of the "missed message" counter */
+#define FAST_TIME_MAX_MISS 800 /* maximum value of the "missed message" counter */
+#define SLOW_TIME_MAX_MISS 400 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_UNREPORT (4*15) /* max number of reports per burst * max number of non-reports before vacuum */
 
+// MIT/MAT speed constants
+extern int MIT_SPEEDS[]; // in meters per second (times 1000)
+extern int MAT_SPEEDS[]; // in meters per second (times 1000)
+extern int MIT_ACCEL[];  // in meters per second per second (times 1000)
+extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
+
 // common complex timer starts
 #define START_EXPOSE_TIMER(S) { \
-   if (S.exp.data == 45) { \
-      /* we're starting transistion: start fast, stop slow */ \
-      S.rf_t.fast_missed = 0; \
-      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
-      stopTimer(S.rf_t, slow_timer, slow_flags); \
-      /* will be fast until we receive an ack, then it will be slow */ \
-      /* start transition */ \
-      setTimerTo(S.exp, exp_timer, exp_flags, TRANSITION_START_TIME, F_exp_start_transition); \
-   } else { \
-      /* we're finished with transition: stop fast, start medium */ \
-      S.rf_t.fast_missed = 0; \
-      stopTimer(S.rf_t, slow_timer, slow_flags); \
-      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_medium); \
-   } \
+   /* start expose simulation */ \
+   setTimerTo(S.exp, exp_timer, exp_flags, TRANSMISSION_TIME, F_exp_start_transition); \
 }
 #define START_CONCEAL_TIMER(S) { \
-   if (S.exp.data == 45) { \
-      /* we're starting transistion: start fast, stop slow */ \
-      S.rf_t.fast_missed = 0; \
-      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
-      stopTimer(S.rf_t, slow_timer, slow_flags); \
-      /* will be fast until we receive an ack, then it will be slow */ \
-   } else { \
-      /* we're finished with transition: stop fast, start slow soon */ \
-      stopTimer(S.rf_t, fast_timer, fast_flags); \
-      S.rf_t.slow_missed = 0; \
-      setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
-   } \
-   /* start transition */ \
-   setTimerTo(S.exp, con_timer, con_flags, TRANSITION_START_TIME, F_con_start_transition); \
+   /* start conceal simulation */ \
+   setTimerTo(S.exp, con_timer, con_flags, TRANSMISSION_TIME, F_con_start_transition); \
 }
 #define START_MOVE_TIMER(S) { \
-   /* start fast, stop slow */ \
-   setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
-   stopTimer(S.rf_t, slow_timer, slow_flags); \
    /* start move simulation */ \
-   setTimerTo(S.move, timer, flags, TRANSITION_START_TIME, F_move_start_movement); \
+   setTimerTo(S.move, timer, flags, TRANSMISSION_TIME, F_move_start_movement); \
 }
 #define START_STANDARD_LOOKUP(S) {\
    /* ensure we're doing some sort of slow lookup */ \
@@ -640,9 +633,22 @@ typedef enum rf_target_type {
    exit(0); /* exit the forked minion */ \
 }
 
+#define change_states(M, T, S, F) { \
+   const char *st; \
+   switch (S) { \
+      case TS_concealed: st = "TS_concealed"; break; \
+      case TS_con_to_exp: st = "TS_con_to_exp"; break; \
+      case TS_exposed: st = "TS_exposed"; break; \
+      case TS_exp_to_con: st = "TS_exp_to_con"; break; \
+      case TS_too_far: st = "TS_too_far"; break; \
+      default: st = "Nothing I expected"; break; \
+   } \
+   DDCMSG(D_NEW, RED, "called change_states(..., %s=%s, %s=%i) @ %s:%i", #S, st, #F, F, __FILE__, __LINE__); \
+   change_states_internal(M, T, S, F); \
+}
 
 void sendStatus2102(int force, FASIT_header *hdr, thread_data_t *minion, minion_time_t *mt);
-void change_states(thread_data_t *minion, minion_time_t *mt, trans_step_t step, int force);
+void change_states_internal(thread_data_t *minion, minion_time_t *mt, trans_step_t step, int force);
 void inform_state(thread_data_t *minion, minion_time_t *mt, FASIT_header *hdr);
 
 #endif

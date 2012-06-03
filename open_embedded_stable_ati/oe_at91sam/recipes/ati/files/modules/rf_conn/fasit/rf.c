@@ -254,12 +254,19 @@ int gather_rf(int fd, char *tail,int max){
 void DDpacket_internal(const char *program, uint8 *buf,int len){
    uint8 *buff;
    char cmdname[32],hbuf[100],qbuf[200];
+   static int devid_map[2048];
+   static int devid_map_init = 0;
    LB_packet_t *LB;
    LB_device_reg_t *LB_devreg;
    LB_assign_addr_t *LB_addr;
    LB_request_new_t *LB_new;
 
    int i,plen,addr,devid,ptype,pnum,color;
+
+   if (!devid_map_init) {
+      memset(devid_map, 0, sizeof(int)*2048);
+      devid_map_init = 1;
+   }
 
    buff=buf;    // copy ptr so we can mess with it
    pnum=1;
@@ -300,7 +307,7 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
          {
             LB_status_req_t *L=(LB_status_req_t *)LB;
             strcpy(cmdname,"Status_Req");
-            sprintf(hbuf,"RFaddr=%3d",L->addr);
+            sprintf(hbuf,"RFaddr=%3d devid=%3x",L->addr, devid_map[L->addr]);
          }
          break;
 
@@ -451,6 +458,9 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
             LB_assign_addr_t *L=(LB_assign_addr_t *)LB;
             strcpy(cmdname,"Assign_Addr");
             sprintf(hbuf,"rereg=%d devid=%3x new_addr=%3d",L->reregister,L->devid,L->new_addr);
+
+            // remember this info for later
+            devid_map[L->new_addr] = L->devid;
          }
          break;
 

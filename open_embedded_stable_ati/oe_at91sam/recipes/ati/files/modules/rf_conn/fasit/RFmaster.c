@@ -489,7 +489,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
 
                DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%d]", tbuf_size);
                DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %d %d", remaining_time, inittime);
-               remaining_time += (inittime*2) + (364*2); // add initial delay time (for beginning and end) and DTXM measured delaya (for beggining and end)
+               remaining_time += (inittime) + (364*0); // add initial delay time (for beginning and end) and DTXM measured delaya (for beggining and end)
 
                if (tbuf_size > RF_size(LBb->cmd)) {  // if we have something to Tx, Tx it.
                   TIMESTAMP_NOW;
@@ -969,7 +969,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
                   Queue_Contains[laa->new_addr] = 0;
                }
                if (ptype==4) {
-                  // only going to receive LB_CONTROL_QUEUE messages from 
+                  // only going to receive LB_CONTROL_QUEUE messages from minions
                   LB_control_queue_t *lcq = (LB_control_queue_t*)LB;
                   last_control_sequence = lcq->sequence;
                   last_control_addr = lcq->addr;
