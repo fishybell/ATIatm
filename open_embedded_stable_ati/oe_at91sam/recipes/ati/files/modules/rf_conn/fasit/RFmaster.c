@@ -9,6 +9,11 @@ const char *__PROGRAM__ = "RFmaster ";
 
 int verbose,rtime,collecting_time;    // globals
 
+typedef struct rfpair {
+   int parent;
+   int child;
+} rfpair_t;
+
 // this makes the warning go away
 extern size_t strnlen (__const char *__string, size_t __maxlen)
 __THROW __attribute_pure__ __nonnull ((1));
@@ -119,7 +124,7 @@ static void queueMsg(char *msgbuf, int *buflen, void *msg, int size) {
 #define Txsize 256
 #define RF_BUF_SIZE 512
 
-void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
+void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
    struct timespec elapsed_time, start_time, istart_time,delta_time, dwait_time, collect_time;
    queue_item_t *Rx,*Tx,*qi;
    int Queue_Contains[2048]; // used to see what commands the outbound queue contains. max of rf addr 2047, 0 is not used
@@ -170,9 +175,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
    // add RF fd to epoll
    memset(&ev, 0, sizeof(ev));
    ev.events = EPOLLIN; // only for reading to start
-   ev.data.fd = RFfd; // remember for later
-   if (epoll_ctl(efd, EPOLL_CTL_ADD, RFfd, &ev) < 0) {
-      EMSG("epoll RFfd insertion error\n");
+   ev.data.fd = child; // remember for later
+   if (epoll_ctl(efd, EPOLL_CTL_ADD, child, &ev) < 0) {
+      EMSG("epoll child insertion error\n");
       close_nicely=1;
    }
 
@@ -305,7 +310,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
       ep_rf=-1; ep_mcp=-1; ep_ris=-1; ep_ric=-1; // none marked yet
       for (n = 0; !close_nicely && n < nfds; n++) {
          //DDCMSG(D_NEW, YELLOW, "Looking at %i in events...%i", n, events[n].data.fd);
-         if (events[n].data.fd == RFfd) { // RFfd is ready...
+         if (events[n].data.fd == child) { // child is ready...
             ep_rf = n; // ...at index n
          } else if (events[n].data.fd == MCPsock) { // MCPsock is ready...
             ep_mcp = n; // ...at index n
@@ -711,7 +716,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd){
          DDCMSG(D_VERY|D_NEW,BLACK,"RFmaster FD_ISSET(RFfd)");
          /* Receive message, or continue to recieve message from RF */
          Rptr = Rbuf + Rsize;
-         if ((gotrf = gather_rf(RFfd,Rptr,RF_BUF_SIZE-Rsize)) > 0) {
+         if ((gotrf = read(child, Rptr, RF_BUF_SIZE-Rsize)) > 0) {
             Rsize += gotrf;
             Rptr = Rbuf + Rsize;
          } else {
@@ -1130,6 +1135,8 @@ int main(int argc, char **argv) {
    int opt,xmit,hardflow;
    int slottime,total_slots;
    int low_dev,high_dev;
+   rfpair_t rf_pair;
+   int child;
 
    rtime=0;
    collecting_time=300; //  minimum time to wait for collecting messages for a burst (in ms)
@@ -1141,10 +1148,6 @@ int main(int argc, char **argv) {
    strcpy(ttyport,"/dev/ttyS0");
    hardflow=0;
    
-   // install signal handlers
-   signal(SIGINT, quitproc);
-   signal(SIGQUIT, quitproc);
-
    while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:c:")) != -1) {
       switch(opt) {
          case 'h':
@@ -1222,17 +1225,17 @@ int main(int argc, char **argv) {
    DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
    print_verbosity_bits();
 
-   //   Okay,   set up the RF modem link here
-
-   RFfd=open_port(ttyport,hardflow);   // with hardware flow
-
-   if (RFfd<0) {
-      DCMSG(RED,"RFmaster: comm port could not be opened. Shutting down");
-      exit(-1);
-   }
 
    //  this section is just used for testing   
    if (xmit){   
+      //   Okay,   set up the RF modem link here
+      RFfd=open_port(ttyport,hardflow);   // with hardware flow
+
+      if (RFfd<0) {
+         DCMSG(RED,"RFmaster: comm port could not be opened. Shutting down");
+         exit(-1);
+      }
+
       int i = 0;
       char obuf[200];
       memset(obuf, 0, 200);
@@ -1391,6 +1394,61 @@ int main(int argc, char **argv) {
       DCMSG(RED, "listen(risock) failed");
    }
 
+   // open a bidirectional pipe for communication with the child
+   if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &rf_pair.parent))){
+      DieWithError("socketpair() failed");
+   }
+
+   //   fork a minion
+   if ((child = fork()) == -1) {
+      DieWithError("fork failed");
+   }
+   if (child) {
+      // install signal handlers
+      signal(SIGINT, quitproc);
+      signal(SIGQUIT, quitproc);
+      // we're the parent
+      close(rf_pair.parent);
+   } else {
+      // install signal handlers
+      signal(SIGINT, quitproc);
+      signal(SIGQUIT, quitproc);
+      // we're the child
+      close(rf_pair.child);
+      // do child thread here...
+      __PROGRAM__ = "RFmaster:child ";
+
+      //   Okay,   set up the RF modem link here
+      RFfd=open_port(ttyport,hardflow | 2 | 0x08);   // with hardflow (and force blocking and read-only)
+
+      if (RFfd<0) {
+         DCMSG(RED,"RFmaster: comm port could not be opened. Shutting down");
+         exit(-1);
+      }
+
+      while (!close_nicely) {
+         char rbuf[RF_BUF_SIZE];
+         int gotrf;
+         if ((gotrf = read(RFfd,rbuf,RF_BUF_SIZE)) > 0) {
+            DDCMSG(D_NEW, GRAY, "Childing pushing to parent %i bytes", gotrf);
+            write(rf_pair.parent, rbuf, gotrf);
+         } else {
+            DDCMSG(D_NEW, RED, "Failed to gather_rf"); 
+            perror("on rf read");
+            sleep(1);
+         }
+      }
+      exit(0);
+   }
+
+   //   Okay,   set up the RF modem link here
+   RFfd=open_port(ttyport,hardflow | 0x10);   // with hardware flow (and force write-only)
+
+   if (RFfd<0) {
+      DCMSG(RED,"RFmaster: comm port could not be opened. Shutting down");
+      exit(-1);
+   }
+
    while (!close_nicely) {
 
       /* error existing riclient */
@@ -1419,7 +1477,7 @@ int main(int argc, char **argv) {
 
 
       DCMSG(BLUE,"Good connection to MCP <%s>  (or telnet or somebody)", inet_ntoa(ClntAddr.sin_addr));
-      HandleRF(MCPsock,risock, &riclient,RFfd);
+      HandleRF(MCPsock,risock, &riclient,RFfd,rf_pair.child);
       DCMSG(RED,"Connection to MCP closed.   listening for a new MCP");
 
    }

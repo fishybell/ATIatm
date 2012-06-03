@@ -98,8 +98,16 @@ float ntohf(float f);
 
 #define htonf(f) (ntohf(f))
 
-#define min(a, b) ( a > b ? b : a )
-#define max(a, b) ( a > b ? a : b )
+#define min(a, b) ({ \
+    typeof(a) _a = (a); \
+    typeof(b) _b = (b); \
+    _a > _b ? _b : _a; \
+})
+#define max(a, b) ({ \
+    typeof(a) _a = (a); \
+    typeof(b) _b = (b); \
+    _a > _b ? _a : _b; \
+})
 
 // for debugging memset/memcpy
 //#define DEBUG_MEM

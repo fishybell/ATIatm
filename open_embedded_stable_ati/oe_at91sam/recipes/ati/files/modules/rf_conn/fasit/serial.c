@@ -20,15 +20,28 @@
  * Returns the file descriptor on success or -1 on error.
  */
 
-/** hard flow bit 1 is hardwareflow, and bit 2 is blocking  bit 4 is IGNBRK **/
+/** hard flow bits:
+ * x01 is hardwareflow
+ * x02 is blocking
+ * x04 is IGNBRK
+ * x08 is read-only
+ * x10 is write-only
+ **/
 int open_port(char *sport, int hardflow){
    int fd,speed,myspeed; /* File descriptor for the port */
    struct termios my_termios;
    struct termios new_termios;
    char buf[200];
    char sbuf[100];
+   int rw = O_RDWR;
 
    sbuf[0]=0;
+
+   if (hardflow&8) {
+      rw = O_RDONLY; // we're just reading
+   } else if (hardflow&0x10) {
+      rw = O_WRONLY; // we're just writing
+   }
 
    if (hardflow&2) {
       fd = open(sport, O_RDWR | O_NOCTTY);     //blocking

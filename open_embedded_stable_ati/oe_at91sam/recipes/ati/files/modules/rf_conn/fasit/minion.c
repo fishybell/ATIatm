@@ -195,7 +195,7 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion, minion_t
 
    #define CACHE_CHECK(S) { \
       if (S.data != S.lastdata) { /* see if we've changed */ \
-         DDCMSG(D_NEW, black, "Changed data for " #S " %d := %d", S.lastdata, S.data); \
+         DDCMSG(D_NEW, black, "Changed data for " #S " %f := %f", (float)S.lastdata, (float)S.data); \
          force=1; /* force it if it's not already forced */ \
          S.lastdata = S.data; /* save this change */ \
       } \
@@ -224,7 +224,11 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion, minion_t
          CACHE_CHECK(minion->S.move);
          msg.body.move = minion->S.move.data;
          CACHE_CHECK(minion->S.position);
-         msg.body.pos = htons(minion->S.position.data);
+         if (msg.body.type == Type_MIT) {
+            msg.body.pos = htons(minion->S.position.data - minion->mit_home); // offset so "home" shows as 0 in SR
+         } else {
+            msg.body.pos = htons(minion->S.position.data - minion->mat_home); // offset so "home" shows as 0 in SR
+         }
 //         DDCMSG(D_NEW,MAGENTA,"\n_____________________________________________________\nMinion %i: building 2102 status.   S.position.data=%i msg.body.pos=%i  htons(...)=%i ",
 //                minion->mID,minion->S.position.data,msg.body.pos,htons(msg.body.pos));
          break;
@@ -1329,9 +1333,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
 
                   // get ready to fake movement
                   minion->S.last_move_time = -1; // not sent for this movement message
+                  DDCMSG(D_POINTER,BLUE,"Moving minion %i with sequence %i because %i and %i", minion->mID, minion->S.last_sequence_sent, LB_move->speed, minion->S.move.data);
                } else {
                   // send changes
                   psend_mcp(minion,LB_move);
+                  DDCMSG(D_POINTER,BLUE,"Moving minion %i without sequence because %i and %i", minion->mID, LB_move->speed, minion->S.move.data);
                }
 
                // send 2101 ack  (2102's will be generated at start and stop of actuator)
@@ -2277,7 +2283,9 @@ void *minion_thread(thread_data_t *minion){
                      minion->S.tokill.newdata = L->tokill;
                      minion->S.mode.newdata = L->hitmode ? 2 : 1; // back to burst/single
                      minion->S.sens.newdata = L->sensitivity;
-                     //minion->S.position.data = L->location;
+                     minion->S.position.data = L->location;
+                     minion->S.speed.fpos = (float)minion->S.position.data;
+                     minion->S.speed.lastfpos = (float)minion->S.position.data;
                      minion->S.burst.newdata = L->timehits * 5; // convert back
                      minion->S.fault.data = L->fault;
 //                     DDCMSG(D_NEW,MAGENTA,"\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nMinion %i: (Rf_addr=%i) parsed response. location=%i fault=%02X sending 2102 status",

@@ -607,6 +607,28 @@ int main(int argc, char **argv) {
                         minions[mID].S.move.data = LB_devreg->move;
                         minions[mID].S.react.data = LB_devreg->react;
                         minions[mID].S.position.data = LB_devreg->location;
+                        DDCMSG(D_POINTER, GRAY, "\n\n----------------------\nPosition from LB: %i", LB_devreg->location);
+                        if (minions[mID].S.position.data > 512) {
+                           DDCMSG(D_POINTER, GRAY, "converting to negative: %i", minions[mID].S.position.data);
+                           minions[mID].S.position.data -= 1024; // we are a negative
+                           DDCMSG(D_POINTER, GRAY, "converted to negative: %i", minions[mID].S.position.data);
+                        }
+                        if (minions[mID].S.dev_type == Type_MIT) {
+                           DDCMSG(D_POINTER, GRAY, "clamping to mit lengths: %i", minions[mID].S.position.data);
+                           minions[mID].S.position.data = max(0, min(minions[mID].S.position.data, mit_length));
+                           DDCMSG(D_POINTER, GRAY, "clamped to mit lengths: %i", minions[mID].S.position.data);
+                        } else if (minions[mID].S.dev_type == Type_MAT) {
+                           DDCMSG(D_POINTER, GRAY, "clamping to mat lengths: %i", minions[mID].S.position.data);
+                           minions[mID].S.position.data = max(0, min(minions[mID].S.position.data, mat_length));
+                           DDCMSG(D_POINTER, GRAY, "clamped to mat lengths: %i", minions[mID].S.position.data);
+                        } else {
+                           DDCMSG(D_POINTER, GRAY, "resetting to 0 from %i", minions[mID].S.position.data);
+                           minions[mID].S.position.data = 0;
+                           DDCMSG(D_POINTER, GRAY, "reset to 0;");
+                        }
+                        minions[mID].S.speed.fpos = (float)minions[mID].S.position.data;
+                        minions[mID].S.speed.lastfpos = (float)minions[mID].S.position.data;
+                        DDCMSG(D_POINTER, GRAY, "Starting fpos:%f from pos:%i", minions[mID].S.speed.fpos, minions[mID].S.position.data);
                         minions[mID].S.mode.data = LB_devreg->hitmode;
                         minions[mID].S.burst.newdata = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
 

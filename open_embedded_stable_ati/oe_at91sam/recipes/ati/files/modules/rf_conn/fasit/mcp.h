@@ -127,6 +127,7 @@ typedef struct state_u8_item {
 typedef struct state_s16_item {
    int16 data;
    int16 newdata;
+   int16 lastdata;
    uint16 flags;
    uint16 old_flags;
    uint16 timer;
@@ -149,11 +150,13 @@ typedef struct state_float_item {
    float lastdata; // what we last told SR
    int towards_index; // what we're going towards (as an index 0-4)
    int last_index; // what we last told SR (as an index 0-4)
+   float fpos; // position as a float (so we can accrue small amounts of position)
+   float lastfpos; // position as a float (so we can accrue small amounts of position)
    uint16 flags;
    uint16 old_flags;
    uint16 timer;
    uint16 old_timer;
-} state_float_item_t;
+} state_speed_item_t;
 
 typedef struct report_memory_item { /* matching reports will be ignored, items in chain will be deleted when we receive a chunk of event reports that does not include this report */
    int report;
@@ -180,8 +183,8 @@ typedef struct minion_state {
    state_u8_item_t              asp;            //  FUTURE FASIT aspect of target
    state_u16_item_t             dir;            //  FUTURE FASIT 0-359 degree angle of target (dir??)
    state_u8_item_t              move;           //  movement direction  0=stopped, 1=forward (away from home), 2=reverse (to home)
-   state_float_item_t           speed;          //  speed in 0 to 20 MPH     at some level 20.47 means emergency stop
-   state_u16_item_t             position;       // MIT/MAT rail position  in meters from home
+   state_speed_item_t           speed;          //  speed in 0 to 20 MPH     at some level 20.47 means emergency stop
+   state_s16_item_t             position;       // MIT/MAT rail position  in meters from home
    int                          last_move_time; // the time we last sent a movement status (to calculate difference on)
    //                                   hit configuration (aka sensor)
    state_u8_item_t              on;             // 4 states of on
@@ -345,12 +348,12 @@ typedef struct _thread_data_t {
    int RF_addr; // current RF address 
    uint32 devid;        // mac address of this minion which we got back from the RF
    minion_state_t S;    // the whole state of this minion
-   int mit_length;      // length of mit track
-   int mit_home;        // where on mit track home is
-   int mit_end;         // where on mit track end is
-   int mat_length;      // length of mat track
-   int mat_home;        // where on mat track home is
-   int mat_end;         // where on mat track end is
+   uint16 mit_length;   // length of mit track
+   uint16 mit_home;     // where on mit track home is
+   uint16 mit_end;      // where on mit track end is
+   uint16 mat_length;   // length of mat track
+   uint16 mat_home;     // where on mat track home is
+   uint16 mat_end;      // where on mat track end is
 } thread_data_t;
 
 /* create simple struct to keep track of the address pool */
@@ -567,8 +570,8 @@ typedef enum rf_target_type {
 #define SIT_TRANSITION_TIME   4   /* 4/10 second */
 #define SAT_TRANSITION_TIME   90  /* 9 seconds */
 #define HSAT_TRANSITION_TIME  115 /* 11 1/2 second */
-#define MIT_MOVE_START_TIME   5   /* 1/2 second */
-#define MAT_MOVE_START_TIME   5   /* 1/2 second */
+#define MIT_MOVE_START_TIME   8   /* 4/5 second */
+#define MAT_MOVE_START_TIME   120 /* 12 seconds */
 
 // other state constants
 #define FAST_TIME_MAX_MISS 800 /* maximum value of the "missed message" counter */

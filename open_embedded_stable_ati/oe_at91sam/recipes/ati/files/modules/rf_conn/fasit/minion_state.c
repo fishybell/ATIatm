@@ -267,7 +267,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          }
       ); // end of CHECK_TIMER for conceal state timer
 
-#if 0 /* something in here is broken */
       CHECK_TIMER (minion->S.move, timer, flags, 
          DDCMSG(D_MSTATE, BLACK, "Now checking move timer flags: %i", minion->S.move.flags);
          switch (minion->S.move.flags) {
@@ -275,16 +274,17 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                // we haven't started moving yet, so let's prepare variables
                minion->S.speed.lastdata = -1.0; // force cache to be dirty
                minion->S.speed.data = 0.0; // we're not moving
+               minion->S.move.data = minion->S.move.newdata; // but we're going to move a direction
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
 
                DDCMSG(D_POINTER, GRAY, "Should start fake movement for minion %i", minion->mID);
                switch (minion->S.dev_type) {
                   default:
                   case Type_MIT:
-                     setTimerTo(S.move, timer, flags, MIT_MOVE_START_TIME, F_move_continue_movement);
+                     setTimerTo(minion->S.move, timer, flags, MIT_MOVE_START_TIME, F_move_continue_movement);
                      break;
                   case Type_MAT:
-                     setTimerTo(S.move, timer, flags, MAT_MOVE_START_TIME, F_move_continue_movement);
+                     setTimerTo(minion->S.move, timer, flags, MAT_MOVE_START_TIME, F_move_continue_movement);
                      break;
                }
                timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);      
@@ -292,50 +292,204 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                minion->S.speed.last_index = 0;
             } break;
             case F_move_continue_movement: {
-               DDCMSG(D_POINTER, GRAY, "Started fake movement for minion %i", minion->mID);
                // first and foremost, find out the difference in time
-               int nt, dt; 
+               int nt;
+               int dt; 
+               int vel;
+               int accel;
+               int dir;
+               float cs;
+               DDCMSG(D_POINTER, GRAY, "Started fake movement for minion %i", minion->mID);
                timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);      
                nt = ts2ms(&mt->elapsed_time);
-               dt = minion->S.last_move_time - nt; // diff = last - now
+               dt = (nt - minion->S.last_move_time); // diff = now - last
+               minion->S.last_move_time = nt; // last is now, now
 
-               // distance = last distance + last speed * time + acceleration * time * time
-
-               // speed = last speed * acceleration * time
+               // get velocity and acceleration for MIT or MAT
+               switch (minion->S.dev_type) {
+                  default:
+                  case Type_MIT:
+                     vel = MIT_SPEEDS[minion->S.speed.last_index];
+                     if (minion->S.speed.last_index < minion->S.speed.towards_index) {
+                        accel = MIT_ACCEL[minion->S.speed.towards_index];
+                     } else {
+                        accel = 0; // not accelerating any more
+                     }
+                     cs = ((float)(MIT_SPEEDS[minion->S.speed.towards_index]) / 1000.0) * 2.24; // convert to mph
+                     break;
+                  case Type_MAT:
+                     vel = MAT_SPEEDS[minion->S.speed.last_index];
+                     if (minion->S.speed.last_index < minion->S.speed.towards_index) {
+                        accel = MAT_ACCEL[minion->S.speed.towards_index];
+                     } else {
+                        accel = 0; // not accelerating any more
+                     }
+                     cs = ((float)(MAT_SPEEDS[minion->S.speed.towards_index]) / 1000.0) * 2.24; // convert to mph
+                     break;
+               }
                
+               // find dir value (-1 for left, 1 for right)
+               minion->S.move.data = minion->S.move.newdata;
+               switch (minion->S.move.data) {
+                  case 1:
+                     // 1 = right = distance gets bigger over time
+                     dir = 1;
+                     break;
+                  case 2:
+                     // 2 = left = distance gets smaller over time
+                     dir = -1;
+                     break;
+                  default:
+                     // everything else implies we're not moving at all
+                     dir = 0;
+               }
+
+               // distance = last distance + last speed * time + acceleration * time^2
+               minion->S.speed.fpos = minion->S.speed.lastfpos + /* in meters */
+                                    ((float)(dir) * ((float)(vel) / 1000.0) * ((float)(dt) / 1000.0)) + /* convert to meters and seconds */
+                                    (((float)(accel) / 1000.0) * ((float)(dt) / 1000.0) * ((float)(dt) / 1000.0)); /* convert to meters and seconds */
+               DDCMSG(D_POINTER, GREEN, "pos: %f = %f + ((%i * %i * %i) / 1000000) + ((%i * %i * %i) / 1000000000)",
+                                         minion->S.speed.fpos, minion->S.speed.lastfpos,
+                                         dir, vel, dt, accel, dt, dt);
+
+               // speed = last speed + acceleration * time
+               if (minion->S.speed.lastdata != cs) {
+                  minion->S.speed.data = minion->S.speed.lastdata + /* in mph */
+                                         ((((float)(accel) / 1000.0) * 2.237) * /* convert to m/s then to mph */
+                                          ((float)(dt) / 1000.0)); /* convert to seconds */
+                  DDCMSG(D_POINTER, GREEN, "speed: %f = %f + (((%i / 1000.0) * 2.237) * (%i / 1000.0))",
+                                            minion->S.speed.data, minion->S.speed.lastdata, accel, dt);
+                  if (minion->S.speed.data >= cs) {
+                     // we've overshot our "correct" goal speed
+                     minion->S.speed.data = cs;
+                  } else if (minion->S.speed.data == minion->S.speed.lastdata) {
+                     // we've settled on a speed, show the "correct" goal speed from now on
+                     minion->S.speed.data = cs;
+                  }
+               }
+
+               // have we reached the end?
+               minion->S.position.data = (int)minion->S.speed.fpos;
+               minion->S.speed.lastfpos = minion->S.speed.fpos;
+               switch (minion->S.dev_type) {
+                  default:
+                  case Type_MIT:
+                     minion->S.speed.fpos = max(0, min(minion->S.speed.fpos, minion->mit_length)); // clamp at 0 to length of track
+                     if (minion->S.position.data <= minion->mit_home && dir < 0) {
+                        minion->S.fault.data = 6; // stopped by left limit
+                        minion->S.speed.data = 0.0;
+                     } else if (minion->S.position.data >= minion->mit_end && dir > 0) {
+                        minion->S.fault.data = 5; // stopped by right limit
+                        minion->S.speed.data = 0.0;
+                     }
+                     break;
+                  case Type_MAT:
+                     minion->S.position.data = max(0, min(minion->S.position.data, minion->mat_length)); // clamp at 0 to length of track
+                     if (minion->S.position.data <= minion->mat_home && dir < 0) {
+                        minion->S.fault.data = 6; // stopped by left limit
+                        minion->S.speed.data = 0.0;
+                     } else if (minion->S.position.data >= minion->mat_end && dir > 0) {
+                        minion->S.fault.data = 5; // stopped by left limit
+                        minion->S.speed.data = 0.0;
+                     }
+                     break;
+               }
 
                // tell the good news
+               DDCMSG(D_POINTER, GRAY, "Calculated movement values from dt=%i: pos:%i mph:%f move:%i", dt,
+                      minion->S.position.data, minion->S.speed.data, minion->S.move.data);
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
+               DDCMSG(D_POINTER, GRAY, "Possibly sent 2102 to FASIT server from minion %i", minion->mID);
+
+               // remember what has transpired
+               switch (minion->S.dev_type) {
+                  default:
+                  case Type_MIT:
+                     // look at average speed (in mph) between speed index set points
+                     DDCMSG(D_POINTER, GRAY, "Finding last_index from mph %f", minion->S.speed.data);
+                     if (minion->S.speed.data > 0.0) {
+                        if (minion->S.speed.data > 2.33) {
+                           if (minion->S.speed.data > 4.35) {
+                              if (minion->S.speed.data > 8.08) {
+                                 // moving above average of 3 and 4, so we'll use 4
+                                 minion->S.speed.last_index = 3;
+                              } else {
+                                 // moving between average of 2 and 3 and 3 and 4, so we'll use 3
+                                 minion->S.speed.last_index = 3;
+                              }
+                           } else {
+                              // moving between average of 1 and 2 and 2 and 3, so we'll use 2
+                              minion->S.speed.last_index = 2;
+                           }
+                        } else {
+                           // moving, but not reached average of speed 1 and 2, so we'll use 1
+                           minion->S.speed.last_index = 1;
+                        }
+                     } else {
+                        // not moving at all, so we'll use 0
+                        minion->S.speed.last_index = 0;
+                     }
+                     DDCMSG(D_POINTER, GRAY, "Found last_index %i from mph %f", minion->S.speed.last_index, minion->S.speed.data);
+                     break;
+                  case Type_MAT:
+                     DDCMSG(D_POINTER, GRAY, "Finding last_index from mph %f", minion->S.speed.data);
+                     // look at average speed (in mph) between speed index set points
+                     if (minion->S.speed.data > 0.0) {
+                        if (minion->S.speed.data > 8.23) {
+                           if (minion->S.speed.data > 11.65) {
+                              if (minion->S.speed.data > 15.53) {
+                                 // moving above average of 3 and 4, so we'll use 4
+                                 minion->S.speed.last_index = 3;
+                              } else {
+                                 // moving between average of 2 and 3 and 3 and 4, so we'll use 3
+                                 minion->S.speed.last_index = 3;
+                              }
+                           } else {
+                              // moving between average of 1 and 2 and 2 and 3, so we'll use 2
+                              minion->S.speed.last_index = 2;
+                           }
+                        } else {
+                           // moving, but not reached average of speed 1 and 2, so we'll use 1
+                           minion->S.speed.last_index = 1;
+                        }
+                     } else {
+                        // not moving at all, so we'll use 0
+                        minion->S.speed.last_index = 0;
+                     }
+                     DDCMSG(D_POINTER, GRAY, "Found last_index %i from mph %f", minion->S.speed.last_index, minion->S.speed.data);
+                     break;
+               }
 
                // and come back later
                if (minion->S.speed.data <= 0.0) {
                   switch (minion->S.dev_type) {
                      default:
                      case Type_MIT:
-                        setTimerTo(S.move, timer, flags, MIT_MOVE_START_TIME, F_move_end_movement);
+                        setTimerTo(minion->S.move, timer, flags, MIT_MOVE_START_TIME, F_move_end_movement);
                         break;
                      case Type_MAT:
-                        setTimerTo(S.move, timer, flags, MAT_MOVE_START_TIME, F_move_end_movement);
+                        setTimerTo(minion->S.move, timer, flags, MAT_MOVE_START_TIME, F_move_end_movement);
                         break;
                   }
                } else {
-                  switch (minion->S.dev_type) {
-                     default:
-                     case Type_MIT:
-                        setTimerTo(S.move, timer, flags, MIT_MOVE_START_TIME, F_move_continue_movement);
-                        break;
-                     case Type_MAT:
-                        setTimerTo(S.move, timer, flags, MAT_MOVE_START_TIME, F_move_continue_movement);
-                        break;
-                  }
+                  // come back after we've moved 1/2 meters
+                  float t = 0.75 * (0.44 * minion->S.speed.data); // find number of seconds to go 3/4 meter (converting mph to m/s first) -- spec want every 2 meters, but as we're faking it, we may as well make it look smooth
+                  setTimerTo(minion->S.move, timer, flags, (int)(t * 10.0), F_move_continue_movement); // convert time to deciseconds
+                  DDCMSG(D_POINTER, GRAY, "Coming back in %i deciseconds (%f seconds)", (int)(t * 10.0), t);
                }
             } break;
             case F_move_end_movement: {
                // Clean up movement data
+               DDCMSG(D_POINTER, GRAY, "Minion %i is ending movement", minion->mID);
                minion->S.speed.towards_index = 0;
                minion->S.speed.last_index = 0;
+               minion->S.speed.lastdata = -1; // force cache to be dirty
                minion->S.speed.data = 0.0;
                minion->S.speed.newdata = 0.0;
+               minion->S.move.data = 0; // stopped, no direction
+               if (minion->S.fault.data == 5 || minion->S.fault.data == 6) {
+                  minion->S.fault.data = 0;
+               }
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
                stopTimer(minion->S.move, timer, flags); // don't be coming back now
             } break;
@@ -344,7 +498,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             }
          }
       ); // end of CHECK_TIMER for move state timer
-#endif
 
       this_r = minion->S.report_chain;
       while (this_r != NULL) {
