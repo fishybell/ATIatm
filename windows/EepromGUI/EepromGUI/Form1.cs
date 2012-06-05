@@ -1058,7 +1058,7 @@ namespace EepromGUI
             thmTB5.Text = "";
             thmTB6.Text = "";
             msdCheck.Checked = false;
-            msdTab.SelectedIndex = -1;
+            msdCB1.SelectedIndex = -1;
             msdCB2.SelectedIndex = -1;
             msdCB3.SelectedIndex = -1;
             msdCB4.SelectedIndex = -1;
@@ -1549,7 +1549,7 @@ namespace EepromGUI
                             msdTB7.Text = msdSplit[11];
                             msdTB8.Text = msdSplit[12];
                             msdCheck.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdTab.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdCB1.ForeColor = System.Drawing.SystemColors.WindowText;
                             msdCB2.ForeColor = System.Drawing.SystemColors.WindowText;
                             msdCB3.ForeColor = System.Drawing.SystemColors.WindowText;
                             msdCB4.ForeColor = System.Drawing.SystemColors.WindowText;
@@ -1574,7 +1574,7 @@ namespace EepromGUI
                     switch (second)
                     {
                         case 'A':   // Major Flash Version
-                            versionLBL.Text = getMessageValue(message, 4) + ".";
+                            versionLBL.Text = getMessageValue(message, 4);
                             break;
                         case 'B':   // Minor Flash Version
                             version2LBL.Text = getMessageValue(message, 4);
@@ -2100,8 +2100,8 @@ namespace EepromGUI
 
         private void msdCB1_Click(object sender, EventArgs e)
         {
-            changedList.Add(msdTab);
-            msdTab.ForeColor = System.Drawing.SystemColors.HotTrack;
+            changedList.Add(msdCB1);
+            msdCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
         private void msdCB2_Click(object sender, EventArgs e)
@@ -2485,55 +2485,55 @@ namespace EepromGUI
                                 thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
                             break;
                         case "msdCheck":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdCB1":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdCB2":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdCB3":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdCB4":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdTB1":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdTB2":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdTB3":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdTB4":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdTB5":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdTB6":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdTB7":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         case "msdTB8":
-                            msdDefault(msdCheck.Checked, msdTab.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
                                 msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
                             break;
                         default:
@@ -2856,17 +2856,15 @@ namespace EepromGUI
         {
             ProcessStartInfo psi = new ProcessStartInfo();
             OpenFileDialog fileDialog = new OpenFileDialog();
-            FolderBrowserDialog browserDialog = new FolderBrowserDialog();
+            OpenFileDialog openDialog = new OpenFileDialog();
             
             // Grab the file info
-            if (browserDialog.ShowDialog() == DialogResult.OK)
+            if (openDialog.ShowDialog() == DialogResult.OK)
             {
-                String shellFile = "atifirmware.sh";
-                //String batFile = Directory.GetCurrentDirectory() + "\\atifirmwarecopy.bat";
                 String batFile = ".\\atifirmwarecopy.bat";
 
                 psi.FileName = batFile;
-                psi.Arguments = machine + " \"" + browserDialog.SelectedPath + "\\" + shellFile + "\""; 
+                psi.Arguments = machine + " " + openDialog.FileName;
 
                 // Hides the console window that would pop up
                 //psi.WindowStyle = ProcessWindowStyle.Hidden;
@@ -2891,7 +2889,7 @@ namespace EepromGUI
                 }
                 setVersion();
             }
-
+            
 
         }
     }

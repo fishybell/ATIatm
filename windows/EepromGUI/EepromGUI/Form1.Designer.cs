@@ -245,6 +245,7 @@
             this.ipShowButton = new System.Windows.Forms.Button();
             this.ipSetButton = new System.Windows.Forms.Button();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.firmButton = new System.Windows.Forms.Button();
             this.expSTB = new System.Windows.Forms.TextBox();
             this.knobTB = new System.Windows.Forms.TextBox();
             this.knobTB2 = new System.Windows.Forms.TextBox();
@@ -282,7 +283,6 @@
             this.shutdownButton = new System.Windows.Forms.Button();
             this.stopButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
-            this.firmButton = new System.Windows.Forms.Button();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -502,10 +502,10 @@
             // 
             this.DockDCB.FormattingEnabled = true;
             this.DockDCB.Items.AddRange(new object[] {
-            "Home",
-            "End",
-            "Send to Home",
-            "Send to End"});
+            "Left",
+            "Right",
+            "No Dock Left",
+            "No Dock Right"});
             this.DockDCB.Location = new System.Drawing.Point(53, 13);
             this.DockDCB.Name = "DockDCB";
             this.DockDCB.Size = new System.Drawing.Size(79, 24);
@@ -1649,7 +1649,7 @@
             // versionLBL
             // 
             this.versionLBL.AutoSize = true;
-            this.versionLBL.Location = new System.Drawing.Point(90, 436);
+            this.versionLBL.Location = new System.Drawing.Point(86, 436);
             this.versionLBL.Name = "versionLBL";
             this.versionLBL.Size = new System.Drawing.Size(0, 17);
             this.versionLBL.TabIndex = 5;
@@ -1657,7 +1657,7 @@
             // version2LBL
             // 
             this.version2LBL.AutoSize = true;
-            this.version2LBL.Location = new System.Drawing.Point(105, 436);
+            this.version2LBL.Location = new System.Drawing.Point(176, 437);
             this.version2LBL.Name = "version2LBL";
             this.version2LBL.Size = new System.Drawing.Size(0, 17);
             this.version2LBL.TabIndex = 6;
@@ -2965,6 +2965,16 @@
             this.tabPage1.Text = "Manipulate";
             this.tabPage1.UseVisualStyleBackColor = true;
             // 
+            // firmButton
+            // 
+            this.firmButton.Location = new System.Drawing.Point(223, 204);
+            this.firmButton.Name = "firmButton";
+            this.firmButton.Size = new System.Drawing.Size(155, 27);
+            this.firmButton.TabIndex = 96;
+            this.firmButton.Text = "Download Firmware";
+            this.firmButton.UseVisualStyleBackColor = true;
+            this.firmButton.Click += new System.EventHandler(this.firmButton_Click);
+            // 
             // expSTB
             // 
             this.expSTB.Location = new System.Drawing.Point(608, 82);
@@ -3349,16 +3359,6 @@
             this.tabControl1.SelectedIndex = 0;
             this.tabControl1.Size = new System.Drawing.Size(849, 348);
             this.tabControl1.TabIndex = 93;
-            // 
-            // firmButton
-            // 
-            this.firmButton.Location = new System.Drawing.Point(223, 204);
-            this.firmButton.Name = "firmButton";
-            this.firmButton.Size = new System.Drawing.Size(155, 27);
-            this.firmButton.TabIndex = 96;
-            this.firmButton.Text = "Download Firmware";
-            this.firmButton.UseVisualStyleBackColor = true;
-            this.firmButton.Click += new System.EventHandler(this.firmButton_Click);
             // 
             // Form1
             // 
