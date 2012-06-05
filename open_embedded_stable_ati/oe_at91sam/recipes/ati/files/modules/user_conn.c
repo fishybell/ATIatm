@@ -1918,7 +1918,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Request PHI defaults\nFormat: I P\nChange PHI defaults\nFormat: I P (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
 				                break;
                             case 'Q': case 'q':
-                                snprintf(wbuf, 1024, "Docking Station Defaults\nFormat I Q (0|1|2|3) home_end_sendtohome_sendtoend\n");
+                                snprintf(wbuf, 1024, "Docking Station Defaults\nFormat I Q (0|1|2|3) left_right_nodockleft_nodockright\n");
                                 break;
 			                case 'R': case 'r':
                                 snprintf(wbuf, 1024, "Reboot\nFormat: I R reboot\n");			
