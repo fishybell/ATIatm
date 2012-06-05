@@ -123,9 +123,10 @@ void handle_bit_test_long_lifter(struct nl_handle *handle, int is_on) {
     hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_5); // use helper function to build scenario
 // printf("hex_buf_1 (%i): %s\n", strlen(hex_buf_1), hex_buf_1); fflush(stdout);
     acc_c.request = 0;      // not a request
-    acc_c.on_exp = 1;       // on
+    acc_c.on_exp = 0;       // off at start
     acc_c.on_hit = 1;		// deactivate on hit
     acc_c.on_kill = 1;		// deactivate on kill
+    acc_c.on_time = 2000;	// 2000 milliseconds = 2 seconds
     hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_6); // use helper function to build scenario
 
     // Thermal
