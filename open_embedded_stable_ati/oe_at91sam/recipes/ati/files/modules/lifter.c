@@ -693,6 +693,17 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
     return rc;
 }
 
+void lift_faults(int liftfault) {
+	u8 fault = 0;
+
+   if (liftfault) {
+      fault = liftfault; 
+	   // send fault upstream always
+	   queue_nl_multi(NL_C_FAULT, &fault, sizeof(fault));
+   }
+
+}
+
 /* Kill if we need to */
 void do_kill_internal(void) {
 	int stay_up = 1;
@@ -711,6 +722,7 @@ void do_kill_internal(void) {
 
 		// create events for outputs
 		generic_output_event(EVENT_KILL);
+        lift_faults(ERR_target_killed);
 
 		// send kill upstream (always, no matter what the upload value is)
 		kdata = EVENT_KILL; // cast to 8-bits
@@ -978,16 +990,6 @@ static void position_change(struct work_struct * work) {
     send_nl_message_multi(&pos_data, pos_mfh, NL_C_EXPOSE);
 }
 
-void lift_faults(int liftfault) {
-	u8 fault = 0;
-
-   if (liftfault) {
-      fault = liftfault; 
-	   // send fault upstream always
-	   queue_nl_multi(NL_C_FAULT, &fault, sizeof(fault));
-   }
-
-}
 
 //---------------------------------------------------------------------------
 // event handler for lifts
