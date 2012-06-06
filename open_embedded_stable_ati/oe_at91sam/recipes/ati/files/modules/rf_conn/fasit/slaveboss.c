@@ -398,6 +398,7 @@ int main(int argc, char **argv) {
                      fconns[i].rf = rfclient;
                      fconns[i].fasit = newsock;
                      fconns[i].id = 2047; // not registered yet number
+                     fconns[i].tg_id = 2047; // no temp group
                      fconns[i].index = i; // remember its own index
    DDCMSG(D_MEGA, GREEN,"ADDING rf:%i fasit:%i TO fconns[%i]: %08X", fconns[i].rf, fconns[i].fasit, i, &fconns[i]);
                      fconns[i].target_type = RF_Type_Unknown; // unknown target type

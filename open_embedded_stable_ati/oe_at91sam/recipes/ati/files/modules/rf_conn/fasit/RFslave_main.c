@@ -105,11 +105,11 @@ int handleRet(int ret, rf_connection_t *rc, int efd) {
    int done = 0;
    if (ret == doNothing) { return done; }
    if (ret & mark_ttyWrite) {
-      DDCMSG(D_MEGA, RED, "mark_ttyWrite: %i", rc->tty);
+      DDCMSG(D_MEGA, RED, "mark_ttyWrite: %i", rc->child);
       D_memset(&ev, 0, sizeof(ev));
-      ev.data.fd = rc->tty;
+      ev.data.fd = rc->child;
       ev.events = EPOLLIN | EPOLLOUT;
-      epoll_ctl(efd, EPOLL_CTL_MOD, rc->tty, &ev);
+      epoll_ctl(efd, EPOLL_CTL_MOD, rc->child, &ev);
    }
    if (ret & mark_sockWrite) {
       DDCMSG(D_MEGA, RED, "mark_sockWrite: %i", rc->sock);
@@ -119,11 +119,11 @@ int handleRet(int ret, rf_connection_t *rc, int efd) {
       epoll_ctl(efd, EPOLL_CTL_MOD, rc->sock, &ev);
    }
    if (ret & mark_ttyRead) { // mark_ttyRead overwrites mark_ttyWrite
-      DDCMSG(D_MEGA, RED, "mark_ttyRead: %i", rc->tty);
+      DDCMSG(D_MEGA, RED, "mark_ttyRead: %i", rc->child);
       D_memset(&ev, 0, sizeof(ev));
-      ev.data.fd = rc->tty;
+      ev.data.fd = rc->child;
       ev.events = EPOLLIN;
-      epoll_ctl(efd, EPOLL_CTL_MOD, rc->tty, &ev);
+      epoll_ctl(efd, EPOLL_CTL_MOD, rc->child, &ev);
    }
    if (ret & mark_sockRead) { // mark_sockRead overwrites mark_sockWrite
       DDCMSG(D_MEGA, RED, "mark_sockRead, %i", rc->sock);
@@ -133,9 +133,9 @@ int handleRet(int ret, rf_connection_t *rc, int efd) {
       epoll_ctl(efd, EPOLL_CTL_MOD, rc->sock, &ev);
    }
    if (ret & rem_ttyEpoll) {
-      DDCMSG(D_MEGA, RED, "rem_ttyEpoll: %i", rc->tty);
-      epoll_ctl(efd, EPOLL_CTL_DEL, rc->tty, NULL);
-      close(rc->tty); // nothing to do if errors...ignore return value from close()
+      DDCMSG(D_MEGA, RED, "rem_ttyEpoll: %i", rc->child);
+      epoll_ctl(efd, EPOLL_CTL_DEL, rc->child, NULL);
+      close(rc->child); // nothing to do if errors...ignore return value from close()
       done = 1; // TODO -- don't be done
    }
    if (ret & rem_sockEpoll) {
@@ -158,10 +158,8 @@ int main(int argc, char **argv) {
    rf_connection_t rc;
    int tty_fd_n;
    int sock_fd_n;
-
-   // install signal handlers
-   signal(SIGINT, quitproc);
-   signal(SIGQUIT, quitproc);
+   rfpair_t rf_pair;
+   int child;
 
    // initialize connection structure
    D_memset(&rc, 0, sizeof(rc));
@@ -218,7 +216,55 @@ int main(int argc, char **argv) {
    // initialize timers
    clock_gettime(CLOCK_MONOTONIC,&istart_time); // get the intial current time
    timestamp(&elapsed_time,&istart_time,&delta_time);   // make sure the delta_time gets set    
-   // connect to slaveboss
+
+   // open a bidirectional pipe for communication with the child
+   if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &rf_pair.parent))){
+      DieWithError("socketpair() failed");
+   }
+
+   //   fork a minion
+   if ((child = fork()) == -1) {
+      DieWithError("fork failed");
+   }
+   if (child) {
+      // install signal handlers
+      signal(SIGINT, quitproc);
+      signal(SIGQUIT, quitproc);
+      // we're the parent
+      close(rf_pair.parent);
+      rc.child = rf_pair.child;
+   } else {
+      // install signal handlers
+      signal(SIGINT, quitproc);
+      signal(SIGQUIT, quitproc);
+      // we're the child
+      close(rf_pair.child);
+      // do child thread here...
+      __PROGRAM__ = "RFslave.new:child ";
+
+      //   Okay,   set up the RF modem link here
+      rc.tty=open_port(ttyport, 4|2|8);   // ignore brk/cn, blocking and read-only
+
+      if (rc.tty<0) {
+         DCMSG(RED,"RFslave.new: comm port could not be opened. Shutting down");
+         exit(-1);
+      }
+
+      while (!close_nicely) {
+         char rbuf[RF_BUF_SIZE];
+         int gotrf;
+         if ((gotrf = read(rc.tty,rbuf,RF_BUF_SIZE)) > 0) {
+            DDCMSG(D_NEW, GRAY, "Childing pushing to parent %i bytes", gotrf);
+            write(rf_pair.parent, rbuf, gotrf);
+         } else {
+            DDCMSG(D_NEW, RED, "Failed to gather_rf"); 
+            perror("on rf read");
+            sleep(1);
+         }
+      }
+      exit(0);
+   }
+
    if ((rc.sock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
       PERROR("Error creating socket: ");
       DieWithError("socket");
@@ -246,7 +292,8 @@ int main(int argc, char **argv) {
     
     DCMSG(YELLOW,"A/B set for Low power.\n");
     // open tty and setup the serial device
-   rc.tty = open_port(ttyport, 4); // bit 1 for hardware flow control, bit 2 for blocking, bit 3(on) for IGNBRK | IGNCR
+   rc.tty=open_port(ttyport, 4|2|0x10); // bits 4 (IGNBRK | IGNCR), 2 (blocking), and 9 (write-only) on
+
    if (rc.tty <= 0) {
       DieWithError("Is unhappy tty");
    }
@@ -264,12 +311,12 @@ int main(int argc, char **argv) {
       close_nicely=1;
    }
 
-   // add tty to epoll
+   // add child to epoll
    D_memset(&ev, 0, sizeof(ev));
    ev.events = EPOLLIN; // only for reading to start
-   ev.data.fd = rc.tty; // remember for later
-   if (epoll_ctl(efd, EPOLL_CTL_ADD, rc.tty, &ev) < 0) {
-      EMSG("epoll tty insertion error");
+   ev.data.fd = rc.child; // remember for later
+   if (epoll_ctl(efd, EPOLL_CTL_ADD, rc.child, &ev) < 0) {
+      EMSG("epoll child insertion error");
       close_nicely=1;
    }
 
@@ -306,7 +353,7 @@ int main(int argc, char **argv) {
       // parse all waiting connections
       for (n = 0; !done && !close_nicely && n < nfds; n++) {
          DDCMSG(D_MEGA, YELLOW, "Looking at %i in events...", n);
-         if (events[n].data.fd == rc.tty) { // Read/Write from tty
+         if (events[n].data.fd == rc.child) { // Read/Write from child
             tty_fd_n = n;
          } else if (events[n].data.fd == rc.sock) { // Read/Write from socket
             sock_fd_n = n;
@@ -316,9 +363,9 @@ int main(int argc, char **argv) {
          }
       }
 
-      if (tty_fd_n != -1) { // Read/Write from tty (always, even if socket is ready)
+      if (tty_fd_n != -1) { // Read/Write from child/tty (always, even if socket is ready)
          n = tty_fd_n;
-         DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i tty", n, events[n].events);
+         DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i child", n, events[n].events);
 
          // closed socket?
          if (events[n].events & EPOLLERR || events[n].events & EPOLLHUP) {
@@ -346,11 +393,11 @@ int main(int argc, char **argv) {
                rc.packets = 0; // in burst now
             }
 
-            int ret = rcRead(&rc, 1); // 1 for tty
+            int ret = rcRead(&rc, 1); // 1 for child
             if (ret != doNothing) {
                done = handleRet(ret, &rc, efd); // this 
             } else {
-               // tty2sock will transfer the data from the tty to the socket and handle as necessary
+               // tty2sock will transfer the data from the child to the socket and handle as necessary
                done = handleRet(tty2sock(&rc), &rc, efd);
                
                // handle socket write immediately
@@ -367,7 +414,7 @@ int main(int argc, char **argv) {
                }
             }
          }
-      } else if (sock_fd_n != -1) { // Read/Write from socket (only if tty isn't ready)
+      } else if (sock_fd_n != -1) { // Read/Write from socket (only if child/tty isn't ready)
          n = sock_fd_n;
          DDCMSG(D_MEGA, YELLOW, "events[%i].events: %i socket", n, events[n].events);
 
@@ -394,7 +441,8 @@ int main(int argc, char **argv) {
 
    DCMSG(BLACK,"RFslave.new says goodbye...");
 
-   // close tty and socket
+   // close child, tty and socket
+   close(rc.child);
    close(rc.tty);
    close(rc.sock);
 

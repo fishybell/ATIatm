@@ -13,10 +13,16 @@
 
 #define INFINITE -1
 
+typedef struct rfpair {
+   int parent;
+   int child;
+} rfpair_t;
+
 typedef struct rf_connection {
    // file descriptors and buffers
-   int tty; // the file descriptor to talk to the tty port on
-   int sock; // the file descriptor to talk to slaveboss on
+   int tty;   // the file descriptor to write to the tty port on
+   int child; // the file descriptor to read from the tty port on (through the child process)
+   int sock;  // the file descriptor to talk to slaveboss on
    char tty_obuf[RF_BUF_SIZE]; // outgoing buffer for rf tty messages
    char sock_obuf[RF_BUF_SIZE]; // outgoing buffer for rf sock messages
    char tty_ibuf[RF_BUF_SIZE]; // incoming buffer for rf tty messages
@@ -44,6 +50,8 @@ typedef struct rf_connection {
    int devid_last_high; // the high_dev from the last LBC_REQUEST_NEW packet
    int packets; // the number of packets to expect this "burst"
    long nowt; // the start of burst time
+   int quick_addrs[8*14]; // remember some "quick" addresses from quick group for status req to use
+   int quick_num;
 } rf_connection_t;
 
 extern int verbose;

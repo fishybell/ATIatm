@@ -36,6 +36,10 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          DDCMSG(D_RF, blue, "Invalid socket message length %i - %i < %i", rc->sock_ilen, *start, hl);
          *start = *start + 1; continue; // invalid message length, or more likely, don't have all of the message yet
       }
+      if (hdr->cmd == LBC_QUICK_GROUP) {
+         DCMSG(MAGENTA, "Found quick group message");
+         DDpacket((char*)hdr, RF_size(hdr->cmd));
+      }
 
       *end = *start + hl; // one character after the end of the message
       DDCMSG(D_RF, tty ? cyan : blue, "Checking %s validMessage for %i (s:%i e:%i)", tty ? "TTY" : "SOCKET", hdr->cmd, *start, *end);
@@ -58,6 +62,8 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          case LBC_BURST:
          case LBC_RESET:
          case LBC_QEXPOSE:
+         case LBC_QUICK_GROUP:
+         case LBC_QUICK_GROUP_BIG:
          case LBC_QCONCEAL:
          case LBC_EVENT_REPORT:
          case LBC_REQUEST_NEW:
@@ -172,7 +178,7 @@ int rcRead(rf_connection_t *rc, int tty) {
    DDCMSG(D_PACKET, tty ? CYAN : BLUE, "%s READING", tty ? "TTY" : "SOCKET");
 
    // read as much as possible
-   dests = read(tty ? rc->tty : rc->sock, dest, RF_BUF_SIZE);
+   dests = read(tty ? rc->child : rc->sock, dest, RF_BUF_SIZE); // the child process does the actual tty reading
    err = errno; // save errno
 
    timestamp(&elapsed_time,&istart_time,&delta_time);
@@ -461,7 +467,14 @@ int t2s_handle_STATUS_REQ(rf_connection_t *rc, int start, int end) {
    int i;
    LB_status_req_t *pkt = (LB_status_req_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_STATUS_REQ(%8p, %i, %i)", rc, start, end);
-   addAddrToLastIDs(rc, pkt->addr);
+   if (rc->quick_num == 0) {
+      addAddrToLastIDs(rc, pkt->addr);
+   } else {
+      for (i = 0; i < rc->quick_num; i++) {
+         DCMSG(CYAN, "Using quick address %i", rc->quick_addrs[i]);
+         addAddrToLastIDs(rc, rc->quick_addrs[i]); // add to list in order
+      }
+   }
    return doNothing;
 } 
 
@@ -553,6 +566,24 @@ int t2s_handle_QEXPOSE(rf_connection_t *rc, int start, int end) {
    return doNothing;
 } 
 
+int t2s_handle_QUICK_GROUP(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_quick_group_t *pkt = (LB_quick_group_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_QUICK_GROUP(%8p, %i, %i)", rc, start, end);
+   rc->quick_num = getItemsQR(pkt, rc->quick_addrs);
+   DCMSG(CYAN, "t2s_handle_QUICK_GROUP found %i addresses", rc->quick_num);
+   return doNothing;
+} 
+
+int t2s_handle_QUICK_GROUP_BIG(rf_connection_t *rc, int start, int end) {
+   int i;
+   LB_quick_group_big_t *pkt = (LB_quick_group_big_t *)(rc->tty_ibuf + start);
+   DDCMSG(D_RF, CYAN, "t2s_handle_QUICK_GROUP_BIG(%8p, %i, %i)", rc, start, end);
+   rc->quick_num = getItemsQR(pkt, rc->quick_addrs);
+   DCMSG(CYAN, "t2s_handle_QUICK_GROUP_BIG found %i addresses", rc->quick_num);
+   return doNothing;
+} 
+
 int t2s_handle_RESET(rf_connection_t *rc, int start, int end) {
    int i;
    LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
@@ -622,6 +653,8 @@ int tty2sock(rf_connection_t *rc) {
          t2s_HANDLE_RF (ACCESSORY); // keep track of ids? no
          t2s_HANDLE_RF (HIT_BLANKING); // keep track of ids? no
          t2s_HANDLE_RF (QEXPOSE); // keep track of ids? no
+         t2s_HANDLE_RF (QUICK_GROUP); // keep track of ids? yes
+         t2s_HANDLE_RF (QUICK_GROUP_BIG); // keep track of ids? yes
          t2s_HANDLE_RF (QCONCEAL); // keep track of ids? no
          t2s_HANDLE_RF (REQUEST_NEW); // keep track of devids
          t2s_HANDLE_RF (ASSIGN_ADDR); // keep track of ids? no
@@ -652,6 +685,15 @@ int tty2sock(rf_connection_t *rc) {
          // copy the found message to the socket "out" buffer
          addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
          added_to_buf = 1;
+         if (rc->quick_num > 0 && mnum != LBC_QUICK_GROUP && mnum != LBC_QUICK_GROUP_BIG) {
+            // used quick group addresses
+            DCMSG(CYAN, "Cleared quick_num from being %i", rc->quick_num);
+            rc->quick_num = 0;
+            DDpacket(rc->tty_ibuf + start, end - start);
+         } else if (mnum == LBC_QUICK_GROUP || mnum == LBC_QUICK_GROUP_BIG) {
+            DCMSG(GRAY, "Ideally found quick num %i", rc->quick_num);
+            DDpacket(rc->tty_ibuf + start, end - start);
+         }
       }
 
       // clear out the found message

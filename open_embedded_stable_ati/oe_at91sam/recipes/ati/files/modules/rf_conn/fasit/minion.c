@@ -755,13 +755,28 @@ void ClearTracker(thread_data_t *minion, sequence_tracker_t *tracker) {
 void send_LB_exp(thread_data_t *minion, int expose, minion_time_t *mt) {
    char qbuf[32];      // more packet buffers
    LB_expose_t *LB_exp;
+//   // testing quick group code
+//   static int last_qgroup = 1000;
+//   LB_quick_group_t qg;
+//   qg.cmd = LBC_QUICK_GROUP;
+//   qg.number = 1;
+//   qg.addresses[0].number = 1;
+//   qg.addresses[0].addr1 = minion->RF_addr;
+//   qg.addresses[1].number = 0;
+//   qg.addresses[2].number = 0;
+//   qg.temp_addr = last_qgroup++;
+//   psend_mcp(minion, &qg);
+//   // end testing quick group code
 
    timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);
    //DDCMSG(D_POINTER|D_NEW, black, "send_LB_exp (%i) called @ %3i.%03i\n____________________________________", expose, DEBUG_TS(mt->elapsed_time));
 
    LB_exp =(LB_expose_t *)qbuf;       // make a pointer to our buffer so we can use the bits right
    LB_exp->cmd=LBC_EXPOSE;
+//   // testing quick group code
    LB_exp->addr=minion->RF_addr;
+//   LB_exp->addr = qg.temp_addr;
+//   // end testing quick group code
    LB_exp->expose=expose; // not expose vs. conceal, but a flag saying whether to actually expose or just change event number internally
 #if 0 /* start of old state timer code */
    // change state
@@ -1635,7 +1650,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
          // send low-bandwidth message
          lhb.cmd = LBC_HIT_BLANKING;
          lhb.addr = minion->RF_addr;
-         lhb.blanking = message_14200->blank;
+         lhb.blanking = htons(message_14200->blank);
          DDCMSG(D_NEW,YELLOW, "Before send...");
          set_crc8(&lhb);
          DDpacket((char*)&lhb, RF_size(lhb.cmd));

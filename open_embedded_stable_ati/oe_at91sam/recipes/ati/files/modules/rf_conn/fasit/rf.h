@@ -122,10 +122,11 @@ void print_verbosity_bits(void);
 
 #define LBC_RESET                       12
 
+#define LBC_QUICK_GROUP                 15 /* automatically created group for repeat messages to multiple targets */
 #define LBC_QEXPOSE                     16
 #define LBC_QCONCEAL                    17
 #define LBC_STATUS_REQ                  18
-#define LBC_QUICK_GROUP                 19 /* automatically created group for repeat messages to multiple targets */
+#define LBC_QUICK_GROUP_BIG             19 /* automatically created group for repeat messages to multiple targets */
 
 
 #define LBC_EVENT_REPORT                20
@@ -288,21 +289,41 @@ typedef struct LB_quick_group_chunk {
    uint32 addr11:11 __attribute__ ((packed));
    uint32 addr12_1:7 __attribute__ ((packed));
 
-   uint32 addr12_2:5 __attribute__ ((packed));
+   uint32 addr12_2:4 __attribute__ ((packed));
+   uint32 addr13:11 __attribute__ ((packed));
    uint32 addr14:11 __attribute__ ((packed));
-   uint32 addr15:11 __attribute__ ((packed));
-   uint32 number:4 __attribute__ ((packed)); // number of addresses in this chunk used (max 15)
-   uint32 padding:1 __attribute__ ((packed));
+   uint32 number:4 __attribute__ ((packed)); // number of addresses in this chunk used (max 14)
+   uint32 padding:2 __attribute__ ((packed));
 } __attribute__ ((packed)) LB_quick_group_chunk_t;
 
 //                                                LBC_QUICK_GROUP
 // LBC_QUICK_GROUP
 //    
 typedef struct LB_quick_group {
+   // 65 byte message
+   // 4 bytes...
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 event:13 __attribute__ ((packed));      // rolling event sequence number (ignored)
+   uint32 temp_addr:11 __attribute__ ((packed));  // address to use -- this burst only -- as a group for these targets
+   uint32 number:3 __attribute__ ((packed));      // number of groups used given below (max 3 for non-big version)
+
+   // ...plus 3 * 20 bytes...
+   LB_quick_group_chunk_t addresses[3];                     // the addresses to use this group
+
+   // ...plus 1 byte
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
+
+} __attribute__ ((packed))  LB_quick_group_t;
+
+//                                                LBC_QUICK_GROUP_BIG
+// LBC_QUICK_GROUP_BIG
+//    
+typedef struct LB_quick_group_big {
    // 165 byte message
    // 4 bytes...
    uint32 cmd:5 __attribute__ ((packed));
-   uint32 event:13 __attribute__ ((packed));      // rolling event sequence number
+   uint32 event:13 __attribute__ ((packed));      // rolling event sequence number (ignored)
    uint32 temp_addr:11 __attribute__ ((packed));  // address to use -- this burst only -- as a group for these targets
    uint32 number:3 __attribute__ ((packed));      // number of groups used given below
 
@@ -313,7 +334,7 @@ typedef struct LB_quick_group {
    uint32 crc:8 __attribute__ ((packed));
    uint32 padding:24 __attribute__ ((packed));
 
-} __attribute__ ((packed))  LB_quick_group_t;
+} __attribute__ ((packed))  LB_quick_group_big_t;
 
 //                                                LBC_QCONCEAL
 // LBC_QCONCEAL
@@ -541,6 +562,8 @@ int __ptype(int cmd);
 #define DDpacket(B, L) { DDpacket_internal(__PROGRAM__, B, L); } /* auto add PROGRAM to output */
 #define DDqueue(V, Q, FMT, ...) { DDqueue_internal(#Q, V, Q, __FILE__, __LINE__, FMT, ##__VA_ARGS__); } /* auto add FILE/LINE to output */
 
+int getItemsQR(void *pkt, int *addrs); // get address from quick report packet (big or small) - passed in addrs pointer should have enough space for 8*14 addresses (big) or 3*14 address (normal)
+int setItemsQR(void *pkt, int *addrs, int num); // set address for quick report packet (big or small) - passed in addrs packet pointer should already be allocated and set to the correct big/normal command (will enfore maximum of 3*14 & 8*14 and return however many didn't fit; ideally 0)
 
 
 #endif

@@ -34,6 +34,7 @@ typedef struct fasit_connection {
    int rf; // the file descriptor to talk low-bandwidth rf on
    int fasit; // the file descriptor to talk fasit on
    int id; // the id to listen for (temp or standard)
+   int tg_id; // the temp-group id for use in the command directly after a quick-group
    char rf_obuf[RF_BUF_SIZE]; // outgoing buffer for rf messages
    char fasit_obuf[FASIT_BUF_SIZE]; // outgoing buffer for fasit messages
    char rf_ibuf[RF_BUF_SIZE]; // incoming buffer for rf messages
@@ -156,6 +157,8 @@ int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end);
 int handle_ACCESSORY(fasit_connection_t *fc, int start, int end);
 int handle_HIT_BLANKING(fasit_connection_t *fc, int start, int end);
 int handle_QEXPOSE(fasit_connection_t *fc, int start, int end);
+int handle_QUICK_GROUP(fasit_connection_t *fc, int start, int end);
+int handle_QUICK_GROUP_BIG(fasit_connection_t *fc, int start, int end);
 int handle_RESET(fasit_connection_t *fc, int start, int end);
 int handle_QCONCEAL(fasit_connection_t *fc, int start, int end);
 int send_EVENT_REPORTs(fasit_connection_t *fc);

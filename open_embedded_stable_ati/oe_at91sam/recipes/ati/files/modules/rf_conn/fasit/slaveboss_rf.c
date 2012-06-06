@@ -40,6 +40,12 @@ static int packetForMe(fasit_connection_t *fc, int start) {
    LB_packet_t *hdr = (LB_packet_t*)(fc->rf_ibuf + start);
    int i, j;
    DDCMSG_HEXB(D_RF, RED, "RF packetForMe:", fc->rf_ibuf+start, fc->rf_ilen-start);
+   if (hdr->cmd == LBC_QUICK_GROUP) {
+      DCMSG(MAGENTA, "Determined quick group message was for me");
+      DDpacket((char*)hdr, RF_size(hdr->cmd));
+      return 1;
+   }
+
    if (hdr->cmd == LBC_REQUEST_NEW) {
       // special case check: check reregister or devid range
       LB_request_new_t *msg = (LB_request_new_t*)hdr;
@@ -82,6 +88,12 @@ DDCMSG(D_RF,RED, "RF Packet for someone else's devid: %x:%x", msg->devid, fc->de
    if (hdr->addr == fc->id) {
 DDCMSG(D_RF,RED, "RF Packet for me: %i", hdr->addr);
       return 1; // directly for me
+   }
+   if (hdr->addr == fc->tg_id) {
+DDCMSG(D_RF,RED, "RF Packet for me (temp): %i", hdr->addr);
+      DCMSG(GRAY, "packetForMe used up temp address");
+      fc->tg_id = 2047; // we've used up the temp group
+      return 1; // for me via a quick group temp group
    }
 
    for (i = 0; i<MAX_GROUPS; i++) {
@@ -240,6 +252,11 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
 
       *end = *start + hl;
       DDCMSG(D_RF,RED, "RF validMessage (cmd %i)", hdr->cmd);
+      if (hdr->cmd == LBC_QUICK_GROUP) {
+         DCMSG(MAGENTA, "Found quick group message");
+         DDpacket((char*)hdr, RF_size(hdr->cmd));
+      }
+
       switch (hdr->cmd) {
          // they all have a crc, check it
          case LBC_EXPOSE:
@@ -258,6 +275,8 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
          case LBC_GROUP_CONTROL:
          case LBC_POWER_CONTROL:
          case LBC_QEXPOSE:
+         case LBC_QUICK_GROUP:
+         case LBC_QUICK_GROUP_BIG:
          case LBC_RESET:
          case LBC_QCONCEAL:
          case LBC_REQUEST_NEW:
@@ -320,6 +339,8 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
                HANDLE_RF (ACCESSORY);
                HANDLE_RF (HIT_BLANKING);
                HANDLE_RF (QEXPOSE);
+               HANDLE_RF (QUICK_GROUP);
+               HANDLE_RF (QUICK_GROUP_BIG);
                HANDLE_RF (RESET);
                HANDLE_RF (QCONCEAL);
                HANDLE_RF (REQUEST_NEW);
@@ -1056,6 +1077,43 @@ int handle_QEXPOSE(fasit_connection_t *fc, int start, int end) {
    fc->future_exp = 90;
    fc->did_exp_cmd = 0; // haven't accomplished command yet
    return send_2100_exposure(fc, 90); // 90^ = exposed
+}
+
+int handle_QUICK_GROUP(fasit_connection_t *fc, int start, int end) {
+   int addrs[3*14], num;
+   LB_quick_group_t *pkt = (LB_quick_group_t*)(fc->rf_ibuf + start);
+   DDCMSG(D_RF|D_VERY,RED, "handle_QUICK_GROUP(%8p, %i, %i)", fc, start, end);
+   DCMSG(GRAY, "Before getItemsQR");
+   DDpacket((char*)pkt, RF_size(pkt->cmd));
+   num = getItemsQR(pkt, addrs);
+   DCMSG(GRAY, "handle_QUICK_GROUP found %i addresses even though we should look at least at %i chunks", num, pkt->number);
+   while (num-- > 0) {
+      if (addrs[num] == fc->id) {
+         DCMSG(GRAY, "handle_QUICK_GROUP using temp address %i", pkt->temp_addr);
+         fc->tg_id = pkt->temp_addr;
+         return doNothing;
+      }
+   }
+   DCMSG(GRAY, "what happened?");
+   DDpacket((char*)pkt, RF_size(pkt->cmd));
+   return doNothing;
+}
+
+int handle_QUICK_GROUP_BIG(fasit_connection_t *fc, int start, int end) {
+   int addrs[8*14], num;
+   LB_quick_group_big_t *pkt = (LB_quick_group_big_t*)(fc->rf_ibuf + start);
+   DDCMSG(D_RF|D_VERY,RED, "handle_QUICK_GROUP_BIG(%8p, %i, %i)", fc, start, end);
+   num = getItemsQR(pkt, addrs);
+   DCMSG(GRAY, "handle_QUICK_GROUP_BIG found %i addresses", num);
+   while (num-- > 0) {
+      if (addrs[num] == fc->id) {
+         DCMSG(GRAY, "handle_QUICK_GROUP_BIG using temp address %i", pkt->temp_addr);
+         fc->tg_id = pkt->temp_addr;
+         return doNothing;
+      }
+   }
+   return doNothing;
+   doNothing;
 }
 
 int handle_RESET(fasit_connection_t *fc, int start, int end) {

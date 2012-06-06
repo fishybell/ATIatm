@@ -13,6 +13,10 @@
 
 extern int verbose;
 
+#ifndef strnlen
+size_t strnlen(const char *s, size_t maxlen);
+#endif
+
 
 #if 0 /* old queue stuff */
 // the RFmaster may eventually benifit if these are circular buffers, but for now
@@ -103,6 +107,7 @@ int __ptype(int cmd) {
       case LB_CONTROL_SENT: return 4;
       case LB_CONTROL_REMOVED: return 4;
       case LBC_QUICK_GROUP: return 5;
+      case LBC_QUICK_GROUP_BIG: return 5;
       default: return 3;
    }
 }
@@ -209,8 +214,10 @@ int RF_size(int cmd){
          return (12);
 
       case  LBC_QUICK_GROUP:
+         return (65);
+
+      case  LBC_QUICK_GROUP_BIG:
          return (165);
-         //return (1);
 
       default:
          return (1);
@@ -253,7 +260,7 @@ int gather_rf(int fd, char *tail,int max){
 
 void DDpacket_internal(const char *program, uint8 *buf,int len){
    uint8 *buff;
-   char cmdname[32],hbuf[100],qbuf[200];
+   char cmdname[32],hbuf[1000],qbuf[200];
    static int devid_map[2048];
    static int devid_map_init = 0;
    LB_packet_t *LB;
@@ -359,10 +366,29 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
             sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
             break;
 
-         case LBC_QUICK_GROUP:
+         case LBC_QUICK_GROUP: {
+            int len, num, addrs[3*14], i;
+            LB_quick_group_t *L=(LB_quick_group_t *)LB;
             strcpy(cmdname,"Quick Group");
-            sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
-            break;
+            num = getItemsQR(L, addrs);
+            sprintf(hbuf,"Temp_addr=%i Num=%i", L->temp_addr, num);
+            i = -1;
+            while ((1000 - (len = strnlen(hbuf,1000))) > 15 && ++i < num) {
+               sprintf(hbuf+len, " addr%i=%3d", i, addrs[i]);
+            }
+         }  break;
+
+         case LBC_QUICK_GROUP_BIG: {
+            int len, num, addrs[8*14], i;
+            LB_quick_group_big_t *L=(LB_quick_group_big_t *)LB;
+            strcpy(cmdname,"Quick Group Big");
+            num = getItemsQR(L, addrs);
+            sprintf(hbuf,"Temp_addr=%i Num=%i", L->temp_addr, num);
+            i = -1;
+            while ((1000 - (len = strnlen(hbuf,1000))) > 15 && ++i < num) {
+               sprintf(hbuf+len, " addr%i=%3d", i, addrs[i]);
+            }
+         }  break;
 
          case LBC_POWER_CONTROL:
             strcpy(cmdname,"Power_Control");
@@ -470,7 +496,7 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
 
       }
 
-      sprintf(qbuf,"%s %2d:  %s  %s  ", program, pnum, cmdname, hbuf);
+      sprintf(qbuf,"%s %2d: %2i:%s  %s  ", program, pnum, LB->cmd, cmdname, hbuf);
       printf("\x1B[3%d;%dm%s",(color)&7,((color)>>3)&1,qbuf);
       for (i=0; i<plen-1; i++) printf("%02x.", buff[i]);
       printf("%02x\n", buff[plen-1]);
@@ -847,8 +873,10 @@ queue_item_t *queueTail(queue_item_t* qi) {
 //   filled in with the size of buf, and after return contains size of data in buf)
 void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *remaining_time, int slottime) {
    int should_end = 0;
+   static int last_qgroup = 1000;
    queue_item_t *qi = Rx->next; // start at head of Rx
    queue_item_t *tail = queueTail(Tx), *temp;
+   LB_packet_t *tpkt;
    int bs = *bsize; // remember how much we have left
    *remaining_time = 50; // reset our remaining_time before we are allowed to Tx again   time needs to be smarter
 #define QI2BUF(qi, buf) {\
@@ -919,14 +947,14 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
          case 5: // quick group
             should_end = 1; // so we'll end after this whether we add it to the queue or not
             if (qi->next != NULL && bs >= (qi->size + qi->next->size)) {
-               DCMSG(RED, "\n\n----------------------------\nQueue Quick Group %i %i %i\n--------------------------\n", bs, qi->size, qi->next->size);
                // find out how many pseudo messages we're looking at
-               LB_quick_group_t *lqg = (LB_quick_group_t*)qi->msg;
+               LB_quick_group_big_t *lqg = (LB_quick_group_big_t*)qi->msg; // assume big, but big or little work the same
                int num = lqg->number;
                int pkts = 0;
                while (num-- > 0) {
                   pkts += lqg->addresses[num].number;
                }
+               //DCMSG(RED, "\n\n----------------------------\nQueue Quick Group (%i %i) %i %i %i\n--------------------------\n", pkts, lqg->number, bs, qi->size, qi->next->size);
 
                // move timers
                if (qi->next->ptype == 2) {
@@ -1007,3 +1035,149 @@ void DDqueue_internal(const char *qn, int v, queue_item_t *qi, const char *f, in
       DCOLOR(black);
    }
 }
+
+// get address from quick report packet (big or small)
+// - passed in addrs pointer should have enough space for 8*14 addresses (big) or 3*14 address (normal)
+int getItemsQR(void *msg, int *addrs) {
+   LB_quick_group_big_t *pkt = (LB_quick_group_big_t*)msg; // assume big, but big or little work the same
+   int num = pkt->number;
+   int a = 0, i, j;
+   for (i = 0; i < num; i++) {
+      j = pkt->addresses[i].number;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr1;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr2;
+      if (j-- <= 0) { break; }
+      addrs[a] = pkt->addresses[i].addr3_1 << 1;
+      addrs[a++] |= pkt->addresses[i].addr3_2;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr4;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr5;
+      if (j-- <= 0) { break; }
+      addrs[a] = pkt->addresses[i].addr6_1 << 2;
+      addrs[a++] |= pkt->addresses[i].addr6_2;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr7;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr8;
+      if (j-- <= 0) { break; }
+      addrs[a] = pkt->addresses[i].addr9_1 << 3;
+      addrs[a++] |= pkt->addresses[i].addr9_2;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr10;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr11;
+      if (j-- <= 0) { break; }
+      addrs[a] = pkt->addresses[i].addr12_1 << 4;
+      addrs[a++] |= pkt->addresses[i].addr12_2;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr13;
+      if (j-- <= 0) { break; }
+      addrs[a++] = pkt->addresses[i].addr14;
+   }
+   return a;
+}
+
+// set address for quick report packet (big or small)
+//  - passed in addrs packet pointer should already be allocated and set to the correct big/normal command (will enfore maximum of 3*14 & 8*14 and return however many didn't fit; ideally 0)
+int setItemsQR(void *msg, int *addrs, int num) {
+   int leftover, a, i, j;
+   LB_quick_group_big_t *pkt = (LB_quick_group_big_t*)msg; // use big data structure, but big or little work the same
+   if (pkt->cmd == LBC_QUICK_GROUP_BIG) {
+      if (num > 112) {
+         leftover = num - 112;
+         num = 112;
+      }
+   } else if (pkt->cmd == LBC_QUICK_GROUP) {
+      if (num > 42) {
+         leftover = num - 42;
+         num = 42;
+      }
+   } else {
+      // nothing added
+      DDCMSG(D_NEW, RED, "Returning value given %i", num);
+      return num;
+   }
+   if (num % 14 == 0) {
+      pkt->number = num / 14; // 14 per chunk (all 100% full)
+   } else {
+      pkt->number = (num / 14) + 1; // 14 per chunk (all but one 100% full)
+   }
+   leftover = max(0, leftover); // 
+   DDCMSG(D_NEW, RED, "Have %i leftovers, %i number, and %i left to add", leftover, pkt->number, num);
+
+// TODO FOR TUESDAY: fix this to set rather than get addresses
+   a = 0;
+   for (i = 0; i < pkt->number; i++) {
+      DDCMSG(D_NEW, RED, "Resetting j on number %i with %i added", i, a);
+      j = 0;
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr1 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr2 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr3_1 = (addrs[a] >> 1);
+      pkt->addresses[i].addr3_2 = (addrs[a++] & 0x1);
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr4 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr5 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr6_1 = (addrs[a] >> 2);
+      pkt->addresses[i].addr6_2 = (addrs[a++] & 0x3);
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr7 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr8 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr9_1 = (addrs[a] >> 3);
+      pkt->addresses[i].addr9_2 = (addrs[a++] & 0x7);
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr10 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr11 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr12_1 = (addrs[a] >> 4);
+      pkt->addresses[i].addr12_2 = (addrs[a++] & 0xf);
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr13 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+      if (a >= num) { goto set_num; }
+      pkt->addresses[i].addr14 = addrs[a++];
+      j++;
+      DDCMSG(D_NEW, RED, "Added addr%i=%i to addresses %i", j, addrs[a-1], i);
+
+      set_num:
+      DDCMSG(D_NEW, RED, "j is %i, a is %i, i is %i", j, a, i);
+      pkt->addresses[i].number = j;
+   }
+   return leftover;
+}
+
