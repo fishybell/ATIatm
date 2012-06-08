@@ -14,6 +14,44 @@ void print_help(int exval) {
     exit(exval);
 }
 
+// 0 = uknown, 2047 = basestation, 1-2046 = address 1-2046
+int rfSource(void *buf) {
+   LB_packet_t *pkt = (LB_packet_t*)buf;
+   switch (pkt->cmd) {
+      case  LBC_QEXPOSE:        
+      case  LBC_BURST:
+      case  LBC_RESET:                                
+      case  LBC_STATUS_REQ:
+      case  LBC_POWER_CONTROL:
+      case  LBC_PYRO_FIRE:                
+      case  LBC_MOVE:
+      case  LBC_GROUP_CONTROL:                                             
+      case  LBC_HIT_BLANKING:
+      case  LB_CONTROL_QUEUE:
+      case  LB_CONTROL_SENT:
+      case  LB_CONTROL_REMOVED:
+      case  LBC_AUDIO_CONTROL:                                 
+      case  LBC_CONFIGURE_HIT:                
+      case  LBC_ACCESSORY:
+      case  LBC_REPORT_ACK:                                                
+      case  LBC_EXPOSE:
+      case  LBC_ASSIGN_ADDR:
+      case  LBC_QCONCEAL:
+      case  LBC_QUICK_GROUP:
+      case  LBC_QUICK_GROUP_BIG:
+      case  LBC_REQUEST_NEW:
+         return (2047);
+
+      case  LBC_EVENT_REPORT:
+      case  LBC_STATUS_RESP:
+         return (pkt->addr);
+
+      case  LBC_DEVICE_REG:
+      default:
+         return (0);
+   }
+}
+
 /*************
  *************  RFdump.    just dump everything rxed on the radio
  *************   
@@ -43,13 +81,23 @@ int main(int argc, char **argv) {
     char Rbuf[1024],buf[200];        /* Buffer MCP socket */
     char *Rptr, *Rstart;    
     int gathered,i;
+    int time_last[2048]; // the last time this address (index) sent a message (in milliseconds)
+    int tt; // temp millisecond time value
+    struct timespec ts; // temp timepsec value
     LB_packet_t LB;
     LB_request_new_t *RQ;
     int result,size;
+    int d_base, d_me; // time delta values for time vs. basestation last transmit and me last transmit
     RQ=(LB_request_new_t *)&LB;
 
+    // set all "last" time messages to now
+    clock_gettime(CLOCK_MONOTONIC,&ts); tt = ts2ms(&ts); // get time in milliseconds
+    for (i = 0; i < 2048; i++) {
+       time_last[i] = tt;
+    }
+
     xmit=0;
-    verbose=0;
+    verbose=D_RF;
     hardflow=6; // default is hardware flow control on and blocking
     strcpy(ttyport,"/dev/ttyS1");
     
@@ -157,7 +205,34 @@ int main(int argc, char **argv) {
 	   }
 	   printf("%02x\n", Rstart[gathered-1]);
 
-	   DDpacket(Rstart,gathered);
+      if (verbose & D_TIME) {
+         clock_gettime(CLOCK_MONOTONIC,&ts); tt = ts2ms(&ts); // get time in milliseconds
+         i = rfSource(Rstart);
+         if (i == 2047) {
+            d_base = tt - time_last[i];
+            d_me = d_base;
+            DCMSG(MAGENTA, "New base xmit. Time since last: %3i.%03i", DEBUG_MS(d_base));
+            time_last[i] = tt;
+         } else if (i == 0) {
+            d_base = tt - time_last[2047];
+            DCMSG(YELLOW, "New 0 xmit. Time since base: %3i.%03i", DEBUG_MS(d_base));
+            d_me = tt - time_last[i]; // don't show, just remember
+            time_last[i] = tt;
+         } else {
+            d_base = tt - time_last[2047];
+            d_me = tt - time_last[i];
+            DCMSG(GRAY, "New %i xmit. Time since base: %3i.%03i...%i: %3i.%03i", i, DEBUG_MS(d_base), i, DEBUG_MS(d_me));
+            time_last[i] = tt;
+         }
+         if (d_me < 350 || d_base < 350) {
+            printf("Offending burst:\n");
+            DDpacket(Rstart, gathered);
+         }
+      }
+
+      if (verbose & D_RF) {
+         DDpacket(Rstart,gathered);
+      }
 	   
 	   Rptr=Rstart=Rbuf;
        }
