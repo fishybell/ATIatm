@@ -871,7 +871,7 @@ queue_item_t *queueTail(queue_item_t* qi) {
 //   manual removal and sending of "sent" messages after actual send. if send is unsuccessful, items can be
 //   requeued to Rx by linking Tx's tail to Rx's head, then Rx's head becomes Tx's head. (bsize should come
 //   filled in with the size of buf, and after return contains size of data in buf)
-void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *remaining_time, int slottime) {
+void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *remaining_time, int *slottime, int *inittime) {
    int should_end = 0;
    static int last_qgroup = 1000;
    queue_item_t *qi = Rx->next; // start at head of Rx
@@ -909,18 +909,22 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
             // move on
             break;
 
-         case 1: // request new message
+         case 1: { // request new message
+            LB_request_new_t *LB_new =(LB_request_new_t*)qi->msg;        // we need to parse out the slottime and inittime from this packet.
             // check if we've already gone over our 1 second time limit...
             if (*remaining_time >= 1000) {
                // ...and end without queueing this message if we have
                should_end = 1;
                continue;
             }
+            // grab time values
+            *inittime = LB_new->inittime * 5; // convert to milliseconds
+            *slottime = LB_new->slottime * 5; // convert to milliseconds
             // move timers
-            *remaining_time += (10*slottime); // time for each response: 10 slots = 8 + padding on each end
+            *remaining_time += (10 * *slottime); // time for each response: 10 slots = 8 + padding on each end
             // queue
             QI2BUF(qi, buf);
-            break;
+         }  break;
 
          case 2: // status request
             // check if we've already gone over our 1 second time limit...
@@ -930,7 +934,7 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
                continue;
             }
             // move timers
-            *remaining_time +=slottime; // add time for a response to this message
+            *remaining_time += *slottime; // add time for a response to this message
             // queue
             QI2BUF(qi, buf);
             break;
@@ -938,6 +942,8 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
          case 3: // normal
             // queue
             QI2BUF(qi, buf);
+            // move timers
+            *remaining_time += (*slottime/4); // add 1/4 slottime for target to process command
             break;
 
          case 4: // control message
@@ -964,7 +970,7 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
                      continue;
                   }
                   // quick group for a status request
-                  *remaining_time += (pkts*slottime); // add time for a response to each pseudo message
+                  *remaining_time += (pkts * *slottime); // add time for a response to each pseudo message
                }
 
                // queue

@@ -6,8 +6,10 @@
 // should really only ever have one connection to a socket and one to a tty
 #define MAX_CONNECTIONS 4
 
-// due to protocol considerations, could have as many as 256 IDs, though not likely more than a few
+// due to protocol considerations, could have as many as 256 IDs, though not likely more than a few dozen
 #define MAX_IDS 256
+#define FAKE_ID 0xdeadbeef
+#define FAKE_DEVID 0xbeeffeed
 
 #define RF_BUF_SIZE 1024
 

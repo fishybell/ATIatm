@@ -112,6 +112,8 @@ int getTimeout(rf_connection_t *rc) {
    // check to see if we're past our allowed timeslot
    if (tv > rc->timeout_end) {
       DDCMSG(D_TIME, YELLOW, "Waited too long, infinite timeout now");
+      timestamp(&elapsed_time,&istart_time,&delta_time);
+      DDCMSG(D_POINTER, MAGENTA, "Waited too long @ %3i.%03i (d:%i.%03i)", DEBUG_TS(elapsed_time), DEBUG_TS(delta_time));
       // flush output tty buffer because we missed our timeslot
       rc->tty_olen = 0;
       return INFINITE;
@@ -183,6 +185,10 @@ int rcRead(rf_connection_t *rc, int tty) {
 
    timestamp(&elapsed_time,&istart_time,&delta_time);
    DDCMSG(D_NEW, tty ? CYAN : BLUE, "%s READ %i BYTES @ time %5ld.%09ld", tty ? "TTY" : "SOCKET", dests, elapsed_time.tv_sec, elapsed_time.tv_nsec);
+   if (verbose&D_POINTER && tty) {
+      DDCMSG(D_POINTER, CYAN, "TTY RX %i BYTES @ time %3i.%03i (d:%3i.%03i)", dests, DEBUG_TS(elapsed_time), DEBUG_TS(delta_time));
+      DDpacket(dest, dests);
+   }
 
    // did we read nothing?
    if (dests <= 0) {
@@ -254,6 +260,10 @@ int rcWrite(rf_connection_t *rc, int tty) {
    timestamp(&elapsed_time,&istart_time,&delta_time);
    DDCMSG(D_NEW, tty ? cyan : blue, "%s WROTE %i BYTES @ time %5ld.%09ld", tty ? "TTY" : "SOCKET", s, elapsed_time.tv_sec, elapsed_time.tv_nsec);
    debugRF(tty ? cyan : blue, tty ? rc->tty_obuf : rc->sock_obuf, tty ? rc->tty_olen : rc->sock_olen);
+   if (verbose&D_POINTER && tty) {
+      DDCMSG(D_POINTER, GRAY, "TTY TX %i BYTES @ time %3i.%03i (d:%3i.%03i)", s, DEBUG_TS(elapsed_time), DEBUG_TS(delta_time));
+      DDpacket(rc->tty_obuf, s);
+   }
 
    // did it fail?
    if (s <= 0) {
@@ -451,10 +461,14 @@ void addToBuffer_sock_in(rf_connection_t *rc, char *buf, int s) {
 void addAddrToLastIDs(rf_connection_t *rc, int addr) {
    int i;
    // check to see if we already of this one in the list
-   for (i = 0; i < min(MAX_IDS, rc->id_lasttime_index+1); i++) {
-      if (rc->ids_lasttime[i] == addr) {
-         return;
+   if (addr != FAKE_ID) { // we allow duplicate fake ids, but nothing else
+      for (i = 0; i < min(MAX_IDS, rc->id_lasttime_index+1); i++) {
+         if (rc->ids_lasttime[i] == addr) {
+            return;
+         }
       }
+   } else {
+      DDCMSG(D_POINTER, BLUE, "adding fake @ index %i", rc->id_lasttime_index + 1);
    }
 
    // add address to id list
@@ -482,7 +496,7 @@ int t2s_handle_EXPOSE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_expose_t *pkt = (LB_expose_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_EXPOSE(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -490,7 +504,7 @@ int t2s_handle_MOVE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_move_t *pkt = (LB_move_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_MOVE(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -498,7 +512,7 @@ int t2s_handle_REPORT_ACK(rf_connection_t *rc, int start, int end) {
    int i;
    LB_report_ack_t *pkt = (LB_report_ack_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_REPORT_ACK(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -506,7 +520,7 @@ int t2s_handle_CONFIGURE_HIT(rf_connection_t *rc, int start, int end) {
    int i;
    LB_configure_t *pkt = (LB_configure_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_CONFIGURE_HIT(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -514,7 +528,7 @@ int t2s_handle_GROUP_CONTROL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_group_control_t *pkt = (LB_group_control_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_GROUP_CONTROL(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -522,7 +536,7 @@ int t2s_handle_AUDIO_CONTROL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_audio_control_t *pkt = (LB_audio_control_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_AUDIO_CONTROL(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -530,7 +544,7 @@ int t2s_handle_POWER_CONTROL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_power_control_t *pkt = (LB_power_control_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_POWER_CONTROL(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -538,7 +552,7 @@ int t2s_handle_PYRO_FIRE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(rc->tty_ibuf + start);
    DDCMSG(D_NEW, CYAN, "t2s_handle_PYRO_FIRE(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -546,7 +560,7 @@ int t2s_handle_ACCESSORY(rf_connection_t *rc, int start, int end) {
    int i;
    LB_accessory_t *pkt = (LB_accessory_t *)(rc->tty_ibuf + start);
    DDCMSG(D_NEW, CYAN, "t2s_handle_ACCESSORY(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -554,7 +568,7 @@ int t2s_handle_HIT_BLANKING(rf_connection_t *rc, int start, int end) {
    int i;
    LB_hit_blanking_t *pkt = (LB_hit_blanking_t *)(rc->tty_ibuf + start);
    DDCMSG(D_NEW, CYAN, "t2s_handle_HIT_BLANKING(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -562,7 +576,7 @@ int t2s_handle_QEXPOSE(rf_connection_t *rc, int start, int end) {
    int i;
    LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_QEXPOSE(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -588,7 +602,7 @@ int t2s_handle_RESET(rf_connection_t *rc, int start, int end) {
    int i;
    LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_RESET(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -596,7 +610,7 @@ int t2s_handle_QCONCEAL(rf_connection_t *rc, int start, int end) {
    int i;
    LB_packet_t *pkt = (LB_packet_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_QCONCEAL(%8p, %i, %i)", rc, start, end);
-   // addAddrToLastIDs(rc, pkt->addr); -- we only need to keep track of ones that reply
+   addAddrToLastIDs(rc, FAKE_ID); // keep track of non-replying commands as fake ids
    return doNothing;
 } 
 
@@ -744,6 +758,10 @@ void addDevidToNowDevIDs(rf_connection_t *rc, int devid) {
    if (++rc->devid_index < MAX_IDS) {
       rc->devids[rc->devid_index] = devid;
    }
+
+   // keep track of this slot in the overall slot list
+   addAddrToLastIDs(rc, FAKE_DEVID);
+
    DDCMSG(D_MEGA, BLACK, "rc->devid_index %i", rc->devid_index);
 }
 
@@ -777,7 +795,8 @@ int s2t_handle_DEVICE_REG(rf_connection_t *rc, int start, int end) {
 
 // transfer socket data to the tty and set up delay times
 int sock2tty(rf_connection_t *rc) {
-   int start, end, mnum, ts = 0, retval = doNothing; // start doing nothing
+   int i, start, end, mnum, ts = 0, retval = doNothing; // start doing nothing
+   int fakes=0; // keep track of number of fakes counted
    DDCMSG(D_MEGA, BLACK, "Called sock2tty");
 
    // read all available valid messages up until I have to do something on return
@@ -804,15 +823,23 @@ int sock2tty(rf_connection_t *rc) {
    DDCMSG(D_T_SLOT, BLACK, "Finding timeslot uinsg rc->id_index (%X) or rc->devid_last_high (%X)", rc->id_index, rc->devid_last_high);
    if (rc->id_index >= 0) {
       // timeslot is decided by which address I am in the chain
-      int i;
       DDCMSG(D_T_SLOT, BLACK, "Finding timeslot using rc->id_index %i", rc->id_index);
       // find the lowest matching address
       for (ts = 0; ts < min(rc->id_lasttime_index+1, MAX_IDS); ts++) {
          DDCMSG(D_T_SLOT, BLACK, "Looking at ts %i...", ts);
+         if (rc->ids_lasttime[ts] == FAKE_DEVID) {
+            fakes += (4*8); // 8 slots times 4, as 4 fakes count as a regular
+            DDCMSG(D_POINTER, BLUE, "chunk of fakes: %i", fakes);
+            continue; // move on...
+         } else if (rc->ids_lasttime[ts] == FAKE_ID) {
+            fakes++; // found another fake
+            DDCMSG(D_POINTER, BLUE, "another fake: %i", fakes);
+         }
          for (i = 0; i < min(rc->id_index+1, MAX_IDS); i++) {
             DDCMSG(D_T_SLOT, BLACK, "Looking at id_index %i...", i);
             if (rc->ids_lasttime[ts] == rc->ids[i]) {
                DDCMSG(D_T_SLOT, BLACK, "Found at %ix%i...%ix%i of %ix%i", ts, i, rc->ids_lasttime[ts], rc->ids[i], min(rc->id_lasttime_index+1, MAX_IDS), min(rc->id_index+1, MAX_IDS));
+               DDCMSG(D_POINTER, BLACK, "Found at %ix%i...%ix%i of %ix%i", ts, i, rc->ids_lasttime[ts], rc->ids[i], min(rc->id_lasttime_index+1, MAX_IDS), min(rc->id_index+1, MAX_IDS));
                goto found_ts; // just jump down, my ts variable is now correct
             }
          }
@@ -830,6 +857,19 @@ int sock2tty(rf_connection_t *rc) {
    } else if (rc->devid_last_high >= 0) {
       int i;
       DDCMSG(D_T_SLOT, BLACK, "Finding timeslot using rc->devid_last_high %X", rc->devid_last_high);
+      // first find out how much is in front of this type of timeslot by adding in multiple fakes
+      for (ts = 0; ts < min(rc->id_lasttime_index+1, MAX_IDS); ts++) {
+         DDCMSG(D_T_SLOT, BLACK, "Looking at ts %i...", ts);
+         if (rc->ids_lasttime[ts] == FAKE_DEVID) {
+            break; // found our real slot
+         } else if (rc->ids_lasttime[i] == FAKE_ID) {
+            fakes++; // found another fake
+            DDCMSG(D_POINTER, BLUE, "another of fake: %i", fakes);
+         } else {
+            fakes += 4; // a regular counts as four fakes
+            DDCMSG(D_POINTER, BLUE, "chunk of fakes: %i", fakes);
+         }
+      }
       ts = 0xffff; // start off as a really big number
       // timeslot is decided by which devid I am in the range, find lowest devid
       for (i = 0; i < min(rc->devid_index+1, MAX_IDS); i++) {
@@ -853,18 +893,13 @@ int sock2tty(rf_connection_t *rc) {
    }
    // label to jump to when I found my timeslot
    found_ts:
-
-#if 1 /* timeslot with initial time */
-   DDCMSG(D_T_SLOT, BLACK, "Found timeout slot: %i (%i + %i)", ts, rc->timeslot_init, (rc->timeslot_length * ts));
-
-   // change timeout
-   doTimeAfter(rc, rc->timeslot_init + (rc->timeslot_length * ts)); // initial time + timeslot length * timeslot I'm in
-#else /* timeslot without initial time */
-   DDCMSG(D_T_SLOT, BLACK, "Found timeout slot: %i (NONE + %i)", ts, (rc->timeslot_length * ts));
+   // calculate time remaining from timeslot, initial time, and fakes
+   i = rc->timeslot_init + (rc->timeslot_length * ts) + ((rc->timeslot_length * fakes) / 4);
+   DDCMSG(D_T_SLOT, BLACK, "Found timeout slot: %i (%i + %i + %i = %i)", ts, rc->timeslot_init, (rc->timeslot_length * ts), ((rc->timeslot_length * fakes) / 4), i);
+   DDCMSG(D_POINTER, BLACK, "Found timeout slot: %i (%i + %i + %i(f:%i) = %i)", ts, rc->timeslot_init, (rc->timeslot_length * ts), ((rc->timeslot_length * fakes) / 4), fakes, i);
 
    // change timeout
-   doTimeAfter(rc, rc->timeslot_length * ts); // timeslot length * timeslot I'm in
-#endif /* timeslot with(out) initial time */
+   doTimeAfter(rc, i); // initial time + timeslot length * timeslot I'm in + fakes that came before me
 
    return (retval | doNothing); // the timeout will determine when we can write, right now do nothing or whatever retval was
 }

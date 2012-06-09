@@ -213,20 +213,19 @@ int main(int argc, char **argv) {
             d_me = d_base;
             DCMSG(MAGENTA, "New base xmit. Time since last: %3i.%03i", DEBUG_MS(d_base));
             time_last[i] = tt;
+            if (d_me < 350 || d_base < 350) {
+               printf("Offending burst:\n");
+               DDpacket(Rstart, gathered);
+            }
          } else if (i == 0) {
             d_base = tt - time_last[2047];
             DCMSG(YELLOW, "New 0 xmit. Time since base: %3i.%03i", DEBUG_MS(d_base));
-            d_me = tt - time_last[i]; // don't show, just remember
-            time_last[i] = tt;
+            DDpacket(Rstart, gathered);
          } else {
             d_base = tt - time_last[2047];
             d_me = tt - time_last[i];
             DCMSG(GRAY, "New %i xmit. Time since base: %3i.%03i...%i: %3i.%03i", i, DEBUG_MS(d_base), i, DEBUG_MS(d_me));
             time_last[i] = tt;
-         }
-         if (d_me < 350 || d_base < 350) {
-            printf("Offending burst:\n");
-            DDpacket(Rstart, gathered);
          }
       }
 

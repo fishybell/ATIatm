@@ -7,7 +7,7 @@
 
 const char *__PROGRAM__ = "RFmaster ";
 
-int verbose, rtime, collecting_time;    // globals from command line
+int inittime=0, slottime=0, verbose, rtime, collecting_time;    // globals from command line
 
 // globals for time management
 int elapsed_time, edelta=0; // current in millseconds, and its delta
@@ -146,7 +146,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
    fd_set rf_or_mcp;
    struct timeval timeout;
    uint8 crc;
-   int inittime=0,slottime=0,total_slots;
+   int total_slots;
    int low_dev,high_dev;
    int burst,ptype,packets;
    LB_burst_t *LBb;
@@ -245,7 +245,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
 
 
       CURRENT_TIME(elapsed_time);
-      DDCMSG(D_TIME,YELLOW,"before select remaining_time=%d  Rx[%d] Tx[%d] @ time %3i.%03i"
+      DDCMSG(D_TIME,YELLOW,"before select remaining_time=%i  Rx[%i] Tx[%i] @ time %3i.%03i"
              ,remaining_time,queueLength(Rx),queueLength(Tx), DEBUG_MS(elapsed_time));
       DDqueue(D_MEGA|D_POINTER, Rx, "top of loop"); 
       DDqueue(D_MEGA|D_POINTER, Tx, "top of loop"); 
@@ -329,7 +329,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
 
       if (close_nicely) {break;}
       CURRENT_TIME(elapsed_time);
-      DDCMSG(D_TIME,YELLOW,"select returned, sock_ready=%d @ time %3i.%03i",sock_ready, DEBUG_MS(elapsed_time));
+      DDCMSG(D_TIME,YELLOW,"select returned, sock_ready=%i @ time %3i.%03i",sock_ready, DEBUG_MS(elapsed_time));
       if (sock_ready<0){
          strerror_r(errno,buf,200);
          DCMSG(RED,"RFmaster select error: %s", buf);
@@ -357,7 +357,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
             continue;
          }
 
-         DDCMSG(D_TIME,YELLOW,"select timed out Rx[%d] Tx[%d] @ time %3i.%03i", queueLength(Rx), queueLength(Tx), DEBUG_MS(elapsed_time));
+         DDCMSG(D_TIME,YELLOW,"select timed out Rx[%i] Tx[%i] @ time %3i.%03i", queueLength(Rx), queueLength(Tx), DEBUG_MS(elapsed_time));
          DDqueue(D_MEGA|D_POINTER, Rx, "timed out"); 
          DDqueue(D_MEGA|D_POINTER, Tx, "timed out"); 
 
@@ -413,7 +413,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
              ******               meant for us
              ******/
 
-            DDCMSG(D_MEGA,YELLOW,"ptype rx=%d before Rx to Tx.  Rx[%d] Tx[%d]",queuePtype(Rx),queueLength(Rx),queueLength(Tx));
+            DDCMSG(D_MEGA,YELLOW,"ptype rx=%i before Rx to Tx.  Rx[%i] Tx[%i]",queuePtype(Rx),queueLength(Rx),queueLength(Tx));
             DDqueue(D_MEGA|D_POINTER, Rx, "before"); 
             DDqueue(D_MEGA|D_POINTER, Tx, "before"); 
 
@@ -430,7 +430,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                  ){     
 
 
-               DDCMSG(D_MEGA,CYAN,"in loop.  Rx[%d] Tx[%d]",queueLength(Rx),queueLength(Tx));
+               DDCMSG(D_MEGA,CYAN,"in loop.  Rx[%i] Tx[%i]",queueLength(Rx),queueLength(Tx));
                if (ptype==1){   /*  parse it to get the slottime and devid range, and set burst to 0 */
                   LB_new =(LB_request_new_t *) Rx->head;        // we need to parse out the slottime, high_dev and low_dev from this packet.
                   inittime=LB_new->inittime*5;          // convert passed initial time back to milliseconds
@@ -441,12 +441,12 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                   if (burst == 3) {
                      // no existing stuff in out-queue this burst
                      remaining_time =(total_slots)*slottime;       // set up the timer
-                     DDCMSG(D_TIME,YELLOW,"setting remaining_time to %d  total_slots=%d slottime=%d",
+                     DDCMSG(D_TIME,YELLOW,"setting remaining_time to %i  total_slots=%i slottime=%i",
                          remaining_time,total_slots,slottime);
                   } else {
                      // existing stuff in out-queue this burst
                      remaining_time +=(total_slots)*slottime;       // set up the timer
-                     DDCMSG(D_TIME,YELLOW,"adding remaining_time to %d  total_slots=%d slottime=%d",
+                     DDCMSG(D_TIME,YELLOW,"adding remaining_time to %i  total_slots=%i slottime=%i",
                          remaining_time,total_slots,slottime);
                   }
                   ReQueue(Tx,Rx,RF_size(LB_new->cmd));  // move it to the Tx queue
@@ -458,7 +458,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                   if (ptype==2) {
                      burst=2;
                      remaining_time +=slottime; // add time for a response to this one
-                     DDCMSG(D_TIME,YELLOW,"incrementing remaining_time by slottime to %d  slottime=%d",
+                     DDCMSG(D_TIME,YELLOW,"incrementing remaining_time by slottime to %i  slottime=%i",
                             remaining_time,slottime);
 
                      // no longer in Rx queue; un-mark
@@ -485,7 +485,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                tbuf_size = 254 - RF_size(LBb->cmd);
 
                // queue packets into the burst buffer
-               queueBurst(Rx, Tx, tbuf, &tbuf_size, &remaining_time, slottime);
+               queueBurst(Rx, Tx, tbuf, &tbuf_size, &remaining_time, &slottime, &inittime);
                DDqueue(D_MEGA|D_POINTER, Rx, "after q burst"); 
                DDqueue(D_MEGA|D_POINTER, Tx, "after q burst"); 
 
@@ -498,13 +498,13 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                 ***********
                 ***********/
 
-               DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%d]", tbuf_size);
-               DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %d %d", remaining_time, inittime);
-               remaining_time += (inittime) + (364*0); // add initial delay time (for beginning and end) and DTXM measured delaya (for beggining and end)
+               DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%i]", tbuf_size);
+               DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %i+%i+(x*%i)", remaining_time, inittime, slottime);
+               remaining_time += (inittime*2) + (364*2); // add initial delay time (for beginning and end) and DTXM measured delay (for beggining and end)
 
                if (tbuf_size > RF_size(LBb->cmd)) {  // if we have something to Tx, Tx it.
                   CURRENT_TIME(elapsed_time);
-                  DDCMSG(D_TIME, YELLOW, "TX @ Remaining time: %d %d, Elapsed time: %3i.%03i ", remaining_time, slottime, DEBUG_MS(elapsed_time));
+                  DDCMSG(D_TIME, YELLOW, "TX @ Remaining time: %i %i, Elapsed time: %3i.%03i ", remaining_time, slottime, DEBUG_MS(elapsed_time));
 
                   // when we're sending, we're busy, tell the Radio Interface client
                   if (*riclient > 0) {
@@ -533,9 +533,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                   } else {
                      if (result == tbuf_size) {
                         if (verbose&D_RF) {
-                              sprintf(buf,"[%03d] %3i.%03i  ->RF [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
+                              sprintf(buf,"[%03i] %3i.%03i  ->RF [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
                               printf("%s",buf);
-                              printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                              printf("\x1B[3%i;%im",(BLUE)&7,((BLUE)>>3)&1);
                               if (result>1) {
                                  for (int i=0; i<result-1; i++) printf("%02x.", (uint8) TransBuf[i]);
                               }
@@ -610,9 +610,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
             if (result==mcpbuf_len) {
                // debug stuff
                if (verbose&D_RF){
-                  sprintf(buf,"[%03d] %3i.%03i ->MCP [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
+                  sprintf(buf,"[%03i] %3i.%03i ->MCP [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
                   printf("%s",buf);
-                  printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                  printf("\x1B[3%i;%im",(BLUE)&7,((BLUE)>>3)&1);
                   if(result>1){
                      for (int i=0; i<result-1; i++) printf("%02x.", (uint8) mcpbuf[i]);
                   }
@@ -632,7 +632,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                memcpy(mcpbuf, tbuf, mcpbuf_len - result);
                mcpbuf_len -= result;
             } else {
-               sprintf(buf,"RF ->MCP  [%d!=%d]  ",mcpbuf_len,result);
+               sprintf(buf,"RF ->MCP  [%i!=%i]  ",mcpbuf_len,result);
                DDCMSG_HEXB(D_RF,RED,buf,mcpbuf,mcpbuf_len);
                close(MCPsock);    /* Close socket */    
                return;            /* go back to the main loop waiting for MCP connection */
@@ -728,15 +728,15 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
             Rsize += gotrf;
             Rptr = Rbuf + Rsize;
          } else {
-            Rsize = Rptr - Rbuf;
+            //Rsize = Rptr - Rbuf; -- redundant
          }
 
          if (gotrf <= 0) {
             DDCMSG(D_NEW,GRAY,"RFmaster RF Received no data: %p %i", riclient, gotrf);
          } else {
-            DDCMSG(D_NEW,GRAY,"RFmaster RF Received %i bytes", gotrf);
+            DCMSG(GRAY, "->RF Rx %i bytes", gotrf);
          }
-         DDpacket(Rbuf, Rsize);
+         DDpacket(Rptr, gotrf);
 
          // after gathering RF data, we're free, tell the Radio Interface client
          //DDCMSG(D_NEW,BLACK,"RFmaster got to here 1...");
@@ -774,9 +774,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                result=write(MCPsock,Rstart,size);
                if (result==size) {
                   if (verbose&D_RF){
-                     sprintf(buf,"[%03d] %3i.%03i ->MCP [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
+                     sprintf(buf,"[%03i] %3i.%03i ->MCP [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
                      printf("%s",buf);
-                     printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                     printf("\x1B[3%i;%im",(BLUE)&7,((BLUE)>>3)&1);
                      if(result>1){
                         for (int i=0; i<result-1; i++) printf("%02x.", (uint8) Rstart[i]);
                      }
@@ -786,7 +786,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                      DDpacket(Rstart,result);
                   }
                } else {
-                  sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
+                  sprintf(buf,"RF ->MCP  [%i!=%i]  ",size,result);
                   DDCMSG_HEXB(D_RF,RED,buf,Rstart,size);
                }
                #endif /* end of old, pre-queue, method */
@@ -826,18 +826,18 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
 
          gotrf = gather_rf(RFfd,Rptr,300);
          if (gotrf>0){  // increment our current pointer
-            DDCMSG(D_VERY,GREEN,"gotrf=%d gathered =%2i, incrementing  Rptr=%2i (%p)  Rbuf=%p",
+            DDCMSG(D_VERY,GREEN,"gotrf=%i gathered =%2i, incrementing  Rptr=%2i (%p)  Rbuf=%p",
                    gotrf,gathered,(int)(Rptr-Rbuf), Rptr, Rbuf);
             Rptr+=gotrf;
             gathered+=gotrf;
-            DDCMSG(D_VERY,GREEN,"gotrf=%d gathered =%2i  Rptr=%2i (%p) Rbuf=%p ",
+            DDCMSG(D_VERY,GREEN,"gotrf=%i gathered =%2i  Rptr=%2i (%p) Rbuf=%p ",
                    gotrf,gathered,(int)(Rptr-Rbuf), Rptr, Rbuf);
          } else {
-            DDCMSG(D_VERY,RED,"gotrf=%d gathered =%2i  Rptr=%2i (%p) ",
+            DDCMSG(D_VERY,RED,"gotrf=%i gathered =%2i  Rptr=%2i (%p) ",
                    gotrf,gathered,(int)(Rptr-Rbuf), Rptr);
          }
          /* Receive message, or continue to recieve message from RF */
-         DDCMSG(D_VERY,YELLOW,"gotrf=%d  gathered=%2i  Rptr=%2i Rstart=%2i Rptr-Rstart=%2i  ",
+         DDCMSG(D_VERY,YELLOW,"gotrf=%i  gathered=%2i  Rptr=%2i Rstart=%2i Rptr-Rstart=%2i  ",
                 gotrf,gathered,(int)(Rptr-Rbuf),(int)(Rstart-Rbuf),(int)(Rptr-Rstart));
 
          // after gathering RF data, we're free, tell the Radio Interface client
@@ -852,7 +852,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
             size=RF_size(LB->cmd);
 
             /* Receive message, or continue to recieve message from RF */
-            DDCMSG(D_VERY,GREEN,"cmd=%d addr=%d RF_size =%2i  Rptr-Rstart=%2i  ",
+            DDCMSG(D_VERY,GREEN,"cmd=%i addr=%i RF_size =%2i  Rptr-Rstart=%2i  ",
                    LB->cmd,LB->addr,size,(int)(Rptr-Rstart));
 
             if ((Rptr-Rstart) >= size){
@@ -864,9 +864,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                   result=write(MCPsock,Rstart,size);
                   if (result==size) {
                      if (verbose&D_RF){
-                        sprintf(buf,"[%03d] %3i.%03i ->MCP [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
+                        sprintf(buf,"[%03i] %3i.%03i ->MCP [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
                         printf("%s",buf);
-                        printf("\x1B[3%d;%dm",(BLUE)&7,((BLUE)>>3)&1);
+                        printf("\x1B[3%i;%im",(BLUE)&7,((BLUE)>>3)&1);
                         if(result>1){
                            for (int i=0; i<result-1; i++) printf("%02x.", (uint8) Rstart[i]);
                         }
@@ -877,21 +877,21 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                      }
                      
                   } else {
-                     sprintf(buf,"RF ->MCP  [%d!=%d]  ",size,result);
+                     sprintf(buf,"RF ->MCP  [%i!=%i]  ",size,result);
                      DDCMSG_HEXB(D_RF,RED,buf,Rstart,size);
                   }
 
                   if ((Rptr-Rstart) > size){
                      Rstart+=size; // step ahead to the next packet
                      gathered-=size;
-                     DDCMSG(D_VERY,RED,"Stepping to next packet, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
+                     DDCMSG(D_VERY,RED,"Stepping to next packet, Rstart=%i Rptr=%i size=%i ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
                      sprintf(buf,"  Next 8 chars in Rbuf at Rstart  ");
                      DDCMSG_HEXB(D_VERY,RED,buf,Rstart,8);
 
                   } else {
                      gathered=0;
                      Rptr=Rstart=Rbuf;     // reset to the beginning of the buffer
-                     DDCMSG(D_VERY,RED,"Resetting to beginning of Rbuf, Rstart=%d Rptr=%d size=%d ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
+                     DDCMSG(D_VERY,RED,"Resetting to beginning of Rbuf, Rstart=%i Rptr=%i size=%i ",(int)(Rstart-Rbuf),(int)(Rptr-Rbuf),size);
                   }
                   
                } else {
@@ -926,9 +926,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
          err=errno;
 
          if (verbose&D_PACKET){
-            sprintf(buf,"[%03d] %3i.%03i MCP-> [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), MsgSize);
+            sprintf(buf,"[%03i] %3i.%03i MCP-> [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), MsgSize);
             printf("%s",buf);
-            printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
+            printf("\x1B[3%i;%im",(GREEN)&7,((GREEN)>>3)&1);
             if(MsgSize>1){
                for (int i=0; i<MsgSize-1; i++) printf("%02x.", (uint8) rbuf[i]);
             }
@@ -941,7 +941,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
 
          if (MsgSize<0){
             strerror_r(err,buf,200);
-            DCMSG(RED,"read from MCP fd=%d failed  %s ",MCPsock,buf);
+            DCMSG(RED,"read from MCP fd=%i failed  %s ",MCPsock,buf);
             sleep(1);
          }
          if (!MsgSize){
@@ -1070,7 +1070,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                       , DEBUG_MS(elapsed_time), DEBUG_MS(collect_time));
             }
             bytecount=queueLength(Rx);
-            DDCMSG(D_QUEUE,YELLOW,"Rx[%d]",bytecount);
+            DDCMSG(D_QUEUE,YELLOW,"Rx[%i]",bytecount);
          }  // if msgsize was positive
 
       }  // end of MCP_sock
@@ -1144,7 +1144,7 @@ int main(int argc, char **argv) {
    unsigned int clntLen;               /* Length of client address data structure */
    char ttyport[32];    /* default to ttyS0  */
    int opt,xmit,hardflow;
-   int slottime,total_slots;
+   int total_slots;
    int low_dev,high_dev;
    rfpair_t rf_pair;
    int child;
@@ -1206,7 +1206,7 @@ int main(int argc, char **argv) {
             break;
 
          case 'l':
-            slottime = atoi(optarg);
+            inittime = atoi(optarg);
             break;
 
          case 'x':
@@ -1231,8 +1231,8 @@ int main(int argc, char **argv) {
    
    DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);
    DCMSG(YELLOW,"RFmaster: hardflow is set to 0x%x", hardflow);
-   DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %d",RFmasterport);
-   DCMSG(YELLOW,"RFmaster: listen for SmartRange on TCP/IP port %d",SRport);
+   DCMSG(YELLOW,"RFmaster: listen for MCP on TCP/IP port %i",RFmasterport);
+   DCMSG(YELLOW,"RFmaster: listen for SmartRange on TCP/IP port %i",SRport);
    DCMSG(YELLOW,"RFmaster: comm port for Radio transciever = %s",ttyport);
    print_verbosity_bits();
 
@@ -1270,15 +1270,15 @@ int main(int argc, char **argv) {
 
       total_slots=high_dev-low_dev+2;
       if (!slottime || (high_dev<low_dev)){
-         DCMSG(RED,"\nRFmaster: xmit test: slottime=%d must be set and high_dev=%d cannot be less than low_dev=%d",slottime,high_dev,low_dev);
+         DCMSG(RED,"\nRFmaster: xmit test: slottime=%i must be set and high_dev=%i cannot be less than low_dev=%i",slottime,high_dev,low_dev);
          exit(-1);
       } else {
 
-         DCMSG(GREEN,"RFmaster: xmit test: slottime=%d  high_dev=%d low_dev=%d  total_slots=%d",slottime,high_dev,low_dev,total_slots);
+         DCMSG(GREEN,"RFmaster: xmit test: slottime=%i  high_dev=%i low_dev=%i  total_slots=%i",slottime,high_dev,low_dev,total_slots);
       }
 
       if (slottime>1275){
-         DCMSG(RED,"\nRFmaster: xmit test: slottime=%d must be set between 50? and 1275 milliseconds",slottime);
+         DCMSG(RED,"\nRFmaster: xmit test: slottime=%i must be set between 50? and 1275 milliseconds",slottime);
          exit(-1);
       }
 
@@ -1298,7 +1298,7 @@ int main(int argc, char **argv) {
       while(1){
 
          usleep(xmit*1000);
-         DCMSG(YELLOW,"top usleep for %d ms",xmit);
+         DCMSG(YELLOW,"top usleep for %i ms",xmit);
          
          // now send it to the RF master
          setblocking(RFfd);
@@ -1307,23 +1307,23 @@ int main(int argc, char **argv) {
             sprintf(buf,"Xmit test  ->RF  [%2i]  ",size);
             DCMSG_HEXB(BLUE,buf,RQ,size);
          } else {
-            sprintf(buf,"Xmit test  ->RF  [%d!=%d]  ",size,result);
+            sprintf(buf,"Xmit test  ->RF  [%i!=%i]  ",size,result);
             DCMSG_HEXB(RED,buf,RQ,size);
          }
          setnonblocking(RFfd);
       
          
          usleep(slottime + ((1+total_slots)*slottime*1000)); // use slottime as initial time
-         DCMSG(YELLOW,"usleep for %d ms",total_slots*slottime);
+         DCMSG(YELLOW,"usleep for %i ms",total_slots*slottime);
          
          result = gather_rf(RFfd,rbuf,275);
 
          if (result>0) {
             sprintf(buf,"Rcved [%2i]  ",result);
 //            sprintf(buf,"%3i.%03i  %2i    ", DEBUG_MS(elapsed_time), gathered);
-//	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
+//	   printf("\x1B[3%i;%im%s",(GREEN)&7,((GREEN)>>3)&1,buf);
             printf("%s",buf);
-            printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
+            printf("\x1B[3%i;%im",(GREEN)&7,((GREEN)>>3)&1);
             if(result>1){
                for (int i=0; i<result-1; i++) printf("%02x.", rbuf[i]);
             }
@@ -1345,9 +1345,9 @@ int main(int argc, char **argv) {
          if (result>0) {
             sprintf(buf,"x2 Rcved [%2i]  ",result);
 //            sprintf(buf,"%3i.%03i  %2i    ", DEBUG_MS(elapsed_time), gathered);
-//	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
+//	   printf("\x1B[3%i;%im%s",(GREEN)&7,((GREEN)>>3)&1,buf);
             printf("%s",buf);
-            printf("\x1B[3%d;%dm",(GREEN)&7,((GREEN)>>3)&1);
+            printf("\x1B[3%i;%im",(GREEN)&7,((GREEN)>>3)&1);
             if(result>1){
                for (int i=0; i<result-1; i++) printf("%02x.", rbuf[i]);
             }

@@ -549,7 +549,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
          fc->target_type = RF_Type_SES;
          break;
    }
-   DCMSG(GRAY, "Found 2102 expose: fc->f2102_resp.body.exp=%i", fc->f2102_resp.body.exp);
+   //DCMSG(GRAY, "Found 2102 expose: fc->f2102_resp.body.exp=%i", fc->f2102_resp.body.exp);
    // remember hit sensing settings
    fc->hit_on = fc->f2102_resp.body.hit_conf.on;
    fc->hit_react = fc->f2102_resp.body.hit_conf.react;

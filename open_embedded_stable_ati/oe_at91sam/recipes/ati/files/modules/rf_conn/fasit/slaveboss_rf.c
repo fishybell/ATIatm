@@ -647,12 +647,12 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    D_memset(&s, 0, sizeof(LB_status_resp_t));
    //s.hits = max(0,min(fc->hit_event_sum[fc->current_event], 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
-      DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+      //DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       s.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
    } else {
       s.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
    }
-   DCMSG(GRAY, "RESP with expose: s.expose=%i, fc->f2102_resp.body.exp=%i @ %i", s.expose, fc->f2102_resp.body.exp, __LINE__);
+   //DCMSG(GRAY, "RESP with expose: s.expose=%i, fc->f2102_resp.body.exp=%i @ %i", s.expose, fc->f2102_resp.body.exp, __LINE__);
    s.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
    switch (fc->f2102_resp.body.move) {
       case 0:
@@ -812,7 +812,7 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
       fc->future_exp = 90;
    }
    fc->did_exp_cmd = 0; // haven't accomplished command yet (count as a command even if we're not changing exposure)
-   DCMSG(BLACK, "||||||||||||||||\nSETTING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+   //DCMSG(BLACK, "||||||||||||||||\nSETTING FUTURE: %i\n||||||||||||||||", fc->future_exp);
 
    // send configure hit sensing
    retval |= send_2100_conf_hit(fc, 4, /* blank on conceal */
@@ -1008,7 +1008,7 @@ int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end) {
 int handle_ACCESSORY(fasit_connection_t *fc, int start, int end) {
    LB_accessory_t *pkt = (LB_accessory_t *)(fc->rf_ibuf + start);
    DDCMSG(D_NEW,RED, "handle_ACCESSORY(%8p, %i, %i)", fc, start, end);
-   DDpacket((char*)pkt, RF_size(pkt->cmd));
+   //DDpacket((char*)pkt, RF_size(pkt->cmd));
    int retval = doNothing;
    switch (pkt->type) {
       case 0:
@@ -1066,7 +1066,7 @@ int handle_ACCESSORY(fasit_connection_t *fc, int start, int end) {
 int handle_HIT_BLANKING(fasit_connection_t *fc, int start, int end) {
    LB_hit_blanking_t *pkt = (LB_hit_blanking_t *)(fc->rf_ibuf + start);
    DDCMSG(D_NEW,RED, "handle_HIT_BLANKING(%8p, %i, %i)", fc, start, end);
-   DDpacket((char*)pkt, RF_size(pkt->cmd));
+   //DDpacket((char*)pkt, RF_size(pkt->cmd));
    // send hit blanking command
    return send_14200(fc, pkt->blanking);
 }
@@ -1169,13 +1169,13 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    // status block
    //bdy.hits = max(0,min(fc->hit_event_sum[fc->current_event], 127)); // cap upper/lower bounds
    if (fc->f2102_resp.body.exp == 45) {
-      DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
+      //DCMSG(BLACK, "||||||||||||||||\nUSING FUTURE: %i\n||||||||||||||||", fc->future_exp);
       bdy.expose = fc->future_exp == 90 ? 1 : 0; // look into the future
    } else {
       bdy.expose = fc->f2102_resp.body.exp == 90 ? 1: 0; // transitions become "down"
    }
    bdy.speed = max(0,min(htonf(fc->f2102_resp.body.speed) * 100, 2047)); // cap upper/lower bounds
-   DCMSG(GRAY, "REG with expose: bdy.expose=%i, fc->f2102_resp.body.exp=%i @ %i", bdy.expose, fc->f2102_resp.body.exp, __LINE__);
+   //DCMSG(GRAY, "REG with expose: bdy.expose=%i, fc->f2102_resp.body.exp=%i @ %i", bdy.expose, fc->f2102_resp.body.exp, __LINE__);
    switch (fc->f2102_resp.body.move) {
       case 0:
       default:
