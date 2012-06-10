@@ -1414,7 +1414,7 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
-    DELAY_PRINTK("At Dock Sensor %s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&find_dock_atomic));
+    //DELAY_PRINTK("At Dock Sensor %s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&find_dock_atomic));
 
     if (isMoverAtDock() != 0) {
        do_event(EVENT_DOCK_LIMIT); // triggered on dock limit
@@ -1919,6 +1919,9 @@ static int percent_from_speed(int speed) {
     if (speed < 0) {
         speed = 0; // limit to zero
     }
+    if (NUMBER_OF_SPEEDS[mover_type] <= 0) {
+       return 0; // bad data, 0 effort
+    }
     return (1000*speed/NUMBER_OF_SPEEDS[mover_type]); // 1000 * percent = 0 to 1000
 }
 
@@ -2019,6 +2022,9 @@ static int current_speed10() {
 //    if (vel != 0) {
 //        vel = (100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel)/VELO_K[mover_type];
 //    }
+    if (VELO_K[mover_type] <= 0) {
+       return 0; // bad data, 0 effort
+    }
     if (vel > 0) {
         vel = (100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel)/VELO_K[mover_type];
     } else if (vel < 0) {
@@ -2039,6 +2045,9 @@ static int calcPidError( int new, int input){
 // if within a percentage. This will allow
 // the effort to float down. This is especially
 // important at low speeds.
+      if (new <= 0) {
+         return 0;
+      }
       diff = abs(pidError) * 100 / new;
       if (diff < 10) {
          pidError = 0;
@@ -2059,8 +2068,11 @@ static int calcPidError( int new, int input){
 
 static int calcTargetRatio( int input, int new){
    int rtnVal = 0;
-   int ratio = input * 100 / new;
+   int ratio = input * 100;
    int diff = 0;
+   if (new <= 0) {
+      return 0;
+   }
    if (mover_type == IS_MAT){ //MAT
       if (new <= 50) diff = 10;
       else if (new <= 100) diff = 10;
@@ -2183,6 +2195,9 @@ EXPORT_SYMBOL(mover_set_speed_stop);
 
 extern int mover_position_get() {
     int pos = atomic_read(&position);
+    if (TICKS_DIV <= 0 || ENC_PER_REV[mover_type] <= 0) {
+       return 0; // bad data, return 0
+    }
     return ((INCHES_PER_TICK[mover_type]*pos)/(ENC_PER_REV[mover_type]*TICKS_DIV))/12; // inches to feet
 }
 EXPORT_SYMBOL(mover_position_get);
@@ -2301,6 +2316,9 @@ static ssize_t rpm_show(struct device *dev, struct device_attribute *attr, char 
     {
     int vel = atomic_read(&velocity);
     if (vel != 0) {
+        if (vel <= 0 || ENC_PER_REV[mover_type]) {
+           return 0; // bad data, return 0
+        }
         return sprintf(buf, "%i\n", (RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel);
     } else {
         return sprintf(buf, "%i\n", 0);
@@ -2569,7 +2587,7 @@ static ssize_t clock_store(struct device *dev, struct device_attribute *attr, co
 static ssize_t hz_show(struct device *dev, struct device_attribute *attr, char *buf)
     {
     // find clock
-    int rc = atomic_read(&tc_clock);
+    int rc = atomic_read(&tc_clock), r;
     switch (rc) {
        case 1: rc = 66500000; break;
        case 2: rc = 16625000; break;
@@ -2577,7 +2595,11 @@ static ssize_t hz_show(struct device *dev, struct device_attribute *attr, char *
        case 4: rc = 1039062; break;
        default: rc = 1; break;
     }
-    rc = rc / __raw_readl(tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RC)); // convert to hz
+    r = __raw_readl(tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RC)); // convert to hz
+    if (r <= 0) {
+       return 0;
+    }
+    rc /= r;
     return sprintf(buf, "%d\n", rc);
     }
 
@@ -2608,6 +2630,9 @@ DELAY_PRINTK("changing hz to %i\n", value);
            case 4: rc = 1039062; break;
        }
 
+       if (value <= 0) {
+          return 0;
+       }
        if (rc / value > 0xffff) {
            nc--; // clock too high for frequency
            // keep going
@@ -2920,6 +2945,11 @@ static void pid_step() {
     }
     if (error_sum < (pid_error * 5)) error_sum = pid_error * 5;
 
+       // sanity check
+       if (kp_d <= 0 || ki_d <= 0 || kd_d <= 0 || delta <= 0) {
+          pid_effort = 0;
+       } else {
+
        // do the PID calculations
 
        // individual pid steps to make full equation more clean
@@ -2936,7 +2966,8 @@ static void pid_step() {
 //       pid_effort = pid_last_effort + pid_p + pid_i + pid_d;
        pid_effort = pid_p + pid_i + pid_d;
 
-   SENDUSERCONNMSG( "pid0,r,%d,p,%i,i,%i,d,%i,e,%i,t,%i", pid_error, pid_p, pid_i, pid_d, pid_effort,direction);
+   //delay_printk( "pid0,r,%d,p,%i,i,%i,d,%i,e,%i,t,%i", pid_error, pid_p, pid_i, pid_d, pid_effort,direction);
+   //SENDUSERCONNMSG( "pid0,r,%d,p,%i,i,%i,d,%i,e,%i,t,%i", pid_error, pid_p, pid_i, pid_d, pid_effort,direction);
     // max effort to 100%
    if (new_speed != 0 && isMoverAtDock() != 0) {
       pid_effort += 1000;
@@ -2961,9 +2992,9 @@ static void pid_step() {
          }
       }
     }
-   
+   } 
          
-   SENDUSERCONNMSG( "pid1,t,%i,e,%i,n,%i,i,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_effort, new_speed, input_speed,delta);
+   //SENDUSERCONNMSG( "pid1,t,%i,e,%i,n,%i,i,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_effort, new_speed, input_speed,delta);
 /*
     if (pid_effort > 800){
       pidEffortCounter ++;
