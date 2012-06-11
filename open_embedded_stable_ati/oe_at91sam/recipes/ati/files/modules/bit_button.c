@@ -46,7 +46,7 @@ void handle_bit_test_long_lifter(struct nl_handle *handle, int is_on) {
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request MGL state (installed below) \
      {SetVarLast;2;;;} -- Set response value to register 2 \
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request PHI state (installed below) \
-     {SetVarLast;3;;;} -- Set response value to register 2 \
+     {SetVarLast;3;;;} -- Set response value to register 3 \
      {SendWait;R_LIFTER;NL_C_EXPOSE;FF;500} -- Send 'Get Exposure' to lifter  \
      {SetVarLast;0;;;} -- Set response value to register 0 \
      {If;0;01;%s;%s} -- If register 0 is '01', conceal (installed below) \
