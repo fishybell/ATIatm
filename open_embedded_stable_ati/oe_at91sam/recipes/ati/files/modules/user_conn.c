@@ -506,6 +506,9 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                    case ERR_notcharging_battery:
                       snprintf(wbuf, 1024, "U not charging battery\n");
                       break;
+                   case ERR_target_killed:
+                      snprintf(wbuf, 1024, "U target killed\n");
+                      break;
                    default:
                       snprintf(wbuf, 1024, "U Unknown: %i\n", value);
                       break;
