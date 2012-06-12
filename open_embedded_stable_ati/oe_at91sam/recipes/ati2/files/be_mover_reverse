@@ -1,0 +1,4 @@
+echo -n "Enter Mover Reverse (0|1): "
+read movr
+size=$(echo $movr | wc -c)
+echo -n $movr | /usr/bin/eeprom_rw write -addr 0x428 -size $size -blank 0x03
