@@ -7,7 +7,7 @@ start () {
 
    matm=1
    matb=$(has_mat_battery)
-   matr=$(has_mat_reverse)
+   matr=$(has_mover_reverse)
    matd=$(has_dock)
    if [ "$matb" == "" ] ; then
       matb=48
