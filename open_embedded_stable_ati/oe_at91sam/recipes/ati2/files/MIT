@@ -5,15 +5,12 @@ start () {
    # load network
    source /usr/bin/load_network
 
+   mitm=2
    mitb=$(has_mit_battery)
-   mitm=$(has_mit_mover)
    mitr=$(has_mit_reverse)
    mitd=$(has_dock)
    if [ "$mitb" == "" ] ; then
       mitb=48
-   fi
-   if [ "$mitm" == "" ] ; then
-      mitm=2
    fi
    if [ "$mitr" == "" ] ; then
       mitr=0
