@@ -5,15 +5,12 @@ start () {
    # load network
    source /usr/bin/load_network
 
+   matm=1
    matb=$(has_mat_battery)
-   matm=$(has_mat_mover)
    matr=$(has_mat_reverse)
    matd=$(has_dock)
    if [ "$matb" == "" ] ; then
       matb=48
-   fi
-   if [ "$matm" == "" ] ; then
-      matm=1
    fi
    if [ "$matr" == "" ] ; then
       matr=0
