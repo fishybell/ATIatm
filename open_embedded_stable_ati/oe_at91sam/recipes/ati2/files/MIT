@@ -7,7 +7,7 @@ start () {
 
    mitm=2
    mitb=$(has_mit_battery)
-   mitr=$(has_mit_reverse)
+   mitr=$(has_mover_reverse)
    mitd=$(has_dock)
    if [ "$mitb" == "" ] ; then
       mitb=48
