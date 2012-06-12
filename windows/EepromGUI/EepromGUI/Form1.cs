@@ -523,6 +523,28 @@ namespace EepromGUI
             }
         }
 
+        /**************************************************
+         * Change the mover reverse type depending on if
+         * MIT or MAT is selected
+         * *************************************************/
+        private void moveTypeCB_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (moveTypeCB.SelectedIndex == 0)
+            {
+                conn.sendMessage("I E REVERSE_MIT");
+                conn.sendMessage("I E 6 2");
+                logSent("I E REVERSE_MIT");
+                logSent("I E 6 2");
+            }
+            else if (moveTypeCB.SelectedIndex == 1)
+            {
+                conn.sendMessage("I E REVERSE_MAT");
+                conn.sendMessage("I E 8 1");
+                logSent("I E REVERSE_MAT");
+                logSent("I E 8 1");
+            }
+        }
+
         /*************************************************
          * The drop down of the event combo box is exposed
          * ***********************************************/
@@ -998,10 +1020,8 @@ namespace EepromGUI
             sesBTB.Text = "";
             mitBTB.Text = "";
             matBTB.Text = "";
-            mitTTB.Text = "";
-            mitRTB.Text = "";
-            matTTB.Text = "";
-            matRTB.Text = "";
+            moveTypeCB.SelectedIndex = -1;
+            revCB.SelectedIndex = -1;
             mfsCheck.Checked = false;
             mfsCB1.SelectedIndex = -1;
             mfsCB2.SelectedIndex = -1;
@@ -1266,6 +1286,14 @@ namespace EepromGUI
                             boardType = board;
                             deviceTB.Text = board;
                             boardCB.SelectedItem = board;
+                            if (board == "MIT")
+                            {
+                                moveTypeCB.SelectedIndex = 0;
+                            }
+                            else if (board == "MAT")
+                            {
+                                moveTypeCB.SelectedIndex = 1;
+                            }
                             // Enable and disable controls according to the board type
                             disableEnable(boardType);
                             break;
@@ -1295,13 +1323,15 @@ namespace EepromGUI
                                     case "MIT":
                                         if (batMovList[1] == "TYPE")
                                         {
-                                            mitTTB.Text = batMovList[2];
-                                            mitTTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                            moveTypeCB.SelectedIndex = 0;
+                                            moveTypeCB.ForeColor = System.Drawing.SystemColors.WindowText;
                                         }
                                         else if (batMovList[1] == "REVERSE")
                                         {
-                                            mitRTB.Text = batMovList[2];
-                                            mitRTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                            moveTypeCB.SelectedIndex = 0;
+                                            revCB.SelectedIndex = Convert.ToInt32(batMovList[2]);
+                                            moveTypeCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                            revCB.ForeColor = System.Drawing.SystemColors.WindowText;
                                         }
                                         else
                                         {
@@ -1312,13 +1342,15 @@ namespace EepromGUI
                                     case "MAT":
                                        if (batMovList[1] == "TYPE")
                                         {
-                                            matTTB.Text = batMovList[2];
-                                            matTTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                            moveTypeCB.SelectedIndex = 1;
+                                            moveTypeCB.ForeColor = System.Drawing.SystemColors.WindowText;
                                         }
                                         else if (batMovList[1] == "REVERSE")
                                         {
-                                            matRTB.Text = batMovList[2];
-                                            matRTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                            moveTypeCB.SelectedIndex = 1;
+                                            revCB.SelectedIndex = Convert.ToInt32(batMovList[2]);
+                                            moveTypeCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                            revCB.ForeColor = System.Drawing.SystemColors.WindowText;
                                         }
                                         else
                                         {
@@ -1738,28 +1770,16 @@ namespace EepromGUI
             HomeDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mitTTB_Click(object sender, EventArgs e)
+        private void moveTypeCB_Click(object sender, EventArgs e)
         {
-            changedList.Add(mitTTB);
-            mitTTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            changedList.Add(moveTypeCB);
+            moveTypeCB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
-        private void mitRTB_Click(object sender, EventArgs e)
+        private void revCB_Click(object sender, EventArgs e)
         {
-            changedList.Add(mitRTB);
-            mitRTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void matTTB_Click(object sender, EventArgs e)
-        {
-            changedList.Add(matTTB);
-            matTTB.ForeColor = System.Drawing.SystemColors.HotTrack;
-        }
-
-        private void matRTB_Click(object sender, EventArgs e)
-        {
-            changedList.Add(matRTB);
-            matRTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            changedList.Add(revCB);
+            revCB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
         private void mfsCheck_Click(object sender, EventArgs e)
@@ -2223,6 +2243,26 @@ namespace EepromGUI
                         case "mitTTB":
                             batDefaults(6, textValue);
                             break;
+                        case "moveTypeCB":
+                            if (moveTypeCB.SelectedIndex == 0)
+                            {
+                                batDefaults(6, "2");
+                            }
+                            else if (moveTypeCB.SelectedIndex == 1)
+                            {
+                                batDefaults(8, "1");
+                            }
+                            break;
+                        case "revCB":
+                            if (moveTypeCB.SelectedIndex == 0)
+                            {                                
+                                batDefaults(7, Convert.ToString(revCB.SelectedIndex));
+                            }
+                            else if (moveTypeCB.SelectedIndex == 1)
+                            {
+                                batDefaults(9, Convert.ToString(revCB.SelectedIndex));
+                            }
+                            break;
                         case "mitRTB":
                             batDefaults(7, textValue);
                             break;
@@ -2557,10 +2597,16 @@ namespace EepromGUI
                 conn.sendMessage("I E SES");
                 conn.sendMessage("I E MIT");
                 conn.sendMessage("I E MAT");
-                conn.sendMessage("I E TYPE_MIT");
-                conn.sendMessage("I E REVERSE_MIT");
-                conn.sendMessage("I E TYPE_MAT");
-                conn.sendMessage("I E REVERSE_MAT");
+                //conn.sendMessage("I E TYPE_MIT");
+                if (moveTypeCB.SelectedIndex == 0)
+                {
+                    conn.sendMessage("I E REVERSE_MIT");
+                }
+                else if (moveTypeCB.SelectedIndex == 1)
+                {
+                    conn.sendMessage("I E REVERSE_MAT");
+                }
+                //conn.sendMessage("I E TYPE_MAT");
                 conn.sendMessage("I A");
                 conn.sendMessage("I F");
                 conn.sendMessage("I G");
@@ -2864,7 +2910,8 @@ namespace EepromGUI
                 String batFile = ".\\atifirmwarecopy.bat";
 
                 psi.FileName = batFile;
-                psi.Arguments = machine + " " + openDialog.FileName;
+                String shellFile = openDialog.SafeFileName;
+                psi.Arguments = machine + " " + openDialog.FileName + " " + shellFile;
 
                 // Hides the console window that would pop up
                 //psi.WindowStyle = ProcessWindowStyle.Hidden;
@@ -2892,5 +2939,6 @@ namespace EepromGUI
             
 
         }
+
     }
 }

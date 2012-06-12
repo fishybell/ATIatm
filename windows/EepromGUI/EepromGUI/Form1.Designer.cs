@@ -42,10 +42,6 @@
             this.hitcDTB1 = new System.Windows.Forms.TextBox();
             this.sensorDCB = new System.Windows.Forms.ComboBox();
             this.hitcCB4 = new System.Windows.Forms.ComboBox();
-            this.mitTTB = new System.Windows.Forms.TextBox();
-            this.mitRTB = new System.Windows.Forms.TextBox();
-            this.matTTB = new System.Windows.Forms.TextBox();
-            this.matRTB = new System.Windows.Forms.TextBox();
             this.DockDCB = new System.Windows.Forms.ComboBox();
             this.HomeDCB = new System.Windows.Forms.ComboBox();
             this.freqTB = new System.Windows.Forms.TextBox();
@@ -283,6 +279,8 @@
             this.shutdownButton = new System.Windows.Forms.Button();
             this.stopButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
+            this.moveTypeCB = new System.Windows.Forms.ComboBox();
+            this.revCB = new System.Windows.Forms.ComboBox();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -457,46 +455,6 @@
             this.hitcCB4.TabIndex = 104;
             this.toolTip1.SetToolTip(this.hitcCB4, "Enable on value");
             this.hitcCB4.Click += new System.EventHandler(this.hitcCB4_Click);
-            // 
-            // mitTTB
-            // 
-            this.mitTTB.Location = new System.Drawing.Point(44, 111);
-            this.mitTTB.Margin = new System.Windows.Forms.Padding(4);
-            this.mitTTB.Name = "mitTTB";
-            this.mitTTB.Size = new System.Drawing.Size(37, 22);
-            this.mitTTB.TabIndex = 3;
-            this.toolTip1.SetToolTip(this.mitTTB, "MIT Type");
-            this.mitTTB.Click += new System.EventHandler(this.mitTTB_Click);
-            // 
-            // mitRTB
-            // 
-            this.mitRTB.Location = new System.Drawing.Point(91, 111);
-            this.mitRTB.Margin = new System.Windows.Forms.Padding(4);
-            this.mitRTB.Name = "mitRTB";
-            this.mitRTB.Size = new System.Drawing.Size(37, 22);
-            this.mitRTB.TabIndex = 4;
-            this.toolTip1.SetToolTip(this.mitRTB, "MIT Reverse");
-            this.mitRTB.Click += new System.EventHandler(this.mitRTB_Click);
-            // 
-            // matTTB
-            // 
-            this.matTTB.Location = new System.Drawing.Point(44, 138);
-            this.matTTB.Margin = new System.Windows.Forms.Padding(4);
-            this.matTTB.Name = "matTTB";
-            this.matTTB.Size = new System.Drawing.Size(37, 22);
-            this.matTTB.TabIndex = 8;
-            this.toolTip1.SetToolTip(this.matTTB, "MAT Type");
-            this.matTTB.Click += new System.EventHandler(this.matTTB_Click);
-            // 
-            // matRTB
-            // 
-            this.matRTB.Location = new System.Drawing.Point(91, 138);
-            this.matRTB.Margin = new System.Windows.Forms.Padding(4);
-            this.matRTB.Name = "matRTB";
-            this.matRTB.Size = new System.Drawing.Size(37, 22);
-            this.matRTB.TabIndex = 9;
-            this.toolTip1.SetToolTip(this.matRTB, "MAT Reverse");
-            this.matRTB.Click += new System.EventHandler(this.matRTB_Click);
             // 
             // DockDCB
             // 
@@ -1727,15 +1685,13 @@
             // 
             // groupBox2
             // 
+            this.groupBox2.Controls.Add(this.revCB);
+            this.groupBox2.Controls.Add(this.moveTypeCB);
             this.groupBox2.Controls.Add(this.HomeDCB);
             this.groupBox2.Controls.Add(this.label37);
             this.groupBox2.Controls.Add(this.DockDCB);
             this.groupBox2.Controls.Add(this.label47);
-            this.groupBox2.Controls.Add(this.matRTB);
-            this.groupBox2.Controls.Add(this.matTTB);
             this.groupBox2.Controls.Add(this.label39);
-            this.groupBox2.Controls.Add(this.mitRTB);
-            this.groupBox2.Controls.Add(this.mitTTB);
             this.groupBox2.Controls.Add(this.label36);
             this.groupBox2.Location = new System.Drawing.Point(172, 129);
             this.groupBox2.Margin = new System.Windows.Forms.Padding(4);
@@ -1769,24 +1725,24 @@
             // label39
             // 
             this.label39.AutoSize = true;
-            this.label39.Font = new System.Drawing.Font("Microsoft Sans Serif", 6.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label39.Location = new System.Drawing.Point(8, 143);
+            this.label39.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F);
+            this.label39.Location = new System.Drawing.Point(9, 151);
             this.label39.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label39.Name = "label39";
-            this.label39.Size = new System.Drawing.Size(32, 15);
+            this.label39.Size = new System.Drawing.Size(41, 17);
             this.label39.TabIndex = 5;
-            this.label39.Text = "MAT";
+            this.label39.Text = "Rev?";
             // 
             // label36
             // 
             this.label36.AutoSize = true;
-            this.label36.Font = new System.Drawing.Font("Microsoft Sans Serif", 6.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label36.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F);
             this.label36.Location = new System.Drawing.Point(8, 113);
             this.label36.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label36.Name = "label36";
-            this.label36.Size = new System.Drawing.Size(28, 15);
+            this.label36.Size = new System.Drawing.Size(40, 17);
             this.label36.TabIndex = 0;
-            this.label36.Text = "MIT";
+            this.label36.Text = "Type";
             // 
             // batDSetButton
             // 
@@ -3360,6 +3316,31 @@
             this.tabControl1.Size = new System.Drawing.Size(849, 348);
             this.tabControl1.TabIndex = 93;
             // 
+            // moveTypeCB
+            // 
+            this.moveTypeCB.FormattingEnabled = true;
+            this.moveTypeCB.Items.AddRange(new object[] {
+            "MIT",
+            "MAT"});
+            this.moveTypeCB.Location = new System.Drawing.Point(53, 108);
+            this.moveTypeCB.Name = "moveTypeCB";
+            this.moveTypeCB.Size = new System.Drawing.Size(79, 24);
+            this.moveTypeCB.TabIndex = 14;
+            this.moveTypeCB.SelectedIndexChanged += new System.EventHandler(this.moveTypeCB_SelectedIndexChanged);
+            this.moveTypeCB.Click += new System.EventHandler(this.moveTypeCB_Click);
+            // 
+            // revCB
+            // 
+            this.revCB.FormattingEnabled = true;
+            this.revCB.Items.AddRange(new object[] {
+            "Normal",
+            "Reverse"});
+            this.revCB.Location = new System.Drawing.Point(53, 147);
+            this.revCB.Name = "revCB";
+            this.revCB.Size = new System.Drawing.Size(79, 24);
+            this.revCB.TabIndex = 15;
+            this.revCB.Click += new System.EventHandler(this.revCB_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -3462,11 +3443,7 @@
         private System.Windows.Forms.Label label37;
         private System.Windows.Forms.ComboBox DockDCB;
         private System.Windows.Forms.Label label47;
-        private System.Windows.Forms.TextBox matRTB;
-        private System.Windows.Forms.TextBox matTTB;
         private System.Windows.Forms.Label label39;
-        private System.Windows.Forms.TextBox mitRTB;
-        private System.Windows.Forms.TextBox mitTTB;
         private System.Windows.Forms.Label label36;
         private System.Windows.Forms.Button batDSetButton;
         private System.Windows.Forms.Button batDShowButton;
@@ -3687,6 +3664,8 @@
         private System.Windows.Forms.Button stopButton;
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.Button firmButton;
+        private System.Windows.Forms.ComboBox revCB;
+        private System.Windows.Forms.ComboBox moveTypeCB;
     }
 }
 
