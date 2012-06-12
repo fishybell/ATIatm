@@ -801,20 +801,11 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                            case 5:	// MAT
                               snprintf(wbuf, 1024, "I E MAT %s\n", writeEeprom(MAT_BATTERY_LOC, strnlen(ebuf2, 5), MAT_BATTERY_SIZE, ebuf2)); 
                               break;
-                           case 6:	// MIT Mover Type
-                              snprintf(wbuf, 1024, "I E MIT TYPE %s\n", writeEeprom(MIT_MOVER_TYPE_LOC, strnlen(ebuf2, 5), MIT_MOVER_TYPE_SIZE, ebuf2)); 
-                              break;
-                           case 7:	// MIT Reverse
-                              snprintf(wbuf, 1024, "I E MIT REVERSE %s\n", writeEeprom(MIT_REVERSE_LOC, strnlen(ebuf2, 5), MIT_REVERSE_SIZE, ebuf2));
-                              break;
-                           case 8:	// MAT Mover Type
-                              snprintf(wbuf, 1024, "I E MAT TYPE %s\n", writeEeprom(MAT_MOVER_TYPE_LOC, strnlen(ebuf2, 5), MAT_MOVER_TYPE_SIZE, ebuf2)); 
-                              break;
-                           case 9:	// MAT Reverse
-                              snprintf(wbuf, 1024, "I E MAT REVERSE %s\n", writeEeprom(MAT_REVERSE_LOC, strnlen(ebuf2, 5), MAT_REVERSE_SIZE, ebuf2));
+                           case 6:	// Reverse
+                              snprintf(wbuf, 1024, "I E REVERSE %s\n", writeEeprom(REVERSE_LOC, strnlen(ebuf2, 5), REVERSE_SIZE, ebuf2));
                               break;
                            default:
-                              snprintf(wbuf, 1024, "Please choose a correct parameter\n(1-SIT|2-SAT|3-SES|4-MIT|5-MAT|6-MIT Mover Type|7-MIT Reverse|8-MAT Mover Type|9-MAT Reverse\n");
+                              snprintf(wbuf, 1024, "Please choose a correct parameter\n(1-SIT|2-SAT|3-SES|4-MIT|5-MAT|6-Reverse\n");
                               break;
                         }
                      } else {	// read
@@ -856,34 +847,13 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                               snprintf(bat5, BATTERY_SIZE, "%i", MAT_BATTERY);
                            }
                            snprintf(wbuf, 1024, "I E MAT %s\n", bat5);
-                        } else if (memcmp(eparam3, "TYPE_MIT", 8)==0 || memcmp(eparam3, "type_mit", 8)==0) {// read MIT mover type
+                        } else if (memcmp(eparam3, "reverse", 7)==0 || memcmp(eparam3, "REVERSE", 7)==0) {	// read reverse
                            memset(bat6, 0, MOVER_SIZE+1);
-                           memcpy(bat6,readEeprom(MIT_MOVER_TYPE_LOC, MIT_MOVER_TYPE_SIZE), MOVER_SIZE);
+                           memcpy(bat6,readEeprom(REVERSE_LOC, REVERSE_SIZE), MOVER_SIZE);
                            if (!isNumber(bat6)) {  //revert to default value
-                              snprintf(bat6, BATTERY_SIZE, "%i", MIT_MOVER_TYPE);
+                              snprintf(bat6, BATTERY_SIZE, "%i", REVERSE);
                            }
-                           snprintf(wbuf, 1024, "I E MIT TYPE %s\n", bat6);
-                        } else if (memcmp(eparam3, "reverse_mit", 11)==0 || memcmp(eparam3, "REVERSE_MIT", 11)==0) {	// read MIT reverse
-                          memset(bat7, 0, MOVER_SIZE+1);
-                           memcpy(bat7,readEeprom(MIT_REVERSE_LOC, MIT_REVERSE_SIZE), MOVER_SIZE);
-                           if (!isNumber(bat7)) {  //revert to default value
-                              snprintf(bat7, BATTERY_SIZE, "%i", MIT_REVERSE);
-                           }
-                           snprintf(wbuf, 1024, "I E MIT REVERSE %s\n", bat7);
-                        } else if (memcmp(eparam3, "type_mat", 8)==0 || memcmp(eparam3, "TYPE_MAT", 8)==0) {// read MAT mover type
-                           memset(bat8, 0, MOVER_SIZE+1);
-                           memcpy(bat8,readEeprom(MAT_MOVER_TYPE_LOC, MAT_MOVER_TYPE_SIZE), MOVER_SIZE);
-                           if (!isNumber(bat8)) {  //revert to default value
-                              snprintf(bat8, BATTERY_SIZE, "%i", MAT_MOVER_TYPE);
-                           }
-                           snprintf(wbuf, 1024, "I E MAT TYPE %s\n", bat8);
-                        } else if (memcmp(eparam3, "reverse_mat", 11)==0 || memcmp(eparam3, "REVERSE_MAT", 11)==0) {	// read MAT reverse
-                          memset(bat9, 0, MOVER_SIZE+1);
-                           memcpy(bat9,readEeprom(MAT_REVERSE_LOC, MAT_REVERSE_SIZE), MOVER_SIZE);
-                           if (!isNumber(bat9)) {  //revert to default value
-                              snprintf(bat9, BATTERY_SIZE, "%i", MAT_REVERSE);
-                           }
-                           snprintf(wbuf, 1024, "I E MAT REVERSE %s\n", bat9);
+                           snprintf(wbuf, 1024, "I E REVERSE %s\n", bat6);
                         } else {
                            snprintf(wbuf, 1024, "I E Incorrect Format\n");
                         }
@@ -1888,7 +1858,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         	    snprintf(wbuf, 1024, "Get/Set connect port number\nFormat: I C <cport>\n");		
                                 break;
                             case 'E': case 'e':
-                                snprintf(wbuf, 1024, "Request battery/mover defaults\nFormat I E (SIT|SAT|SES|MIT|MAT|TYPE_MIT|REVERSE_MIT|TYPE_MAT|REVERSE_MAT)\nChange battery/mover defaults\nFormat I E (1-SIT|2-SAT|3-SES|4-MIT|5-MAT|6-MIT Mover Type|7-MIT Reverse|8-MAT Mover Type|9-MAT Reverse) (default)\n");
+                                snprintf(wbuf, 1024, "Request battery/mover defaults\nFormat I E (SIT|SAT|SES|MIT|MAT|REVERSE)\nChange battery/mover defaults\nFormat I E (1-SIT|2-SAT|3-SES|4-MIT|5-MAT|6-Mover Reverse) (default)\n");
                                 break;
                             case 'F': case 'f':
                                 snprintf(wbuf, 1024, "Request fall parameters\nFormat: I F\nChange fall parameters\nFormat: I F (0-100)kill_at_x_hits (0|1|2|3|4)at_kill_do_fall_or_kill_or_stop_or_fall_and_stop_or_bob\n");
