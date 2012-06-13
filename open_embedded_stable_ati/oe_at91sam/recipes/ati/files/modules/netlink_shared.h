@@ -114,6 +114,7 @@ enum {
     BIT_KNOB_REQ,   /* request knob */
     BIT_MODE_REQ,   /* request mode */
     BIT_LONG_PRESS, /* test button, long press */
+    BIT_GOTO_DOCK,  /* move the mover to the dock */
 };
 enum {
     BIT_A_UNSPEC,
