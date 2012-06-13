@@ -1951,7 +1951,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Change Mode\nFormat: O (0-3)mode_number\nMode request\nFormat: O\n");
                         break;
                     case 'P': case 'p':
-                        snprintf(wbuf, 1024, "Sleep command\nFormat: P (0|1|2)sleep_or_wake_or_request_or_dock\n");
+                        snprintf(wbuf, 1024, "Sleep command\nFormat: P (0|1|2|3)sleep_or_wake_or_request_or_dock\n");
                         break;
                     case 'Q': case 'q':
                         snprintf(wbuf, 1024, "Types of accessories: MFS, MGL, SES, PHI, MSD, SMK, THM\nRequest accessory paramaters\nFormat: Q accessory_type\nChange accessory parameters\nFormat: Q accessory_type (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
