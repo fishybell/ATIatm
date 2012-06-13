@@ -112,7 +112,7 @@
 #define MAT_BATTERY_SIZE 0x08
 
 #define REVERSE 0
-#define REVERSE_LOC 0x428
+#define REVERSE_LOC 0x438
 #define REVERSE_SIZE 0x04
 
 #define BATTERY_SIZE 8
