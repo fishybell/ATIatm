@@ -344,8 +344,24 @@ void handle_bit_test_long(struct nl_handle *handle, int is_on) {
    }
 }
 
-// bit button might have been pressed, move the lifter up or down
+// bit button might have been pressed, do the short test for the lifter or the mover
 void handle_bit_test(struct nl_handle *handle, int is_on) {
+printf("--------handle_bit_test-------\n");
+
+    switch (ROLE) {
+       case R_LIFTER:
+          handle_bit_lifter(handle, is_on);
+          break;
+       case R_MOVER:
+          handle_bit_move(handle, BIT_GOTO_DOCK);
+          break;
+    }
+}
+
+// bit button might have been pressed, move the lifter up or down
+void handle_bit_lifter(struct nl_handle *handle, int is_on) {
+printf("--------handle_bit_lifter-------\n");
+
     // toggle lifter position
     struct nl_msg *msg;
     msg = nlmsg_alloc();
@@ -360,11 +376,13 @@ void handle_bit_test(struct nl_handle *handle, int is_on) {
 }
 
 void handle_bit_move(struct nl_handle *handle, int type) {
+printf("--------handle_bit_move-------\n");
     // move button pressed? send the correct command back to the kernel
     struct nl_msg *msg;
     msg = nlmsg_alloc();
-    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_MOVE, 1);
+    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_SLEEP, 1);
 
+    //mover_sleep_set(DOCK_COMMAND);
     // fill with the correct movement data
     switch (type) {
         case BIT_MOVE_FWD:
@@ -378,6 +396,9 @@ void handle_bit_move(struct nl_handle *handle, int type) {
         case BIT_MOVE_STOP:
 //printf("BIT: sending STOP\n");
             nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
+            break;
+        case BIT_GOTO_DOCK:
+            nla_put_u8(msg, GEN_INT8_A_MSG, 3);  // 3 is the command to dock
             break;
     }
 
