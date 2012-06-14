@@ -1,0 +1,4 @@
+if [ "$mver" != "`has_minor_version`" ] ; then
+   size=$(echo $mver | wc -c)
+   echo -n $mver | /usr/bin/eeprom_rw write -addr 0x56C -size $size -blank 0x08
+fi
