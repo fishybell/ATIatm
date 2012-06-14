@@ -1,0 +1,4 @@
+echo -n "Enter Radio High Power: "
+read hghp
+size=$(echo $hghp | wc -c)
+echo -n $hghp | /usr/bin/eeprom_rw write -addr 0x554 -size $size -blank 0x3
