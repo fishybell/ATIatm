@@ -12,7 +12,7 @@ start () {
    if [ "$mitb" == "" ] ; then
       mitb=48
    fi
-   if [ "$mitr" != "0"  && "$mitr" != "1" ] ; then
+   if [ "$mitr" != "0" ] && [ "$mitr" != "1" ] ; then
       mitr=0
    fi
    if [ "$mitd" == "" ] ; then

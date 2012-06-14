@@ -12,7 +12,7 @@ start () {
    if [ "$matb" == "" ] ; then
       matb=48
    fi
-   if [ "$matr" != "0"  && "$matr" != "1" ] ; then
+   if [ "$matr" != "0" ] && [ "$matr" != "1" ] ; then
       matr=0
    fi
    if [ "$matd" == "" ] ; then
