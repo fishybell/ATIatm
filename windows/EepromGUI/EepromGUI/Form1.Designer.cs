@@ -145,10 +145,10 @@
             this.logTB = new System.Windows.Forms.TextBox();
             this.tabPage3 = new System.Windows.Forms.TabPage();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.revCB = new System.Windows.Forms.ComboBox();
             this.label37 = new System.Windows.Forms.Label();
             this.label47 = new System.Windows.Forms.Label();
             this.label39 = new System.Windows.Forms.Label();
-            this.label36 = new System.Windows.Forms.Label();
             this.batDSetButton = new System.Windows.Forms.Button();
             this.batDShowButton = new System.Windows.Forms.Button();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
@@ -279,8 +279,7 @@
             this.shutdownButton = new System.Windows.Forms.Button();
             this.stopButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
-            this.moveTypeCB = new System.Windows.Forms.ComboBox();
-            this.revCB = new System.Windows.Forms.ComboBox();
+            this.radioButton = new System.Windows.Forms.Button();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -1686,13 +1685,11 @@
             // groupBox2
             // 
             this.groupBox2.Controls.Add(this.revCB);
-            this.groupBox2.Controls.Add(this.moveTypeCB);
             this.groupBox2.Controls.Add(this.HomeDCB);
             this.groupBox2.Controls.Add(this.label37);
             this.groupBox2.Controls.Add(this.DockDCB);
             this.groupBox2.Controls.Add(this.label47);
             this.groupBox2.Controls.Add(this.label39);
-            this.groupBox2.Controls.Add(this.label36);
             this.groupBox2.Location = new System.Drawing.Point(172, 129);
             this.groupBox2.Margin = new System.Windows.Forms.Padding(4);
             this.groupBox2.Name = "groupBox2";
@@ -1701,6 +1698,18 @@
             this.groupBox2.TabIndex = 115;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Mover";
+            // 
+            // revCB
+            // 
+            this.revCB.FormattingEnabled = true;
+            this.revCB.Items.AddRange(new object[] {
+            "Normal",
+            "Reverse"});
+            this.revCB.Location = new System.Drawing.Point(53, 86);
+            this.revCB.Name = "revCB";
+            this.revCB.Size = new System.Drawing.Size(79, 24);
+            this.revCB.TabIndex = 15;
+            this.revCB.Click += new System.EventHandler(this.revCB_Click);
             // 
             // label37
             // 
@@ -1726,23 +1735,12 @@
             // 
             this.label39.AutoSize = true;
             this.label39.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F);
-            this.label39.Location = new System.Drawing.Point(9, 151);
+            this.label39.Location = new System.Drawing.Point(9, 90);
             this.label39.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label39.Name = "label39";
             this.label39.Size = new System.Drawing.Size(41, 17);
             this.label39.TabIndex = 5;
             this.label39.Text = "Rev?";
-            // 
-            // label36
-            // 
-            this.label36.AutoSize = true;
-            this.label36.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F);
-            this.label36.Location = new System.Drawing.Point(8, 113);
-            this.label36.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.label36.Name = "label36";
-            this.label36.Size = new System.Drawing.Size(40, 17);
-            this.label36.TabIndex = 0;
-            this.label36.Text = "Type";
             // 
             // batDSetButton
             // 
@@ -2875,6 +2873,7 @@
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.radioButton);
             this.tabPage1.Controls.Add(this.firmButton);
             this.tabPage1.Controls.Add(this.expSTB);
             this.tabPage1.Controls.Add(this.knobTB);
@@ -2923,7 +2922,7 @@
             // 
             // firmButton
             // 
-            this.firmButton.Location = new System.Drawing.Point(223, 204);
+            this.firmButton.Location = new System.Drawing.Point(8, 238);
             this.firmButton.Name = "firmButton";
             this.firmButton.Size = new System.Drawing.Size(155, 27);
             this.firmButton.TabIndex = 96;
@@ -3293,7 +3292,7 @@
             // 
             this.stopButton.BackColor = System.Drawing.SystemColors.Highlight;
             this.stopButton.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.stopButton.Location = new System.Drawing.Point(385, 203);
+            this.stopButton.Location = new System.Drawing.Point(224, 203);
             this.stopButton.Margin = new System.Windows.Forms.Padding(4);
             this.stopButton.Name = "stopButton";
             this.stopButton.Size = new System.Drawing.Size(100, 28);
@@ -3316,30 +3315,15 @@
             this.tabControl1.Size = new System.Drawing.Size(849, 348);
             this.tabControl1.TabIndex = 93;
             // 
-            // moveTypeCB
+            // radioButton
             // 
-            this.moveTypeCB.FormattingEnabled = true;
-            this.moveTypeCB.Items.AddRange(new object[] {
-            "MIT",
-            "MAT"});
-            this.moveTypeCB.Location = new System.Drawing.Point(53, 108);
-            this.moveTypeCB.Name = "moveTypeCB";
-            this.moveTypeCB.Size = new System.Drawing.Size(79, 24);
-            this.moveTypeCB.TabIndex = 14;
-            this.moveTypeCB.SelectedIndexChanged += new System.EventHandler(this.moveTypeCB_SelectedIndexChanged);
-            this.moveTypeCB.Click += new System.EventHandler(this.moveTypeCB_Click);
-            // 
-            // revCB
-            // 
-            this.revCB.FormattingEnabled = true;
-            this.revCB.Items.AddRange(new object[] {
-            "Normal",
-            "Reverse"});
-            this.revCB.Location = new System.Drawing.Point(53, 147);
-            this.revCB.Name = "revCB";
-            this.revCB.Size = new System.Drawing.Size(79, 24);
-            this.revCB.TabIndex = 15;
-            this.revCB.Click += new System.EventHandler(this.revCB_Click);
+            this.radioButton.Location = new System.Drawing.Point(170, 238);
+            this.radioButton.Name = "radioButton";
+            this.radioButton.Size = new System.Drawing.Size(98, 27);
+            this.radioButton.TabIndex = 97;
+            this.radioButton.Text = "Test Radio";
+            this.radioButton.UseVisualStyleBackColor = true;
+            this.radioButton.Click += new System.EventHandler(this.radioButton_Click);
             // 
             // Form1
             // 
@@ -3444,7 +3428,6 @@
         private System.Windows.Forms.ComboBox DockDCB;
         private System.Windows.Forms.Label label47;
         private System.Windows.Forms.Label label39;
-        private System.Windows.Forms.Label label36;
         private System.Windows.Forms.Button batDSetButton;
         private System.Windows.Forms.Button batDShowButton;
         private System.Windows.Forms.GroupBox groupBox1;
@@ -3665,7 +3648,7 @@
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.Button firmButton;
         private System.Windows.Forms.ComboBox revCB;
-        private System.Windows.Forms.ComboBox moveTypeCB;
+        private System.Windows.Forms.Button radioButton;
     }
 }
 
