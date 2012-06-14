@@ -47,6 +47,8 @@ bcast_server: ${EC_DIR}/bcast_server.c ${EC_DIR}/bcast.h
 	${CC} ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -I${EC_DIR} ${EC_DIR}/bcast_server.c -o bcast_server
 
 atifirmware: 
+	date +mver=\"%Y%m%d\" > ../../../ati2/files/be_minor_version
+	cat ../../../ati2/files/make_minor_version >> ../../../ati2/files/be_minor_version
 	tar -cvzf atifirmware.tar *.ko *.arm ${BFILES} \
 			../../../ati2/files/be_* \
 			../../../ati2/files/has_* \
@@ -65,6 +67,7 @@ atifirmware:
 			../../../ati2/files/BASE \
 			../../../ati2/files/HHC \
 			../../../ati2/files/TTMT \
+			../../../ati2/files/atiradiotest.sh \
 			../../../sysvinit/sysvinit/inittab
 	cat extract.sh atifirmware.tar > atifirmware.sh
 	chmod +x atifirmware.sh
