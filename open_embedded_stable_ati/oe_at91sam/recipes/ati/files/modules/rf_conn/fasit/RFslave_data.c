@@ -4,6 +4,24 @@
 
 extern struct timespec elapsed_time, start_time, istart_time,delta_time; // global timers
 
+// cancel the outbound rf queue and everything that uses it
+void clearTxQ(rf_connection_t *rc) {
+   int i;
+   // reset tty output buffer
+   //DCMSG(RED, "id:%i idl:%i did:%i dlo:%3x dhi:%3x", rc->id_index, rc->id_lasttime_index,
+   //      rc->devid_index, rc->devid_last_low, rc->devid_last_high);
+   rc->tty_olen = 0;
+   // reset timeslot stuff
+   rc->id_index = -1;
+   for (i = 0; i < MAX_IDS; i++) {rc->ids[i] = -1;}
+   rc->id_lasttime_index = -1;
+   for (i = 0; i < MAX_IDS; i++) {rc->ids_lasttime[i] = -1;}
+   rc->devid_index = -1;
+   rc->devid_last_low = -1;
+   rc->devid_last_high = -1;
+   for (i = 0; i < MAX_IDS; i++) {rc->devids[i] = -1;}
+}
+
 // the start and end values may be set even if no valid message is found
 static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
    LB_packet_t *hdr;
@@ -115,7 +133,7 @@ int getTimeout(rf_connection_t *rc) {
       timestamp(&elapsed_time,&istart_time,&delta_time);
       DDCMSG(D_POINTER, MAGENTA, "Waited too long @ %3i.%03i (d:%i.%03i)", DEBUG_TS(elapsed_time), DEBUG_TS(delta_time));
       // flush output tty buffer because we missed our timeslot
-      rc->tty_olen = 0;
+      clearTxQ(rc);
       return INFINITE;
    }
 
@@ -303,6 +321,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
             // if we're tty, block no more
             if (tty) {
                setnonblocking(rc->tty, 0);
+               clearTxQ(rc);
             }
 
             return tty ? rem_ttyEpoll : rem_sockEpoll;
@@ -316,6 +335,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
       // if we're tty, block no more
       if (tty) {
          setnonblocking(rc->tty, 0);
+         clearTxQ(rc); // if we didn't write the whole thing, oh well, we had our chance
       }
 
       // don't try writing again
@@ -323,7 +343,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
    } else {
       // everything was written, clear write buffer
       if (tty) {
-         rc->tty_olen = 0;
+         clearTxQ(rc);
       } else {
          rc->sock_olen = 0;
       }
@@ -339,6 +359,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
       // don't try writing again
       return tty ? mark_ttyRead : mark_sockRead;
    }
+   // can't get here, all if/elses have returns...
 
    // make sure to pad the tty to at least MIN_WRITE bytes
    padTTY(rc, tty, s);
@@ -346,6 +367,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
    // if we're tty, block no more
    if (tty) {
       setnonblocking(rc->tty, 0);
+      clearTxQ(rc);
    }
 
    // partial success, leave writeable so we try again
@@ -468,7 +490,7 @@ void addAddrToLastIDs(rf_connection_t *rc, int addr) {
          }
       }
    } else {
-      DDCMSG(D_POINTER, BLUE, "adding fake @ index %i", rc->id_lasttime_index + 1);
+      //DDCMSG(D_POINTER, BLUE, "adding fake @ index %i", rc->id_lasttime_index + 1);
    }
 
    // add address to id list
@@ -829,11 +851,11 @@ int sock2tty(rf_connection_t *rc) {
          DDCMSG(D_T_SLOT, BLACK, "Looking at ts %i...", ts);
          if (rc->ids_lasttime[ts] == FAKE_DEVID) {
             fakes += (4*8); // 8 slots times 4, as 4 fakes count as a regular
-            DDCMSG(D_POINTER, BLUE, "chunk of fakes: %i", fakes);
+            //DDCMSG(D_POINTER, BLUE, "chunk of fakes: %i", fakes);
             continue; // move on...
          } else if (rc->ids_lasttime[ts] == FAKE_ID) {
             fakes++; // found another fake
-            DDCMSG(D_POINTER, BLUE, "another fake: %i", fakes);
+            //DDCMSG(D_POINTER, BLUE, "another fake: %i", fakes);
          }
          for (i = 0; i < min(rc->id_index+1, MAX_IDS); i++) {
             DDCMSG(D_T_SLOT, BLACK, "Looking at id_index %i...", i);
@@ -864,10 +886,10 @@ int sock2tty(rf_connection_t *rc) {
             break; // found our real slot
          } else if (rc->ids_lasttime[i] == FAKE_ID) {
             fakes++; // found another fake
-            DDCMSG(D_POINTER, BLUE, "another of fake: %i", fakes);
+            //DDCMSG(D_POINTER, BLUE, "another of fake: %i", fakes);
          } else {
             fakes += 4; // a regular counts as four fakes
-            DDCMSG(D_POINTER, BLUE, "chunk of fakes: %i", fakes);
+            //DDCMSG(D_POINTER, BLUE, "chunk of fakes: %i", fakes);
          }
       }
       ts = 0xffff; // start off as a really big number

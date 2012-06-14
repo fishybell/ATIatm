@@ -588,7 +588,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                remain_time = elapsed_time;
                xmit_time += rtime; // set a future time that is our earliest time allowed to select
                remain_time += remaining_time; // set a future time that is our earliest time allowed to select
-               DDCMSG(D_NEW,CYAN,"Just might have Tx'ed to RF   at %3i.%03i timestamp, xmit=%3i.%03i, remain=%3i.%03i"
+               DDCMSG(D_TIME,CYAN,"Just might have Tx'ed to RF   at %3i.%03i timestamp, xmit=%3i.%03i, remain=%3i.%03i"
                       , DEBUG_MS(elapsed_time), DEBUG_MS(xmit_time), DEBUG_MS(remain_time));
             }
 #if 0 /* old queue code */
@@ -737,6 +737,12 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
             DCMSG(GRAY, "->RF Rx %i bytes", gotrf);
          }
          DDpacket(Rptr, gotrf);
+         // we change xmit time whether it was us or someone else who transmitted
+         CURRENT_TIME(elapsed_time);
+         xmit_time = elapsed_time;
+         xmit_time += rtime; // set a future time that is our earliest time allowed to select
+         DDCMSG(D_TIME,RED,"Reset xmit after RF   at %3i.%03i timestamp, xmit=%3i.%03i"
+                      , DEBUG_MS(elapsed_time), DEBUG_MS(xmit_time));
 
          // after gathering RF data, we're free, tell the Radio Interface client
          //DDCMSG(D_NEW,BLACK,"RFmaster got to here 1...");

@@ -63,6 +63,8 @@ int getTimeout(rf_connection_t *rc); // returns the timeout value to pass to epo
 void doTimeAfter(rf_connection_t *rc, int msecs); // set the timeout for X milliseconds after the start time
 void waitRest(rf_connection_t *rc); // wait until the timeout time arrives (the epoll timeout will get us close)
 
+// cancel the outbound rf queue and everything that uses it
+void clearTxQ(rf_connection_t *rc);
 
 // read/write function helpers
 int rcRead(rf_connection_t *rc, int tty); // if tty is 1, read data from tty into buffer, otherwise read data from socket into buffer

@@ -41,6 +41,7 @@ void print_help(int exval) {
    printf("  -s 150        slottime in ms (5ms granules, 1275 ms max\n");
    printf("  -d 0x20       Lowest devID to find\n");
    printf("  -D 0x30       Highest devID to find\n");
+   printf("  -H            Hunt forever. Only use for debugging.\n");
    print_verbosity();
    exit(exval);
 }
@@ -116,6 +117,7 @@ int main(int argc, char **argv) {
    struct timespec elapsed_time, start_time, istart_time,delta_time, dwait_time;
    int tempslot = 0; // keep track if of what we're adding to our timeout based on having the slavehunt not overlap normal commands:requests
    int mit_length, mat_length, mit_home, mat_home, mit_end, mat_end;
+   int forever = 0;
 
    LB_packet_t *LB,LB_buf;
    LB_request_new_t *LB_new;
@@ -159,10 +161,14 @@ int main(int argc, char **argv) {
    RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");            // RFmaster server the MCP connects to
    RF_addr.sin_port = htons(4004);                              // RFmaster server port number
 
-   while((opt = getopt(argc, argv, "hv:m:r:i:p:f:s:d:D:t:q:Q:l:L:x:X:")) != -1) {
+   while((opt = getopt(argc, argv, "hHv:m:r:i:p:f:s:d:D:t:q:Q:l:L:x:X:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
+            break;
+
+         case 'H':
+            forever = 1;
             break;
 
          case 'v':
@@ -361,7 +367,9 @@ int main(int argc, char **argv) {
             // the hunt is over, for now
             slave_hunting=1;
             low=low_dev;                // restart the hunt at the beginning
-            hunt_rotate = 1;
+            if (!forever) {
+               hunt_rotate = 1; // don't rotate if we're not hunting forever
+            }
          } 
 
          // reset our pseudo-burst slot value

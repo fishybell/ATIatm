@@ -375,15 +375,7 @@ int main(int argc, char **argv) {
          } else if (events[n].events & EPOLLOUT) {
             // rcWrite will push the data as quickly as possible
             done = handleRet(rcWrite(&rc, 1),&rc, efd); // 1 for tty
-            // reset timeslot stuff now
-            rc.id_index = -1;
-            for (i = 0; i < MAX_IDS; i++) {rc.ids[i] = -1;}
-            rc.id_lasttime_index = -1;
-            for (i = 0; i < MAX_IDS; i++) {rc.ids_lasttime[i] = -1;}
-            rc.devid_index = -1;
-            rc.devid_last_low = -1;
-            rc.devid_last_high = -1;
-            for (i = 0; i < MAX_IDS; i++) {rc.devids[i] = -1;}
+            clearTxQ(&rc);
          // reading?
          } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
             if (rc.packets < 0) { // is this the start of a fresh burst?
@@ -391,6 +383,7 @@ int main(int argc, char **argv) {
                // grab now time
                rc.nowt = getTime();
                rc.packets = 0; // in burst now
+               clearTxQ(&rc);
             }
 
             int ret = rcRead(&rc, 1); // 1 for child
