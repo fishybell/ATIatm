@@ -1,0 +1,4 @@
+echo -n "Enter Radio Frequency: "
+read radf
+size=$(echo $radf | wc -c)
+echo -n $radf | /usr/bin/eeprom_rw write -addr 0x500 -size $size -blank 0x4F
