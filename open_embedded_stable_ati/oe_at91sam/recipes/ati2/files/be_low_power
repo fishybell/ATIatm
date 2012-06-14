@@ -1,0 +1,4 @@
+echo -n "Enter Radio Low Power: "
+read lowp
+size=$(echo $lowp | wc -c)
+echo -n $lowp | /usr/bin/eeprom_rw write -addr 0x550 -size $size -blank 0x3
