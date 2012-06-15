@@ -1792,13 +1792,18 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J A %s\n", readEeprom(MAJOR_VERSION_LOC, MAJOR_VERSION_SIZE)); // reads and prints out what it read
                      }
                      break;
-               }
-               switch (cmd[arg1]) { 
                   case 'B': case 'b':	  // Reads and sets the partial flash version
                      if (arg3 > 1) { // are they passing in information?
                         snprintf(wbuf, 1024, "J B %s\n", writeEeprom(MINOR_VERSION_LOC, arg3, MINOR_VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
                         snprintf(wbuf, 1024, "J B %s\n", readEeprom(MINOR_VERSION_LOC, MINOR_VERSION_SIZE)); // reads and prints out what it read
+                     }
+                     break;
+                  case 'C': case 'c':	  // Will the radio reprogram?
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "J C %s\n", writeEeprom(RADIO_WRITTEN_LOC, arg3, RADIO_WRITTEN_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "J C %s\n", readEeprom(RADIO_WRITTEN_LOC, RADIO_WRITTEN_SIZE)); // reads and prints out what it read
                      }
                      break;
                }
@@ -1933,8 +1938,11 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'B': case 'b':
                                 snprintf(wbuf, 1024, "Get/Set Partial Flash Version\nFormat: J B <flash version>\n");
                                 break;
+                            case 'C': case 'c':
+                                snprintf(wbuf, 1024, "Get/Set Will the radio reprogram?\nFormat: J C (Y|N)\n");
+                                break;
                             default:
-                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ B: Partial Flash Version\n");
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ B: Partial Flash Version\nJ C: Program The Radio?\n");
                                 break;
                         }
                         break;
