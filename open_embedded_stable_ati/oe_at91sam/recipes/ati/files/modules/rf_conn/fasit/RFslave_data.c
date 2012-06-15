@@ -8,7 +8,8 @@ extern struct timespec elapsed_time, start_time, istart_time,delta_time; // glob
 void clearTxQ(rf_connection_t *rc) {
    int i;
    // reset tty output buffer
-   //DCMSG(RED, "id:%i idl:%i did:%i dlo:%3x dhi:%3x", rc->id_index, rc->id_lasttime_index,
+   //DCMSG(RED, "tty:%i id:%i idl:%i did:%i dlo:%3x dhi:%3x", rc->tty_olen,
+   //      rc->id_index, rc->id_lasttime_index,
    //      rc->devid_index, rc->devid_last_low, rc->devid_last_high);
    rc->tty_olen = 0;
    // reset timeslot stuff
@@ -55,7 +56,7 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          *start = *start + 1; continue; // invalid message length, or more likely, don't have all of the message yet
       }
       if (hdr->cmd == LBC_QUICK_GROUP) {
-         DCMSG(MAGENTA, "Found quick group message");
+         //DCMSG(MAGENTA, "Found quick group message");
          DDpacket((char*)hdr, RF_size(hdr->cmd));
       }
 
@@ -133,6 +134,7 @@ int getTimeout(rf_connection_t *rc) {
       timestamp(&elapsed_time,&istart_time,&delta_time);
       DDCMSG(D_POINTER, MAGENTA, "Waited too long @ %3i.%03i (d:%i.%03i)", DEBUG_TS(elapsed_time), DEBUG_TS(delta_time));
       // flush output tty buffer because we missed our timeslot
+      //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
       clearTxQ(rc);
       return INFINITE;
    }
@@ -321,6 +323,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
             // if we're tty, block no more
             if (tty) {
                setnonblocking(rc->tty, 0);
+      //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
                clearTxQ(rc);
             }
 
@@ -335,6 +338,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
       // if we're tty, block no more
       if (tty) {
          setnonblocking(rc->tty, 0);
+      //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
          clearTxQ(rc); // if we didn't write the whole thing, oh well, we had our chance
       }
 
@@ -343,6 +347,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
    } else {
       // everything was written, clear write buffer
       if (tty) {
+      //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
          clearTxQ(rc);
       } else {
          rc->sock_olen = 0;
@@ -367,6 +372,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
    // if we're tty, block no more
    if (tty) {
       setnonblocking(rc->tty, 0);
+      //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
       clearTxQ(rc);
    }
 
@@ -507,7 +513,7 @@ int t2s_handle_STATUS_REQ(rf_connection_t *rc, int start, int end) {
       addAddrToLastIDs(rc, pkt->addr);
    } else {
       for (i = 0; i < rc->quick_num; i++) {
-         DCMSG(CYAN, "Using quick address %i", rc->quick_addrs[i]);
+         //DCMSG(CYAN, "Using quick address %i", rc->quick_addrs[i]);
          addAddrToLastIDs(rc, rc->quick_addrs[i]); // add to list in order
       }
    }
@@ -607,7 +613,7 @@ int t2s_handle_QUICK_GROUP(rf_connection_t *rc, int start, int end) {
    LB_quick_group_t *pkt = (LB_quick_group_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_QUICK_GROUP(%8p, %i, %i)", rc, start, end);
    rc->quick_num = getItemsQR(pkt, rc->quick_addrs);
-   DCMSG(CYAN, "t2s_handle_QUICK_GROUP found %i addresses", rc->quick_num);
+   //DCMSG(CYAN, "t2s_handle_QUICK_GROUP found %i addresses", rc->quick_num);
    return doNothing;
 } 
 
@@ -616,7 +622,7 @@ int t2s_handle_QUICK_GROUP_BIG(rf_connection_t *rc, int start, int end) {
    LB_quick_group_big_t *pkt = (LB_quick_group_big_t *)(rc->tty_ibuf + start);
    DDCMSG(D_RF, CYAN, "t2s_handle_QUICK_GROUP_BIG(%8p, %i, %i)", rc, start, end);
    rc->quick_num = getItemsQR(pkt, rc->quick_addrs);
-   DCMSG(CYAN, "t2s_handle_QUICK_GROUP_BIG found %i addresses", rc->quick_num);
+   //DCMSG(CYAN, "t2s_handle_QUICK_GROUP_BIG found %i addresses", rc->quick_num);
    return doNothing;
 } 
 
@@ -649,6 +655,10 @@ int t2s_handle_REQUEST_NEW(rf_connection_t *rc, int start, int end) {
    // remember timeslot length
    rc->timeslot_init = pkt->inittime * 5; // convert to milliseconds
    rc->timeslot_length = pkt->slottime * 5; // convert to milliseconds
+
+   // keep track of this slot in the overall slot list
+   addAddrToLastIDs(rc, FAKE_DEVID);
+
    DDCMSG(D_T_SLOT|D_VERY, BLACK, "Setting timeslot stuff to %i %i", rc->timeslot_init, rc->timeslot_length);
 
    return doNothing;
@@ -723,11 +733,11 @@ int tty2sock(rf_connection_t *rc) {
          added_to_buf = 1;
          if (rc->quick_num > 0 && mnum != LBC_QUICK_GROUP && mnum != LBC_QUICK_GROUP_BIG) {
             // used quick group addresses
-            DCMSG(CYAN, "Cleared quick_num from being %i", rc->quick_num);
+            //DCMSG(CYAN, "Cleared quick_num from being %i", rc->quick_num);
             rc->quick_num = 0;
             DDpacket(rc->tty_ibuf + start, end - start);
          } else if (mnum == LBC_QUICK_GROUP || mnum == LBC_QUICK_GROUP_BIG) {
-            DCMSG(GRAY, "Ideally found quick num %i", rc->quick_num);
+            //DCMSG(GRAY, "Ideally found quick num %i", rc->quick_num);
             DDpacket(rc->tty_ibuf + start, end - start);
          }
       }
@@ -780,9 +790,6 @@ void addDevidToNowDevIDs(rf_connection_t *rc, int devid) {
    if (++rc->devid_index < MAX_IDS) {
       rc->devids[rc->devid_index] = devid;
    }
-
-   // keep track of this slot in the overall slot list
-   addAddrToLastIDs(rc, FAKE_DEVID);
 
    DDCMSG(D_MEGA, BLACK, "rc->devid_index %i", rc->devid_index);
 }
@@ -851,11 +858,11 @@ int sock2tty(rf_connection_t *rc) {
          DDCMSG(D_T_SLOT, BLACK, "Looking at ts %i...", ts);
          if (rc->ids_lasttime[ts] == FAKE_DEVID) {
             fakes += (4*8); // 8 slots times 4, as 4 fakes count as a regular
-            //DDCMSG(D_POINTER, BLUE, "chunk of fakes: %i", fakes);
+            DDCMSG(D_POINTER, GREEN, "chunk of fakes: %i", fakes);
             continue; // move on...
          } else if (rc->ids_lasttime[ts] == FAKE_ID) {
             fakes++; // found another fake
-            //DDCMSG(D_POINTER, BLUE, "another fake: %i", fakes);
+            DDCMSG(D_POINTER, GREEN, "another fake: %i", fakes);
          }
          for (i = 0; i < min(rc->id_index+1, MAX_IDS); i++) {
             DDCMSG(D_T_SLOT, BLACK, "Looking at id_index %i...", i);
@@ -886,10 +893,10 @@ int sock2tty(rf_connection_t *rc) {
             break; // found our real slot
          } else if (rc->ids_lasttime[i] == FAKE_ID) {
             fakes++; // found another fake
-            //DDCMSG(D_POINTER, BLUE, "another of fake: %i", fakes);
+            DDCMSG(D_POINTER, GREEN, "another of fake: %i", fakes);
          } else {
             fakes += 4; // a regular counts as four fakes
-            //DDCMSG(D_POINTER, BLUE, "chunk of fakes: %i", fakes);
+            DDCMSG(D_POINTER, GREEN, "chunk of fakes: %i", fakes);
          }
       }
       ts = 0xffff; // start off as a really big number

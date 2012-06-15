@@ -525,6 +525,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    // copy until for later potential sending over RF
    D_memcpy(&fc->f2102_resp, fc->fasit_ibuf+sizeof(FASIT_header)+start, sizeof(FASIT_2102));
    // remember target type
+   DCMSG(GRAY, "Got response from target");
    switch (fc->f2102_resp.body.type) {
       case Type_SIT:
          if (fc->has_MFS) {
@@ -595,6 +596,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    // check to see if we're waiting to send the information back
    if (fc->waiting_status_resp) {
       fc->waiting_status_resp = 0; // not waiting anymore
+      DCMSG(GRAY, "Going to send STATUS_RESP: %x", retval);
       return retval|send_STATUS_RESP(fc); // return appropriate information
    } else if (!added_rf_to_epoll) {
       added_rf_to_epoll = 1;

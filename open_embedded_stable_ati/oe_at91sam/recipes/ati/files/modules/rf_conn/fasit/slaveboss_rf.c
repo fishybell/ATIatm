@@ -41,7 +41,7 @@ static int packetForMe(fasit_connection_t *fc, int start) {
    int i, j;
    DDCMSG_HEXB(D_RF, RED, "RF packetForMe:", fc->rf_ibuf+start, fc->rf_ilen-start);
    if (hdr->cmd == LBC_QUICK_GROUP) {
-      DCMSG(MAGENTA, "Determined quick group message was for me");
+      //DCMSG(CYAN, "Determined quick group message was for me");
       DDpacket((char*)hdr, RF_size(hdr->cmd));
       return 1;
    }
@@ -60,12 +60,15 @@ static int packetForMe(fasit_connection_t *fc, int start) {
          }
       } else if (fc->target_type == RF_Type_Unknown) {
 DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %x", msg->low_dev);
+         //DCMSG(CYAN,"Ignored message %d because finished connection", hdr->cmd);
          return 0; // doesn't matter if I'm in the range or not, I've haven't finished connecting
       } else if (fc->id != 2047) {
 DDCMSG(D_RF,RED, "RF Packet ignored based on already having registered as %i: %x", fc->id, msg->low_dev);
+         //DCMSG(CYAN,"Ignored message %d because already registered as %i", hdr->cmd, fc->id);
          return 0; // have already registered
       }
 DDCMSG(D_RF,RED, "RF Packet outside my devid range: %x  OR forget bit not set OR our address %d not 2047", msg->low_dev,fc->id);
+         //DCMSG(CYAN,"Ignored message %d because outside dev range, forget bit, or etc.", hdr->cmd);
       return 0;
    } else if (hdr->cmd == LBC_ASSIGN_ADDR) {
       // special case: check devid match (ignore reregister bit if it still exists in packet)
@@ -75,13 +78,16 @@ DDCMSG(D_RF,RED, "RF Packet for my devid: %x:%x", msg->devid, fc->devid);
          return 1;
       } else if (fc->target_type == RF_Type_Unknown) {
 DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %x", msg->devid);
+         //DCMSG(CYAN,"Ignored message %d because not finished connection", hdr->cmd);
          return 0;
       } else if (msg->new_addr == fc->id) {
 DDCMSG(D_RF,RED, "RF Packet for someone else's devid: %x:%x, but for my addr %i", msg->devid, fc->devid, msg->new_addr);
          fc->id = 2047;
+         //DCMSG(CYAN,"Ignored message %d something got goofy with devids", hdr->cmd);
          return 0;
       } else {
 DDCMSG(D_RF,RED, "RF Packet for someone else's devid: %x:%x", msg->devid, fc->devid);
+         //DCMSG(CYAN,"Ignored message %d because not my devid", hdr->cmd);
          return 0;
       }
    }
@@ -91,7 +97,7 @@ DDCMSG(D_RF,RED, "RF Packet for me: %i", hdr->addr);
    }
    if (hdr->addr == fc->tg_id) {
 DDCMSG(D_RF,RED, "RF Packet for me (temp): %i", hdr->addr);
-      DCMSG(GRAY, "packetForMe used up temp address");
+      //DCMSG(GRAY, "packetForMe used up temp address");
       fc->tg_id = 2047; // we've used up the temp group
       return 1; // for me via a quick group temp group
    }
@@ -101,6 +107,7 @@ DDCMSG(D_RF,RED, "RF Packet for me (temp): %i", hdr->addr);
          for (j = 0; j<MAX_GROUPS; j++) {
             if (hdr->addr == fc->groups_disabled[j]) {
 DDCMSG(D_RF,RED, "RF Packet for disabled group %i", hdr->addr);
+         //DCMSG(CYAN,"Ignored message %d because for disabled group", hdr->cmd);
                return 0; // is one of my groups, but it's disabled
             }
          }
@@ -111,6 +118,7 @@ DDCMSG(D_RF,RED, "RF Packet for enabled group %i", hdr->addr);
 
    // not for me
 DDCMSG(D_RF,RED, "RF Packet for other listener %i:%i", hdr->addr, fc->id);
+         //DCMSG(CYAN,"Ignored message %d because for other listener %i, not me %i", hdr->cmd, hdr->addr, fc->id);
    return 0;
 }
 
@@ -253,7 +261,7 @@ static int validMessage(fasit_connection_t *fc, int *start, int *end) {
       *end = *start + hl;
       DDCMSG(D_RF,RED, "RF validMessage (cmd %i)", hdr->cmd);
       if (hdr->cmd == LBC_QUICK_GROUP) {
-         DCMSG(MAGENTA, "Found quick group message");
+         //DCMSG(MAGENTA, "Found quick group message");
          DDpacket((char*)hdr, RF_size(hdr->cmd));
       }
 
@@ -321,6 +329,7 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
          DDCMSG(D_RF,BLACK,"Ignored RF message %d",mnum);
       } else {
          DDCMSG(D_RF,BLACK,"Recieved RF message %d",mnum);
+         //DCMSG(GRAY,"Didn't ignore RF message %d",mnum);
          debugRF(RED, fc->rf_ibuf + start, end-start);
          if (fc->sleeping && mnum != LBC_POWER_CONTROL) {
             // ignore message when sleeping
@@ -361,6 +370,7 @@ int handle_STATUS_REQ(fasit_connection_t *fc, int start, int end) {
    // wait 'til we have the most up-to-date information to send
    fc->waiting_status_resp = 1;
    DDCMSG(D_RF|D_MEGA, BLACK, "#######################################\nWaiting: %i, Epoll: %i\n#######################################", fc->waiting_status_resp, added_rf_to_epoll);
+   //DCMSG(GRAY, "Trying to get response from target");
    return send_2100_status_req(fc); // gather latest information
 }
 
@@ -740,7 +750,9 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    fc->hit_hit = last_hh;
 #endif
    // send an appropriate number of event reports if I have any hits
+   //DCMSG(GRAY, "Sent status response: %x", retval);
    retval |= send_EVENT_REPORTs(fc);
+   //DCMSG(GRAY, "Possibly sent events: %x", retval);
    return retval;
 }
 
@@ -1083,18 +1095,18 @@ int handle_QUICK_GROUP(fasit_connection_t *fc, int start, int end) {
    int addrs[3*14], num;
    LB_quick_group_t *pkt = (LB_quick_group_t*)(fc->rf_ibuf + start);
    DDCMSG(D_RF|D_VERY,RED, "handle_QUICK_GROUP(%8p, %i, %i)", fc, start, end);
-   DCMSG(GRAY, "Before getItemsQR");
+   //DCMSG(GRAY, "Before getItemsQR");
    DDpacket((char*)pkt, RF_size(pkt->cmd));
    num = getItemsQR(pkt, addrs);
-   DCMSG(GRAY, "handle_QUICK_GROUP found %i addresses even though we should look at least at %i chunks", num, pkt->number);
+   //DCMSG(GRAY, "handle_QUICK_GROUP found %i addresses even though we should look at least at %i chunks", num, pkt->number);
    while (num-- > 0) {
       if (addrs[num] == fc->id) {
-         DCMSG(GRAY, "handle_QUICK_GROUP using temp address %i", pkt->temp_addr);
+         //DCMSG(GRAY, "handle_QUICK_GROUP using temp address %i", pkt->temp_addr);
          fc->tg_id = pkt->temp_addr;
          return doNothing;
       }
    }
-   DCMSG(GRAY, "what happened?");
+   //DCMSG(GRAY, "what happened?");
    DDpacket((char*)pkt, RF_size(pkt->cmd));
    return doNothing;
 }
@@ -1104,10 +1116,10 @@ int handle_QUICK_GROUP_BIG(fasit_connection_t *fc, int start, int end) {
    LB_quick_group_big_t *pkt = (LB_quick_group_big_t*)(fc->rf_ibuf + start);
    DDCMSG(D_RF|D_VERY,RED, "handle_QUICK_GROUP_BIG(%8p, %i, %i)", fc, start, end);
    num = getItemsQR(pkt, addrs);
-   DCMSG(GRAY, "handle_QUICK_GROUP_BIG found %i addresses", num);
+   //DCMSG(GRAY, "handle_QUICK_GROUP_BIG found %i addresses", num);
    while (num-- > 0) {
       if (addrs[num] == fc->id) {
-         DCMSG(GRAY, "handle_QUICK_GROUP_BIG using temp address %i", pkt->temp_addr);
+         //DCMSG(GRAY, "handle_QUICK_GROUP_BIG using temp address %i", pkt->temp_addr);
          fc->tg_id = pkt->temp_addr;
          return doNothing;
       }

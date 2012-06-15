@@ -375,6 +375,7 @@ int main(int argc, char **argv) {
          } else if (events[n].events & EPOLLOUT) {
             // rcWrite will push the data as quickly as possible
             done = handleRet(rcWrite(&rc, 1),&rc, efd); // 1 for tty
+      //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
             clearTxQ(&rc);
          // reading?
          } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
@@ -383,6 +384,7 @@ int main(int argc, char **argv) {
                // grab now time
                rc.nowt = getTime();
                rc.packets = 0; // in burst now
+      //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
                clearTxQ(&rc);
             }
 

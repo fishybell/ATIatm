@@ -388,6 +388,12 @@ FUNCTION_START("::handle_2100(int start, int end)")
          doContinuousMove(ntohf(msg->speed), 1);
          needPass = false; // don't pass this message to the attached SIT
          break;
+      case CID_Status_Request:
+         if (!hasSIT()) {
+            // if we don't have a sit, still respond to status requests
+            sendStatus2102();
+         }
+         break;
       case CID_MoveAway:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
          doMoveAway(ntohf(msg->speed), 1);
