@@ -155,6 +155,7 @@ enum {
    CID_Continuous_Move_Request = 181,/* not a standard FASIT value */
    CID_Hit_Count_Reset = 182,/* not a standard FASIT value */
    CID_Gohome = 183,/* not a standard FASIT value */
+   CID_MoveAway = 184,/* not a standard FASIT value */
 };
 
 /********************************************/

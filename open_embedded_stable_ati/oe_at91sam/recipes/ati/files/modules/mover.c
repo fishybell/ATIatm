@@ -217,6 +217,40 @@ delay_printk("Mover: returning rc: %i\n", rc);
 //---------------------------------------------------------------------------
 // netlink command handler for stop commands
 //---------------------------------------------------------------------------
+int nl_moveaway_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct nlattr *na;
+    int rc, value = 0;
+delay_printk("Mover: handling moveaway movement command\n");
+    
+    // get attribute from message
+    na = info->attrs[GEN_INT16_A_MSG]; // generic 16-bit message
+    if (na) {
+        // grab value from attribute
+        value = nla_get_u16(na);
+delay_printk("Mover: received value: %i\n", value);
+
+        mover_set_moveaway_move(value-32768); // unsigned value to signed speed (0 will coast)
+
+        // message creation success?
+        if (rc == 0) {
+            rc = HANDLE_SUCCESS;
+        } else {
+            delay_printk("Mover: could not create return message\n");
+            rc = HANDLE_FAILURE;
+        }
+    } else {
+        delay_printk("Mover: could not get attribute\n");
+        rc = HANDLE_FAILURE;
+    }
+delay_printk("Mover: returning rc: %i\n", rc);
+
+    // return to let provider send message back
+    return rc;
+}
+
+//---------------------------------------------------------------------------
+// netlink command handler for stop commands
+//---------------------------------------------------------------------------
 int nl_stop_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
     int rc, value = 0;
@@ -265,6 +299,7 @@ int nl_move_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
     int rc;
     u16 value = 0;
 delay_printk("Mover: handling move command\n");
+SENDUSERCONNMSG( "randy move_handler" );
     
     // get attribute from message
     na = info->attrs[GEN_INT16_A_MSG]; // generic 8-bit message
@@ -279,12 +314,14 @@ delay_printk("Mover: handling move command\n");
 
         // do something to the mover
         if (value == VELOCITY_STOP) {
+SENDUSERCONNMSG( "randy move_handler STOP" );
             // stop
             mover_set_speed_stop(); // -- this is emergency stop
 // report as requested stop
             move_faults(ERR_stop);
             // mover_speed_set(0); -- this is "coast" stop
         } else if (value == VELOCITY_REQ) {
+SENDUSERCONNMSG( "randy move_handler REQ" );
             // retrieve speed
             value = 32768+mover_speed_get(); // signed speed turned to unsigned byte
             rc = nla_put_u16(skb, GEN_INT16_A_MSG, value);
@@ -324,6 +361,7 @@ delay_printk("Mover: handling move command\n");
             // move
 //            enable_battery_check(0); // disable battery checking while motor is on
             delay_printk("NL_MOVE_HANDLER: value1: %d value2: %d\n", value, value-32768);
+SENDUSERCONNMSG( "randy move_handler value" );
             mover_set_move_speed(value-32768); // unsigned value to signed speed (0 will coast)
         }
 
@@ -592,6 +630,7 @@ static int __init Mover_init(void) {
         {NL_C_EVENT,     nl_event_handler},
         {NL_C_FAULT,     nl_fault_handler},
         {NL_C_CONTINUOUS, nl_continuous_handler},
+        {NL_C_MOVEAWAY, nl_moveaway_handler},
         {NL_C_GOHOME, nl_gohome_handler},
         {NL_C_HIT_CAL,   nl_hit_cal_handler},
         {NL_C_SLEEP,     nl_sleep_handler},

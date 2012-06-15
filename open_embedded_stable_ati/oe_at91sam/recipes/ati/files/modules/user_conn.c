@@ -2038,6 +2038,14 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         i ++;
                         snprintf(wbuf, 1024, "Continuous Move Request [%s]\n", cmd+i);
                         write(client, wbuf, strnlen(wbuf,1024));
+                    } else if (cmd[1] == 'A' || cmd[1] == 'a') {
+                        nl_cmd = NL_C_MOVEAWAY;
+                        nlmsg_free(msg);
+                        msg = nlmsg_alloc();
+                        genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, nl_cmd, 1);
+                        i ++;
+                        snprintf(wbuf, 1024, "Move AWAY Request [%s]\n", cmd+i);
+                        write(client, wbuf, strnlen(wbuf,1024));
                     }
                     if (sscanf(cmd+i, "%f", &farg1) == 1) {
 						farg1 = farg1*10;	// muliplied to work with floats in target_mover_generic

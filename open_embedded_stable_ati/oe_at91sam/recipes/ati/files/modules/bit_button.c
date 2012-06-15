@@ -179,7 +179,7 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
     // Step 15  - Move @ 3 mph
     // Step 16 - Wait for stopped
     const char *scen = "\
-     {Send;R_MOVER;NL_C_MOVE;1;1080} \
+     {Send;R_MOVER;NL_C_MOVEAWAY;1;1080} \
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
      {SetVarLast;1;;;} \
@@ -194,7 +194,7 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
      {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
      {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
      {Send;R_LIFTER;NL_C_EXPOSE;1;01} \
-     {Send;R_MOVER;NL_C_MOVE;1;EA7F} \
+     {Send;R_MOVER;NL_C_MOVEAWAY;1;EA7F} \
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
      {Send;R_LIFTER;NL_C_EXPOSE;1;00} \
      {DoWait;%s;EVENT_DOWN;15000;%s} \
@@ -332,6 +332,159 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
     nlmsg_free(msg);
 }
 
+// bit test long for mover
+void handle_bit_test_short_mover(struct nl_handle *handle, int is_on) {
+    // build scenario
+    // TODO -- thermals
+    // Step 1  - Move @ 1.5 mph
+    // Step 2  - Wait for stopped
+    // Step 3  - Get mfs state and wait for response
+    // Step 4  - Set register 1 to the received value
+    // Step 5  - Get exposure status and wait for response
+    // Step 6  - Set register 0 to the received value
+    // Step 7  - If register 0 is equal to "exposed", conceal, wait for conceal
+    //         - If not, nothing
+    // Step 8  - Enable MFS in burst mode
+    // Step 9  - Expose
+    // Step 10 - Move @ -3 mph
+    // Step 11 - Wait for stopped
+    // Step 12 - Conceal
+    // Step 13 - Wait for conceal
+    // Step 14 - Reset mfs state
+    // Step 15  - Move @ 3 mph
+    // Step 16 - Wait for stopped
+    const char *scen = "\
+     {Send;R_MOVER;NL_C_MOVEAWAY;1;1080} \
+     {DoWait;%s;EVENT_STOPPED;15000;%s} \
+     {Send;R_MOVER;NL_C_MOVEAWAY;1;EA7F} \
+     {DoWait;%s;EVENT_STOPPED;15000;%s} \
+     ";
+#if 0
+    const char *scen = "\
+     {SetVarLast;4;;;}                         -- Set response value to register 4 \
+     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request Thermal state (installed below, \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s}       -- Enable Thermal (data installed below) \
+     {Send;R_MOVER;NL_C_MOVE;1;1080}           -- Move @ 1.5 mph (inverted byte order of 0x800f : 0x8000 + 15) \
+     {DoWait;%s;EVENT_STOPPED;15000;%s}        -- Wait 15 seconds for stop (cmd installed below)\
+     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request MFS state (installed below, timeout of 1/2 second) \
+     {SetVarLast;1;;;}                         -- Set response value to register 1 \
+     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request MGL state (installed below, \
+     {SetVarLast;2;;;}                         -- Set response value to register 2 \
+     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request PHI state (installed below, \
+     {SetVarLast;3;;;}                         -- Set response value to register 3 \
+     {SendWait;R_LIFTER;NL_C_EXPOSE;FF;500}    -- Send 'Get Exposure' to lifter (timeout of 1/2 second) \
+     {SetVarLast;0;;;}                         -- Set response value to register 0 \
+     {If;0;01;%s;%s}                           -- If register 0 is '01', conceal (installed below) \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s}       -- Enable MFS (data installed below) \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s}       -- Enable MGL (data installed below) \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s}       -- Enable PHI (data installed below) \
+     {Send;R_LIFTER;NL_C_EXPOSE;1;01}          -- Send Expose to lifter \
+     {Send;R_MOVER;NL_C_MOVE;1;EA7F}           -- Move @ -3 mph (inverted byte order of 0x7fe2 : 0x8000 - 30) \
+     {DoWait;%s;EVENT_STOPPED;15000;%s}        -- Wait 15 seconds for stop (cmd installed below)\
+     {Send;R_LIFTER;NL_C_EXPOSE;1;00}          -- Send Conceal to lifter \
+     {DoWait;%s;EVENT_DOWN;15000;%s}           -- Wait 15 seconds for conceal (installed below) \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_1}    -- Set MFS to old state \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_2}    -- Set MGL to old state \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_3}    -- Set PHI to old state \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_4}    -- Set Thermal to old state \
+     {Send;R_MOVER;NL_C_MOVE;1;1080}           -- Move @ 3 mph (inverted byte order of 0x80e1 : 0x8000 + 30) \
+     {DoWait;%s;EVENT_STOPPED;15000;%s}        -- Wait 15 seconds for stop (cmd installed below) \
+     ";
+#endif
+    const char *scen2 = "\
+      {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
+      {DoWait;%s;EVENT_DOWN;15000;%s}  -- Wait 15 seconds for conceal (installed below)";
+
+    char scen_buf[2048];
+    char hex_buf_1[256];
+    char hex_buf_2[256];
+    char hex_buf_3[256];
+    char hex_buf_4[256];
+    char hex_buf_5[256];
+    char hex_buf_6[256];
+    char hex_buf_7[256];
+    char hex_buf_8[256];
+    char nothing_buf[256];
+    char conceal_buf[256];
+    char conceal_msg[256];
+    struct accessory_conf acc_c;
+    // build internal "Nothing" message
+    escape_scen_call("{Nothing;;;;}", 13, nothing_buf);
+// printf("nothing_buf (%i): %s\n", strlen(nothing_buf), nothing_buf); fflush(stdout);
+    // build internal "Conceal, wait for conceal" message
+    snprintf(conceal_buf, 256, scen2, nothing_buf, nothing_buf);
+// printf("conceal_buf (%i): %s\n", strlen(conceal_buf), conceal_buf); fflush(stdout);
+    escape_scen_call(conceal_buf, strnlen(conceal_buf,256), conceal_msg);
+// printf("conceal_msg (%i): %s\n", strlen(conceal_msg), conceal_msg); fflush(stdout);
+    // build accessory configuration message
+    memset(&acc_c, 0, sizeof(acc_c));
+    acc_c.acc_type  = ACC_NES_MFS;
+    acc_c.request = 1;      // this is a request
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_1); // use helper function to build scenario
+// printf("hex_buf_1 (%i): %s\n", strlen(hex_buf_1), hex_buf_1); fflush(stdout);
+    acc_c.request = 0;      // not a request
+    acc_c.on_exp = 1;       // on
+    acc_c.on_kill = 2;      // 2 = deactivate on kill
+    acc_c.ex_data1 = 1;     // do burst
+    acc_c.ex_data2 = 5;     // burst 5 times
+    acc_c.on_time = 15;     // on 15 milliseconds
+    acc_c.off_time = 85;    // off 85 milliseconds
+    acc_c.repeat_delay = 5; // when burst, burst every 5 half-seconds
+    acc_c.repeat = 63;      // infinite repeat
+    acc_c.start_delay = 1;  // start after 1 half-seconds
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_2); // use helper function to build scenario
+
+    // MGL
+    memset(&acc_c, 0, sizeof(acc_c));
+    acc_c.acc_type  = ACC_NES_MGL;
+    acc_c.request = 1;      // this is a request
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_3); // use helper function to build scenario
+// printf("hex_buf_1 (%i): %s\n", strlen(hex_buf_1), hex_buf_1); fflush(stdout);
+    acc_c.request = 0;      // not a request
+    acc_c.on_exp = 1;       // on
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_4); // use helper function to build scenario
+
+   // PHI
+    memset(&acc_c, 0, sizeof(acc_c));
+    acc_c.acc_type  = ACC_NES_PHI;
+    acc_c.request = 1;      // this is a request
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_5); // use helper function to build scenario
+// printf("hex_buf_1 (%i): %s\n", strlen(hex_buf_1), hex_buf_1); fflush(stdout);
+    acc_c.request = 0;      // not a request
+    acc_c.on_exp = 1;       // on
+    acc_c.on_hit = 1;		// deactivate on hit
+    acc_c.on_kill = 1;		// deactivate on kill
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_6); // use helper function to build scenario
+
+    // Thermal
+    memset(&acc_c, 0, sizeof(acc_c));
+    acc_c.acc_type  = ACC_THERMAL;
+    acc_c.request = 1;      // this is a request
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_7); // use helper function to build scenario
+// printf("hex_buf_1 (%i): %s\n", strlen(hex_buf_1), hex_buf_1); fflush(stdout);
+    acc_c.request = 0;      // not a request
+    acc_c.on_exp = 1;       // on
+    hex_encode_attr((void*)&acc_c, sizeof(acc_c), hex_buf_8); // use helper function to build scenario
+
+// printf("hex_buf_2 (%i): %s\n", strlen(hex_buf_2), hex_buf_2); fflush(stdout);
+    // format scenario with hex buffers, conceal message, and nothing buffer
+    snprintf(scen_buf, 4096, scen, nothing_buf, nothing_buf,
+                                   nothing_buf, nothing_buf);
+
+// printf("scen_buf (%i): %s\n", strlen(scen_buf), scen_buf); fflush(stdout);
+    // send scenario
+    struct nl_msg *msg;
+    msg = nlmsg_alloc();
+    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_SCENARIO, 1);
+    nla_put_string(msg, GEN_STRING_A_MSG, scen_buf);
+
+    // Send message over netlink handle
+    nl_send_auto_complete(handle, msg);
+
+    // Free message
+    nlmsg_free(msg);
+}
+
 // bit button has been pressed (long-press)
 void handle_bit_test_long(struct nl_handle *handle, int is_on) {
    switch (ROLE) {
@@ -346,21 +499,22 @@ void handle_bit_test_long(struct nl_handle *handle, int is_on) {
 
 // bit button might have been pressed, do the short test for the lifter or the mover
 void handle_bit_test(struct nl_handle *handle, int is_on) {
-printf("--------handle_bit_test-------\n");
+//printf("---shelly----handle_bit_test-------\n");
 
     switch (ROLE) {
        case R_LIFTER:
           handle_bit_lifter(handle, is_on);
           break;
        case R_MOVER:
-          handle_bit_move(handle, BIT_GOTO_DOCK);
+//          handle_bit_move(handle, BIT_GOTO_DOCK);
+          handle_bit_test_short_mover(handle, is_on);
           break;
     }
 }
 
 // bit button might have been pressed, move the lifter up or down
 void handle_bit_lifter(struct nl_handle *handle, int is_on) {
-printf("--------handle_bit_lifter-------\n");
+//printf("---shelly----handle_bit_lifter-------\n");
 
     // toggle lifter position
     struct nl_msg *msg;
@@ -376,11 +530,11 @@ printf("--------handle_bit_lifter-------\n");
 }
 
 void handle_bit_move(struct nl_handle *handle, int type) {
-printf("--------handle_bit_move-------\n");
+//printf("---shelly-----handle_bit_move-------\n");
     // move button pressed? send the correct command back to the kernel
     struct nl_msg *msg;
     msg = nlmsg_alloc();
-    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_SLEEP, 1);
+    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_MOVEAWAY, 1);
 
     //mover_sleep_set(DOCK_COMMAND);
     // fill with the correct movement data
@@ -398,7 +552,8 @@ printf("--------handle_bit_move-------\n");
             nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
             break;
         case BIT_GOTO_DOCK:
-            nla_put_u8(msg, GEN_INT8_A_MSG, 3);  // 3 is the command to dock
+            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 20); // fwd at 1.5 mph
+//            nla_put_u8(msg, GEN_INT8_A_MSG, 3);  // 3 is the command to dock
             break;
     }
 

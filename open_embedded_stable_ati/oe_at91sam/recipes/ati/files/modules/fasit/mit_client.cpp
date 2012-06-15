@@ -388,6 +388,11 @@ FUNCTION_START("::handle_2100(int start, int end)")
          doContinuousMove(ntohf(msg->speed), 1);
          needPass = false; // don't pass this message to the attached SIT
          break;
+      case CID_MoveAway:
+		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
+         doMoveAway(ntohf(msg->speed), 1);
+         needPass = false; // don't pass this message to the attached SIT
+         break;
    }
 
    // pass lift commands to SIT
@@ -622,6 +627,27 @@ FUNCTION_START("::doContinuousMove()")
       nl_conn->doContinuousMove();
    }
 FUNCTION_END("::doContinuousMove()")
+}
+
+// start movement or change movement
+void MIT_Client::doMoveAway(float speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
+FUNCTION_START("::doMoveAway(float speed, int direction)")
+   DMSG("Moving %f %i\n", speed, direction);
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doMoveAway(speed, direction);
+   }
+FUNCTION_END("::doMoveAway(float speed, int direction)")
+}
+
+// retrieve movement values
+void MIT_Client::doMoveAway() {
+FUNCTION_START("::doMoveAway()")
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doMoveAway();
+   }
+FUNCTION_END("::doMoveAway()")
 }
 
 // current direction value
@@ -932,6 +958,25 @@ FUNCTION_START("::doContinuousMove()")
    queueMsgU16(NL_C_CONTINUOUS, 0);
 
 FUNCTION_END("::doContinuousMove()")
+}
+
+// start movement or change movement
+void MIT_Conn::doMoveAway(float speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
+FUNCTION_START("::doMoveAway(float speed, int direction)")
+   DCMSG(GREEN, "MIT_Conn doMoveAway - speed: %f", speed);
+   // Queue command
+   queueMsgU16(NL_C_MOVEAWAY, 32768+(speed*10));  //speed * 10
+
+FUNCTION_END("::doMoveAway(float speed, int direction)")
+}
+
+// retrieve movement values
+void MIT_Conn::doMoveAway() {
+FUNCTION_START("::doMoveAway()")
+   // Queue command
+   queueMsgU16(NL_C_MOVEAWAY, 0);
+
+FUNCTION_END("::doMoveAway()")
 }
 
 // shutdown device

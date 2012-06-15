@@ -15,6 +15,9 @@ extern int mover_set_move_speed(int speed); // in whole mph
 // set current speed (positive/negative for direction)
 extern int mover_set_continuous_move(int speed); // in whole mph
 
+// set current speed (positive/negative for direction)
+extern int mover_set_moveaway_move(int speed); // in whole mph
+
 // immediate stop (set to 0 will coast to a stop)
 extern int mover_set_speed_stop(void);
 

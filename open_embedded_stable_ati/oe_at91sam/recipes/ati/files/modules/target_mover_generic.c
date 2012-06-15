@@ -2163,6 +2163,38 @@ int mover_set_continuous_move(int c) {
 }
 EXPORT_SYMBOL(mover_set_continuous_move);
 
+int mover_set_moveaway_move(int c) {
+   int sensor, speed;
+   DELAY_PRINTK("mover_set_moveaway_move\n");
+   // check to see if we're sleeping or not
+   if (atomic_read(&sleep_atomic) == 1) {
+         return 0;
+   }
+   atomic_set(&find_dock_atomic, 0);
+   if (c != 0) {
+      speed = abs(c);
+      if (isMoverAtDock()){
+         if (dock_loc == 1) { // Dock on right
+            speed *= -1;
+         }
+      } else {
+         sensor = atomic_read(&last_sensor); // home sensor
+         if (sensor == MOVER_SENSOR_END) {
+            speed *= -1;
+         } else {
+            if (home_loc == 1) { // Home on right
+               speed *= -1;
+            }
+         }
+      }
+      mover_speed_set( speed );
+   } else {
+      mover_speed_stop();
+   }
+   return 0;
+}
+EXPORT_SYMBOL(mover_set_moveaway_move);
+
 int mover_set_move_speed(int speed) {
    atomic_set(&continuous_speed, 0);
    atomic_set(&find_dock_atomic, 0);

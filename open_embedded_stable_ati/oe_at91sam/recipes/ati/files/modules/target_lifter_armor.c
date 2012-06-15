@@ -13,6 +13,10 @@
 
 #include "netlink_kernel.h"
 #include "fasit/faults.h"
+
+#define LIFTER_DIRECTION_STOP 0
+#define LIFTER_DIRECTION_UP 1
+#define LIFTER_DIRECTION_DOWN 2
 //---------------------------------------------------------------------------
 // #define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -59,6 +63,7 @@ static DEFINE_SPINLOCK(motor_lock);
 //---------------------------------------------------------------------------
 atomic_t operating_atomic = ATOMIC_INIT(FALSE);
 atomic_t at_conceal = ATOMIC_INIT(0);
+atomic_t motorDir = ATOMIC_INIT(LIFTER_DIRECTION_STOP);
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are fully initialized
@@ -131,6 +136,14 @@ void set_lift_callback(lift_event_callback handler, lift_event_callback faultHan
     }
 }
 EXPORT_SYMBOL(set_lift_callback);
+
+//---------------------------------------------------------------------------
+// Message filler handler for expose functions
+//---------------------------------------------------------------------------
+int pos_mfh(struct sk_buff *skb, void *pos_data) {
+    // the pos_data argument is a pre-made pos_event structure
+    return nla_put_u8(skb, GEN_INT8_A_MSG, *((int*)pos_data));
+}
 
 static void do_event(int etype) {
     if (lift_callback != NULL) {
@@ -258,7 +271,6 @@ static void bob_timeout_stop(void)
 //---------------------------------------------------------------------------
 static void bob_timeout_fire(unsigned long data)
     {
-    int readLimit;
     bob_timeout_stop();
     if (!atomic_read(&full_init))
         {
@@ -277,21 +289,27 @@ static int hardware_motor_on(int direction) {
    delay_printk("%s - %s()\n",TARGET_NAME, __func__);
     spin_lock_irqsave(&motor_lock, flags);
 
-    // turn everything off
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // forward neg off
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // reverse neg off
+    if (direction == LIFTER_POSITION_UP) {
+      atomic_set(&motorDir, LIFTER_DIRECTION_UP);
+    } else if (direction == LIFTER_POSITION_DOWN) {
+      atomic_set(&motorDir, LIFTER_DIRECTION_DOWN);
+    }
+    // turn off POS, turn on Ground
     at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);    // forward pos off
     at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);    // reverse pos off
+
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // forward neg on
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // reverse neg on
 
     if (direction == LIFTER_POSITION_UP) {
         delay_printk("%s - %s() - up\n",TARGET_NAME, __func__);
 
         if (atomic_read(&reverse) == TRUE) {
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// forward neg off
             at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// reverse pos on
-            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// reverse neg on
         } else {
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// reverse neg off
             at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// forward pos on
-            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// forward neg on
         }
         sensor_timeout_leave_start(direction);
         sensor_timeout_arrive_start(direction);
@@ -299,11 +317,11 @@ static int hardware_motor_on(int direction) {
         delay_printk("%s - %s() - down\n",TARGET_NAME, __func__);
 
         if (atomic_read(&reverse) == TRUE) {
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// reverse neg off
             at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// forward pos on
-            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// forward neg on
         } else {
+            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// forward neg off
             at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); 	// reverse pos on
-            at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); 	// reverse neg on
         }
         sensor_timeout_leave_start(direction);
         sensor_timeout_arrive_start(direction);
@@ -331,11 +349,12 @@ static int hardware_motor_off(void)
    delay_printk("%s - %s()\n",TARGET_NAME, __func__);
     spin_lock_irqsave(&motor_lock, flags);
 
-    // turn everything off
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // forward neg off
-    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // reverse neg off
+    atomic_set(&motorDir, LIFTER_DIRECTION_STOP);
+    // turn off POS, turn on Ground
     at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);    // forward pos off
     at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);    // reverse pos off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // forward neg off
+    at91_set_gpio_value(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);    // reverse neg off
 
     spin_unlock_irqrestore(&motor_lock, flags);
     return 0;
@@ -398,6 +417,12 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
     
+    if (atomic_read(&motorDir) == LIFTER_DIRECTION_UP)
+        {
+        // ...then ignore switch
+        return IRQ_HANDLED;
+        }
+
     
 	// We get an interrupt on both edges, so we have to check to which edge
     // we are responding.
@@ -424,7 +449,6 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
             atomic_set(&at_conceal, 0);
             bob_timeout_start();
          }
-
         }
     else
     	{
@@ -445,6 +469,12 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
     
+    if (atomic_read(&motorDir) == LIFTER_DIRECTION_DOWN)
+        {
+        // ...then ignore switch
+        return IRQ_HANDLED;
+        }
+
    
 	// We get an interrupt on both edges, so we have to check to which edge
     // we are responding.
@@ -483,10 +513,11 @@ static int hardware_init(void)
     int status = 0;
 
     // Configure motor gpio for output and set initial output
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); // forward neg off
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); // reverse neg off
+    // turn off POS, turn on Ground
     at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // forward pos off
     at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE); // reverse pos off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); // forward neg off
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE); // reverse neg off
 
     // Configure as reverse polarity or normal polarity
     at91_set_gpio_input(INPUT_MOVER_TEST_BUTTON_FWD, INPUT_MOVER_TEST_BUTTON_PULLUP_STATE);
@@ -542,11 +573,13 @@ static int hardware_init(void)
 //---------------------------------------------------------------------------
 static int hardware_exit(void)
     {
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
-    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, !OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
-
+    // turn off POS, turn on Ground
     at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);
     at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_POS, !OUTPUT_LIFTER_MOTOR_POS_ACTIVE_STATE);
+
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_REV_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
+    at91_set_gpio_output(OUTPUT_LIFTER_MOTOR_FWD_NEG, OUTPUT_LIFTER_MOTOR_NEG_ACTIVE_STATE);
+
 
     free_irq(INPUT_LIFTER_POS_DOWN_LIMIT, NULL);
     free_irq(INPUT_LIFTER_POS_UP_LIMIT, NULL);
@@ -761,14 +794,6 @@ struct target_device target_device_lifter_armor =
     .dev       = NULL,
     .get_attr_group = armor_lifter_get_attr_group,
     };
-
-//---------------------------------------------------------------------------
-// Message filler handler for expose functions
-//---------------------------------------------------------------------------
-int pos_mfh(struct sk_buff *skb, void *pos_data) {
-    // the pos_data argument is a pre-made pos_event structure
-    return nla_put_u8(skb, GEN_INT8_A_MSG, *((int*)pos_data));
-}
 
 //---------------------------------------------------------------------------
 // Work item to notify the user-space about a position change or error

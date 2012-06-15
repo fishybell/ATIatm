@@ -37,6 +37,8 @@ public :
    void doHitCal(struct hit_calibration hit_c);  // so we know the kill reaction
    void doContinuousMove(float speed, int direction); // start movement or change movement
    void doContinuousMove(); // retrieve movement values
+   void doMoveAway(float speed, int direction); // start movement or change movement
+   void doMoveAway(); // retrieve movement values
    void didMove(float speed, int direction); // current direction value
    void doBattery(); // retrieve battery value
    void didBattery(int val); // current battery value
@@ -156,6 +158,8 @@ public:
    void doHitCal(struct hit_calibration hit_c);  // so we know the kill reaction
    void doContinuousMove(float speed, int direction); // start movement or change movement
    void doContinuousMove(); // retrieve movement values
+   void doMoveAway(float speed, int direction); // start movement or change movement
+   void doMoveAway(); // retrieve movement values
    void doBattery(); // retrieve battery value
    void doStop(); // immediate stop (stops accessories as well)
    void didStop(); // received immediate stop response
