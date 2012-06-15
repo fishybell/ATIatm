@@ -194,7 +194,7 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
      {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
      {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
      {Send;R_LIFTER;NL_C_EXPOSE;1;01} \
-     {Send;R_MOVER;NL_C_MOVEAWAY;1;EA7F} \
+     {Send;R_MOVER;NL_C_MOVEAWAY;1;1080} \
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
      {Send;R_LIFTER;NL_C_EXPOSE;1;00} \
      {DoWait;%s;EVENT_DOWN;15000;%s} \
@@ -356,7 +356,7 @@ void handle_bit_test_short_mover(struct nl_handle *handle, int is_on) {
     const char *scen = "\
      {Send;R_MOVER;NL_C_MOVEAWAY;1;1080} \
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
-     {Send;R_MOVER;NL_C_MOVEAWAY;1;EA7F} \
+     {Send;R_MOVER;NL_C_MOVEAWAY;1;1080} \
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
      ";
 #if 0

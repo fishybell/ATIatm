@@ -2171,6 +2171,7 @@ int mover_set_moveaway_move(int c) {
          return 0;
    }
    atomic_set(&find_dock_atomic, 0);
+   atomic_set(&continuous_speed, 0);
    if (c != 0) {
       speed = abs(c);
       if (isMoverAtDock()){
@@ -2178,8 +2179,8 @@ int mover_set_moveaway_move(int c) {
             speed *= -1;
          }
       } else {
-         sensor = atomic_read(&last_sensor); // home sensor
-         if (sensor == MOVER_SENSOR_END) {
+         sensor = atomic_read(&last_sensor);
+         if (sensor == MOVER_SENSOR_END) { // On right
             speed *= -1;
          } else {
             if (home_loc == 1) { // Home on right
