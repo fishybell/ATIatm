@@ -563,7 +563,7 @@ typedef enum rf_target_type {
 #define FAST_TIME             40  /* 4 seconds */
 #define FAST_RESPONSE_TIME    90  /* 9 seconds */
 #define SLOW_SOON_TIME        5   /* 1/2 second */
-#define SLOW_TIME             250 /* 25 seconds */
+#define SLOW_TIME             600 /* 1 minute */
 #define SLOW_RESPONSE_TIME    90  /* 9 seconds */
 #define EVENT_SOON_TIME       5   /* 1/2 second */
 #define TRANSMISSION_TIME     4   /* 4/10 second */
@@ -572,6 +572,9 @@ typedef enum rf_target_type {
 #define HSAT_TRANSITION_TIME  115 /* 11 1/2 second */
 #define MIT_MOVE_START_TIME   8   /* 4/5 second */
 #define MAT_MOVE_START_TIME   120 /* 12 seconds */
+
+#define RF_BURST_DELAY 150 /* the amount of time to wait between sending bursts of data */
+#define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
 #define FAST_TIME_MAX_MISS 800 /* maximum value of the "missed message" counter */

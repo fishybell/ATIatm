@@ -46,8 +46,6 @@ void print_help(int exval) {
    exit(exval);
 }
 
-#define RF_MASTER_DELAY 200 /* the amount of time to wait for the RFmaster to receive the data and send it */
-
 #define EXIT(_e) { \
    DCMSG(RED, "\n\nExiting MCP on line %i, current errno: %i", __LINE__, errno); \
    exit(_e); \
@@ -381,7 +379,7 @@ int main(int argc, char **argv) {
          } else {
             timeout=slottime*10;        // idle time to wait for next go around
          }
-         timeout+=(inittime + RF_MASTER_DELAY); // add initial time and just a little bit more so the RFmaster can keep up (RFmaster will collect messages for 200ms minimum)
+         timeout+=(inittime + RF_COLLECT_DELAY); // add initial time and just a little bit more so the RFmaster can keep up (RFmaster will collect messages for 200ms minimum)
          // adjust dwait_time to the time to nothing, as we haven't waited anything yet
          dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
 

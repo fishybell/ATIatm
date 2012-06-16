@@ -717,6 +717,8 @@ int tty2sock(rf_connection_t *rc) {
             rc->timeout_end = rc->nowt; // reset end time as well
             DDCMSG(D_TIME, BLACK, "Clock changed to %9ld", rc->time_start);
 
+            //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
+            clearTxQ(rc);
             use_command = 0; // don't send this command on to slaveboss
          }  break;
          default:

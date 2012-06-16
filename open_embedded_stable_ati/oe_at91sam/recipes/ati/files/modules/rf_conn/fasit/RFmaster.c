@@ -156,6 +156,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
    struct epoll_event ev, events[MAX_EVENTS]; // temporary event, main event list
    int efd, nfds, n; // file descriptors for sockets
    int ep_rf, ep_mcp, ep_ris, ep_ric; // fds marked as ready in epoll
+   int old_xmit_time=0;
 
    // setup epoll
    efd = epoll_create(MAX_CONNECTIONS);
@@ -215,6 +216,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
 #define CURRENT_TIME(ts) { \
    clock_gettime(CLOCK_MONOTONIC,&temp_time); \
    ts = ts2ms(&temp_time); \
+   /*DCMSG(RED, "Getting time @ %s:%i := %3i.%03i = %3i.%03i", __FILE__, __LINE__, DEBUG_TS(temp_time), DEBUG_MS(ts));*/ \
 }
 
    while(!close_nicely) {
@@ -244,15 +246,14 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
        */
 
 
-      CURRENT_TIME(elapsed_time);
       DDCMSG(D_TIME,YELLOW,"before select remaining_time=%i  Rx[%i] Tx[%i] @ time %3i.%03i"
              ,remaining_time,queueLength(Rx),queueLength(Tx), DEBUG_MS(elapsed_time));
       DDqueue(D_MEGA|D_POINTER, Rx, "top of loop"); 
       DDqueue(D_MEGA|D_POINTER, Tx, "top of loop"); 
 
       // find out how much time to sleep based on a) not transmitting without having collected for a minimum amount of time and b) not transmitting more often than X milliseconds c) not transmitting over our need to wait for results and
-      CURRENT_TIME(elapsed_time);
 
+      CURRENT_TIME(elapsed_time);
       // a)
       cdelta = collect_time - elapsed_time; // when we should be done collecting minus now
       if (cdelta > 0) {
@@ -278,10 +279,10 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
       }
 
       timeout_ms = max(0, timeout_ms); // a minimum of 0
+      DCMSG(GREEN, "Final timeout will be @ %3i.%03i", DEBUG_MS((timeout_ms+elapsed_time)));
       // if we don't have anything in the queue, don't timeout
       bytecount=queueLength(Rx);
       bytecount2=queueLength(Tx);
-      CURRENT_TIME(elapsed_time);
       if (bytecount <= 0 && mcpbuf_len <= 0) {
          DDCMSG(D_TIME, CYAN, "BEFORE_SELECT: in: %i, out: %i, mcp: %i, time=%3i.%03i, ctime=%3i.%03i, xtime=%3i.%03i, rtime=%3i.%03i, timeout=INFINITE", bytecount, bytecount2, mcpbuf_len, DEBUG_MS(elapsed_time), DEBUG_MS(collect_time), DEBUG_MS(xmit_time), DEBUG_MS(remain_time));
          // new epoll method
@@ -294,14 +295,10 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
          if (timeout_ms <= 0) {
             // will cause an immediate return if we're ready to send another burst
             DDCMSG(D_TIME,MAGENTA,"GOING TO RETURN IMMEDIATELY FROM SELECT (%i <= 0)", timeout_ms);
-            timeout.tv_sec=0;
-            timeout.tv_usec=0;
-         } else {
-            timeout.tv_sec = timeout_ms / 1000;
-            timeout.tv_usec = (timeout_ms % 1000) * 1000;
+            timeout_ms = 0;
          }
          // new epoll method
-         nfds = epoll_wait(efd, events, MAX_EVENTS, (timeout.tv_sec*1000) + (timeout.tv_usec/1000)); // calculate millisecond timeout
+         nfds = epoll_wait(efd, events, MAX_EVENTS, timeout_ms); // use millisecond timeout
 #if 0 /* old select method */      
          sock_ready=select(FD_SETSIZE,&rf_or_mcp,(fd_set *) 0,(fd_set *) 0, &timeout);
 #endif /* end of old select method */
@@ -499,8 +496,9 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                 ***********/
 
                DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%i]", tbuf_size);
-               DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %i+%i+(x*%i)", remaining_time, inittime, slottime);
-               remaining_time += (inittime*2) + (364*2); // add initial delay time (for beginning and end) and DTXM measured delay (for beggining and end)
+               DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %i+%i+(x*%i)", remaining_time, (inittime*2) + (RF_COLLECT_DELAY), slottime);
+               //remaining_time += (inittime*2) + (364*2); // add initial delay time (for beginning and end) and DTXM measured delay (for beggining and end)
+               remaining_time += (inittime*2) + (RF_COLLECT_DELAY);
 
                if (tbuf_size > RF_size(LBb->cmd)) {  // if we have something to Tx, Tx it.
                   CURRENT_TIME(elapsed_time);
@@ -581,15 +579,17 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                }
                CURRENT_TIME(elapsed_time);
                // adjust dwait_time to the time to nothing, as we haven't waited anything yet
-               if (elapsed_time - select_time < 350) {
-                  DDCMSG(D_TIME, RED, "Transmitted again before 350 milliseconds @ time %3i.%03i (last:%3i.%03i)", elapsed_time, select_time);
+               if (elapsed_time - select_time < RF_BURST_DELAY) {
+                  DDCMSG(D_TIME, RED, "Transmitted again before %i milliseconds @ time %3i.%03i (last:%3i.%03i)", RF_BURST_DELAY, elapsed_time, select_time);
                }
+               old_xmit_time = elapsed_time - old_xmit_time;
                xmit_time = elapsed_time;
                remain_time = elapsed_time;
                xmit_time += rtime; // set a future time that is our earliest time allowed to select
                remain_time += remaining_time; // set a future time that is our earliest time allowed to select
-               DDCMSG(D_TIME,CYAN,"Just might have Tx'ed to RF   at %3i.%03i timestamp, xmit=%3i.%03i, remain=%3i.%03i"
-                      , DEBUG_MS(elapsed_time), DEBUG_MS(xmit_time), DEBUG_MS(remain_time));
+               DDCMSG(D_TIME,GRAY,"Just might have Tx'ed to RF   at %3i.%03i timestamp, xmit=%3i.%03i, remain=%3i.%03i (time between = %3i.%03i)"
+                      , DEBUG_MS(elapsed_time), DEBUG_MS(xmit_time), DEBUG_MS(remain_time), DEBUG_MS(old_xmit_time));
+               old_xmit_time = elapsed_time;
             }
 #if 0 /* old queue code */
             } else {
@@ -734,15 +734,16 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
          if (gotrf <= 0) {
             DDCMSG(D_NEW,GRAY,"RFmaster RF Received no data: %p %i", riclient, gotrf);
          } else {
-            DCMSG(GRAY, "->RF Rx %i bytes", gotrf);
+            CURRENT_TIME(elapsed_time);
+            DCMSG(GRAY, "->RF Rx %i bytes @ %3i.%03i", gotrf, DEBUG_MS(elapsed_time));
          }
          DDpacket(Rptr, gotrf);
          // we change xmit time whether it was us or someone else who transmitted
          CURRENT_TIME(elapsed_time);
          xmit_time = elapsed_time;
          xmit_time += rtime; // set a future time that is our earliest time allowed to select
-         DDCMSG(D_TIME,RED,"Reset xmit after RF   at %3i.%03i timestamp, xmit=%3i.%03i"
-                      , DEBUG_MS(elapsed_time), DEBUG_MS(xmit_time));
+         //DDCMSG(D_TIME,RED,"Reset xmit after RF Rx at %3i.%03i timestamp, xmit=%3i.%03i"
+         //             , DEBUG_MS(elapsed_time), DEBUG_MS(xmit_time));
 
          // after gathering RF data, we're free, tell the Radio Interface client
          //DDCMSG(D_NEW,BLACK,"RFmaster got to here 1...");
@@ -1156,7 +1157,7 @@ int main(int argc, char **argv) {
    int child;
 
    rtime=0;
-   collecting_time=300; //  minimum time to wait for collecting messages for a burst (in ms)
+   collecting_time=RF_COLLECT_DELAY; //  minimum time to wait for collecting messages for a burst (in ms)
    slottime=0;
    verbose=0;
    xmit=0;              // used for testing
@@ -1231,8 +1232,8 @@ int main(int argc, char **argv) {
       }
    }
 
-   if (rtime<350) rtime = 350;  // enforce a minimum time to wait  - also the default if no -r option
-   if (rtime>35000) rtime = 35000;  // enforce a maximum rtime
+   if (rtime<RF_BURST_DELAY) rtime = RF_BURST_DELAY;  // enforce a minimum time to wait  - also the default if no -r option
+   if (rtime>RF_BURST_DELAY*10) rtime = RF_BURST_DELAY*10;  // enforce a maximum rtime
    //hardflow|=2; // force BLOCKING for the time being
    
    DCMSG(YELLOW,"RFmaster: verbosity is set to 0x%x", verbose);

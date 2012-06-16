@@ -880,7 +880,7 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
    queue_item_t *tail = queueTail(Tx), *temp;
    LB_packet_t *tpkt;
    int bs = *bsize; // remember how much we have left
-   *remaining_time = 50; // reset our remaining_time before we are allowed to Tx again   time needs to be smarter
+   *remaining_time = 5; // reset our remaining_time before we are allowed to Tx again   time needs to be smarter
 #define QI2BUF(qi, buf) {\
    memcpy(buf, qi->msg, qi->size); \
    buf += qi->size; \
@@ -923,7 +923,7 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
             *inittime = LB_new->inittime * 5; // convert to milliseconds
             *slottime = LB_new->slottime * 5; // convert to milliseconds
             // move timers
-            *remaining_time += (10 * *slottime); // time for each response: 10 slots = 8 + padding on each end
+            *remaining_time += (8 * *slottime); // time for each response: 10 slots = 8 + padding on each end
             // queue
             QI2BUF(qi, buf);
             // slots used
@@ -949,7 +949,7 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
             // queue
             QI2BUF(qi, buf);
             // move timers
-            *remaining_time += (*slottime/4); // add 1/4 slottime for target to process command
+            *remaining_time += (*slottime/3); // add 1/3 slottime for target to process command (actual clients add 1/4)
             break;
 
          case 4: // control message

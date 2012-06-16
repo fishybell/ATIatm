@@ -384,8 +384,6 @@ int main(int argc, char **argv) {
                // grab now time
                rc.nowt = getTime();
                rc.packets = 0; // in burst now
-      //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
-               clearTxQ(&rc);
             }
 
             int ret = rcRead(&rc, 1); // 1 for child

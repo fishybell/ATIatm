@@ -68,7 +68,7 @@ void log_NewHits(fasit_connection_t *fc, int new_hits) {
             if (fc->hit_times[i].event == 0 &&
                 fc->hit_times[i].time.tv_sec == 0 &&
                 fc->hit_times[i].time.tv_nsec == 0l) {
-               DCMSG(BLACK, "Setting %5ld.%03ld in fc->hit_times[%i] with event %i", tv.tv_sec, tv.tv_nsec/1000000l, i, fc->current_event);
+               //DCMSG(BLACK, "Setting %5ld.%03ld in fc->hit_times[%i] with event %i", tv.tv_sec, tv.tv_nsec/1000000l, i, fc->current_event);
                fc->hit_times[i].time = tv;
                fc->hit_times[i].event = fc->current_event;
                fc->hit_times[i].report = -1; // not reported yet
