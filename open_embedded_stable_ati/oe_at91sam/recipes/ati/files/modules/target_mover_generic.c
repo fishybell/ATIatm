@@ -2166,8 +2166,10 @@ EXPORT_SYMBOL(mover_set_continuous_move);
 int mover_set_moveaway_move(int c) {
    int sensor, speed;
    DELAY_PRINTK("mover_set_moveaway_move\n");
+   SENDUSERCONNMSG( "mover_set_moveaway_move %i", c);
    // check to see if we're sleeping or not
    if (atomic_read(&sleep_atomic) == 1) {
+   SENDUSERCONNMSG( "mover_set_moveaway_move sleeping");
          return 0;
    }
    atomic_set(&find_dock_atomic, 0);
@@ -2978,29 +2980,34 @@ static void pid_step() {
     }
     if (error_sum < (pid_error * 5)) error_sum = pid_error * 5;
 
-       // sanity check
-       if (kp_d <= 0 || ki_d <= 0 || kd_d <= 0 || delta <= 0) {
-          pid_effort = 0;
-       } else {
+   SENDUSERCONNMSG( "pid0,p,%i,i,%i,d,%i,l,%i", kp_d, ki_d, kd_d, delta);
 
        // do the PID calculations
 
        // individual pid steps to make full equation more clean
-       pid_p = (((1000 * kp_m * pid_error) / kp_d) / 1000);
-       pid_i = (((1000 * ki_m * error_sum) / ki_d) / 1000);
+       if (kp_d > 0){
+         pid_p = (((1000 * kp_m * pid_error) / kp_d) / 1000);
+       } else {
+         pid_p = ((1000 * kp_m * pid_error) / 1000);
+       }
+       if (ki_d > 0){
+         pid_i = (((1000 * ki_m * error_sum) / ki_d) / 1000);
+       }
 
 /*       a = 1000 * kd_m;
        b = pid_error - pid_last_error;
        c = (kd_d * delta) / 1000;
        pid_d = ((a * b) / c); */
+       if (delta > 0){
        pid_d = ((((1000 * kd_m) * (pid_error - pid_last_error)) / (kd_d * delta)) / 1000);
+       }
 
        // descrete PID algorithm gleamed from Scott's brain
 //       pid_effort = pid_last_effort + pid_p + pid_i + pid_d;
        pid_effort = pid_p + pid_i + pid_d;
 
    //delay_printk( "pid0,r,%d,p,%i,i,%i,d,%i,e,%i,t,%i", pid_error, pid_p, pid_i, pid_d, pid_effort,direction);
-   //SENDUSERCONNMSG( "pid0,r,%d,p,%i,i,%i,d,%i,e,%i,t,%i", pid_error, pid_p, pid_i, pid_d, pid_effort,direction);
+   SENDUSERCONNMSG( "pid0,r,%d,p,%i,i,%i,d,%i,e,%i,t,%i", pid_error, pid_p, pid_i, pid_d, pid_effort,direction);
     // max effort to 100%
    if (new_speed != 0 && isMoverAtDock() != 0) {
       pid_effort += 1000;
@@ -3025,9 +3032,8 @@ static void pid_step() {
          }
       }
     }
-   } 
          
-   //SENDUSERCONNMSG( "pid1,t,%i,e,%i,n,%i,i,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_effort, new_speed, input_speed,delta);
+   SENDUSERCONNMSG( "pid1,t,%i,r,%i,e,%i,n,%i,i,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed,delta);
 /*
     if (pid_effort > 800){
       pidEffortCounter ++;
