@@ -577,8 +577,8 @@ typedef enum rf_target_type {
 #define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
-#define FAST_TIME_MAX_MISS 800 /* maximum value of the "missed message" counter */
-#define SLOW_TIME_MAX_MISS 400 /* maximum value of the "missed message" counter */
+#define FAST_TIME_MAX_MISS 3 /* maximum value of the "missed message" counter */
+#define SLOW_TIME_MAX_MISS 3 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_UNREPORT (4*15) /* max number of reports per burst * max number of non-reports before vacuum */
 
