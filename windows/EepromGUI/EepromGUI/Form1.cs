@@ -15,6 +15,7 @@ namespace EepromGUI
     public partial class Form1 : Form
     {
         String machine = "";
+        String rebootingMachine = "";
         String macPassword = "change MAC";
         Eeprom conn;
         Eeprom bconn;
@@ -153,6 +154,9 @@ namespace EepromGUI
             {
                 conn.sendMessage("K");
                 logSent("K");
+                disconnect();               
+                targetCB.Text = "";
+                targetCB.Items.Clear();
             }
         }
 
@@ -174,12 +178,23 @@ namespace EepromGUI
                 conn.sendMessage("I R");
                 logSent("I R");
                 errorLBL.Text = "Rebooting, Don't press any buttons till finished...";
-                clearFields();
-                changedList.Clear();
-                conn.CloseConnection();
-                conn.killThread();
-                timer1.Start();
+                rebootingMachine = machine;
+                disconnect();
+                //timer1.Start();                
+                targetCB.Items.Clear();
+                targetCB.Text = "";
             }
+        }
+
+        private void disconnect()
+        {
+            rebootingMachine = machine;
+            clearFields();
+            changedList.Clear();
+            conn.CloseConnection();
+            conn.killThread();
+            //targetCB.Items.Clear();
+            //targetCB.Text = "";
         }
 
         /***********************************************
@@ -1071,6 +1086,7 @@ namespace EepromGUI
             freqTB.Text = "";
             lpTB.Text = "";
             hpTB.Text = "";
+            radioCheck.Checked = false;
             versionLBL.Text = "";
             version2LBL.Text = "";
         }
@@ -1266,6 +1282,7 @@ namespace EepromGUI
                             boardCB.SelectedItem = board;
                             // Enable and disable controls according to the board type
                             disableEnable(boardType);
+                            targetCB.Text = machine;
                             break;
                         case 'C':   // connection port
                             connectTB.Text = getMessageValue(message, 4);
@@ -1558,6 +1575,13 @@ namespace EepromGUI
                         case 'B':   // Minor Flash Version
                             version2LBL.Text = getMessageValue(message, 4);
                             break;
+                        case 'C':   // Program radio?
+                            if (getMessageValue(message, 4) == "Y")
+                            {
+                                radioCheck.Checked = true;
+                            }
+                            radioCheck.ForeColor = System.Drawing.SystemColors.WindowText;
+                            break;
                     }
                     break;
                 default:
@@ -1591,7 +1615,7 @@ namespace EepromGUI
          * ************************************************/
         private void timer1_Tick(object sender, EventArgs e)
         {
-            if (conn.StartConnection(machine))
+            if (conn.StartConnection(rebootingMachine))
             {
                 errorLBL.Text = "";
                 showAllButton.Enabled = true;
@@ -2149,6 +2173,12 @@ namespace EepromGUI
             hpTB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
 
+        private void radioCheck_CheckedChanged(object sender, EventArgs e)
+        {
+            changedList.Add(radioCheck);
+            radioCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
+        }
+
         /**************************************************
          * Parses all the default controls to see which
          * textboxes, comboboxes, or checkboxes were altered
@@ -2204,6 +2234,9 @@ namespace EepromGUI
                             break;
                         case "hpTB":
                             hpDefault(textValue);
+                            break;
+                        case "radioCheck":
+                            programDefault(radioCheck.Checked);
                             break;
                         case "fallDTB":
                             fallDefault(textValue, fallDCB.SelectedIndex);
@@ -2527,6 +2560,7 @@ namespace EepromGUI
                 conn.sendMessage("I X");
                 conn.sendMessage("I Y");
                 conn.sendMessage("I Z");
+                conn.sendMessage("J C");
                 logSent("I E SIT");
                 logSent("I E SAT");
                 logSent("I E SES");
@@ -2543,6 +2577,7 @@ namespace EepromGUI
                 logSent("I S");
                 logSent("I T");
                 logSent("I X");
+                logSent("J C");
             }
         }
 
@@ -2555,6 +2590,25 @@ namespace EepromGUI
             {
                 conn.sendMessage("I E " + index + " " + battery);
                 logSent("I E " + index + " " + battery);
+            }
+        }
+
+        /************************************************
+         * Sends whether or not to reprogram the battery
+         * **********************************************/
+        public void programDefault(Boolean state)
+        {
+            string value = "";
+            if (state == true) 
+            { 
+                value = "Y"; 
+            } else {
+                value = "N";
+            }
+            if (conn != null)
+            {
+                conn.sendMessage("J C " + value);
+                logSent("J C " + value);
             }
         }
 
@@ -2815,7 +2869,7 @@ namespace EepromGUI
 
                 psi.FileName = batFile;
                 String shellFile = openDialog.SafeFileName;
-                psi.Arguments = machine + " " + openDialog.FileName + " " + shellFile;
+                psi.Arguments = machine + " " + openDialog.FileName + " " + shellFile + " root shoot";
 
                 // Hides the console window that would pop up
                 //psi.WindowStyle = ProcessWindowStyle.Hidden;
@@ -2838,7 +2892,13 @@ namespace EepromGUI
                 {
                     Console.WriteLine("There was an error with the file.");
                 }
-                setVersion();
+                else
+                {
+                    setVersion();
+                    disconnect();
+                    targetCB.Text = "";
+                    targetCB.Items.Clear();
+                }
             }
             
 

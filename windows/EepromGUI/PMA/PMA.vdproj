@@ -21,6 +21,30 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_669D9AF7CE1D441982289A1A2DEF5DF1"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_66A5F6D61E024C528C7B08B1374FDCC3"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_BF57B6E94DCB4268BFCA262C366417EA"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_F6DE1C51501A450DBD864A1B11C163A3"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_23C6BFF8CCD349C2B9F89AFD1A1BCFF8"
         "MsmSig" = "8:_UNDEFINED"
@@ -50,6 +74,19 @@
             "PrerequisitesLocation" = "2:1"
             "Url" = "8:"
             "ComponentsUrl" = "8:"
+                "Items"
+                {
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:.NETFramework,Version=v4.0,Profile=Client"
+                    {
+                    "Name" = "8:Microsoft .NET Framework 4 Client Profile (x86 and x64)"
+                    "ProductCode" = "8:.NETFramework,Version=v4.0,Profile=Client"
+                    }
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:Microsoft.Windows.Installer.3.1"
+                    {
+                    "Name" = "8:Windows Installer 3.1"
+                    "ProductCode" = "8:Microsoft.Windows.Installer.3.1"
+                    }
+                }
             }
         }
         "Release"
@@ -74,6 +111,19 @@
             "PrerequisitesLocation" = "2:1"
             "Url" = "8:"
             "ComponentsUrl" = "8:"
+                "Items"
+                {
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:.NETFramework,Version=v4.0,Profile=Client"
+                    {
+                    "Name" = "8:Microsoft .NET Framework 4 Client Profile (x86 and x64)"
+                    "ProductCode" = "8:.NETFramework,Version=v4.0,Profile=Client"
+                    }
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:Microsoft.Windows.Installer.3.1"
+                    {
+                    "Name" = "8:Windows Installer 3.1"
+                    "ProductCode" = "8:Microsoft.Windows.Installer.3.1"
+                    }
+                }
             }
         }
     }
@@ -160,6 +210,86 @@
         }
         "File"
         {
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_669D9AF7CE1D441982289A1A2DEF5DF1"
+            {
+            "SourcePath" = "8:radiotest.bat"
+            "TargetName" = "8:radiotest.bat"
+            "Tag" = "8:"
+            "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_66A5F6D61E024C528C7B08B1374FDCC3"
+            {
+            "SourcePath" = "8:plink.exe"
+            "TargetName" = "8:plink.exe"
+            "Tag" = "8:"
+            "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_BF57B6E94DCB4268BFCA262C366417EA"
+            {
+            "SourcePath" = "8:atifirmwarecopy.bat"
+            "TargetName" = "8:atifirmwarecopy.bat"
+            "Tag" = "8:"
+            "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_F6DE1C51501A450DBD864A1B11C163A3"
+            {
+            "SourcePath" = "8:pscp.exe"
+            "TargetName" = "8:pscp.exe"
+            "Tag" = "8:"
+            "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
         }
         "FileType"
         {
@@ -217,7 +347,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:PMA"
         "ProductCode" = "8:{65FAD869-F0BC-4DF8-98C9-1B9E3A6AA168}"
-        "PackageCode" = "8:{B208AEF1-D723-459F-B665-96BD1511A1B9}"
+        "PackageCode" = "8:{253A2589-71CA-4A49-B099-06579797A209}"
         "UpgradeCode" = "8:{F2195914-ABD7-48EC-9F47-962C60BD4A08}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
@@ -738,7 +868,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_23C6BFF8CCD349C2B9F89AFD1A1BCFF8"
             {
-            "SourcePath" = "8:\\\\tao\\shellyb\\Shelly's VS Projects\\EepromGUI\\EepromGUI\\obj\\x86\\Debug\\EepromGUI.exe"
+            "SourcePath" = "8:..\\EepromGUI\\obj\\x86\\Release\\EepromGUI.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"

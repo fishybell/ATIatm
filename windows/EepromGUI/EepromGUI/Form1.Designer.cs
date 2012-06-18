@@ -241,6 +241,7 @@
             this.ipShowButton = new System.Windows.Forms.Button();
             this.ipSetButton = new System.Windows.Forms.Button();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.radioButton = new System.Windows.Forms.Button();
             this.firmButton = new System.Windows.Forms.Button();
             this.expSTB = new System.Windows.Forms.TextBox();
             this.knobTB = new System.Windows.Forms.TextBox();
@@ -279,7 +280,7 @@
             this.shutdownButton = new System.Windows.Forms.Button();
             this.stopButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
-            this.radioButton = new System.Windows.Forms.Button();
+            this.radioCheck = new System.Windows.Forms.CheckBox();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -2106,6 +2107,7 @@
             // 
             // tabPage5
             // 
+            this.tabPage5.Controls.Add(this.radioCheck);
             this.tabPage5.Controls.Add(this.hpTB);
             this.tabPage5.Controls.Add(this.lpTB);
             this.tabPage5.Controls.Add(this.freqTB);
@@ -2920,6 +2922,16 @@
             this.tabPage1.Text = "Manipulate";
             this.tabPage1.UseVisualStyleBackColor = true;
             // 
+            // radioButton
+            // 
+            this.radioButton.Location = new System.Drawing.Point(170, 238);
+            this.radioButton.Name = "radioButton";
+            this.radioButton.Size = new System.Drawing.Size(98, 27);
+            this.radioButton.TabIndex = 97;
+            this.radioButton.Text = "Test Radio";
+            this.radioButton.UseVisualStyleBackColor = true;
+            this.radioButton.Click += new System.EventHandler(this.radioButton_Click);
+            // 
             // firmButton
             // 
             this.firmButton.Location = new System.Drawing.Point(8, 238);
@@ -3315,15 +3327,17 @@
             this.tabControl1.Size = new System.Drawing.Size(849, 348);
             this.tabControl1.TabIndex = 93;
             // 
-            // radioButton
+            // radioCheck
             // 
-            this.radioButton.Location = new System.Drawing.Point(170, 238);
-            this.radioButton.Name = "radioButton";
-            this.radioButton.Size = new System.Drawing.Size(98, 27);
-            this.radioButton.TabIndex = 97;
-            this.radioButton.Text = "Test Radio";
-            this.radioButton.UseVisualStyleBackColor = true;
-            this.radioButton.Click += new System.EventHandler(this.radioButton_Click);
+            this.radioCheck.AutoSize = true;
+            this.radioCheck.CheckAlign = System.Drawing.ContentAlignment.MiddleRight;
+            this.radioCheck.Location = new System.Drawing.Point(24, 98);
+            this.radioCheck.Name = "radioCheck";
+            this.radioCheck.Size = new System.Drawing.Size(133, 21);
+            this.radioCheck.TabIndex = 7;
+            this.radioCheck.Text = "Program Radio?";
+            this.radioCheck.UseVisualStyleBackColor = true;
+            this.radioCheck.CheckedChanged += new System.EventHandler(this.radioCheck_CheckedChanged);
             // 
             // Form1
             // 
@@ -3649,6 +3663,7 @@
         private System.Windows.Forms.Button firmButton;
         private System.Windows.Forms.ComboBox revCB;
         private System.Windows.Forms.Button radioButton;
+        private System.Windows.Forms.CheckBox radioCheck;
     }
 }
 
