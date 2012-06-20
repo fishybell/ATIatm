@@ -505,6 +505,7 @@ int main(int argc, char **argv) {
                      DDCMSG(D_POINTER, GRAY,"MCP: just send a new address assignment to reconnect the minon and RFslave  devid=%06x",LB_devreg->devid);
 
                      // create a message to send to the already initiliazed minion
+                     // THIS IS DONE BY SENDING THE INFO DIRECTLY TO THE MINION BELOW (on connect and reconnect)
 #if 0
                      mID = addr_pool[addr_cnt].mID;
                      lbsr.cmd = LBC_STATUS_RESP_EXT; // copy stuff to extended response, it's got it all
@@ -614,11 +615,11 @@ int main(int argc, char **argv) {
                         minions[mID].S.react.data = LB_devreg->react;
                         minions[mID].S.position.data = LB_devreg->location;
                         DDCMSG(D_POINTER, GRAY, "\n\n----------------------\nPosition from LB: %i", LB_devreg->location);
-                        if (minions[mID].S.position.data > 512) {
+                        /*if (minions[mID].S.position.data > 512) {
                            DDCMSG(D_POINTER, GRAY, "converting to negative: %i", minions[mID].S.position.data);
                            minions[mID].S.position.data -= 1024; // we are a negative
                            DDCMSG(D_POINTER, GRAY, "converted to negative: %i", minions[mID].S.position.data);
-                        }
+                        }*/
                         if (minions[mID].S.dev_type == Type_MIT) {
                            DDCMSG(D_POINTER, GRAY, "clamping to mit lengths: %i", minions[mID].S.position.data);
                            minions[mID].S.position.data = max(0, min(minions[mID].S.position.data, mit_length));
@@ -687,6 +688,14 @@ int main(int argc, char **argv) {
                      } // else addr_cnt>2046   - not all used
                      mID=oldID;
                   } // if addr_cnt>2046  devid not found so we made a new minon
+
+                  // the registration packet must also get sent to the minion
+                  result=write(minions[addr_pool[addr_cnt].mID].minion,LB_devreg,RF_size(LB_devreg->cmd));
+                  if (result<0) {
+                     DCMSG(RED,"MCP: regX Sent %d bytes to minion %d at fd=%d",
+                           result,addr_cnt,minions[addr_pool[addr_cnt].mID].minion);
+                     EXIT(-1);
+                  }
 
                   // Create an LB ASSIGN ADDR packet to send back to the slaves
                   // addr_cnt  should be the RF_addr slot  it already had

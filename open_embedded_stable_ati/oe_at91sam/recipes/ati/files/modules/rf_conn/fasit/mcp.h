@@ -169,6 +169,48 @@ typedef struct report_memory_item { /* matching reports will be ignored, items i
    struct report_memory_item *next;
 } report_memory_t;
 
+enum {
+   move_stop,
+   move_left,
+   move_right,
+   move_continuous,
+   move_dock,
+   lift_expose,
+   lift_conceal,
+};
+enum {
+   react_fall,
+   react_kill,
+   react_stop,
+   react_stop_and_fall,
+   react_bob,
+};
+typedef struct state_response_item {
+   int data;     // number of hits left before killed
+   int newdata;  // has current reponse = 1, 0 otherwise
+   int lastdata; // has last response = 1, 0 otherwise
+   int mover_command; // last command sent to mover
+   int lifter_command; // last command sent to lifter
+   int did_exp_cmd; // only valid for current response
+   // most recent status response
+   int current_exp;
+   int current_direction;
+   int current_speed;
+   int current_position;
+   int current_hit;
+   // 2nd most recent status response
+   int last_exp;
+   int last_direction;
+   int last_speed;
+   int last_position;
+   int last_hit;
+   uint16 flags;
+   uint16 old_flags;
+   uint16 timer;
+   uint16 old_timer;
+} state_response_item_t;
+
+
 typedef struct minion_state {
    uint32                       cap;    // actual capability bitfield - u32 to keep alignment    
    uint8                        dev_type;   // FASIT device type
@@ -216,6 +258,9 @@ typedef struct minion_state {
 
    struct sequence_tracker *tracker;
    int last_sequence_sent;
+
+   state_response_item_t         resp;
+   int ignoring_response; // 0 = not ignoring, anything else = ignoring
 
 } minion_state_t;
 
@@ -322,6 +367,11 @@ enum {
 enum {
    F_event_none = 0, /* no state, doing nothing */
    F_event_ack, /* sends event acks, then nothing else */
+};
+
+enum {
+   F_resp_none = 0, /* no state, doing nothing */
+   F_resp_handle,   /* does the response handling */
 };
 
 
@@ -572,13 +622,14 @@ typedef enum rf_target_type {
 #define HSAT_TRANSITION_TIME  115 /* 11 1/2 second */
 #define MIT_MOVE_START_TIME   8   /* 4/5 second */
 #define MAT_MOVE_START_TIME   120 /* 12 seconds */
+#define RESP_TIME             2   /* 2/10 second */
 
 #define RF_BURST_DELAY 150 /* the amount of time to wait between sending bursts of data */
 #define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
-#define FAST_TIME_MAX_MISS 3 /* maximum value of the "missed message" counter */
-#define SLOW_TIME_MAX_MISS 3 /* maximum value of the "missed message" counter */
+#define FAST_TIME_MAX_MISS 800 /* maximum value of the "missed message" counter */
+#define SLOW_TIME_MAX_MISS 800 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_UNREPORT (4*15) /* max number of reports per burst * max number of non-reports before vacuum */
 
@@ -636,7 +687,7 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
    result= psend_mcp(minion,&LB_buf); \
    fsync(minion->mcp_sock); /* make sure the data gets written to the mcp before we close */ \
    close(minion->mcp_sock); /* close this half of the connection to mcp */ \
-   exit(0); /* exit the forked minion */ \
+   exit(0); /* exit the forked minion -- all unfreed data is will now free */ \
 }
 
 #define change_states(M, T, S, F) { \
@@ -653,8 +704,22 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
    change_states_internal(M, T, S, F); \
 }
 
+// macro to send a status request
+#define SEND_STATUS_REQUEST(LB_buf) { \
+   /* send out a request for actual position */ \
+   LB_status_req_t *L=(LB_status_req_t *)LB_buf; \
+   L->cmd=LBC_STATUS_REQ;          /* start filling in the packet */ \
+   L->addr=minion->RF_addr; \
+   DDCMSG(D_MSTATE,GREEN,"Minion %i:   build and send L LBC_STATUS_REQ", minion->mID); \
+   result= psend_mcp(minion,LB_buf); \
+}
+
+
 void sendStatus2102(int force, FASIT_header *hdr, thread_data_t *minion, minion_time_t *mt);
 void change_states_internal(thread_data_t *minion, minion_time_t *mt, trans_step_t step, int force);
 void inform_state(thread_data_t *minion, minion_time_t *mt, FASIT_header *hdr);
+void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt);
 
+int psend_mcp(thread_data_t *minion,void *Lc);
+int psend_mcp_seq(thread_data_t *minion,void *Lc);
 #endif

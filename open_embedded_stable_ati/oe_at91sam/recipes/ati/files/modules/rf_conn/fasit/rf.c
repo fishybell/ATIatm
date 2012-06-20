@@ -305,7 +305,7 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
          {
             LB_device_reg_t *L=(LB_device_reg_t *)LB;
             strcpy(cmdname,"Device_Reg");
-            sprintf(hbuf,"devid=%3x devtype=%d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->devid,L->dev_type,L->expose,L->speed,L->move,L->react,L->location-512,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
+            sprintf(hbuf,"devid=%3x devtype=%d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->devid,L->dev_type,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
             color=MAGENTA;
          }
          break;
@@ -416,7 +416,7 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
          {
             LB_status_resp_t *L=(LB_status_resp_t *)LB;
             strcpy(cmdname,"Status_Resp_Ext");
-            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d did_exp_cmd=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d event=%d",L->addr,L->expose,L->speed,L->did_exp_cmd,L->move,L->react,L->location-512,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault,L->event);
+            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d did_exp_cmd=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d event=%d",L->addr,L->expose,L->speed,L->did_exp_cmd,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault,L->event);
             color=MAGENTA;
          }
             break;

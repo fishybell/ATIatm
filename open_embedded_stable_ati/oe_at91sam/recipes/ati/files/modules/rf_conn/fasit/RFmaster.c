@@ -501,6 +501,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                remaining_time += (inittime*2) + (RF_COLLECT_DELAY);
 
                if (tbuf_size > RF_size(LBb->cmd)) {  // if we have something to Tx, Tx it.
+                  char *out_buf = TransBuf;
                   CURRENT_TIME(elapsed_time);
                   DDCMSG(D_TIME, YELLOW, "TX @ Remaining time: %i %i, Elapsed time: %3i.%03i ", remaining_time, slottime, DEBUG_MS(elapsed_time));
 
@@ -516,44 +517,52 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                      ev.data.fd = *riclient; // remember for later
                   }
 
-                  setblocking(RFfd);
-                  result=write(RFfd, TransBuf, tbuf_size);
-                  setnonblocking(RFfd);
-                  if (result<0){
-                     strerror_r(errno,buf,200);                
-                     DCMSG(RED,"write Tx queue to RF error %s",buf);
-                     // TODO -- requeue to Rx? die? what?
-                     DDqueue(D_POINTER, Tx, "dead 1"); 
-                  } else if (result == 0) {
-                     DCMSG(RED,"write Tx queue to RF returned 0");
-                     // TODO -- requeue to Rx? die? what?
-                     DDqueue(D_POINTER, Tx, "dead 2"); 
-                  } else {
-                     if (result == tbuf_size) {
-                        if (verbose&D_RF) {
-                              sprintf(buf,"[%03i] %3i.%03i  ->RF [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
-                              printf("%s",buf);
-                              printf("\x1B[3%i;%im",(BLUE)&7,((BLUE)>>3)&1);
-                              if (result>1) {
-                                 for (int i=0; i<result-1; i++) printf("%02x.", (uint8) TransBuf[i]);
-                              }
-                              printf("%02x\n", (uint8) TransBuf[result-1]);
-                        }
-                        if (verbose&D_PARSE) {
-                           DDCMSG(D_NEW, GREEN, "-> RF:");
-                           DDpacket(TransBuf,result);
-                        } else {
-                           DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF", result);
-                        }
+                  do {
+                     setblocking(RFfd);
+                     result=write(RFfd, out_buf, tbuf_size);
+                     setnonblocking(RFfd);
+                     if (result<0){
+                        strerror_r(errno,buf,200);                
+                        DCMSG(RED,"write Tx queue to RF error %s",buf);
+                        // TODO -- requeue to Rx? die? what?
+                        DDqueue(D_POINTER, Tx, "dead 1"); 
+                        break;
+                     } else if (result == 0) {
+                        DCMSG(RED,"write Tx queue to RF returned 0");
+                        // TODO -- requeue to Rx? die? what?
+                        DDqueue(D_POINTER, Tx, "dead 2"); 
+                        break;
                      } else {
-                        DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF, but should have transmitted %i", result, tbuf_size);
-                        if (verbose&D_PARSE) {
-                           DDpacket(TransBuf,result);
+                        if (result == tbuf_size) {
+                           if (verbose&D_RF) {
+                                 sprintf(buf,"[%03i] %3i.%03i  ->RF [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
+                                 printf("%s",buf);
+                                 printf("\x1B[3%i;%im",(BLUE)&7,((BLUE)>>3)&1);
+                                 if (result>1) {
+                                    for (int i=0; i<result-1; i++) printf("%02x.", (uint8) out_buf[i]);
+                                 }
+                                 printf("%02x\n", (uint8) out_buf[result-1]);
+                           }
+                           if (verbose&D_PARSE) {
+                              DDCMSG(D_NEW, GREEN, "-> RF:");
+                              DDpacket(out_buf,result);
+                           } else {
+                              DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF", result);
+                           }
+                        } else {
+                           DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF, but should have transmitted %i", result, tbuf_size);
+                           if (verbose&D_PARSE) {
+                              DDpacket(out_buf,result);
+                           }
+                           // TODO -- requeue unset packets to Rx? die? what?
+                           DDqueue(D_POINTER, Tx, "dead 3"); 
+                           // transmit again
+                           tbuf_size -= result;
+                           out_buf -= result;
+                           result = 0;
                         }
-                        // TODO -- requeue unset packets to Rx? die? what?
-                        DDqueue(D_POINTER, Tx, "dead 3"); 
                      }
-                  }
+                  } while (result < tbuf_size);
                   // remove items from Tx queue, sending messages back to mcp as needed
                   DDqueue(D_MEGA|D_POINTER, Tx, "Tx before sentItems...", queueLength(Tx));
                   qi = Tx->next; // remove from head

@@ -176,7 +176,7 @@ typedef struct LB_status_resp_t {
    uint32 did_exp_cmd:1 __attribute__ ((packed)); // 0 = didn't change exposure between last command and now, 1 = did
    uint32 react:3 __attribute__ ((packed));
 
-   uint32 location:10 __attribute__ ((packed)); // meters from home (actual loc = location - 512, ex. 512 = 0, 513 = 1 meter)
+   int32  location:10 __attribute__ ((packed)); // meters from home
    uint32 expose:1 __attribute__ ((packed)); // current state of exposure, 0 = concealed, 1 = exposed
    uint32 hitmode:1 __attribute__ ((packed));
    uint32 tokill:4 __attribute__ ((packed));
@@ -217,7 +217,7 @@ typedef struct LB_device_reg_t {
    uint32 move:1 __attribute__ ((packed)); // 0 = towards home, 1 = away from home
    uint32 pad2:1 __attribute__ ((packed));
    uint32 react:3 __attribute__ ((packed));
-   uint32 location:10 __attribute__ ((packed)); // meters from home (actual loc = location - 512, ex. 512 = 0, 513 = 1 meter)
+   int32  location:10 __attribute__ ((packed)); // meters from home
    uint32 expose:1 __attribute__ ((packed));
    uint32 hitmode:1 __attribute__ ((packed));
    uint32 tokill:4 __attribute__ ((packed));

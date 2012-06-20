@@ -2,6 +2,7 @@
 #include "mcp.h"
 #include "rf.h"
 #include "fasit_c.h"
+#include "../../fasit/faults.h"
 
 #define S_set(ITEM,D,ND,F,T) \
     { \
@@ -87,16 +88,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                minion->S.exp.con_flags, minion->S.exp.con_timer,
                minion->S.move.flags, minion->S.move.timer);
 
-      // macro to send a status request
-      #define SEND_STATUS_REQUEST { \
-         /* send out a request for actual position */ \
-         LB_status_req_t *L=(LB_status_req_t *)&LB_buf; \
-         L->cmd=LBC_STATUS_REQ;          /* start filling in the packet */ \
-         L->addr=minion->RF_addr; \
-         DDCMSG(D_MSTATE,GREEN,"Minion %i:   build and send L LBC_STATUS_REQ", minion->mID); \
-         result= psend_mcp(minion,&LB_buf); \
-      }
-
       // check each timer, running its state code if it is needed, moving its timer otherwise
       #define CHECK_TIMER(S, T, F, CODE) { \
          if (S.F) { \
@@ -111,6 +102,18 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          } \
       }
 
+      CHECK_TIMER (minion->S.resp, timer, flags, 
+         DDCMSG(D_MSTATE, BLACK, "Now checking reponse timer flags: %i", minion->S.resp.flags);
+         switch (minion->S.resp.flags) {
+            case F_resp_handle: {
+               Handle_Status_Resp(minion, mt); // if everything went well, no 2102 will be created
+            } break;
+            default: {
+               DDCMSG(D_MSTATE, RED, "Default reached in response flags: %i", minion->S.resp.flags);
+            }
+         }
+      ); // end of CHECK_TIMER for response state timer
+
       CHECK_TIMER (minion->S.rf_t, fast_timer, fast_flags, 
          DDCMSG(D_MSTATE, BLACK, "Now checking fast timer flags: %i", minion->S.rf_t.fast_flags);
          switch (minion->S.rf_t.fast_flags) {
@@ -120,7 +123,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                if (++minion->S.rf_t.fast_missed > FAST_TIME_MAX_MISS) {
                   DISCONNECT;
                } else {
-                  SEND_STATUS_REQUEST;
+                  SEND_STATUS_REQUEST(&LB_buf);
                   setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start); // same state over and over (short interval)
                }
             } break;
@@ -130,14 +133,14 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                if (++minion->S.rf_t.fast_missed > FAST_TIME_MAX_MISS) {
                   DISCONNECT;
                } else {
-                  SEND_STATUS_REQUEST;
+                  SEND_STATUS_REQUEST(&LB_buf);
                   setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_RESPONSE_TIME, F_fast_medium); // same state over and over (medium interval)
                }
             } break;
             case F_fast_once: {
                // should only get here as start of message, so just add one to the miss counter as we normally assume a miss
                ++minion->S.rf_t.fast_missed;
-               SEND_STATUS_REQUEST;
+               SEND_STATUS_REQUEST(&LB_buf);
                setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_RESPONSE_TIME, F_fast_end); // move to end (medium interval)
             } break;
             case F_fast_end: {
@@ -147,7 +150,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   DISCONNECT;
                } else if (minion->S.rf_t.fast_missed > 1) {
                   // missed, keep trying fast
-                  SEND_STATUS_REQUEST;
+                  SEND_STATUS_REQUEST(&LB_buf);
                   setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_RESPONSE_TIME, F_fast_end); // move to end (medium interval)
                } else {
                   // didn't miss, so go slow again
@@ -172,7 +175,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          DDCMSG(D_MSTATE, BLACK, "Now checking slow timer flags: %i", minion->S.rf_t.slow_flags);
          switch (minion->S.rf_t.slow_flags) {
             case F_slow_start: {
-               SEND_STATUS_REQUEST;
+               SEND_STATUS_REQUEST(&LB_buf);
                setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_RESPONSE_TIME, F_slow_continue); // will only get to F_slow_continue if we don't reset (code in minion.c)
             } break;
             case F_slow_continue: {
@@ -181,7 +184,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                if (++minion->S.rf_t.slow_missed > SLOW_TIME_MAX_MISS) {
                   DISCONNECT;
                } else {
-                  SEND_STATUS_REQUEST;
+                  SEND_STATUS_REQUEST(&LB_buf);
                   setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_RESPONSE_TIME, F_slow_continue);
                }
             } break;
@@ -214,6 +217,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                      wait = SAT_TRANSITION_TIME; // time it takes a light armor lifter to lift
                      break;
                }
+               minion->S.ignoring_response ^= 1; // not ignoring responses due to exposure (bit 1)
                // sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102 -- removed in favor of change_states()
                //DDCMSG(D_POINTER|D_NEW, YELLOW, "calling change_states(%s) @ %s:%i", step_words[TS_con_to_exp], __FILE__, __LINE__);
                change_states(minion, mt, TS_con_to_exp, 0);
@@ -222,6 +226,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             case F_exp_end_transition: {
                change_states(minion, mt, TS_exposed, 0);
                stopTimer(minion->S.exp, exp_timer, exp_flags);
+               SEND_STATUS_REQUEST(&LB_buf);
             } break;
             default: {
                DDCMSG(D_MSTATE, RED, "Default reached in expose flags: %i", minion->S.exp.exp_flags);
@@ -252,6 +257,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                      wait = SAT_TRANSITION_TIME; // time it takes a light armor lifter to lift
                      break;
                }
+               minion->S.ignoring_response ^= 1; // not ignoring responses due to exposure (bit 1)
                // sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102 -- removed in favor of change_states()
                //DDCMSG(D_POINTER|D_NEW, YELLOW, "calling change_states(%s) @ %s:%i", step_words[TS_exp_to_con], __FILE__, __LINE__);
                change_states(minion, mt, TS_exp_to_con, 0);
@@ -260,6 +266,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             case F_con_end_transition: {
                change_states(minion, mt, TS_concealed, 0);
                stopTimer(minion->S.exp, con_timer, con_flags);
+               SEND_STATUS_REQUEST(&LB_buf);
             } break;
             default: {
                DDCMSG(D_MSTATE, RED, "Default reached in conceal flags: %i", minion->S.exp.con_flags);
@@ -276,6 +283,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                minion->S.speed.data = 0.0; // we're not moving
                minion->S.move.data = minion->S.move.newdata; // but we're going to move a direction
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
+               minion->S.ignoring_response ^= 2; // not ignoring responses due to movement (bit 2)
 
                DDCMSG(D_POINTER, GRAY, "Should start fake movement for minion %i", minion->mID);
                switch (minion->S.dev_type) {
@@ -366,6 +374,9 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                      // we've settled on a speed, show the "correct" goal speed from now on
                      minion->S.speed.data = cs;
                   }
+                  if (minion->S.speed.data == cs) {
+                     SEND_STATUS_REQUEST(&LB_buf); // should only happen once
+                  }
                }
 
                // have we reached the end?
@@ -376,20 +387,20 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   case Type_MIT:
                      minion->S.speed.fpos = max(0, min(minion->S.speed.fpos, minion->mit_length)); // clamp at 0 to length of track
                      if (minion->S.position.data <= minion->mit_home && dir < 0) {
-                        minion->S.fault.data = 6; // stopped by left limit
+                        minion->S.fault.data = ERR_stop_left_limit; // stopped by left limit
                         minion->S.speed.data = 0.0;
                      } else if (minion->S.position.data >= minion->mit_end && dir > 0) {
-                        minion->S.fault.data = 5; // stopped by right limit
+                        minion->S.fault.data = ERR_stop_right_limit; // stopped by right limit
                         minion->S.speed.data = 0.0;
                      }
                      break;
                   case Type_MAT:
                      minion->S.position.data = max(0, min(minion->S.position.data, minion->mat_length)); // clamp at 0 to length of track
                      if (minion->S.position.data <= minion->mat_home && dir < 0) {
-                        minion->S.fault.data = 6; // stopped by left limit
+                        minion->S.fault.data = ERR_stop_left_limit; // stopped by left limit
                         minion->S.speed.data = 0.0;
                      } else if (minion->S.position.data >= minion->mat_end && dir > 0) {
-                        minion->S.fault.data = 5; // stopped by left limit
+                        minion->S.fault.data = ERR_stop_right_limit; // stopped by left limit
                         minion->S.speed.data = 0.0;
                      }
                      break;
@@ -487,7 +498,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                minion->S.speed.data = 0.0;
                minion->S.speed.newdata = 0.0;
                minion->S.move.data = 0; // stopped, no direction
-               if (minion->S.fault.data == 5 || minion->S.fault.data == 6) {
+               if (minion->S.fault.data == ERR_stop_right_limit || minion->S.fault.data == ERR_stop_left_limit) {
                   minion->S.fault.data = 0;
                }
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
