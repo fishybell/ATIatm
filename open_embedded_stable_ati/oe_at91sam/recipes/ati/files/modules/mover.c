@@ -221,6 +221,7 @@ int nl_moveaway_handler(struct genl_info *info, struct sk_buff *skb, int cmd, vo
     struct nlattr *na;
     int rc, value = 0;
 delay_printk("Mover: handling moveaway movement command\n");
+SENDUSERCONNMSG( "randy moveaway_handler" );
     
     // get attribute from message
     na = info->attrs[GEN_INT16_A_MSG]; // generic 16-bit message
@@ -228,6 +229,7 @@ delay_printk("Mover: handling moveaway movement command\n");
         // grab value from attribute
         value = nla_get_u16(na);
 delay_printk("Mover: received value: %i\n", value);
+SENDUSERCONNMSG( "randy moveaway value %i", value );
 
         mover_set_moveaway_move(value-32768); // unsigned value to signed speed (0 will coast)
 
