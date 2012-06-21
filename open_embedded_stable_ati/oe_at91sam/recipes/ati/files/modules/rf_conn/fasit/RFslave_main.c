@@ -251,9 +251,9 @@ int main(int argc, char **argv) {
       }
 
       while (!close_nicely) {
-         char rbuf[RF_BUF_SIZE];
+         char rbuf[1];
          int gotrf;
-         if ((gotrf = read(rc.tty,rbuf,RF_BUF_SIZE)) > 0) {
+         if ((gotrf = read(rc.tty,rbuf,1)) > 0) {
             DDCMSG(D_NEW, GRAY, "Childing pushing to parent %i bytes", gotrf);
             write(rf_pair.parent, rbuf, gotrf);
          } else {

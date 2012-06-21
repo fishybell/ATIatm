@@ -99,6 +99,64 @@ void defHeader(FASIT_header *rhdr,int mnum,int seq,int length){
    }
 }
 
+// is the fault a status (good) or a malfunction (bad) ?
+int badFault(int fault) {
+   switch(fault) {
+      default: /* future statuses that aren't in the FASIT spec won't cause a fault here by default */
+      case ERR_normal:
+      case ERR_stop_right_limit:
+      case ERR_stop_left_limit:
+      case ERR_stop_by_distance:
+      case ERR_stop:
+      case ERR_target_killed:
+      case ERR_left_dock_limit:
+      case ERR_stop_dock_limit:
+         return 0;
+         break;
+
+      /* even the ones that are actual statuses below should be treated as faults so the FASIT server sees them */
+      case ERR_connected_SIT:
+      case ERR_critical_battery:
+      case ERR_normal_battery:
+      case ERR_charging_battery:
+      case ERR_notcharging_battery:
+         return -1;
+         break;
+
+      /* actual errors */
+      case ERR_both_limits_active:
+      case ERR_invalid_direction_req:
+      case ERR_invalid_speed_req:
+      case ERR_speed_zero_req:
+      case ERR_emergency_stop:
+      case ERR_no_movement:
+      case ERR_over_speed:
+      case ERR_unassigned:
+      case ERR_wrong_direction:
+      case ERR_lifter_stuck_at_limit:
+      case ERR_actuation_not_complete:
+      case ERR_not_leave_conceal:
+      case ERR_not_leave_expose:
+      case ERR_not_reach_expose:
+      case ERR_not_reach_conceal:
+      case ERR_low_battery:
+      case ERR_engine_stop:
+      case ERR_IR_failure:
+      case ERR_audio_failure:
+      case ERR_miles_failure:
+      case ERR_thermal_failure:
+      case ERR_hit_sensor_failure:
+      case ERR_invalid_target_type:
+      case ERR_bad_RF_packet:
+      case ERR_bad_checksum:
+      case ERR_unsupported_command:
+      case ERR_invalid_exception:
+      case ERR_disconnected_SIT:
+         return 1;
+         break;
+   }
+}
+
 void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    /* 
     * Lifter Commands: expose, conceal
@@ -120,16 +178,34 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
       minion->S.resp.mover_command = move_right; \
       START_MOVE_TIMER(minion->S); /* pretend to start moving */ \
    }
+   #define fake_movement_stop() { \
+      minion->S.move.newdata = 0; \
+      minion->S.resp.mover_command = move_stop; \
+      minion->S.speed.data = 0.0; \
+      switch (minion->S.dev_type) { \
+         default: \
+         case Type_MIT: \
+            setTimerTo(minion->S.move, timer, flags, MIT_MOVE_START_TIME, F_move_end_movement); \
+            break; \
+         case Type_MAT: \
+            setTimerTo(minion->S.move, timer, flags, MAT_MOVE_START_TIME, F_move_end_movement); \
+            break; \
+      } \
+   }
    #define fake_movement_left() { \
       minion->S.move.newdata = 2; \
       minion->S.resp.mover_command = move_left; \
       START_MOVE_TIMER(minion->S); /* pretend to start moving */ \
    }
    #define fake_transition_up() { \
-      START_EXPOSE_TIMER(minion->S); \
+      if (!faking_up) { \
+         START_EXPOSE_TIMER(minion->S); \
+      } \
    }
    #define fake_transition_down() { \
-      START_CONCEAL_TIMER(minion->S); \
+      if (!faking_down) { \
+         START_CONCEAL_TIMER(minion->S); \
+      } \
    }
    #define send_stop_message() { \
       LB_move_t L; \
@@ -215,12 +291,52 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    }
 
    // quick lookup items -- so it is easier to follow logic below
-   int fault, killed;
+   int fault, killed, should_be_moving;
    int same_move_status, same_position_status, same_speed_status, same_hit_status, same_lift_status, same_direction;
    int at_home, at_end, in_middle;
-   int moving_right, moving_left;
-
+   int moving_right, moving_left, slower, faster, faking_left, faking_right, faking_stopped, faking_up, faking_down;
    int need_fill_lifter_status = 1;
+
+   #define DEBUG_PARAMETER(p) { \
+      printf("%s=%i\n", #p, p); \
+   }
+   #define DEBUG_REAL_2_FAKE(c) { \
+      DCOLOR(c); \
+      printf("___________________________________________________________\nMinion %i creating fake status from real parameters:\n @ %s:%i\n", minion->mID, __FILE__, __LINE__); \
+      DEBUG_PARAMETER(fault); \
+      DEBUG_PARAMETER(killed); \
+      DEBUG_PARAMETER(should_be_moving); \
+      DEBUG_PARAMETER(same_move_status); \
+      DEBUG_PARAMETER(same_position_status); \
+      DEBUG_PARAMETER(same_speed_status); \
+      DEBUG_PARAMETER(same_hit_status); \
+      DEBUG_PARAMETER(same_lift_status); \
+      DEBUG_PARAMETER(same_direction); \
+      DEBUG_PARAMETER(at_home); \
+      DEBUG_PARAMETER(at_end); \
+      DEBUG_PARAMETER(in_middle); \
+      DEBUG_PARAMETER(moving_right); \
+      DEBUG_PARAMETER(moving_left); \
+      DEBUG_PARAMETER(slower); \
+      DEBUG_PARAMETER(faster); \
+      DEBUG_PARAMETER(faking_left); \
+      DEBUG_PARAMETER(faking_right); \
+      DEBUG_PARAMETER(faking_stopped); \
+      DEBUG_PARAMETER(faking_up); \
+      DEBUG_PARAMETER(faking_down); \
+      DEBUG_PARAMETER(minion->S.resp.current_position); \
+      DEBUG_PARAMETER(minion->S.resp.last_position); \
+      DEBUG_PARAMETER(minion->S.resp.mover_command); \
+      DEBUG_PARAMETER(minion->S.exp.last_step); \
+      DEBUG_PARAMETER(minion->S.resp.current_speed); \
+      DEBUG_PARAMETER(minion->S.resp.last_speed); \
+      DEBUG_PARAMETER(minion->S.resp.current_exp); \
+      DEBUG_PARAMETER(minion->S.resp.last_exp); \
+      DEBUG_PARAMETER(minion->S.react.newdata); \
+      DEBUG_PARAMETER(minion->S.fault.data); \
+      printf("\n___________________________________________________________ @ %s:%i\n", __FILE__, __LINE__); \
+      DCOLOR(black); \
+   }
 
    if (minion->S.resp.newdata == 0) {
       // No data? You can't handle no data!
@@ -228,56 +344,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    }
 
    // fill in quick lookup items
-   switch(minion->S.fault.data) {
-      default: /* future statuses that aren't in the FASIT spec won't cause a fault here by default */
-      case ERR_normal:
-      case ERR_stop_right_limit:
-      case ERR_stop_left_limit:
-      case ERR_stop_by_distance:
-      case ERR_stop:
-      case ERR_target_killed:
-      case ERR_critical_battery:
-      case ERR_normal_battery:
-      case ERR_charging_battery:
-      case ERR_notcharging_battery:
-      case ERR_left_dock_limit:
-      case ERR_stop_dock_limit:
-      case ERR_connected_SIT:
-         fault = 0;
-         break;
-
-      case ERR_both_limits_active:
-      case ERR_invalid_direction_req:
-      case ERR_invalid_speed_req:
-      case ERR_speed_zero_req:
-      case ERR_emergency_stop:
-      case ERR_no_movement:
-      case ERR_over_speed:
-      case ERR_unassigned:
-      case ERR_wrong_direction:
-      case ERR_lifter_stuck_at_limit:
-      case ERR_actuation_not_complete:
-      case ERR_not_leave_conceal:
-      case ERR_not_leave_expose:
-      case ERR_not_reach_expose:
-      case ERR_not_reach_conceal:
-      case ERR_low_battery:
-      case ERR_engine_stop:
-      case ERR_IR_failure:
-      case ERR_audio_failure:
-      case ERR_miles_failure:
-      case ERR_thermal_failure:
-      case ERR_hit_sensor_failure:
-      case ERR_invalid_target_type:
-      case ERR_bad_RF_packet:
-      case ERR_bad_checksum:
-      case ERR_unsupported_command:
-      case ERR_invalid_exception:
-      case ERR_disconnected_SIT:
-         fault = 1;
-         break;
-   }
-   killed = minion->S.resp.data <= 0 ? 1 : 0;
+   fault = badFault(minion->S.fault.data) == 1 ? 1 : 0;
+   killed = minion->S.resp.data < 0 ? 1 : 0;
    same_move_status = minion->S.resp.current_direction == minion->S.resp.last_direction ? 1 : 0;
    same_position_status = minion->S.resp.current_position == minion->S.resp.last_position ? 1 : 0;
    same_speed_status = minion->S.resp.current_speed == minion->S.resp.last_speed ? 1 : 0;
@@ -299,14 +367,147 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
       moving_right = minion->S.resp.current_direction == 1 ? 1 : 0;
       moving_left = minion->S.resp.current_direction == 0 ? 1 : 0;
    }
+   if (minion->S.resp.current_speed == minion->S.resp.last_speed) {
+      slower = 0;
+      faster = 0;
+   } else if (minion->S.resp.current_speed > minion->S.resp.last_speed) {
+      slower = 0;
+      faster = 1;
+   } else {
+      slower = 1;
+      faster = 0;
+   }
    if ((minion->S.resp.current_speed == minion->S.resp.last_speed ||
        (minion->S.resp.current_speed > 0 && minion->S.resp.last_speed > 0)) &&
        minion->S.resp.current_direction == minion->S.resp.last_direction) {
-      same_direction == 1;
+      same_direction = 1;
    } else {
-      same_direction == 0;
+      same_direction = 0;
+   }
+   if (minion->S.resp.mover_command == move_stop || (killed && /* command stopped or killed and ... */
+       (minion->S.react.newdata == react_stop || minion->S.react.newdata == react_stop_and_fall) && /* not stopping and ... */
+       (minion->S.resp.mover_command == move_continuous || /* not moving continuously or ... */
+        (minion->S.resp.mover_command == move_left && !at_home) || /* not reached home or ... */
+        (minion->S.resp.mover_command == move_right && !at_end)))) { /* not reached end */
+      should_be_moving = 0;
+   } else { /* otherwise it should be moving */
+      should_be_moving = 1;
+   }
+   switch (minion->S.exp.last_step) {
+      default:
+      case TS_exp_to_con:
+      case TS_concealed:
+         faking_down = 1;
+         faking_up = 0;
+         break;
+      case TS_con_to_exp:
+      case TS_exposed:
+         faking_down = 0;
+         faking_up = 1;
+         break;
+   }
+   if (minion->S.speed.data > 0.0) {
+      faking_stopped = 0;
+      if (minion->S.move.data == 1) {
+         faking_right = 1;
+         faking_left = 0;
+      } else {
+         faking_right = 0;
+         faking_left = 1;
+      }
+   } else {
+      faking_stopped = 1;
+      faking_left = 0;
+      faking_right = 0;
    }
 
+   // attempt 2 -- try to determine overall set of circumstances for each output individually
+   // check to see if there was a detected failure
+   if (fault) {
+      DEBUG_REAL_2_FAKE(MAGENTA);
+      create_fail_status(minion->S.fault.data); // we're already set correctly, but this will show debug output
+      update_movement_status();
+      maybe_update_lift_status();
+      sendStatus2102(0, NULL,minion,mt); // tell FASIT server
+      return;
+   }
+
+   // mover stuff
+   // check to see if we failed stopping
+   if (minion->S.resp.mover_command != move_dock && /* not docking and ... */
+       !should_be_moving && (moving_left || moving_right) && /* shouldn't be moving and is moving and ... */
+       (faster || !slower)) { /* is moving faster or same speed */
+      DEBUG_REAL_2_FAKE(MAGENTA);
+      create_fail_status(ERR_over_speed);
+      send_stop_message();
+      fake_movement_stop();
+   }
+   // check to see if we failed movement
+   else if (minion->S.resp.mover_command != move_dock && /* not docking and ... */
+            should_be_moving && !moving_left && !moving_right && same_position_status) { /* should be moving and isn't */
+
+      DEBUG_REAL_2_FAKE(MAGENTA);
+      create_fail_status(ERR_no_movement);
+      fake_movement_stop();
+   }
+   // check to see if we should fake movement right (when continuous moving)
+   else if (minion->S.resp.mover_command == move_continuous && should_be_moving && /* should be moving back and forth */
+       ((minion->S.resp.current_speed == 0 && at_home) || /* and is either at home or ... */
+        (moving_right && (faking_stopped || faking_left)))) { /* is moving right and we're faking stopped or left */
+      DEBUG_REAL_2_FAKE(MAGENTA);
+      fake_movement_right();
+   }
+   // check to see if we should fake movement left (when continuous moving)
+   else if (minion->S.resp.mover_command == move_continuous && should_be_moving && /* should be moving back and forth */
+       ((minion->S.resp.current_speed == 0 && at_end) || /* and is either at end or ... */
+        (moving_left && (faking_stopped || faking_right)))) { /* is moving left and we're faking stopped or right */
+      DEBUG_REAL_2_FAKE(MAGENTA);
+      fake_movement_left();
+   }
+
+   // lifter stuff
+   // check to see if we failed transition up (but didn't get shot down)
+   if (minion->S.resp.current_exp == 0 && same_lift_status && minion->S.resp.lifter_command == lift_expose && /* down for a while and commanded up and ... */
+       !(!killed && minion->S.react.newdata == react_bob) && /* not alive-and-bobbing and ... */
+       !(killed && ( /* not shot down (killed and ... */
+         minion->S.react.newdata == react_bob || /* bobbing or ... */
+         minion->S.react.newdata == react_fall || /* falling or ... */
+         minion->S.react.newdata == react_stop_and_fall))) /* stopping-and-falling) */ {
+      DEBUG_REAL_2_FAKE(MAGENTA);
+      create_fail_status(ERR_not_leave_expose);
+      fake_transition_up();
+   }
+   // check to see if we failed transition down (either from command or shot down)
+   else if (minion->S.resp.current_exp == 90 && same_lift_status && /* up for a while and ... */
+            (minion->S.resp.lifter_command == lift_conceal || /* commanded down or ... */
+             (killed && (/* shot down (killed and ... */
+              minion->S.react.newdata == react_bob || /* bobbing or ... */
+              minion->S.react.newdata == react_fall || /* falling or ... */
+              minion->S.react.newdata == react_stop_and_fall)))) /* stopping-and-falling) */ {
+      DEBUG_REAL_2_FAKE(MAGENTA);
+      create_fail_status(ERR_not_leave_conceal);
+      fake_transition_down();
+   }
+   // check to see if we should fake transition up (when bobbing)
+   else if (minion->S.react.newdata == react_bob && faking_down && /* bobbing and faking down and ... */
+            minion->S.resp.current_exp == 90) { /* is up */
+      DEBUG_REAL_2_FAKE(MAGENTA);
+      fake_transition_up();
+   }
+   // check to see if we should fake transition down (when bobbing or shot down)
+   else if (faking_up && /* faking up and ... */
+            ((killed && (/* shot down (killed and ... */
+              minion->S.react.newdata == react_bob || /* bobbing or ... */
+              minion->S.react.newdata == react_fall || /* falling or ... */
+              minion->S.react.newdata == react_stop_and_fall)) || /* stopping-and-falling) or ... */
+             (minion->S.react.newdata == react_bob && /* bobbing and ... */
+              minion->S.resp.current_exp == 0))) { /* is down */
+      DEBUG_REAL_2_FAKE(MAGENTA);
+      fake_transition_down();
+   }
+   DCMSG(YELLOW, "No status update...");
+   DEBUG_REAL_2_FAKE(YELLOW);
+#if 0 /* attempt 1 -- try to follow status tree to see what to do -- complete distaster */
    // start filling in the data we report to the FASIT server based on what we expect vs. what we heard over RF
    if (fault) {
       update_movement_status();
@@ -552,6 +753,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
          maybe_update_lift_status();
       }
    }
+#endif /* end of attempt 1 */
 }
 
 int read_FASIT_msg(thread_data_t *minion,char *buf, int bufsize){
@@ -1293,7 +1495,7 @@ void send_LB_exp(thread_data_t *minion, int expose, minion_time_t *mt) {
       minion->S.exp.cmd_end_time[minion->S.exp.event] = 0; // reset cmd end time
       minion->S.exp.log_end_time[minion->S.exp.event] = 0; // reset log end time
       // set our response cache kill and expose data as fresh
-      minion->S.resp.data = minion->S.tokill.newdata;
+      minion->S.resp.data = minion->S.tokill.newdata - 1; // minus one so when we're killed it tests differently than the initial state of zero (killed == -1 or less)
       minion->S.resp.last_exp = -1; // won't match as "same" next time
    } else {
       LB_exp->event=minion->S.exp.event;  // just fill in the event
@@ -2671,13 +2873,16 @@ void *minion_thread(thread_data_t *minion){
 
                case LBC_STATUS_RESP:
                {
-                  if (minion->S.ignoring_response) {
-                     DDCMSG(D_POINTER, CYAN, "Ignored LBC_STATUS_RESP for now...");
-                     //DDpacket((char*)LB, RF_size(LBC_STATUS_RESP));
-                     break;
-                  }
                   LB_status_resp_t *L=(LB_status_resp_t *)(LB); // map our bitfields in
                   
+                  if (minion->S.ignoring_response) {
+                     if (badFault(L->fault) == 0) {
+                        DDCMSG(D_POINTER, CYAN, "Ignored LBC_STATUS_RESP for now...");
+                        //DDpacket((char*)LB, RF_size(LBC_STATUS_RESP));
+                        break;
+                     }
+                  }
+
                   DDCMSG(D_POINTER, MAGENTA, "Found new data for minion %i", minion->mID);
                   // check to see if we have previous valid data
                   if (minion->S.resp.newdata) { // did we have valid data before?

@@ -39,8 +39,10 @@ int open_port(char *sport, int hardflow){
 
    if (hardflow&8) {
       rw = O_RDONLY; // we're just reading
+      strcat(sbuf,"Read-Only ");
    } else if (hardflow&0x10) {
       rw = O_WRONLY; // we're just writing
+      strcat(sbuf,"Write-Only ");
    }
 
    if (hardflow&2) {

@@ -89,6 +89,17 @@ void setnonblocking(int fd) {
    }
 }
 
+/*
+#define MIN_WRITE 15
+void padTTY(int tty, int s) {
+   if (s < MIN_WRITE) {
+      char emptbuf[MIN_WRITE];
+      memset(emptbuf, 0, MIN_WRITE);
+      DCMSG(GREEN, "TTY PADDING %i BYTES", MIN_WRITE - s);
+      write(tty, emptbuf, MIN_WRITE - s);
+   }
+} */
+
 // add message to the write buffer
 static void queueMsg(char *msgbuf, int *buflen, void *msg, int size) {
 
@@ -502,6 +513,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
 
                if (tbuf_size > RF_size(LBb->cmd)) {  // if we have something to Tx, Tx it.
                   char *out_buf = TransBuf;
+                  //int tbt;
                   CURRENT_TIME(elapsed_time);
                   DDCMSG(D_TIME, YELLOW, "TX @ Remaining time: %i %i, Elapsed time: %3i.%03i ", remaining_time, slottime, DEBUG_MS(elapsed_time));
 
@@ -517,10 +529,10 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                      ev.data.fd = *riclient; // remember for later
                   }
 
+                  //tbt=tbuf_size;
+                  setblocking(RFfd);
                   do {
-                     setblocking(RFfd);
                      result=write(RFfd, out_buf, tbuf_size);
-                     setnonblocking(RFfd);
                      if (result<0){
                         strerror_r(errno,buf,200);                
                         DCMSG(RED,"write Tx queue to RF error %s",buf);
@@ -563,6 +575,8 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                         }
                      }
                   } while (result < tbuf_size);
+                  //padTTY(RFfd, tbt);
+                  setnonblocking(RFfd);
                   // remove items from Tx queue, sending messages back to mcp as needed
                   DDqueue(D_MEGA|D_POINTER, Tx, "Tx before sentItems...", queueLength(Tx));
                   qi = Tx->next; // remove from head

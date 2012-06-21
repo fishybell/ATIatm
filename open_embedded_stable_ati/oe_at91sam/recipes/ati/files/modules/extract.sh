@@ -48,6 +48,15 @@ mv sysvinit/sysvinit/inittab /etc
 echo "Finished Copying Files"
 echo ""
 
+if [ "$(eeprom_rw read -addr 0x550 -size 3)" -lt 200 ] ; then
+   echo "Changing radio to maximum awesomeness"
+   echo ""
+
+   echo "255" | eeprom_rw write -addr 0x550 -size 3 -blank 4
+   echo "255" | eeprom_rw write -addr 0x554 -size 3 -blank 4
+   echo "25" | eeprom_rw write -addr 0x558 -size 2 -blank 2
+fi
+
 echo "Restarting Device"
 echo ""
 sleep 5

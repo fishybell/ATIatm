@@ -267,7 +267,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
 
    // if we're tty, block
    if (tty) {
-      setblocking(rc->tty);
+      //setblocking(rc->tty);
    }
 
    // write all the data we can
@@ -290,7 +290,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
       if (s == 0 || err == EAGAIN) {
          // if we're tty, block no more
          if (tty) {
-            setnonblocking(rc->tty, 0);
+            //setnonblocking(rc->tty, 0);
          }
 
          // try again later
@@ -301,7 +301,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
          DDCMSG(D_RF, tty ? cyan : blue, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
          // if we're tty, block no more
          if (tty) {
-            setnonblocking(rc->tty, 0);
+            //setnonblocking(rc->tty, 0);
          }
 
          return tty ? rem_ttyEpoll : rem_sockEpoll;
@@ -322,7 +322,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
             DDCMSG(D_RF, tty ? cyan : blue, "%s Dead at %i", tty ? "TTY" : "SOCKET", __LINE__);
             // if we're tty, block no more
             if (tty) {
-               setnonblocking(rc->tty, 0);
+               //setnonblocking(rc->tty, 0);
       //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
                clearTxQ(rc);
             }
@@ -337,7 +337,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
 
       // if we're tty, block no more
       if (tty) {
-         setnonblocking(rc->tty, 0);
+         //setnonblocking(rc->tty, 0);
       //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
          clearTxQ(rc); // if we didn't write the whole thing, oh well, we had our chance
       }
@@ -358,7 +358,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
 
       // if we're tty, block no more
       if (tty) {
-         setnonblocking(rc->tty, 0);
+         //setnonblocking(rc->tty, 0);
       }
 
       // don't try writing again
@@ -371,7 +371,7 @@ int rcWrite(rf_connection_t *rc, int tty) {
 
    // if we're tty, block no more
    if (tty) {
-      setnonblocking(rc->tty, 0);
+      //setnonblocking(rc->tty, 0);
       //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
       clearTxQ(rc);
    }
@@ -496,7 +496,7 @@ void addAddrToLastIDs(rf_connection_t *rc, int addr) {
          }
       }
    } else {
-      //DDCMSG(D_POINTER, BLUE, "adding fake @ index %i", rc->id_lasttime_index + 1);
+      DDCMSG(D_POINTER, BLUE, "adding fake @ index %i", rc->id_lasttime_index + 1);
    }
 
    // add address to id list
@@ -893,7 +893,7 @@ int sock2tty(rf_connection_t *rc) {
          DDCMSG(D_T_SLOT, BLACK, "Looking at ts %i...", ts);
          if (rc->ids_lasttime[ts] == FAKE_DEVID) {
             break; // found our real slot
-         } else if (rc->ids_lasttime[i] == FAKE_ID) {
+         } else if (rc->ids_lasttime[ts] == FAKE_ID) {
             fakes++; // found another fake
             DDCMSG(D_POINTER, GREEN, "another of fake: %i", fakes);
          } else {
