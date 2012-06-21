@@ -2998,7 +2998,7 @@ static void pid_step() {
        b = pid_error - pid_last_error;
        c = (kd_d * delta) / 1000;
        pid_d = ((a * b) / c); */
-       if (delta > 0){
+       if (kd_d > 0 && delta > 0){
        pid_d = ((((1000 * kd_m) * (pid_error - pid_last_error)) / (kd_d * delta)) / 1000);
        }
 
