@@ -111,16 +111,18 @@ int badFault(int fault) {
       case ERR_target_killed:
       case ERR_left_dock_limit:
       case ERR_stop_dock_limit:
-         return 0;
+         return 0; // these are simulated
          break;
 
       /* even the ones that are actual statuses below should be treated as faults so the FASIT server sees them */
-      case ERR_connected_SIT:
       case ERR_critical_battery:
       case ERR_normal_battery:
       case ERR_charging_battery:
+         return -2; // non-status fields that are sent continuously to the FASIT server
+         break;
+      case ERR_connected_SIT:
       case ERR_notcharging_battery:
-         return -1;
+         return -1; // non-status fields that are sent to the FASIT server
          break;
 
       /* actual errors */
@@ -217,7 +219,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
       psend_mcp(minion, &L); \
    }
    #define create_fail_status(fail) { \
-      DCMSG(CYAN, "___________________________________________________________\ncreate_fail_status(%s) for minion %i, devid %3x @ %s:%i\n___________________________________________________________", #fail, minion->mID, minion->devid, __FILE__, __LINE__); \
+      DCMSG(CYAN, "___________________________________________________________\ncreate_fail_status(%s=%i) for minion %i, devid %3x @ %s:%i\n___________________________________________________________", #fail, fail, minion->mID, minion->devid, __FILE__, __LINE__); \
       minion->S.fault.data = fail; \
    }
    #define update_movement_status() { \
@@ -295,7 +297,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    int same_move_status, same_position_status, same_speed_status, same_hit_status, same_lift_status, same_direction;
    int at_home, at_end, in_middle;
    int moving_right, moving_left, slower, faster, faking_left, faking_right, faking_stopped, faking_up, faking_down;
-   int need_fill_lifter_status = 1;
+   int need_fill_lifter_status = 1, need_tell_FASIT = 0;
 
    #define DEBUG_PARAMETER(p) { \
       printf("%s=%i\n", #p, p); \
@@ -327,6 +329,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
       DEBUG_PARAMETER(minion->S.resp.current_position); \
       DEBUG_PARAMETER(minion->S.resp.last_position); \
       DEBUG_PARAMETER(minion->S.resp.mover_command); \
+      DEBUG_PARAMETER(minion->S.resp.lifter_command); \
       DEBUG_PARAMETER(minion->S.exp.last_step); \
       DEBUG_PARAMETER(minion->S.resp.current_speed); \
       DEBUG_PARAMETER(minion->S.resp.last_speed); \
@@ -427,7 +430,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
       DEBUG_REAL_2_FAKE(MAGENTA);
       create_fail_status(minion->S.fault.data); // we're already set correctly, but this will show debug output
       update_movement_status();
-      maybe_update_lift_status();
+      //maybe_update_lift_status(); -- or maybe not
       sendStatus2102(0, NULL,minion,mt); // tell FASIT server
       return;
    }
@@ -438,17 +441,21 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
        !should_be_moving && (moving_left || moving_right) && /* shouldn't be moving and is moving and ... */
        (faster || !slower)) { /* is moving faster or same speed */
       DEBUG_REAL_2_FAKE(MAGENTA);
-      create_fail_status(ERR_over_speed);
+      create_fail_status(ERR_over_speed); // for logging only
+      create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
       send_stop_message();
       fake_movement_stop();
+      need_tell_FASIT = 1;
    }
    // check to see if we failed movement
    else if (minion->S.resp.mover_command != move_dock && /* not docking and ... */
             should_be_moving && !moving_left && !moving_right && same_position_status) { /* should be moving and isn't */
 
       DEBUG_REAL_2_FAKE(MAGENTA);
-      create_fail_status(ERR_no_movement);
+      create_fail_status(ERR_no_movement); // for logging only
+      create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
       fake_movement_stop();
+      need_tell_FASIT = 1;
    }
    // check to see if we should fake movement right (when continuous moving)
    else if (minion->S.resp.mover_command == move_continuous && should_be_moving && /* should be moving back and forth */
@@ -467,26 +474,31 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
 
    // lifter stuff
    // check to see if we failed transition up (but didn't get shot down)
-   if (minion->S.resp.current_exp == 0 && same_lift_status && minion->S.resp.lifter_command == lift_expose && /* down for a while and commanded up and ... */
+   if (minion->S.resp.current_exp == 0 && same_lift_status && faking_up && /* down for a while and faking up and ... */
+       /* minion->S.resp.lifter_command == lift_expose && -- should we even check commanded up ? ... */
        !(!killed && minion->S.react.newdata == react_bob) && /* not alive-and-bobbing and ... */
        !(killed && ( /* not shot down (killed and ... */
          minion->S.react.newdata == react_bob || /* bobbing or ... */
          minion->S.react.newdata == react_fall || /* falling or ... */
          minion->S.react.newdata == react_stop_and_fall))) /* stopping-and-falling) */ {
       DEBUG_REAL_2_FAKE(MAGENTA);
-      create_fail_status(ERR_not_leave_expose);
+      create_fail_status(ERR_not_leave_expose); // for logging only
+      create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
       fake_transition_up();
+      need_tell_FASIT = 1;
    }
    // check to see if we failed transition down (either from command or shot down)
-   else if (minion->S.resp.current_exp == 90 && same_lift_status && /* up for a while and ... */
+   else if (minion->S.resp.current_exp == 90 && same_lift_status && faking_down && /* up for a while and faking down and ... */
             (minion->S.resp.lifter_command == lift_conceal || /* commanded down or ... */
              (killed && (/* shot down (killed and ... */
               minion->S.react.newdata == react_bob || /* bobbing or ... */
               minion->S.react.newdata == react_fall || /* falling or ... */
               minion->S.react.newdata == react_stop_and_fall)))) /* stopping-and-falling) */ {
       DEBUG_REAL_2_FAKE(MAGENTA);
-      create_fail_status(ERR_not_leave_conceal);
+      create_fail_status(ERR_not_leave_conceal); // for logging only
+      create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
       fake_transition_down();
+      need_tell_FASIT = 1;
    }
    // check to see if we should fake transition up (when bobbing)
    else if (minion->S.react.newdata == react_bob && faking_down && /* bobbing and faking down and ... */
@@ -505,8 +517,12 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
       DEBUG_REAL_2_FAKE(MAGENTA);
       fake_transition_down();
    }
-   DCMSG(YELLOW, "No status update...");
-   DEBUG_REAL_2_FAKE(YELLOW);
+   if (need_tell_FASIT) {
+      sendStatus2102(0, NULL,minion,mt); // tell FASIT server
+   } else {
+      DCMSG(YELLOW, "No status update...");
+      DEBUG_REAL_2_FAKE(YELLOW);
+   }
 #if 0 /* attempt 1 -- try to follow status tree to see what to do -- complete distaster */
    // start filling in the data we report to the FASIT server based on what we expect vs. what we heard over RF
    if (fault) {
@@ -522,7 +538,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                // expect to be moving: any status, including stopped at an end for a moment, is okay
                if (minion->S.resp.current_speed == 0) {
                   if (same_move_status || in_middle) {
-                     create_fail_status(ERR_no_movement);
+                     create_fail_status(ERR_no_movement); // for logging only
+                     create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   } else if (at_home) {
                      fake_movement_right();
                   } else if (at_end) {
@@ -538,13 +555,15 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                      // do nothing but update below
                   } else if (same_position_status) {
                      // home or middle are no place to be
-                     create_fail_status(ERR_no_movement);
+                     create_fail_status(ERR_no_movement); // for logging only
+                     create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   }
                } else if (moving_right) {
                   // looks good so far
                   // do nothing but update below
                } else if (moving_left) {
-                  create_fail_status(ERR_wrong_direction);
+                  create_fail_status(ERR_wrong_direction); // for logging only
+                  create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                }
             } break;
             case move_left: {
@@ -555,13 +574,15 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                      // do nothing but update below
                   } else if (same_position_status) {
                      // end or middle are no place to be
-                     create_fail_status(ERR_no_movement);
+                     create_fail_status(ERR_no_movement); // for logging only
+                     create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   }
                } else if (moving_right) {
                   // looks good so far
                   // do nothing but update below
                } else if (moving_left) {
-                  create_fail_status(ERR_wrong_direction);
+                  create_fail_status(ERR_wrong_direction); // for logging only
+                  create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                }
             } break;
             case move_stop: {
@@ -572,7 +593,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                } else if(!same_position_status) {
                   if (same_speed_status || minion->S.resp.current_speed > minion->S.resp.last_speed) {
                      // not stopping
-                     create_fail_status(ERR_over_speed);
+                     create_fail_status(ERR_over_speed); // for logging only
+                     create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                      send_stop_message(); // perhaps it didn't hear? try again
                   } else {
                      // still stopping
@@ -595,21 +617,25 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                      if (minion->S.react.newdata == react_bob) {
                         if (same_hit_status) {
                            // if we haven't received any new hits, we should be up
-                           create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error
+                           create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error // for logging only
+                           create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                         } else if (same_lift_status) {
                            // malfunction or bug in software
-                           create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error
+                           create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error // for logging only
+                           create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                         } else {
                            // normal bobbing action
                            fake_transition_up();
                         }
                      } else {
                         // malfunction or bug in software
-                        create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error
+                        create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error // for logging only
+                        create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                      }
                   } else if (same_lift_status) {
                      // malfunction or bug in software
-                     create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error
+                     create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error // for logging only
+                     create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   } else {
                      // start of lift
                      dont_update_lift_status();
@@ -624,7 +650,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                if (minion->S.resp.current_exp == 90) {
                   if (same_lift_status) {
                      // went down, then came back up? bad juju (might also have did_exp_cmd set, but we still want same_lift_status, so ignore it)
-                     create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error
+                     create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error // for logging only
+                     create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   } else {
                      // start of conceal
                      dont_update_lift_status();
@@ -649,7 +676,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
             } else if(!same_position_status) {
                if (same_speed_status || minion->S.resp.current_speed > minion->S.resp.last_speed) {
                   // not stopping
-                  create_fail_status(ERR_over_speed);
+                  create_fail_status(ERR_over_speed); // for logging only
+                  create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   send_stop_message(); // run away mover! try to stop it
                } else {
                   // still stopping
@@ -666,11 +694,13 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                      // do nothing but update below
                   } else if (same_position_status) {
                      // stopped prematurely
-                     create_fail_status(ERR_no_movement);
+                     create_fail_status(ERR_no_movement); // for logging only
+                     create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   }
                } else if (moving_right) {
                   // turned around, so obviously not stopping
-                  create_fail_status(ERR_wrong_direction);
+                  create_fail_status(ERR_wrong_direction); // for logging only
+                  create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   send_stop_message(); // run away mover! try to stop it
                } else {
                   // still moving towards home (or dock)
@@ -684,11 +714,13 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                      // do nothing but update below
                   } else if (same_position_status) {
                      // stopped prematurely
-                     create_fail_status(ERR_no_movement);
+                     create_fail_status(ERR_no_movement); // for logging only
+                     create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   }
                } else if (moving_left) {
                   // turned around, so obviously not stopping
-                  create_fail_status(ERR_wrong_direction);
+                  create_fail_status(ERR_wrong_direction); // for logging only
+                  create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                   send_stop_message(); // run away mover! try to stop it
                } else {
                   // still moving towards end (or dock)
@@ -705,7 +737,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                      if ((moving_left && minion->S.resp.current_position < minion->S.resp.last_position) ||
                          (moving_right && minion->S.resp.current_position > minion->S.resp.last_position)) {
                         // not stopping
-                        create_fail_status(ERR_no_movement);
+                        create_fail_status(ERR_no_movement); // for logging only
+                        create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                         send_stop_message(); // run away mover! try to stop it
                      } else {
                         // still stopping
@@ -713,7 +746,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                      }
                   } else {
                      // turned around, so obviously not stopping
-                     create_fail_status(ERR_wrong_direction);
+                     create_fail_status(ERR_wrong_direction); // for logging only
+                     create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
                      send_stop_message(); // run away mover! try to stop it
                   }
                }
@@ -731,7 +765,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
                dont_update_lift_status();
             } else if (same_lift_status) {
                // didn't conceal, presume malfunction
-               create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error
+               create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error // for logging only
+               create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
             } else {
                // start of conceal
                dont_update_lift_status();
@@ -743,7 +778,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
             // should stay up
             if (minion->S.resp.current_exp == 0) {
                // shouldn't have concealed, presume malfunction
-               create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error
+               create_fail_status(ERR_unassigned); // treat as normal for now -- lifter should have found its own error // for logging only
+               create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
             } else {
                // correctly up
                dont_update_lift_status();
@@ -911,6 +947,10 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion, minion_t
    msg.body.pstatus = 0; // always "shore" power
    CACHE_CHECK(minion->S.fault);
    msg.body.fault = htons(minion->S.fault.data);
+   if (badFault(minion->S.fault.data) != -2) {
+      // it is a one-off message...reset
+      minion->S.fault.data = ERR_normal;
+   }
 
    // hit record
    // CACHE_CHECK(minion->S.exp); always zero with new hit time message
@@ -1274,26 +1314,26 @@ void change_states_internal(thread_data_t *minion, minion_time_t *mt, trans_step
    switch (minion->S.exp.data) {
       case 0:
          if (minion->S.exp.last_step != TS_concealed) {
-            //DDCMSG(D_POINTER|D_NEW, YELLOW, "Force sending here @ %i derived from exp.data=%i & last_step=%s", __LINE__, minion->S.exp.data, step_words[minion->S.exp.last_step]);
+            DDCMSG(D_POINTER|D_NEW, YELLOW, "Force sending here @ %i derived from exp.data=%i & last_step=%s", __LINE__, minion->S.exp.data, step_words[minion->S.exp.last_step]);
             force_send = 1;
          }
          break;
       case 45:
          if (minion->S.exp.newdata == 90) {
             if (minion->S.exp.last_step != TS_con_to_exp) {
-               //DDCMSG(D_POINTER|D_NEW, YELLOW, "Force sending here @ %i derived from exp.data=%i & last_step=%s", __LINE__, minion->S.exp.data, step_words[minion->S.exp.last_step]);
+               DDCMSG(D_POINTER|D_NEW, YELLOW, "Force sending here @ %i derived from exp.data=%i & last_step=%s", __LINE__, minion->S.exp.data, step_words[minion->S.exp.last_step]);
                force_send = 1;
             }
          } else {
             if (minion->S.exp.last_step != TS_exp_to_con) {
-               //DDCMSG(D_POINTER|D_NEW, YELLOW, "Force sending here @ %i derived from exp.data=%i & last_step=%s", __LINE__, minion->S.exp.data, step_words[minion->S.exp.last_step]);
+               DDCMSG(D_POINTER|D_NEW, YELLOW, "Force sending here @ %i derived from exp.data=%i & last_step=%s", __LINE__, minion->S.exp.data, step_words[minion->S.exp.last_step]);
                force_send = 1;
             }
          }
          break;
       case 90:
          if (minion->S.exp.last_step != TS_exposed) {
-            //DDCMSG(D_POINTER|D_NEW, YELLOW, "Force sending here @ %i derived from exp.data=%i & last_step=%s", __LINE__, minion->S.exp.data, step_words[minion->S.exp.last_step]);
+            DDCMSG(D_POINTER|D_NEW, YELLOW, "Force sending here @ %i derived from exp.data=%i & last_step=%s", __LINE__, minion->S.exp.data, step_words[minion->S.exp.last_step]);
             force_send = 1;
          }
          break;
@@ -1304,6 +1344,7 @@ void change_states_internal(thread_data_t *minion, minion_time_t *mt, trans_step
       // remove the force after one use
       if (minion->S.exp.last_step == step && force) {
          force = 0;
+         DDCMSG(D_POINTER|D_NEW, YELLOW, "Force sending here @ %i derived from exp.last_step=%s & step=%s & force=%i", __LINE__, step_words[minion->S.exp.last_step], step_words[step], force);
          force_send = 1; // force hand next send
       }
 
@@ -2875,11 +2916,18 @@ void *minion_thread(thread_data_t *minion){
                {
                   LB_status_resp_t *L=(LB_status_resp_t *)(LB); // map our bitfields in
                   
+                  // simulated fault fields are ignored and never sent from here
+                  if (badFault(L->fault) == 0) {
+                     minion->S.fault.data = ERR_normal; // clear out these non-statuses immediately
+                  }
                   if (minion->S.ignoring_response) {
-                     if (badFault(L->fault) == 0) {
+                     if (badFault(L->fault) != 1) { // type 1 (faults) need to be ignored, everything is data we want to send
                         DDCMSG(D_POINTER, CYAN, "Ignored LBC_STATUS_RESP for now...");
                         //DDpacket((char*)LB, RF_size(LBC_STATUS_RESP));
                         break;
+                     } else {
+                        // at least remember other status fields for later
+                        minion->S.fault.data = L->fault;
                      }
                   }
 
