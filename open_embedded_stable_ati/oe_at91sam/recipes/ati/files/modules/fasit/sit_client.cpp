@@ -699,10 +699,12 @@ int SIT_Client::handle_2100(int start, int end) {
             break;
         case CID_Sleep:
             DCMSG(RED,"CID_Sleep...sleeping") ; 
+            didFailure(ERR_target_asleep);
             doSleep();
             break;
         case CID_Wake:
-            DCMSG(RED,"CID_Wake...waking") ; 
+            DCMSG(RED,"CID_Wake...waking") ;
+            didFailure(ERR_target_awake); 
             doWake();
             break;
         case CID_Hit_Count_Reset:
