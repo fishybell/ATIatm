@@ -844,7 +844,7 @@ static int hardware_movement_stop(int stop_timer)
 static int mover_speed_stop() {
     do_event(EVENT_STOP); // started stopping
     atomic_set(&goal_atomic, 0); // reset goal speed
-    hardware_movement_stop(FALSE);
+    hardware_movement_stop(TRUE); // always true here, so always stops timing out when we stop the mover
     enable_battery_check(1);
     return 1;
 }
