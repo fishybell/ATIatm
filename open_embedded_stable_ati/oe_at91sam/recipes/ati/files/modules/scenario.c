@@ -96,7 +96,7 @@ static string_match_t string_table[] = {
    {"NL_C_BATTERY", NL_C_BATTERY},    /* battery status as percentage (request/reply) (generic 8-bit int) */
    {"NL_C_EXPOSE", NL_C_EXPOSE},     /* expose/conceal (command/reply) (generic 8-bit int) */
    {"NL_C_MOVE", NL_C_MOVE},       /* move as mph (command/reply) (generic 16-bit int) */
-   {"NL_C_MOVEAWAY", NL_C_MOVEAWAY},       /* move as mph (command/reply) (generic 16-bit int) */
+   {"NL_C_MOVEAWAY", NL_C_MOVEAWAY}, /* move as mph (command/reply) (generic 16-bit int) */
    {"NL_C_POSITION", NL_C_POSITION},   /* position in feet from home (request/reply) (generic 16-bit int) */
    {"NL_C_STOP", NL_C_STOP},       /* stop (command/reply) (generic 8-bit int) */
    {"NL_C_HITS", NL_C_HITS},       /* hit count (request/reply) (generic 8-bit int) */
@@ -151,7 +151,7 @@ static wait_watcher_t wait_watchers[] = {
    {"NL_C_BATTERY",  NL_C_BATTERY,  -1, 0, WATCHER_NONE, 0},
    {"NL_C_EXPOSE",   NL_C_EXPOSE,   -1, 0, WATCHER_NONE, 0},
    {"NL_C_MOVE",     NL_C_MOVE,     -1, 0, WATCHER_NONE, 0},
-   {"NL_C_MOVEAWAY",     NL_C_MOVEAWAY,     -1, 0, WATCHER_NONE, 0},
+   {"NL_C_MOVEAWAY", NL_C_MOVEAWAY, -1, 0, WATCHER_NONE, 0},
    {"NL_C_POSITION", NL_C_POSITION, -1, 0, WATCHER_NONE, 0},
    {"NL_C_STOP",     NL_C_STOP,     -1, 0, WATCHER_NONE, 0},
    {"NL_C_HITS",     NL_C_HITS,     -1, 0, WATCHER_NONE, 0},
