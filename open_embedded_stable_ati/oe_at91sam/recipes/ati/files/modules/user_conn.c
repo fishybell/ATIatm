@@ -509,6 +509,12 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                    case ERR_target_killed:
                       snprintf(wbuf, 1024, "U target killed\n");
                       break;
+                   case ERR_target_asleep:
+                      snprintf(wbuf, 1024, "U target asleep\n");
+                      break;
+                   case ERR_target_awake:
+                      snprintf(wbuf, 1024, "U target awake\n");
+                      break;
                    default:
                       snprintf(wbuf, 1024, "U Unknown: %i\n", value);
                       break;
@@ -1974,7 +1980,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Toggle target\nFormat: T\n");
                         break;
                     case 'V': case 'v':
-                        snprintf(wbuf, 1024, "Send event to kernel\nFormat: V (0-255)event\nCurrently defined events 0-11:\n0: Start of raise\n1: finished raising\n2: start of lower\n3: finished lowering\n4: start of move\n5: reached target speed\n6: Changed position\n7: started coast\n8: started stopping\n9: finished stopping\n10: hit\n11: kill\n12: Shutdown\n13: Sleep\n:14: Wake\n15: home limit\n16: end limit\n17: timed out\n18: mover changed speed\n19: error\n");
+                        snprintf(wbuf, 1024, "Send event to kernel\nFormat: V (0-255)event\nCurrently defined events 0-11:\n0: Start of raise\n1: Finished raising\n2: Start of lower\n3: Finished lowering\n4: Start of move\n5: Reached target speed\n6: Changed position\n7: Started coast\n8: Started stopping\n9: Finished stopping\n10: Hit\n11: Kill\n12: Shutdown\n13: Dock\n14: Undocked\n15: Sleep\n:16: Wake\n17: Home limit\n18: End limit\n19: Dock Limit\n20: Timed out\n21: Mover changed speed\n22: Charging\n23: Not charging\n24: Enable Battery Check\n25: Disable Battery Check\n26: Error\nUnknown\n");
                         break;
                     case 'X': case 'x':
                         snprintf(wbuf, 1024, "Emergency stop\nFormat: X\n");
