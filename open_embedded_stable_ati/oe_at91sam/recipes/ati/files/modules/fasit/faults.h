@@ -44,6 +44,8 @@ enum {
    ERR_charging_battery=190,
    ERR_notcharging_battery=191,
    ERR_target_killed=192,
+   ERR_target_asleep=193,
+   ERR_target_awake=194,
 };
 
 #endif
