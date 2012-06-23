@@ -449,7 +449,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    }
    // check to see if we failed movement
    else if (minion->S.resp.mover_command != move_dock && /* not docking and ... */
-            should_be_moving && !moving_left && !moving_right && same_position_status) { /* should be moving and isn't */
+            should_be_moving && !moving_left && !moving_right && same_position_status && !at_home && !at_end) { /* should be moving and isn't */
 
       DEBUG_REAL_2_FAKE(MAGENTA);
       create_fail_status(ERR_no_movement); // for logging only
