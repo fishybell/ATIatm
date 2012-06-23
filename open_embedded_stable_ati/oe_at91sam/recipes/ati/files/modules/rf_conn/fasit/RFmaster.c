@@ -1140,6 +1140,7 @@ void print_help(int exval) {
    printf("  -x 800        xmit test, xmit a request devices every arg milliseconds (default=disabled=0)\n");
    printf("  -s 150        slottime in ms (5ms granules, 1275 ms max  ONLY WITH -x\n");
    printf("  -c 300        collection time for burst messages in ms\n");
+   printf("  -w 1          Fork process into parent/child for read/write seperation of radio\n");
    printf("  -d 0x20       Lowest devID to find  ONLY WITH -x\n");
    printf("  -D 0x30       Highest devID to find  ONLY WITH -x\n");
    print_verbosity();
@@ -1177,7 +1178,7 @@ int main(int argc, char **argv) {
    int total_slots;
    int low_dev,high_dev;
    rfpair_t rf_pair;
-   int child;
+   int child=1; // default to fork
 
    rtime=0;
    collecting_time=RF_COLLECT_DELAY; //  minimum time to wait for collecting messages for a burst (in ms)
@@ -1187,9 +1188,9 @@ int main(int argc, char **argv) {
    RFmasterport = defaultPORT;
    SRport = smartrangePORT;
    strcpy(ttyport,"/dev/ttyS0");
-   hardflow=0;
+   hardflow=6;
    
-   while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:c:")) != -1) {
+   while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:c:w:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
@@ -1197,6 +1198,10 @@ int main(int argc, char **argv) {
 
          case 'f':
             hardflow=7 & atoi(optarg);            
+            break;
+
+         case 'w':
+            child = atoi(optarg);            
             break;
 
          case 'r':
@@ -1444,50 +1449,56 @@ int main(int argc, char **argv) {
       DieWithError("socketpair() failed");
    }
 
-   //   fork a minion
-   if ((child = fork()) == -1) {
-      DieWithError("fork failed");
-   }
+   //   fork child process for reading, and leave parent for writing, or have single process do both
    if (child) {
-      // install signal handlers
-      signal(SIGINT, quitproc);
-      signal(SIGQUIT, quitproc);
-      // we're the parent
-      close(rf_pair.parent);
-   } else {
-      // install signal handlers
-      signal(SIGINT, quitproc);
-      signal(SIGQUIT, quitproc);
-      // we're the child
-      close(rf_pair.child);
-      // do child thread here...
-      __PROGRAM__ = "RFmaster:child ";
+      if ((child = fork()) == -1) {
+         DieWithError("fork failed");
+      }
+      if (child) {
+         // install signal handlers
+         signal(SIGINT, quitproc);
+         signal(SIGQUIT, quitproc);
+         // we're the parent
+         close(rf_pair.parent);
+      } else {
+         // install signal handlers
+         signal(SIGINT, quitproc);
+         signal(SIGQUIT, quitproc);
+         // we're the child
+         close(rf_pair.child);
+         // do child thread here...
+         __PROGRAM__ = "RFmaster:child ";
+
+         //   Okay,   set up the RF modem link here
+         RFfd=open_port(ttyport,hardflow | 2 | 0x08);   // with hardflow (and force blocking and read-only)
+
+         if (RFfd<0) {
+            DCMSG(RED,"RFmaster: comm port could not be opened. Shutting down");
+            exit(-1);
+         }
+
+         while (!close_nicely) {
+            char rbuf[RF_BUF_SIZE];
+            int gotrf;
+            if ((gotrf = read(RFfd,rbuf,RF_BUF_SIZE)) > 0) {
+               DDCMSG(D_NEW, GRAY, "Childing pushing to parent %i bytes", gotrf);
+               write(rf_pair.parent, rbuf, gotrf);
+            } else {
+               DDCMSG(D_NEW, RED, "Failed to gather_rf"); 
+               perror("on rf read");
+               sleep(1);
+            }
+         }
+         exit(0);
+      }
 
       //   Okay,   set up the RF modem link here
-      RFfd=open_port(ttyport,hardflow | 2 | 0x08);   // with hardflow (and force blocking and read-only)
-
-      if (RFfd<0) {
-         DCMSG(RED,"RFmaster: comm port could not be opened. Shutting down");
-         exit(-1);
-      }
-
-      while (!close_nicely) {
-         char rbuf[RF_BUF_SIZE];
-         int gotrf;
-         if ((gotrf = read(RFfd,rbuf,RF_BUF_SIZE)) > 0) {
-            DDCMSG(D_NEW, GRAY, "Childing pushing to parent %i bytes", gotrf);
-            write(rf_pair.parent, rbuf, gotrf);
-         } else {
-            DDCMSG(D_NEW, RED, "Failed to gather_rf"); 
-            perror("on rf read");
-            sleep(1);
-         }
-      }
-      exit(0);
+      RFfd = open_port(ttyport,hardflow | 0x10);   // with hardware flow (and force write-only)
+   } else {
+      // no child process forked, but keep everything the same so it seems so
+      RFfd = open_port(ttyport, hardflow); // hardware flow (and leave read-write)
+      rf_pair.child = RFfd;
    }
-
-   //   Okay,   set up the RF modem link here
-   RFfd=open_port(ttyport,hardflow | 0x10);   // with hardware flow (and force write-only)
 
    if (RFfd<0) {
       DCMSG(RED,"RFmaster: comm port could not be opened. Shutting down");
