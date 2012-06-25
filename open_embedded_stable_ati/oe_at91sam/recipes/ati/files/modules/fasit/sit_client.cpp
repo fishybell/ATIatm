@@ -189,6 +189,7 @@ void SIT_Client::sendStatus2102(int force) {
         return;
     }
 
+
     FASIT_header hdr;
     FASIT_2102 msg;
     defHeader(2102, &hdr); // sets the sequence number and other data
@@ -196,6 +197,11 @@ void SIT_Client::sendStatus2102(int force) {
 
     // fill message
     fillStatus2102(&msg); // fills in status values with current values
+
+    // Change the fault if the target is sleeping
+    if (lastWakeVal == 0) {
+       msg.body.fault = htons(ERR_target_asleep);
+    }
 
     if (force||(memcmp(&lastMsgBody,&msg.body,sizeof(FASIT_2102b)))){
         lastMsgBody = msg.body;   // make a copy of the body of the status message for checking for changes
@@ -1069,6 +1075,12 @@ void SIT_Client::didFailure(int type) {
         skippedFault = type; // send after connection
         FUNCTION_END("::didFailure(int type)")
         return;
+    }
+
+    if (type == ERR_target_asleep) {
+       lastWakeVal = 0;
+    } else if (type = ERR_target_awake) {
+       lastWakeVal = 1;
     }
 
     FASIT_header hdr;
