@@ -115,6 +115,9 @@ private:
    // remember the battery value rather than send a response each time we get a change
    int lastBatteryVal;
 
+   // remember if the target was asleep or awake
+   int lastWakeVal;
+
    // remember data to send back over and over again
    struct hit_calibration lastHitCal;
    __uint16_t fake_sens; // to remember their unreasonable sensitivity values
