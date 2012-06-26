@@ -854,24 +854,28 @@ int sock2tty(rf_connection_t *rc) {
    DDCMSG(D_T_SLOT, BLACK, "Finding timeslot uinsg rc->id_index (%X) or rc->devid_last_high (%X)", rc->id_index, rc->devid_last_high);
    if (rc->id_index >= 0) {
       // timeslot is decided by which address I am in the chain
+      int j;
+      ts = -1; // so first slot is 0
       DDCMSG(D_T_SLOT, BLACK, "Finding timeslot using rc->id_index %i", rc->id_index);
       // find the lowest matching address
-      for (ts = 0; ts < min(rc->id_lasttime_index+1, MAX_IDS); ts++) {
-         DDCMSG(D_T_SLOT, BLACK, "Looking at ts %i...", ts);
-         if (rc->ids_lasttime[ts] == FAKE_DEVID) {
+      for (j = 0; j < min(rc->id_lasttime_index+1, MAX_IDS); j++) {
+         DDCMSG(D_T_SLOT, BLACK, "Looking at index %i...", j);
+         if (rc->ids_lasttime[j] == FAKE_DEVID) {
             fakes += (4*8); // 8 slots times 4, as 4 fakes count as a regular
             DDCMSG(D_POINTER, GREEN, "chunk of fakes: %i", fakes);
             continue; // move on...
-         } else if (rc->ids_lasttime[ts] == FAKE_ID) {
+         } else if (rc->ids_lasttime[j] == FAKE_ID) {
             fakes++; // found another fake
             DDCMSG(D_POINTER, GREEN, "another fake: %i", fakes);
+         } else {
+            ts++; // found a real slot, remember total, mine will be the last we look at
          }
          for (i = 0; i < min(rc->id_index+1, MAX_IDS); i++) {
             DDCMSG(D_T_SLOT, BLACK, "Looking at id_index %i...", i);
-            if (rc->ids_lasttime[ts] == rc->ids[i]) {
-               DDCMSG(D_T_SLOT, BLACK, "Found at %ix%i...%ix%i of %ix%i", ts, i, rc->ids_lasttime[ts], rc->ids[i], min(rc->id_lasttime_index+1, MAX_IDS), min(rc->id_index+1, MAX_IDS));
-               DDCMSG(D_POINTER, BLACK, "Found at %ix%i...%ix%i of %ix%i", ts, i, rc->ids_lasttime[ts], rc->ids[i], min(rc->id_lasttime_index+1, MAX_IDS), min(rc->id_index+1, MAX_IDS));
-               goto found_ts; // just jump down, my ts variable is now correct
+            if (rc->ids_lasttime[j] == rc->ids[i]) {
+               DDCMSG(D_T_SLOT, BLACK, "Found at %ix%i...%ix%i of %ix%i", j, i, rc->ids_lasttime[j], rc->ids[i], min(rc->id_lasttime_index+1, MAX_IDS), min(rc->id_index+1, MAX_IDS));
+               DDCMSG(D_POINTER, BLACK, "Found at %ix%i...%ix%i of %ix%i", j, i, rc->ids_lasttime[j], rc->ids[i], min(rc->id_lasttime_index+1, MAX_IDS), min(rc->id_index+1, MAX_IDS));
+               goto found_ts; // just jump down, my j variable is now correct
             }
          }
       }
