@@ -114,6 +114,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          }
       ); // end of CHECK_TIMER for response state timer
 
+#if 1 /* old fast/slow timer code */
       CHECK_TIMER (minion->S.rf_t, fast_timer, fast_flags, 
          DDCMSG(D_MSTATE, BLACK, "Now checking fast timer flags: %i", minion->S.rf_t.fast_flags);
          switch (minion->S.rf_t.fast_flags) {
@@ -193,6 +194,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             }
          }
       ); // end of CHECK_TIMER for slow state timer
+#endif /* end of old fast/slow timer code */
 
       CHECK_TIMER (minion->S.exp, exp_timer, exp_flags, 
          DDCMSG(D_MSTATE, BLACK, "Now checking expose timer flags: %i", minion->S.exp.exp_flags);
