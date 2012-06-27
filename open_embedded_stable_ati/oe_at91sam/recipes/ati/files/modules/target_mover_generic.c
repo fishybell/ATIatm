@@ -976,6 +976,7 @@ static void dock_timeout_start(int ms)
 	{
    if (ms <= 0) ms = DOCK_TIMEOUT_IN_MILLISECONDS;
 	mod_timer(&dock_timeout_list, jiffies+(ms*HZ/1000));
+   SENDUSERCONNMSG( "randy dock_timeout_start,%i" ,ms);
 	}
 
 //---------------------------------------------------------------------------
@@ -984,6 +985,7 @@ static void dock_timeout_start(int ms)
 static void dock_timeout_stop(void)
 	{
 	del_timer(&dock_timeout_list);
+   SENDUSERCONNMSG( "randy dock_timeout_stop");
 	}
 
 //---------------------------------------------------------------------------
@@ -997,11 +999,12 @@ static void dock_timeout_fire(unsigned long data)
         {
         return;
         }
+   SENDUSERCONNMSG( "randy dock_timeout_fire");
 
     if (dock_loc == 0) { // Dock at home
        if (atomic_read(&last_sensor) == MOVER_SENSOR_HOME){
          fault = atomic_read(&lifter_fault);
-         if (atomic_read(&lifter_position) == LIFTER_POSITION_DOWN
+         if (1 || atomic_read(&lifter_position) == LIFTER_POSITION_DOWN
                || atomic_read(&sleep_atomic) != 0 
                || (fault != 0 && fault != ERR_connected_SIT)
                ){
@@ -1013,7 +1016,7 @@ static void dock_timeout_fire(unsigned long data)
     } else if (dock_loc == 1){ // Dock at end
        if (atomic_read(&last_sensor) == MOVER_SENSOR_END){
          fault = atomic_read(&lifter_fault);
-         if (atomic_read(&lifter_position) == LIFTER_POSITION_DOWN
+         if (1 || atomic_read(&lifter_position) == LIFTER_POSITION_DOWN
                || atomic_read(&sleep_atomic) != 0
                || (fault != 0 && fault != ERR_connected_SIT)
                ){
@@ -2116,7 +2119,7 @@ int mover_speed_get(void) {
    }
    atomic_set(&last_reported_speed, rtnSpeed);
 #endif
-   SENDUSERCONNMSG( "rtnSpeed,%i" ,rtnSpeed);
+   SENDUSERCONNMSG( "randy rtnSpeed,%i" ,rtnSpeed);
    return rtnSpeed;  // changed from current_speed
 }
 EXPORT_SYMBOL(mover_speed_get);
@@ -2166,10 +2169,10 @@ EXPORT_SYMBOL(mover_set_continuous_move);
 int mover_set_moveaway_move(int c) {
    int sensor, speed;
    DELAY_PRINTK("mover_set_moveaway_move\n");
-   SENDUSERCONNMSG( "mover_set_moveaway_move %i", c);
+   SENDUSERCONNMSG( "randy mover_set_moveaway_move %i", c);
    // check to see if we're sleeping or not
    if (atomic_read(&sleep_atomic) == 1) {
-   SENDUSERCONNMSG( "mover_set_moveaway_move sleeping");
+   SENDUSERCONNMSG( "randy mover_set_moveaway_move sleeping");
          return 0;
    }
    atomic_set(&find_dock_atomic, 0);
@@ -2177,15 +2180,18 @@ int mover_set_moveaway_move(int c) {
    if (c != 0) {
       speed = abs(c);
       if (isMoverAtDock()){
+   SENDUSERCONNMSG( "randy mover_set_moveaway_move at dock");
          if (dock_loc == 1) { // Dock on right
             speed *= -1;
          }
       } else {
          sensor = atomic_read(&last_sensor);
          if (sensor == MOVER_SENSOR_END) { // On right
+   SENDUSERCONNMSG( "randy mover_set_moveaway_move at right sensor");
             speed *= -1;
          } else {
             if (home_loc == 1) { // Home on right
+   SENDUSERCONNMSG( "randy mover_set_moveaway_move home on right");
                speed *= -1;
             }
          }
@@ -2980,7 +2986,6 @@ static void pid_step() {
     }
     if (error_sum < (pid_error * 5)) error_sum = pid_error * 5;
 
-   SENDUSERCONNMSG( "pid0,p,%i,i,%i,d,%i,l,%i", kp_d, ki_d, kd_d, delta);
 
        // do the PID calculations
 
@@ -3009,8 +3014,10 @@ static void pid_step() {
    //delay_printk( "pid0,r,%d,p,%i,i,%i,d,%i,e,%i,t,%i", pid_error, pid_p, pid_i, pid_d, pid_effort,direction);
    SENDUSERCONNMSG( "pid0,r,%d,p,%i,i,%i,d,%i,e,%i,t,%i", pid_error, pid_p, pid_i, pid_d, pid_effort,direction);
     // max effort to 100%
-   if (new_speed != 0 && isMoverAtDock() != 0) {
-      pid_effort += 1000;
+   if (new_speed != 0) {
+      if (isMoverAtDock() != 0) {
+        pid_effort += 1000;
+      }
    }
 
     pid_last_error = pid_error;
@@ -3024,11 +3031,14 @@ static void pid_step() {
       if (mover_type == IS_MIT) {
          if (new_speed < 50) {
             if (pid_effort < 0) {
-               pid_effort /= 2;
+               pid_effort /= 4;
+            } else if (pid_effort < 100) {
+               pid_effort = 150;
+               pid_effort = 175;
             }
-            if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD) {
-               pid_effort += 100;
-            }
+//            if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD) {
+//               pid_effort += 100;
+//            }
          }
       }
     }
