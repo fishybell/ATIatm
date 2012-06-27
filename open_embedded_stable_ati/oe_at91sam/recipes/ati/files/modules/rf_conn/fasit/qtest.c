@@ -4,7 +4,7 @@
 int verbose = 0x1040;
 const char *__PROGRAM__ = "Qtest ";
 
-#define SIZE 4000
+#define SIZE 8000
 
 int main(int argc, char **argv) {
    queue_item_t *Rx, *Tx, *qi;
@@ -16,6 +16,7 @@ int main(int argc, char **argv) {
    int addr = -1;
    int rtime=0, stime=150, itime=150;
    int lqg = 0;
+   int retval;
 
    Rx = malloc(sizeof(queue_item_t));
    memset(Rx, 0, sizeof(queue_item_t));
@@ -72,8 +73,8 @@ int main(int argc, char **argv) {
       printf("created message %i and have %i bytes left\n", ad-1, SIZE - bs);
    }
    // output original
-   DDqueue(D_POINTER, Rx, "Before %i", queueSize(Rx));
-   DDqueue(D_POINTER, Tx, "Before %i", queueSize(Tx));
+   //DDqueue(D_POINTER, Rx, "Before %i", queueSize(Rx));
+   //DDqueue(D_POINTER, Tx, "Before %i", queueSize(Tx));
    DDpacket(buf, bs);
    int burst=0;
    while (queueSize(Rx) > 0) {
@@ -82,16 +83,16 @@ int main(int argc, char **argv) {
       bs = 254; // max size of 254 in a burst
       memset(buf, 0, bs);
       // burst
-      queueBurst(Rx, Tx, buf, &bs, &rtime, &stime, &itime); 
+      retval = queueBurst(Rx, Tx, buf, &bs, &rtime, &stime, &itime); 
       //DDqueue(D_POINTER, Rx, "After %i", queueSize(Rx));
       //DDqueue(D_POINTER, Tx, "After %i", queueSize(Tx));
       DDpacket(buf, bs);
       if (bs > 254) {
-         DCMSG(GRAY, "Burst %i was %i bytes, rtime %i", burst, bs, rtime);
+         DCMSG(GRAY, "Burst %i was %i bytes, rtime %i, retval %i", burst, bs, rtime, retval);
       } else {
-         DCMSG(GREEN, "Burst %i was %i bytes, rtime %i", burst, bs, rtime);
+         DCMSG(GREEN, "Burst %i was %i bytes, rtime %i, retval %i", burst, bs, rtime, retval);
       }
    }
-   DDqueue(D_POINTER, Rx, "After %i", queueSize(Rx));
-   DDqueue(D_POINTER, Tx, "After %i", queueSize(Tx));
+   //DDqueue(D_POINTER, Rx, "After %i", queueSize(Rx));
+   //DDqueue(D_POINTER, Tx, "After %i", queueSize(Tx));
 }
