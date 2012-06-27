@@ -219,7 +219,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
       psend_mcp(minion, &L); \
    }
    #define create_fail_status(fail) { \
-      DCMSG(CYAN, "___________________________________________________________\ncreate_fail_status(%s=%i) for minion %i, devid %3x @ %s:%i\n___________________________________________________________", #fail, fail, minion->mID, minion->devid, __FILE__, __LINE__); \
+      DDCMSG(D_POINTER, CYAN, "___________________________________________________________\ncreate_fail_status(%s=%i) for minion %i, devid %3x @ %s:%i\n___________________________________________________________", #fail, fail, minion->mID, minion->devid, __FILE__, __LINE__); \
       minion->S.fault.data = fail; \
    }
    #define update_movement_status() { \
@@ -303,42 +303,44 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
       printf("%s=%i\n", #p, p); \
    }
    #define DEBUG_REAL_2_FAKE(c) { \
-      DCOLOR(c); \
-      printf("___________________________________________________________\nMinion %i creating fake status from real parameters:\n @ %s:%i\n", minion->mID, __FILE__, __LINE__); \
-      DEBUG_PARAMETER(fault); \
-      DEBUG_PARAMETER(killed); \
-      DEBUG_PARAMETER(should_be_moving); \
-      DEBUG_PARAMETER(same_move_status); \
-      DEBUG_PARAMETER(same_position_status); \
-      DEBUG_PARAMETER(same_speed_status); \
-      DEBUG_PARAMETER(same_hit_status); \
-      DEBUG_PARAMETER(same_lift_status); \
-      DEBUG_PARAMETER(same_direction); \
-      DEBUG_PARAMETER(at_home); \
-      DEBUG_PARAMETER(at_end); \
-      DEBUG_PARAMETER(in_middle); \
-      DEBUG_PARAMETER(moving_right); \
-      DEBUG_PARAMETER(moving_left); \
-      DEBUG_PARAMETER(slower); \
-      DEBUG_PARAMETER(faster); \
-      DEBUG_PARAMETER(faking_left); \
-      DEBUG_PARAMETER(faking_right); \
-      DEBUG_PARAMETER(faking_stopped); \
-      DEBUG_PARAMETER(faking_up); \
-      DEBUG_PARAMETER(faking_down); \
-      DEBUG_PARAMETER(minion->S.resp.current_position); \
-      DEBUG_PARAMETER(minion->S.resp.last_position); \
-      DEBUG_PARAMETER(minion->S.resp.mover_command); \
-      DEBUG_PARAMETER(minion->S.resp.lifter_command); \
-      DEBUG_PARAMETER(minion->S.exp.last_step); \
-      DEBUG_PARAMETER(minion->S.resp.current_speed); \
-      DEBUG_PARAMETER(minion->S.resp.last_speed); \
-      DEBUG_PARAMETER(minion->S.resp.current_exp); \
-      DEBUG_PARAMETER(minion->S.resp.last_exp); \
-      DEBUG_PARAMETER(minion->S.react.newdata); \
-      DEBUG_PARAMETER(minion->S.fault.data); \
-      printf("\n___________________________________________________________ @ %s:%i\n", __FILE__, __LINE__); \
-      DCOLOR(black); \
+      if (verbose & D_POINTER) { \
+         DCOLOR(c); \
+         printf("___________________________________________________________\nMinion %i creating fake status from real parameters:\n @ %s:%i\n", minion->mID, __FILE__, __LINE__); \
+         DEBUG_PARAMETER(fault); \
+         DEBUG_PARAMETER(killed); \
+         DEBUG_PARAMETER(should_be_moving); \
+         DEBUG_PARAMETER(same_move_status); \
+         DEBUG_PARAMETER(same_position_status); \
+         DEBUG_PARAMETER(same_speed_status); \
+         DEBUG_PARAMETER(same_hit_status); \
+         DEBUG_PARAMETER(same_lift_status); \
+         DEBUG_PARAMETER(same_direction); \
+         DEBUG_PARAMETER(at_home); \
+         DEBUG_PARAMETER(at_end); \
+         DEBUG_PARAMETER(in_middle); \
+         DEBUG_PARAMETER(moving_right); \
+         DEBUG_PARAMETER(moving_left); \
+         DEBUG_PARAMETER(slower); \
+         DEBUG_PARAMETER(faster); \
+         DEBUG_PARAMETER(faking_left); \
+         DEBUG_PARAMETER(faking_right); \
+         DEBUG_PARAMETER(faking_stopped); \
+         DEBUG_PARAMETER(faking_up); \
+         DEBUG_PARAMETER(faking_down); \
+         DEBUG_PARAMETER(minion->S.resp.current_position); \
+         DEBUG_PARAMETER(minion->S.resp.last_position); \
+         DEBUG_PARAMETER(minion->S.resp.mover_command); \
+         DEBUG_PARAMETER(minion->S.resp.lifter_command); \
+         DEBUG_PARAMETER(minion->S.exp.last_step); \
+         DEBUG_PARAMETER(minion->S.resp.current_speed); \
+         DEBUG_PARAMETER(minion->S.resp.last_speed); \
+         DEBUG_PARAMETER(minion->S.resp.current_exp); \
+         DEBUG_PARAMETER(minion->S.resp.last_exp); \
+         DEBUG_PARAMETER(minion->S.react.newdata); \
+         DEBUG_PARAMETER(minion->S.fault.data); \
+         printf("\n___________________________________________________________ @ %s:%i\n", __FILE__, __LINE__); \
+         DCOLOR(black); \
+      } \
    }
 
    if (minion->S.resp.newdata == 0) {
@@ -520,7 +522,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    if (need_tell_FASIT) {
       sendStatus2102(0, NULL,minion,mt); // tell FASIT server
    } else {
-      DCMSG(YELLOW, "No status update...");
+      DDCMSG(D_POINTER, YELLOW, "No status update...");
       DEBUG_REAL_2_FAKE(YELLOW);
    }
 #if 0 /* attempt 1 -- try to follow status tree to see what to do -- complete distaster */
@@ -921,12 +923,16 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion, minion_t
          CACHE_CHECK(minion->S.exp);
          msg.body.exp = minion->S.exp.data;
          DDCMSG(D_PACKET, GRAY, "Might send 2102 expose: msg.body.exp=%i @ %i", msg.body.exp, __LINE__);
-         msg.body.speed = 0.0;
+         msg.body.speed = htonf(0.0);
+         DCMSG(GRAY, "Lifter Dev %3x sending speed %f from %f", minion->devid, msg.body.speed, minion->S.speed.data);
+         DCMSG(GRAY, "Lifter Dev %3x sending speed %08x from %08x", minion->devid, *((int*)((char*)&msg.body.speed)), *((int*)((char*)&minion->S.speed.data)));
          break;
       case Type_MIT:
       case Type_MAT:
          CACHE_CHECK(minion->S.speed);
          msg.body.speed = htonf(minion->S.speed.data);
+         DCMSG(GRAY, "Mover Dev %3x sending speed %f from %f", minion->devid, msg.body.speed, minion->S.speed.data);
+         DCMSG(GRAY, "Mover Dev %3x sending speed %08x from %08x", minion->devid, *((int*)((char*)&msg.body.speed)), *((int*)((char*)&minion->S.speed.data)));
          CACHE_CHECK(minion->S.exp);
          msg.body.exp = minion->S.exp.data;
          DDCMSG(D_PACKET, GRAY, "Might send 2102 expose: msg.body.exp=%i @ %i", msg.body.exp, __LINE__);
@@ -2475,17 +2481,17 @@ void *minion_thread(thread_data_t *minion){
    minion->S.exp.last_step = TS_too_far; // invalid step, will have to find way back
 //   minion->S.cap|=PD_NES;       // add the NES capability   this should be percolating through by itself now 
 
-   DCMSG(BLUE,"Minion %i: state is initialized as devid 0x%06X", minion->mID,minion->devid);
-   DCMSG(BLUE,"Minion %i: RF_addr = %i capabilities=%i  device_type=%i", minion->mID,minion->RF_addr,minion->S.cap,minion->S.dev_type);
+   DDCMSG(D_RF, BLUE,"Minion %i: state is initialized as devid 0x%06X", minion->mID,minion->devid);
+   DDCMSG(D_RF, BLUE,"Minion %i: RF_addr = %i capabilities=%i  device_type=%i", minion->mID,minion->RF_addr,minion->S.cap,minion->S.dev_type);
 
    if (minion->S.cap&PD_NES) {
-      DCMSG(BLUE,"Minion %i: has Night Effects Simulator (NES) capability", minion->mID);
+      DDCMSG(D_RF, BLUE,"Minion %i: has Night Effects Simulator (NES) capability", minion->mID);
    }
    if (minion->S.cap&PD_MILES) {
-      DCMSG(BLUE,"Minion %i: has MILES (shootback) capability", minion->mID);
+      DDCMSG(D_RF, BLUE,"Minion %i: has MILES (shootback) capability", minion->mID);
    }
    if (minion->S.cap&PD_GPS) {
-      DCMSG(BLUE,"Minion %i: has Global Positioning System (GPS) capability", minion->mID);
+      DDCMSG(D_RF, BLUE,"Minion %i: has Global Positioning System (GPS) capability", minion->mID);
    }
 
    i=0;
