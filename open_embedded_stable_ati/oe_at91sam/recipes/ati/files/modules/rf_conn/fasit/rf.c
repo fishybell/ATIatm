@@ -108,6 +108,9 @@ int __ptype(int cmd) {
       case LB_CONTROL_REMOVED: return 4;
       case LBC_QUICK_GROUP: return 5;
       case LBC_QUICK_GROUP_BIG: return 5;
+      case LBC_QCONCEAL: return 6;
+      case LBC_EXPOSE: return 6;
+      case LBC_MOVE: return 6;
       default: return 3;
    }
 }
@@ -292,6 +295,9 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
             break;
          case 4:
             color=CYAN;
+            break;
+         case 6:
+            color=GRAY;
             break;
          default:
             color=RED;
@@ -872,10 +878,12 @@ queue_item_t *queueTail(queue_item_t* qi) {
 //   manual removal and sending of "sent" messages after actual send. if send is unsuccessful, items can be
 //   requeued to Rx by linking Tx's tail to Rx's head, then Rx's head becomes Tx's head. (bsize should come
 //   filled in with the size of buf, and after return contains size of data in buf)
-void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *remaining_time, int *slottime, int *inittime) {
+int queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *remaining_time, int *slottime, int *inittime) {
    int should_end = 0;
    int max_slots = MAX_SLOTS;
    static int last_qgroup = 1000;
+   static int last_sequence = 0;
+   int should_repeat = 0;
    queue_item_t *qi = Rx->next; // start at head of Rx
    queue_item_t *tail = queueTail(Tx), *temp;
    LB_packet_t *tpkt;
@@ -902,6 +910,30 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
    tail = tail->next; /* move tail */ \
    qi = temp; /* next item in original queue */ \
 }
+   // do a first pass, just looking for any repeating command messages
+   while (bs > 16 && qi != NULL) {
+      // is this one of repeating command type?
+      if (qi->ptype == 6) {
+         // yes, move a single item out of the queue and move on
+         should_repeat = 1;
+         QI2BUF(qi, buf);
+         MOVE_Q(qi, tail);
+      } else {
+         // no, just look at next item
+         qi = qi->next;
+      }
+   }
+   if (should_repeat) {
+      *bsize -= bs; // bsize will now be how many we used
+      last_sequence++;
+      if (last_sequence > 15) {
+         last_sequence = 1;
+      }
+      return last_sequence;
+   }
+   // no repeating commands found, move on to normal message bursting and reset qi and tail
+   qi = Rx->next;
+   tail = queueTail(Tx);
    while (should_end != 1 && /* we haven't buffered a request-new message */
          qi != NULL && /* we still have more messages in the queue */
          bs > 16) { /* buffer has enough size for another non quick-group message */
@@ -953,7 +985,7 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
             break;
 
          case 4: // control message
-            // move on
+            // move on -- ends up in Tx queue, but not in buf
             break;
 
          case 5: // quick group
@@ -989,11 +1021,16 @@ void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *
                QI2BUF(qi, buf);
             } // if we didn't send, the next time a burst is created it will have enough room
             break;
+
+         case 6: // repeating message (could/should this be everything but messages that have responses?)
+            // move on -- ends up in Tx queue, but not in buf
+            break;
       } 
       // move to back of Tx queue and move on to next item
       MOVE_Q(qi, tail);
    } /* end of queue loop */
    *bsize -= bs; // bsize will now be how many we used
+   return 0;
 }
 
 // print debug output for the given queue if verbose as bit "v"

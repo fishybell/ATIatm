@@ -7,7 +7,7 @@
 
 const char *__PROGRAM__ = "RFmaster ";
 
-int inittime=0, slottime=0, verbose, rtime, collecting_time;    // globals from command line
+int inittime=0, slottime=0, verbose, rtime, collecting_time, repeat_wait, repeat_count;    // globals from command line
 
 // globals for time management
 int elapsed_time, edelta=0; // current in millseconds, and its delta
@@ -222,6 +222,8 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
    DDqueue(D_MEGA|D_POINTER, Tx, "initialized"); 
 
    remaining_time=100;          //  remaining time before we can transmit (in ms)
+   repeat_count = 3; // repeat 3 times by default
+   repeat_wait = 50; // repeat every 50 ms by default
 
    /**   loop until we lose connection  **/
 #define CURRENT_TIME(ts) { \
@@ -484,7 +486,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
             {
                char TransBuf[254]; // max size we can reliably send on dtxm radio
                char *tbuf;
-               int tbuf_size;
+               int tbuf_size, repeat;
 
                // build burst header into the front of transmission (always, even if only one message is being sent)
                LBb = (LB_burst_t*)TransBuf;
@@ -493,7 +495,12 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                tbuf_size = 254 - RF_size(LBb->cmd);
 
                // queue packets into the burst buffer
-               queueBurst(Rx, Tx, tbuf, &tbuf_size, &remaining_time, &slottime, &inittime);
+               LBb->sequence = queueBurst(Rx, Tx, tbuf, &tbuf_size, &remaining_time, &slottime, &inittime);
+               if (LBb->sequence > 0) {
+                  repeat = repeat_count; // send message many times
+               } else {
+                  repeat = 1; // only send message once
+               }
                DDqueue(D_MEGA|D_POINTER, Rx, "after q burst"); 
                DDqueue(D_MEGA|D_POINTER, Tx, "after q burst"); 
 
@@ -503,9 +510,8 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                tbuf_size = RF_size(LBb->cmd) + queueLength(Tx); // recalculate tbuf_size based on actual size
 
                /***********    Send the RF burst
-                ***********
+                ***********    repeat multiple times if sequence is not zero
                 ***********/
-
                DDCMSG(D_MEGA,CYAN,"before Tx to RF.  Tx[%i]", tbuf_size);
                DDCMSG(D_TIME, BLACK, "Adding initial time to remaining time: %i+%i+(x*%i)", remaining_time, (inittime*2) + (RF_COLLECT_DELAY), slottime);
                //remaining_time += (inittime*2) + (364*2); // add initial delay time (for beginning and end) and DTXM measured delay (for beggining and end)
@@ -531,50 +537,58 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
 
                   //tbt=tbuf_size;
                   setblocking(RFfd);
-                  do {
-                     result=write(RFfd, out_buf, tbuf_size);
-                     if (result<0){
-                        strerror_r(errno,buf,200);                
-                        DCMSG(RED,"write Tx queue to RF error %s",buf);
-                        // TODO -- requeue to Rx? die? what?
-                        DDqueue(D_POINTER, Tx, "dead 1"); 
-                        break;
-                     } else if (result == 0) {
-                        DCMSG(RED,"write Tx queue to RF returned 0");
-                        // TODO -- requeue to Rx? die? what?
-                        DDqueue(D_POINTER, Tx, "dead 2"); 
-                        break;
-                     } else {
-                        if (result == tbuf_size) {
-                           if (verbose&D_RF) {
-                                 sprintf(buf,"[%03i] %3i.%03i  ->RF [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
-                                 printf("%s",buf);
-                                 printf("\x1B[3%i;%im",(BLUE)&7,((BLUE)>>3)&1);
-                                 if (result>1) {
-                                    for (int i=0; i<result-1; i++) printf("%02x.", (uint8) out_buf[i]);
-                                 }
-                                 printf("%02x\n", (uint8) out_buf[result-1]);
-                           }
-                           if (verbose&D_PARSE) {
-                              DDCMSG(D_NEW, GREEN, "-> RF:");
-                              DDpacket(out_buf,result);
-                           } else {
-                              DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF", result);
-                           }
+                  while (repeat-- > 0) {
+                     out_buf = TransBuf; // reset in case we are repeating and have mucked with it
+                     tbuf_size = RF_size(LBb->cmd) + queueLength(Tx); // recalculate tbuf_size in case we are repeating and have mucked with it
+                     do {
+                        result=write(RFfd, out_buf, tbuf_size);
+                        if (result<0){
+                           strerror_r(errno,buf,200);                
+                           DCMSG(RED,"write Tx queue to RF error %s",buf);
+                           // TODO -- requeue to Rx? die? what?
+                           DDqueue(D_POINTER, Tx, "dead 1"); 
+                           break;
+                        } else if (result == 0) {
+                           DCMSG(RED,"write Tx queue to RF returned 0");
+                           // TODO -- requeue to Rx? die? what?
+                           DDqueue(D_POINTER, Tx, "dead 2"); 
+                           break;
                         } else {
-                           DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF, but should have transmitted %i", result, tbuf_size);
-                           if (verbose&D_PARSE) {
-                              DDpacket(out_buf,result);
+                           if (result == tbuf_size) {
+                              if (verbose&D_RF) {
+                                    sprintf(buf,"[%03i] %3i.%03i  ->RF [%2i] ",D_PACKET, DEBUG_MS(elapsed_time), result);
+                                    printf("%s",buf);
+                                    printf("\x1B[3%i;%im",(BLUE)&7,((BLUE)>>3)&1);
+                                    if (result>1) {
+                                       for (int i=0; i<result-1; i++) printf("%02x.", (uint8) out_buf[i]);
+                                    }
+                                    printf("%02x\n", (uint8) out_buf[result-1]);
+                              }
+                              if (verbose&D_PARSE) {
+                                 DDCMSG(D_NEW, GREEN, "-> RF:");
+                                 DDpacket(out_buf,result);
+                              } else {
+                                 DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF", result);
+                              }
+                           } else {
+                              DDCMSG(D_NEW, GREEN, "\t->\tTransmitted %i bytes over RF, but should have transmitted %i", result, tbuf_size);
+                              if (verbose&D_PARSE) {
+                                 DDpacket(out_buf,result);
+                              }
+                              // TODO -- requeue unset packets to Rx? die? what?
+                              DDqueue(D_POINTER, Tx, "dead 3"); 
+                              // transmit again
+                              tbuf_size -= result;
+                              out_buf -= result;
+                              result = 0;
                            }
-                           // TODO -- requeue unset packets to Rx? die? what?
-                           DDqueue(D_POINTER, Tx, "dead 3"); 
-                           // transmit again
-                           tbuf_size -= result;
-                           out_buf -= result;
-                           result = 0;
                         }
+                     } while (result < tbuf_size);
+                     // space out repeating bursts so they arrive as individual packets on the clients
+                     if (repeat > 0) {
+                        usleep(repeat_wait * 1000); // default of 50 milliseconds
                      }
-                  } while (result < tbuf_size);
+                  }
                   //padTTY(RFfd, tbt);
                   setnonblocking(RFfd);
                   // remove items from Tx queue, sending messages back to mcp as needed
@@ -1137,6 +1151,8 @@ void print_help(int exval) {
    printf("  -p 4004       set mcp listen port\n");
    printf("  -i 4008       set radio interface listen port\n");
    printf("  -t /dev/ttyS1 set serial port device\n");
+   printf("  -j 3          Number of times to repeat commands\n");
+   printf("  -J 50         Amount of milliseconds to wait between repeats\n");
    printf("  -x 800        xmit test, xmit a request devices every arg milliseconds (default=disabled=0)\n");
    printf("  -s 150        slottime in ms (5ms granules, 1275 ms max  ONLY WITH -x\n");
    printf("  -c 300        collection time for burst messages in ms\n");
@@ -1190,7 +1206,7 @@ int main(int argc, char **argv) {
    strcpy(ttyport,"/dev/ttyS0");
    hardflow=6;
    
-   while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:c:w:")) != -1) {
+   while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:c:w:j:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
@@ -1202,6 +1218,14 @@ int main(int argc, char **argv) {
 
          case 'w':
             child = atoi(optarg);            
+            break;
+
+         case 'j':
+            repeat_count = atoi(optarg);            
+            break;
+
+         case 'J':
+            repeat_wait = atoi(optarg);            
             break;
 
          case 'r':
