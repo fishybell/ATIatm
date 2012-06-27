@@ -81,10 +81,10 @@ int queueLength(queue_item_t *qi); // finds the total length of message data in 
 int queueSize(queue_item_t *qi); // finds the total number items in the queue
 int queuePtype(queue_item_t *qi); // peeks at queue and returns message type
 void clearQueue(queue_item_t *qi); // assuming qi is the head of the queue, this deallocates the memory and unlinks the whole queue, leaving the head unlinked but otherwise intact (no "removed" or "sent" messages are created)
-void queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *remaining_time, int *slottime, int *inittime); // create a burst message to be sent from the Rx queue. all items put in the burst are put in the Tx queue for manual removal and sending of "sent" messages after actual send. if send is unsuccessful, items can be requeued to Rx by linking Tx's tail to Rx's head, then Rx's head becomes Tx's head. (bsize should come filled in with the size of buf, and after return contains size of data in buf) (slottime and inittime may change mid-burst, but it's unlikely as the first message of the first burst should set them, and they will then remain set the same forever unless mcp gives new values)
+int queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *remaining_time, int *slottime, int *inittime); // create a burst message to be sent from the Rx queue. all items put in the burst are put in the Tx queue for manual removal and sending of "sent" messages after actual send. if send is unsuccessful, items can be requeued to Rx by linking Tx's tail to Rx's head, then Rx's head becomes Tx's head. (bsize should come filled in with the size of buf, and after return contains size of data in buf) (slottime and inittime may change mid-burst, but it's unlikely as the first message of the first burst should set them, and they will then remain set the same forever unless mcp gives new values) -- return value is 0 for non-repeating, 1-15 if repeating (number is sequence number)
 queue_item_t *queueTail(queue_item_t* qi); // find the tail of a queue
 
-int Ptype(char *buf);
+int Ptype(char *buf); // packet type (0: illegal, 1: request devs, 2: request stats, 3: normal, 4: control msg, 5: quick group, 6: repeating cmd)
 
 void print_verbosity_bits(void);
 
@@ -496,7 +496,7 @@ typedef struct LB_burst {
    // 1 * 32 bits = 1 long - padding = 3 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 number:7 __attribute__ ((packed)); // max of 128 items in a burst (really max of 83)
-   uint32 pad:4 __attribute__ ((packed));
+   uint32 sequence:4 __attribute__ ((packed)); // 0 if not applicable, 1-15 if a repeating burst
    uint32 crc:8 __attribute__ ((packed));
    uint32 padding:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_burst_t;
@@ -559,6 +559,7 @@ void DDpacket_internal(const char *program, uint8 *buf,int len); // print debug 
 void DDqueue_internal(const char *qn, int v, queue_item_t *qi, const char *f, int line, char *fmt, ...); // print debug output for the given queue if verbose as bit "v"
 
 int __ptype(int cmd);
+
 #define DDpacket(B, L) { DDpacket_internal(__PROGRAM__, B, L); } /* auto add PROGRAM to output */
 #define DDqueue(V, Q, FMT, ...) { DDqueue_internal(#Q, V, Q, __FILE__, __LINE__, FMT, ##__VA_ARGS__); } /* auto add FILE/LINE to output */
 
