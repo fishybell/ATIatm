@@ -717,6 +717,20 @@ int tty2sock(rf_connection_t *rc) {
             rc->timeout_end = rc->nowt; // reset end time as well
             DDCMSG(D_TIME, BLACK, "Clock changed to %9ld", rc->time_start);
 
+            // check to see if we should be ignoring this message
+            if (pkt->sequence > 0 && /* sequence of 0 is a non-ignorable packet */
+                rc->last_sequence == pkt->sequence &&
+                rc->last_number == pkt->number) {
+               // this is the same burst as before, just ignore everything until the next burst
+               rc->ignoring = 1;
+               DDCMSG(D_NEW, RED, "Found repeat burst");
+            } else {
+               // new burst, don't ignore, but remember pieces
+               rc->ignoring = 0;
+               rc->last_sequence = pkt->sequence;
+               rc->last_number = pkt->number;
+            }
+
             //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
             clearTxQ(rc);
             use_command = 0; // don't send this command on to slaveboss
@@ -730,9 +744,13 @@ int tty2sock(rf_connection_t *rc) {
       if (use_command) {
          rc->packets--; // received a new packet, the burst just got smaller
          DDCMSG(D_TIME, YELLOW, "---------------------------CHANGE IN NUM PACKETS: %i with cmd %i", rc->packets, mnum);
-         // copy the found message to the socket "out" buffer
-         addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
-         added_to_buf = 1;
+         if (!rc->ignoring) {
+            // copy the found message to the socket "out" buffer
+            addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
+            added_to_buf = 1;
+         } else {
+            DDCMSG(D_NEW, RED, "Ignored repeat packet");
+         }
          if (rc->quick_num > 0 && mnum != LBC_QUICK_GROUP && mnum != LBC_QUICK_GROUP_BIG) {
             // used quick group addresses
             //DCMSG(CYAN, "Cleared quick_num from being %i", rc->quick_num);
