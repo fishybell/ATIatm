@@ -723,7 +723,7 @@ int tty2sock(rf_connection_t *rc) {
                 rc->last_number == pkt->number) {
                // this is the same burst as before, just ignore everything until the next burst
                rc->ignoring = 1;
-               DDCMSG(D_NEW, RED, "Found repeat burst");
+               DDCMSG(D_POINTER, RED, "Found repeat burst");
             } else {
                // new burst, don't ignore, but remember pieces
                rc->ignoring = 0;
@@ -749,7 +749,7 @@ int tty2sock(rf_connection_t *rc) {
             addToBuffer_sock_out(rc, rc->tty_ibuf + start, end - start);
             added_to_buf = 1;
          } else {
-            DDCMSG(D_NEW, RED, "Ignored repeat packet");
+            DDCMSG(D_POINTER, RED, "Ignored repeat packet");
          }
          if (rc->quick_num > 0 && mnum != LBC_QUICK_GROUP && mnum != LBC_QUICK_GROUP_BIG) {
             // used quick group addresses

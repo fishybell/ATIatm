@@ -379,6 +379,7 @@ int main(int argc, char **argv) {
             clearTxQ(&rc);
          // reading?
          } else if (events[n].events & EPOLLIN || events[n].events & EPOLLPRI) {
+            //DDCMSG(D_POINTER, MAGENTA, "\n---------------------------\nTTY READ\n---------------------------");
             if (rc.packets < 0) { // is this the start of a fresh burst?
                DDCMSG(D_TIME, YELLOW, "---------------------------START OF BURST!!!");
                // grab now time
