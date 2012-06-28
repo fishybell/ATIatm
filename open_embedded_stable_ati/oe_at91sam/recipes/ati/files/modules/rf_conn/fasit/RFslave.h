@@ -54,6 +54,11 @@ typedef struct rf_connection {
    long nowt; // the start of burst time
    int quick_addrs[8*14]; // remember some "quick" addresses from quick group for status req to use
    int quick_num;
+
+   // ignore stuff
+   int last_sequence; // the last sequence received from an LBC_BURST packet
+   int last_number; // the last number ....
+   int ignoring; // 1 = the last sequence/number combo is a repeat, ignoring, 0 = not ignoring
 } rf_connection_t;
 
 extern int verbose;
