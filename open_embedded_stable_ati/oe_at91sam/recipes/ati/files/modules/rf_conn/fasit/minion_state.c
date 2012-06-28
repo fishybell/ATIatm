@@ -475,14 +475,17 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
 
                // and come back later
                if (minion->S.speed.data <= 0.0) {
-                  switch (minion->S.dev_type) {
-                     default:
-                     case Type_MIT:
-                        setTimerTo(minion->S.move, timer, flags, MIT_MOVE_START_TIME, F_move_end_movement);
-                        break;
-                     case Type_MAT:
-                        setTimerTo(minion->S.move, timer, flags, MAT_MOVE_START_TIME, F_move_end_movement);
-                        break;
+                  if (minion->S.resp.mover_command == move_continuous) {
+                  } else {
+                     switch (minion->S.dev_type) {
+                        default:
+                        case Type_MIT:
+                           setTimerTo(minion->S.move, timer, flags, MIT_MOVE_START_TIME, F_move_end_movement);
+                           break;
+                        case Type_MAT:
+                           setTimerTo(minion->S.move, timer, flags, MAT_MOVE_START_TIME, F_move_end_movement);
+                           break;
+                     }
                   }
                } else {
                   // come back after we've moved 1/2 meters
