@@ -438,6 +438,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    }
 
    // mover stuff
+#if 0 /* movement failures don't work great, need further testing before deployment */
    // check to see if we failed stopping
    if (minion->S.resp.mover_command != move_dock && /* not docking and ... */
        !should_be_moving && (moving_left || moving_right) && /* shouldn't be moving and is moving and ... */
@@ -460,7 +461,9 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
       need_tell_FASIT = 1;
    }
    // check to see if we should fake movement right (when continuous moving)
-   else if (minion->S.resp.mover_command == move_continuous && should_be_moving && /* should be moving back and forth */
+   else
+#endif /* movement failures don't work great, need further testing before deployment */
+if (minion->S.resp.mover_command == move_continuous && should_be_moving && /* should be moving back and forth */
        ((minion->S.resp.current_speed == 0 && at_home) || /* and is either at home or ... */
         (moving_right && (faking_stopped || faking_left)))) { /* is moving right and we're faking stopped or left */
       DEBUG_REAL_2_FAKE(MAGENTA);
