@@ -678,7 +678,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
          break;
    }
    s.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
-   DCMSG(MAGENTA, "++++++++++++++++++++++++++++++\ns.location %i from position %i while moving @ %i\n++++++++++++++++++++++++++++++", s.location, htons(fc->f2102_resp.body.pos), s.speed);
+   //DCMSG(MAGENTA, "++++++++++++++++++++++++++++++\ns.location %i from position %i while moving @ %i\n++++++++++++++++++++++++++++++", s.location, htons(fc->f2102_resp.body.pos), s.speed);
    s.hitmode = fc->hit_mode;
    s.react = fc->hit_react;
    s.sensitivity = fc->hit_react;
@@ -1203,7 +1203,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
          break;
    }
    bdy.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
-   DCMSG(MAGENTA, "++++++++++++++++++++++++++++++\nbdy.location %i from position %i while moving @ %i\n++++++++++++++++++++++++++++++", bdy.location, htons(fc->f2102_resp.body.pos), bdy.speed);
+   //DCMSG(MAGENTA, "++++++++++++++++++++++++++++++\nbdy.location %i from position %i while moving @ %i\n++++++++++++++++++++++++++++++", bdy.location, htons(fc->f2102_resp.body.pos), bdy.speed);
    bdy.hitmode = fc->hit_mode;
    bdy.react = fc->hit_react;
    bdy.sensitivity = fc->hit_react;

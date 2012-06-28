@@ -441,7 +441,7 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
          {
             LB_burst_t *L=(LB_burst_t *)LB;
             strcpy(cmdname,"Burst");
-            sprintf(hbuf,"Number=%3d .....",L->number);
+            sprintf(hbuf,"Number=%3d Sequence=%3d.....",L->number, L->sequence);
          }
          break;
 
