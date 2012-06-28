@@ -222,8 +222,6 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
    DDqueue(D_MEGA|D_POINTER, Tx, "initialized"); 
 
    remaining_time=100;          //  remaining time before we can transmit (in ms)
-   repeat_count = 3; // repeat 3 times by default
-   repeat_wait = 50; // repeat every 50 ms by default
 
    /**   loop until we lose connection  **/
 #define CURRENT_TIME(ts) { \
@@ -586,7 +584,10 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                      } while (result < tbuf_size);
                      // space out repeating bursts so they arrive as individual packets on the clients
                      if (repeat > 0) {
-                        usleep(repeat_wait * 1000); // default of 50 milliseconds
+                        //fsync(RFfd);
+                        DDCMSG(D_NEW, RED, "SLEEPING FOR TIMEOUT LENGTH OF %i * 1000 = %i", repeat_wait, repeat_wait * 1000);
+                        usleep(repeat_wait * 1000); // default of 500 milliseconds
+                        DDCMSG(D_NEW, RED, "DONE SLEEPING");
                      }
                   }
                   //padTTY(RFfd, tbt);
@@ -1152,7 +1153,7 @@ void print_help(int exval) {
    printf("  -i 4008       set radio interface listen port\n");
    printf("  -t /dev/ttyS1 set serial port device\n");
    printf("  -j 3          Number of times to repeat commands\n");
-   printf("  -J 50         Amount of milliseconds to wait between repeats\n");
+   printf("  -J 100         Amount of milliseconds to wait between repeats\n");
    printf("  -x 800        xmit test, xmit a request devices every arg milliseconds (default=disabled=0)\n");
    printf("  -s 150        slottime in ms (5ms granules, 1275 ms max  ONLY WITH -x\n");
    printf("  -c 300        collection time for burst messages in ms\n");
@@ -1205,8 +1206,10 @@ int main(int argc, char **argv) {
    SRport = smartrangePORT;
    strcpy(ttyport,"/dev/ttyS0");
    hardflow=6;
+   repeat_count = 2; // repeat twice by default
+   repeat_wait = 500; // repeat every 500 ms by default (enough time to wait for full 255 byte packet to transmit)
    
-   while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:c:w:j:")) != -1) {
+   while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:c:w:j:J:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
