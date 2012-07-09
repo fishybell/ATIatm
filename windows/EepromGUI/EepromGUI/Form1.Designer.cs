@@ -127,6 +127,7 @@
             this.accTB6 = new System.Windows.Forms.TextBox();
             this.accTB7 = new System.Windows.Forms.TextBox();
             this.accTB8 = new System.Windows.Forms.TextBox();
+            this.moveTB = new System.Windows.Forms.TextBox();
             this.showAllButton = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
             this.deviceTB = new System.Windows.Forms.TextBox();
@@ -176,6 +177,7 @@
             this.MSD = new System.Windows.Forms.TabPage();
             this.msdCheck = new System.Windows.Forms.CheckBox();
             this.tabPage5 = new System.Windows.Forms.TabPage();
+            this.radioCheck = new System.Windows.Forms.CheckBox();
             this.hpTB = new System.Windows.Forms.TextBox();
             this.lpTB = new System.Windows.Forms.TextBox();
             this.label46 = new System.Windows.Forms.Label();
@@ -241,6 +243,10 @@
             this.ipShowButton = new System.Windows.Forms.Button();
             this.ipSetButton = new System.Windows.Forms.Button();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.speedTB = new System.Windows.Forms.TextBox();
+            this.label14 = new System.Windows.Forms.Label();
+            this.moveRightButton = new System.Windows.Forms.Button();
+            this.moveLeftButton = new System.Windows.Forms.Button();
             this.radioButton = new System.Windows.Forms.Button();
             this.firmButton = new System.Windows.Forms.Button();
             this.expSTB = new System.Windows.Forms.TextBox();
@@ -250,7 +256,6 @@
             this.gpsTB = new System.Windows.Forms.TextBox();
             this.posTB = new System.Windows.Forms.TextBox();
             this.batTB = new System.Windows.Forms.TextBox();
-            this.moveTB = new System.Windows.Forms.TextBox();
             this.label26 = new System.Windows.Forms.Label();
             this.expSShowButton = new System.Windows.Forms.Button();
             this.label23 = new System.Windows.Forms.Label();
@@ -271,7 +276,6 @@
             this.label5 = new System.Windows.Forms.Label();
             this.moveShowButton = new System.Windows.Forms.Button();
             this.label3 = new System.Windows.Forms.Label();
-            this.moveSetButton = new System.Windows.Forms.Button();
             this.sleepShowButton = new System.Windows.Forms.Button();
             this.label15 = new System.Windows.Forms.Label();
             this.sleepSetButton = new System.Windows.Forms.Button();
@@ -280,7 +284,6 @@
             this.shutdownButton = new System.Windows.Forms.Button();
             this.stopButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
-            this.radioCheck = new System.Windows.Forms.CheckBox();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -347,10 +350,21 @@
             "10: Hit",
             "11: Kill",
             "12: Shutdown",
-            "13: Sleep",
-            "14: Wake",
-            "15: Error",
-            ""});
+            "13: Dock",
+            "14: Undocked",
+            "15: Sleep",
+            "16: Wake",
+            "17: Home Limit",
+            "18: End Limit",
+            "19: Dock Limit",
+            "20: Timeout",
+            "21: Speed Change",
+            "22: Charging",
+            "23: Not Charging",
+            "24: Enable Battery Check",
+            "25: Disable Battery Check",
+            "26: Error",
+            "Unknown"});
             this.eventCB.Location = new System.Drawing.Point(545, 44);
             this.eventCB.Margin = new System.Windows.Forms.Padding(4);
             this.eventCB.Name = "eventCB";
@@ -1503,6 +1517,15 @@
             this.accTB8.Text = "0";
             this.toolTip1.SetToolTip(this.accTB8, "ex3");
             // 
+            // moveTB
+            // 
+            this.moveTB.Location = new System.Drawing.Point(218, 81);
+            this.moveTB.Margin = new System.Windows.Forms.Padding(4);
+            this.moveTB.Name = "moveTB";
+            this.moveTB.Size = new System.Drawing.Size(50, 22);
+            this.moveTB.TabIndex = 9;
+            this.toolTip1.SetToolTip(this.moveTB, "Enter a positive number 1-4 and click left or right.");
+            // 
             // showAllButton
             // 
             this.showAllButton.Enabled = false;
@@ -2121,6 +2144,18 @@
             this.tabPage5.TabIndex = 5;
             this.tabPage5.Text = "Radio";
             this.tabPage5.UseVisualStyleBackColor = true;
+            // 
+            // radioCheck
+            // 
+            this.radioCheck.AutoSize = true;
+            this.radioCheck.CheckAlign = System.Drawing.ContentAlignment.MiddleRight;
+            this.radioCheck.Location = new System.Drawing.Point(24, 98);
+            this.radioCheck.Name = "radioCheck";
+            this.radioCheck.Size = new System.Drawing.Size(133, 21);
+            this.radioCheck.TabIndex = 7;
+            this.radioCheck.Text = "Program Radio?";
+            this.radioCheck.UseVisualStyleBackColor = true;
+            this.radioCheck.CheckedChanged += new System.EventHandler(this.radioCheck_CheckedChanged);
             // 
             // hpTB
             // 
@@ -2875,6 +2910,10 @@
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.speedTB);
+            this.tabPage1.Controls.Add(this.label14);
+            this.tabPage1.Controls.Add(this.moveRightButton);
+            this.tabPage1.Controls.Add(this.moveLeftButton);
             this.tabPage1.Controls.Add(this.radioButton);
             this.tabPage1.Controls.Add(this.firmButton);
             this.tabPage1.Controls.Add(this.expSTB);
@@ -2905,7 +2944,6 @@
             this.tabPage1.Controls.Add(this.label5);
             this.tabPage1.Controls.Add(this.moveShowButton);
             this.tabPage1.Controls.Add(this.label3);
-            this.tabPage1.Controls.Add(this.moveSetButton);
             this.tabPage1.Controls.Add(this.sleepShowButton);
             this.tabPage1.Controls.Add(this.label15);
             this.tabPage1.Controls.Add(this.sleepSetButton);
@@ -2921,6 +2959,45 @@
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Manipulate";
             this.tabPage1.UseVisualStyleBackColor = true;
+            // 
+            // speedTB
+            // 
+            this.speedTB.ForeColor = System.Drawing.SystemColors.WindowText;
+            this.speedTB.Location = new System.Drawing.Point(608, 46);
+            this.speedTB.Margin = new System.Windows.Forms.Padding(4);
+            this.speedTB.Name = "speedTB";
+            this.speedTB.Size = new System.Drawing.Size(99, 22);
+            this.speedTB.TabIndex = 101;
+            // 
+            // label14
+            // 
+            this.label14.AutoSize = true;
+            this.label14.Location = new System.Drawing.Point(539, 55);
+            this.label14.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label14.Name = "label14";
+            this.label14.Size = new System.Drawing.Size(49, 17);
+            this.label14.TabIndex = 100;
+            this.label14.Text = "Speed";
+            // 
+            // moveRightButton
+            // 
+            this.moveRightButton.Location = new System.Drawing.Point(277, 78);
+            this.moveRightButton.Name = "moveRightButton";
+            this.moveRightButton.Size = new System.Drawing.Size(75, 28);
+            this.moveRightButton.TabIndex = 99;
+            this.moveRightButton.Text = "Right";
+            this.moveRightButton.UseVisualStyleBackColor = true;
+            this.moveRightButton.Click += new System.EventHandler(this.moveRightButton_Click);
+            // 
+            // moveLeftButton
+            // 
+            this.moveLeftButton.Location = new System.Drawing.Point(136, 78);
+            this.moveLeftButton.Name = "moveLeftButton";
+            this.moveLeftButton.Size = new System.Drawing.Size(75, 28);
+            this.moveLeftButton.TabIndex = 98;
+            this.moveLeftButton.Text = "Left";
+            this.moveLeftButton.UseVisualStyleBackColor = true;
+            this.moveLeftButton.Click += new System.EventHandler(this.moveLeftButton_Click);
             // 
             // radioButton
             // 
@@ -2944,7 +3021,7 @@
             // 
             // expSTB
             // 
-            this.expSTB.Location = new System.Drawing.Point(608, 82);
+            this.expSTB.Location = new System.Drawing.Point(608, 118);
             this.expSTB.Margin = new System.Windows.Forms.Padding(4);
             this.expSTB.Name = "expSTB";
             this.expSTB.Size = new System.Drawing.Size(99, 22);
@@ -2952,7 +3029,7 @@
             // 
             // knobTB
             // 
-            this.knobTB.Location = new System.Drawing.Point(567, 156);
+            this.knobTB.Location = new System.Drawing.Point(567, 192);
             this.knobTB.Margin = new System.Windows.Forms.Padding(4);
             this.knobTB.Name = "knobTB";
             this.knobTB.ReadOnly = true;
@@ -2961,7 +3038,7 @@
             // 
             // knobTB2
             // 
-            this.knobTB2.Location = new System.Drawing.Point(668, 156);
+            this.knobTB2.Location = new System.Drawing.Point(668, 192);
             this.knobTB2.Margin = new System.Windows.Forms.Padding(4);
             this.knobTB2.Name = "knobTB2";
             this.knobTB2.ReadOnly = true;
@@ -2978,7 +3055,7 @@
             // 
             // gpsTB
             // 
-            this.gpsTB.Location = new System.Drawing.Point(608, 121);
+            this.gpsTB.Location = new System.Drawing.Point(608, 157);
             this.gpsTB.Margin = new System.Windows.Forms.Padding(4);
             this.gpsTB.Name = "gpsTB";
             this.gpsTB.ReadOnly = true;
@@ -2987,7 +3064,7 @@
             // 
             // posTB
             // 
-            this.posTB.Location = new System.Drawing.Point(608, 47);
+            this.posTB.Location = new System.Drawing.Point(608, 83);
             this.posTB.Margin = new System.Windows.Forms.Padding(4);
             this.posTB.Name = "posTB";
             this.posTB.Size = new System.Drawing.Size(99, 22);
@@ -3002,18 +3079,10 @@
             this.batTB.Size = new System.Drawing.Size(99, 22);
             this.batTB.TabIndex = 1;
             // 
-            // moveTB
-            // 
-            this.moveTB.Location = new System.Drawing.Point(136, 80);
-            this.moveTB.Margin = new System.Windows.Forms.Padding(4);
-            this.moveTB.Name = "moveTB";
-            this.moveTB.Size = new System.Drawing.Size(132, 22);
-            this.moveTB.TabIndex = 9;
-            // 
             // label26
             // 
             this.label26.AutoSize = true;
-            this.label26.Location = new System.Drawing.Point(539, 91);
+            this.label26.Location = new System.Drawing.Point(539, 127);
             this.label26.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label26.Name = "label26";
             this.label26.Size = new System.Drawing.Size(67, 17);
@@ -3022,7 +3091,7 @@
             // 
             // expSShowButton
             // 
-            this.expSShowButton.Location = new System.Drawing.Point(716, 79);
+            this.expSShowButton.Location = new System.Drawing.Point(716, 115);
             this.expSShowButton.Margin = new System.Windows.Forms.Padding(4);
             this.expSShowButton.Name = "expSShowButton";
             this.expSShowButton.Size = new System.Drawing.Size(100, 28);
@@ -3034,7 +3103,7 @@
             // label23
             // 
             this.label23.AutoSize = true;
-            this.label23.Location = new System.Drawing.Point(520, 165);
+            this.label23.Location = new System.Drawing.Point(520, 201);
             this.label23.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label23.Name = "label23";
             this.label23.Size = new System.Drawing.Size(41, 17);
@@ -3043,7 +3112,7 @@
             // 
             // knobShowButton
             // 
-            this.knobShowButton.Location = new System.Drawing.Point(716, 153);
+            this.knobShowButton.Location = new System.Drawing.Point(716, 189);
             this.knobShowButton.Margin = new System.Windows.Forms.Padding(4);
             this.knobShowButton.Name = "knobShowButton";
             this.knobShowButton.Size = new System.Drawing.Size(100, 28);
@@ -3076,7 +3145,7 @@
             // label22
             // 
             this.label22.AutoSize = true;
-            this.label22.Location = new System.Drawing.Point(539, 128);
+            this.label22.Location = new System.Drawing.Point(539, 164);
             this.label22.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label22.Name = "label22";
             this.label22.Size = new System.Drawing.Size(37, 17);
@@ -3097,7 +3166,7 @@
             // gpsShowButton
             // 
             this.gpsShowButton.Enabled = false;
-            this.gpsShowButton.Location = new System.Drawing.Point(716, 116);
+            this.gpsShowButton.Location = new System.Drawing.Point(716, 152);
             this.gpsShowButton.Margin = new System.Windows.Forms.Padding(4);
             this.gpsShowButton.Name = "gpsShowButton";
             this.gpsShowButton.Size = new System.Drawing.Size(100, 28);
@@ -3109,7 +3178,7 @@
             // label21
             // 
             this.label21.AutoSize = true;
-            this.label21.Location = new System.Drawing.Point(539, 55);
+            this.label21.Location = new System.Drawing.Point(539, 91);
             this.label21.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label21.Name = "label21";
             this.label21.Size = new System.Drawing.Size(58, 17);
@@ -3118,7 +3187,7 @@
             // 
             // posShowButton
             // 
-            this.posShowButton.Location = new System.Drawing.Point(716, 43);
+            this.posShowButton.Location = new System.Drawing.Point(716, 79);
             this.posShowButton.Margin = new System.Windows.Forms.Padding(4);
             this.posShowButton.Name = "posShowButton";
             this.posShowButton.Size = new System.Drawing.Size(100, 28);
@@ -3203,7 +3272,7 @@
             // 
             // moveShowButton
             // 
-            this.moveShowButton.Location = new System.Drawing.Point(277, 76);
+            this.moveShowButton.Location = new System.Drawing.Point(716, 43);
             this.moveShowButton.Margin = new System.Windows.Forms.Padding(4);
             this.moveShowButton.Name = "moveShowButton";
             this.moveShowButton.Size = new System.Drawing.Size(100, 28);
@@ -3221,17 +3290,6 @@
             this.label3.Size = new System.Drawing.Size(42, 17);
             this.label3.TabIndex = 8;
             this.label3.Text = "Move";
-            // 
-            // moveSetButton
-            // 
-            this.moveSetButton.Location = new System.Drawing.Point(385, 76);
-            this.moveSetButton.Margin = new System.Windows.Forms.Padding(4);
-            this.moveSetButton.Name = "moveSetButton";
-            this.moveSetButton.Size = new System.Drawing.Size(100, 28);
-            this.moveSetButton.TabIndex = 11;
-            this.moveSetButton.Text = "Set";
-            this.moveSetButton.UseVisualStyleBackColor = true;
-            this.moveSetButton.Click += new System.EventHandler(this.moveSetButton_Click);
             // 
             // sleepShowButton
             // 
@@ -3326,18 +3384,6 @@
             this.tabControl1.SelectedIndex = 0;
             this.tabControl1.Size = new System.Drawing.Size(849, 348);
             this.tabControl1.TabIndex = 93;
-            // 
-            // radioCheck
-            // 
-            this.radioCheck.AutoSize = true;
-            this.radioCheck.CheckAlign = System.Drawing.ContentAlignment.MiddleRight;
-            this.radioCheck.Location = new System.Drawing.Point(24, 98);
-            this.radioCheck.Name = "radioCheck";
-            this.radioCheck.Size = new System.Drawing.Size(133, 21);
-            this.radioCheck.TabIndex = 7;
-            this.radioCheck.Text = "Program Radio?";
-            this.radioCheck.UseVisualStyleBackColor = true;
-            this.radioCheck.CheckedChanged += new System.EventHandler(this.radioCheck_CheckedChanged);
             // 
             // Form1
             // 
@@ -3651,7 +3697,6 @@
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Button moveShowButton;
         private System.Windows.Forms.Label label3;
-        private System.Windows.Forms.Button moveSetButton;
         private System.Windows.Forms.Button sleepShowButton;
         private System.Windows.Forms.Label label15;
         private System.Windows.Forms.Button sleepSetButton;
@@ -3664,6 +3709,10 @@
         private System.Windows.Forms.ComboBox revCB;
         private System.Windows.Forms.Button radioButton;
         private System.Windows.Forms.CheckBox radioCheck;
+        private System.Windows.Forms.TextBox speedTB;
+        private System.Windows.Forms.Label label14;
+        private System.Windows.Forms.Button moveRightButton;
+        private System.Windows.Forms.Button moveLeftButton;
     }
 }
 

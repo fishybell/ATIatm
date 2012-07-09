@@ -94,8 +94,8 @@ namespace EepromGUI
                    {
                        if (item != "")
                        {
-                           this.logTB.AppendText(machine + " - received: " + item + "\n");
-                           logTB.ScrollToCaret();
+                           //this.logTB.AppendText(machine + " - received: " + item + "\n");
+                           //logTB.ScrollToCaret();
                            parseIncoming(item + "\n");
                            parseIP(item);
                        }
@@ -209,10 +209,24 @@ namespace EepromGUI
             }
         }
 
+
         /***********************************************
-         * Set the movement speed
-         * ********************************************/
-        private void moveSetButton_Click(object sender, EventArgs e)
+        * Set the left movement speed
+        * ********************************************/
+        private void moveLeftButton_Click(object sender, EventArgs e)
+        {
+            String move = "-" + moveTB.Text;
+            if (conn != null)
+            {
+                conn.sendMessage("M " + move);
+                logSent("M " + move);
+            }
+        }
+
+        /***********************************************
+        * Set the right movement speed
+        * ********************************************/
+        private void moveRightButton_Click(object sender, EventArgs e)
         {
             String move = moveTB.Text;
             if (conn != null)
@@ -832,7 +846,8 @@ namespace EepromGUI
                 case "SES":
                     enableAll();
                     moveShowButton.Enabled = false;
-                    moveSetButton.Enabled = false;
+                    moveLeftButton.Enabled = false;
+                    moveRightButton.Enabled = false;
                     posShowButton.Enabled = false;
                     concealButton.Enabled = false;
                     exposeButton.Enabled = false;
@@ -853,7 +868,6 @@ namespace EepromGUI
                 case "SIT":
                     enableAll();
                     moveShowButton.Enabled = false;
-                    moveSetButton.Enabled = false;
                     posShowButton.Enabled = false;
                     knobShowButton.Enabled = false;
                     modeShowButton.Enabled = false;
@@ -862,7 +876,8 @@ namespace EepromGUI
                 case "SAT":
                     enableAll();
                     moveShowButton.Enabled = false;
-                    moveSetButton.Enabled = false;
+                    moveRightButton.Enabled = false;
+                    moveLeftButton.Enabled = false;
                     posShowButton.Enabled = false;
                     knobShowButton.Enabled = false;
                     modeShowButton.Enabled = false;
@@ -919,7 +934,8 @@ namespace EepromGUI
         private void enableAll()
         {
             moveShowButton.Enabled = true;
-            moveSetButton.Enabled = true;
+            moveRightButton.Enabled = true;
+            moveLeftButton.Enabled = true;
             posShowButton.Enabled = true;
             modeShowButton.Enabled = true;
             modeSetButton.Enabled = true;
@@ -948,6 +964,7 @@ namespace EepromGUI
             deviceTB.Text = "";
             macOTB.Text = "";
             moveTB.Text = "";
+            speedTB.Text = "";
             sleepCB.SelectedIndex = -1;
             hitDTB.Text = "";
             eventCB.SelectedIndex = -1;
@@ -1141,6 +1158,7 @@ namespace EepromGUI
                 case 'A':   // position
                     posTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
                     posTB.Text = getMessageValue(message, 2);
+                    logSent("A " + getMessageValue(message, 2));
                     break;
                 case 'B':  
                     switch (second)
@@ -1170,26 +1188,31 @@ namespace EepromGUI
                         default:   // battery
                             batTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
                             batTB.Text = getMessageValue(message, 2);
+                            logSent("B " + getMessageValue(message, 2));
                             break;
                     }
                     break;
                 case 'C':   // target is concealed
                     expSTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
                     expSTB.Text = "concealed";
+                    logSent("C " + getMessageValue(message, 2));
                     break;
                 case 'E':   // target is exposed
                     expSTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
                     expSTB.Text = "exposed";
+                    logSent("E " + getMessageValue(message, 2));
                     break;
                 case 'F':   // fall parameters
                     String fall = getMessageValue(message, 2);
                     String[] numbs = fall.Split(' ');
                     fkillTB.Text = numbs[0];
                     fallCB.SelectedIndex = Convert.ToInt32(numbs[1]);
+                    logSent("F " + getMessageValue(message, 2));
                     break;
                 case 'H':   // hit data
                     hitDTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
                     hitDTB.Text = getMessageValue(message, 2);
+                    logSent("H " + getMessageValue(message, 2));
                     break;
                 case 'L':   // hit calibration
                     String cal = getMessageValue(message, 2);
@@ -1198,13 +1221,16 @@ namespace EepromGUI
                     calTB2.Text = calSplit[1];
                     calTB3.Text = calSplit[2];
                     calCB4.SelectedIndex = Convert.ToInt32(calSplit[3]);
+                    logSent("L " + getMessageValue(message, 2));
                     break;
                 case 'M':   // move speed
-                    moveTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
-                    moveTB.Text = getMessageValue(message, 2);
+                    speedTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    speedTB.Text = getMessageValue(message, 2);
+                    logSent("M " + getMessageValue(message, 2));
                     break;
                 case 'P':   // sleep status
                     sleepCB.SelectedIndex = Convert.ToInt32(getMessageValue(message, 2));
+                    logSent("P " + getMessageValue(message, 2));
                     break;
                 case 'Q':   // accessory
                     String acc = getMessageValue(message, 2);
@@ -1231,6 +1257,7 @@ namespace EepromGUI
                     accTB6.Text = accSplit[11];
                     accTB7.Text = accSplit[12];
                     accTB8.Text = accSplit[13];
+                    logSent("Q " + getMessageValue(message, 2));
                     break;
                 case 'S':   // concealed or exposed status
                     expSTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
@@ -1247,6 +1274,7 @@ namespace EepromGUI
                     {
                         expSTB.Text = "moving";
                     }
+                    logSent("S " + getMessageValue(message, 2));
                     break;
                 case 'U':   // error messages
                     errorTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
@@ -1254,19 +1282,30 @@ namespace EepromGUI
                     String[] eSplit = eMessage.Split(' ');
                     errorTB.Text = eMessage;
                     errorTB.Update();
+                    logSent("U " + getMessageValue(message, 2));
                     break;
                 case 'V':   // current event being called
                     eventCB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
                     String vMessage = getMessageValue(message, 2);
                     String[] vSplit = vMessage.Split(' ');
-                    eventCB.SelectedIndex = Convert.ToInt32(vSplit[0]);
+                    int eventNum = Convert.ToInt32(vSplit[0]);
+                    if (eventNum <= 26)
+                    {
+                        eventCB.SelectedIndex = eventNum;
+                    }
+                    else
+                    {
+                        eventCB.SelectedIndex = eventCB.Items.Count-1;
+                    }
                     eventCB.Update();
+                    logSent("V " + getMessageValue(message, 2));
                     break;
                 case 'Y':   // hit sensor
                     String sensor = getMessageValue(message, 2);
                     String[] sensorSplit = sensor.Split(' ');
                     sensorCB.SelectedIndex = Convert.ToInt32(sensorSplit[0]);
                     sensor2CB.SelectedIndex = Convert.ToInt32(sensorSplit[1]);
+                    logSent("Y " + getMessageValue(message, 2));
                     break;
                 case 'I':   // eeprom board settings
                     switch (second)
@@ -1274,6 +1313,7 @@ namespace EepromGUI
                         case 'A':   // Address
                             addressDTB.Text = getMessageValue(message, 4);
                             addressDTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I A " + getMessageValue(message, 4));
                             break;
                         case 'B':   // target type (SIT, MIT, etc.)
                             String board = getMessageValue(message, 4);
@@ -1283,12 +1323,15 @@ namespace EepromGUI
                             // Enable and disable controls according to the board type
                             disableEnable(boardType);
                             targetCB.Text = machine;
+                            logSent("I B " + getMessageValue(message, 4));
                             break;
                         case 'C':   // connection port
                             connectTB.Text = getMessageValue(message, 4);
+                            logSent("I C " + getMessageValue(message, 4));
                             break;
                         case 'D':   // communication type
                             commCB.SelectedItem = getMessageValue(message, 4);
+                            logSent("I D " + getMessageValue(message, 4));
                             break;
                         case 'E':   // battery/moving defaults
                             String batMov = getMessageValue(message, 4);
@@ -1325,6 +1368,7 @@ namespace EepromGUI
                                     default:
                                         break;
 	                            }
+                            logSent("I E " + getMessageValue(message, 4));
                             break;
                         case 'F':   // Fall parameter defaults
                             String[] fallSplit = getMessageValue(message, 4).Split(' ');
@@ -1332,6 +1376,7 @@ namespace EepromGUI
                             fallDCB.SelectedIndex = Convert.ToInt32(fallSplit[1]);
                             fallDTB.ForeColor = System.Drawing.SystemColors.WindowText;
                             fallDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I F " + getMessageValue(message, 4));
                             break;
                         case 'G':   // MGL defaults
                             String[] mglSplit = getMessageValue(message, 4).Split(' ');
@@ -1357,6 +1402,7 @@ namespace EepromGUI
                             mglTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             mglTB5.ForeColor = System.Drawing.SystemColors.WindowText;
                             mglTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I G " + getMessageValue(message, 4));
                             break;
                         case 'H':   // Hit calibration defaults
                             String[] calDSplit = getMessageValue(message, 4).Split(' ');
@@ -1368,9 +1414,11 @@ namespace EepromGUI
                             hitcDTB2.ForeColor = System.Drawing.SystemColors.WindowText;
                             hitcDTB3.ForeColor = System.Drawing.SystemColors.WindowText;
                             hitcCB4.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I H " + getMessageValue(message, 4));
                             break;
                         case 'I':   // IP address
                             ipTB.Text = getMessageValue(message, 4);
+                            logSent("I I " + getMessageValue(message, 4));
                             break;
                         case 'K':   // SMK defaults
                             String[] smkSplit = getMessageValue(message, 4).Split(' ');
@@ -1396,9 +1444,11 @@ namespace EepromGUI
                             smkTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             smkTB5.ForeColor = System.Drawing.SystemColors.WindowText;
                             smkTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I K " + getMessageValue(message, 4));
                             break;
                         case 'L':   // listen port
                             listenTB.Text = getMessageValue(message, 4);
+                            logSent("I L " + getMessageValue(message, 4));
                             break;
                         case 'M':   // MAC address
                             String valid = getMessageValue(message, 4);
@@ -1414,6 +1464,7 @@ namespace EepromGUI
                                 // Get last 4 characters of MAC to display
                                 macOTB.Text = valid.Substring(12, 5);
                             }
+                            logSent("I M " + getMessageValue(message, 4));
                             break;
                         case 'N':   // MFS defaults
                             String[] mfsSplit = getMessageValue(message, 4).Split(' ');
@@ -1439,6 +1490,7 @@ namespace EepromGUI
                             mfsTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             mfsTB5.ForeColor = System.Drawing.SystemColors.WindowText;
                             mfsTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I N " + getMessageValue(message, 4));
                             break;
                         case 'O':   // Bob defaults
                             String[] bobSplit = getMessageValue(message, 4).Split(' ');
@@ -1447,6 +1499,7 @@ namespace EepromGUI
                                 bobDCB.SelectedIndex = Convert.ToInt32(bobSplit[0]);   // crashes here when doing show all in defaults
                                 bobDCB.ForeColor = System.Drawing.SystemColors.WindowText;
                             }
+                            logSent("I O " + getMessageValue(message, 4));
                             break;
                         case 'P':   // PHI defaults
                             String[] phiSplit = getMessageValue(message, 4).Split(' ');
@@ -1472,6 +1525,7 @@ namespace EepromGUI
                             phiTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             phiTB5.ForeColor = System.Drawing.SystemColors.WindowText;
                             phiTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I P " + getMessageValue(message, 4));
                             break;
                         case 'Q':   // Docking end defaults
                             String[] dockSplit = getMessageValue(message, 4).Split(' ');
@@ -1480,6 +1534,7 @@ namespace EepromGUI
                                 DockDCB.SelectedIndex = Convert.ToInt32(dockSplit[0]);
                                 DockDCB.ForeColor = System.Drawing.SystemColors.WindowText;
                             }
+                            logSent("I Q " + getMessageValue(message, 4));
                             break;
                         case 'S':   // Hit sensor defaults
                             String[] hitSplit = getMessageValue(message, 4).Split(' ');
@@ -1487,6 +1542,7 @@ namespace EepromGUI
                             sensorD2CB.SelectedIndex = Convert.ToInt32(hitSplit[1]);
                             sensorDCB.ForeColor = System.Drawing.SystemColors.WindowText;
                             sensorD2CB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I S " + getMessageValue(message, 4));
                             break;
                         case 'T':   // THM defaults
                             String[] thmSplit = getMessageValue(message, 4).Split(' ');
@@ -1512,22 +1568,27 @@ namespace EepromGUI
                             thmTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             thmTB5.ForeColor = System.Drawing.SystemColors.WindowText;
                             thmTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I T " + getMessageValue(message, 4));
                             break;
                         case 'U':   // Radio Frequency Default
                             freqTB.Text = getMessageValue(message, 4);
                             freqTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I U " + getMessageValue(message, 4));
                             break;
                         case 'V':   // Radio Low Power Default
                             lpTB.Text = getMessageValue(message, 4);
                             lpTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I V " + getMessageValue(message, 4));
                             break;
                         case 'W':   // Radio Frequency Default
                             hpTB.Text = getMessageValue(message, 4);
                             hpTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I W " + getMessageValue(message, 4));
                             break;
                         case 'X':   // Serial Number
                             serialDTB.Text = getMessageValue(message, 4);
                             serialDTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I X " + getMessageValue(message, 4));
                             break;
                         case 'Y':   // MSD defaults
                             String[] msdSplit = getMessageValue(message, 4).Split(' ');
@@ -1555,6 +1616,7 @@ namespace EepromGUI
                             msdTB4.ForeColor = System.Drawing.SystemColors.WindowText;
                             msdTB5.ForeColor = System.Drawing.SystemColors.WindowText;
                             msdTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("I Y " + getMessageValue(message, 4));
                             break;
                         case 'Z':   // Home end defaults
                             String[] homeSplit = getMessageValue(message, 4).Split(' ');
@@ -1563,6 +1625,7 @@ namespace EepromGUI
                                 HomeDCB.SelectedIndex = Convert.ToInt32(homeSplit[0]);
                                 HomeDCB.ForeColor = System.Drawing.SystemColors.WindowText;
                             }
+                            logSent("I Z " + getMessageValue(message, 4));
                             break;
                     }
                     break;
@@ -1571,9 +1634,11 @@ namespace EepromGUI
                     {
                         case 'A':   // Major Flash Version
                             versionLBL.Text = getMessageValue(message, 4);
+                            logSent("J A " + getMessageValue(message, 4));
                             break;
                         case 'B':   // Minor Flash Version
                             version2LBL.Text = getMessageValue(message, 4);
+                            logSent("J B " + getMessageValue(message, 4));
                             break;
                         case 'C':   // Program radio?
                             if (getMessageValue(message, 4) == "Y")
@@ -1581,6 +1646,7 @@ namespace EepromGUI
                                 radioCheck.Checked = true;
                             }
                             radioCheck.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("J C " + getMessageValue(message, 4));
                             break;
                     }
                     break;
@@ -1605,7 +1671,7 @@ namespace EepromGUI
          * *********************************/
         private void logSent(String sent)
         {
-            logTB.AppendText(machine + " - sent: " + sent + "\n");
+            logTB.AppendText(machine + " - " + sent + "\n");
             logTB.ScrollToCaret();
         }
 
@@ -2932,6 +2998,6 @@ namespace EepromGUI
                 Console.WriteLine("There was an error with the file.");
             }
         }
-
+  
     }
 }
