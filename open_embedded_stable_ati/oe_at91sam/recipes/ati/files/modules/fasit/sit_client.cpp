@@ -28,6 +28,7 @@ SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
     // we have not yet connected to SmartRange/TRACR
     ever_conn = false;
     skippedFault = 0; // haven't skipped any faults
+    lastWakeVal = 1; // default sleep status is awake
 
     // connect our netlink connection
     nl_conn = NL_Conn::newConn<SIT_Conn>(this);
