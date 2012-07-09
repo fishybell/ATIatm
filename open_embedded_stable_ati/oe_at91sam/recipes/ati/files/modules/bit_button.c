@@ -41,8 +41,8 @@ void handle_bit_test_long_lifter(struct nl_handle *handle, int is_on) {
     // Step 10 - Wait for conceal
     // Step 11 - Reset mfs state
     const char *scen = "\
-     {SetVarLast;4;;;}                         -- Set response value to register 4 \
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request Thermal state (installed below, \
+     {SetVarLast;4;;;}                         -- Set response value to register 4 \
      {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} -- Enable Thermal (data installed below) \
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request MFS state (installed below) \
      {SetVarLast;1;;;} -- Set response value to register 1 \
@@ -63,7 +63,7 @@ void handle_bit_test_long_lifter(struct nl_handle *handle, int is_on) {
      {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_1} -- Set MFS to old state \
      {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_2} -- Set MGL to old state \
      {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_3} -- Set PHI to old state \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_4} -- Set PHI to old state \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_4} -- Set THM to old state \
       ";
     const char *scen2 = "\
       {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
