@@ -28,7 +28,7 @@
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
 //#define DEBUG_PRINT
-//#define DEBUG_SEND
+#define DEBUG_SEND
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -297,6 +297,7 @@ atomic_t driver_id = ATOMIC_INIT(-1);
 // Forward definition of pid function
 //---------------------------------------------------------------------------
 static void pid_step(void); 
+static void pid_step1(void); 
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are awake/asleep
@@ -1036,10 +1037,10 @@ static void pid_timeout_start()
    new_speed = atomic_read(&pid_set_point); // read desired pid set point
    if (new_speed != 0) {
       timeout /= 10;
-      if (new_speed < 50) {
+/*      if (new_speed < 50) {
          timeout /=2;
       }
-      if (isMoverAtDock() != 0) { timeout /= 5; }
+      if (isMoverAtDock() != 0) { timeout /= 5; } */
    }
    mod_timer(&pid_timeout_list, jiffies+(timeout*HZ/1000));
 
@@ -2017,7 +2018,7 @@ static int current_speed10() {
     int vel = atomic_read(&velocity);
 #if 0
         char *msg = kmalloc(256, GFP_KERNEL);
-        //snprintf(msg, 128, "setpoint:%i; detect:%i", new_speed, input_speed);
+        //snprintf(msg, 128, "setpoint:%i; detect:%i", new_speed, meas_vel);
         snprintf(msg, 256, "cs10: (100*(%i/%i)/%i)/%i", RPM_K[mover_type],ENC_PER_REV[mover_type],vel,VELO_K[mover_type]);
         send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
         kfree(msg);
@@ -2952,6 +2953,7 @@ static void pid_step() {
    struct timespec time_now = current_kernel_time();
    struct timespec time_d = timespec_sub(time_now, time_start);
 
+   SENDUSERCONNMSG( " randy - pid_step");
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
@@ -3043,7 +3045,7 @@ static void pid_step() {
       }
     }
          
-   SENDUSERCONNMSG( "pid1,t,%i,r,%i,e,%i,n,%i,i,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed,delta);
+   SENDUSERCONNMSG( "pid1,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed,delta);
 /*
     if (pid_effort > 800){
       pidEffortCounter ++;
@@ -3070,6 +3072,72 @@ static void pid_step() {
 
     // move effort values
     pid_last_effort = pid_effort;
+
+    // unlock for next time
+    spin_unlock(&pid_lock);
+}
+
+// new method
+static void pid_step1() {
+    int req_vel=1, meas_vel=0, error_sum=0, i, effort=0, pid_p=0, pid_i=0, pid_d=0;
+   int pwm_sig = 0, err_vel=0, base = 0;
+   int using_ticks, direction, targetRatio, delta;
+   int a, b, c;
+   struct timespec time_now = current_kernel_time();
+   struct timespec time_d = timespec_sub(time_now, time_start);
+
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    using_ticks = pid_ticks;
+    pid_ticks = 0;
+    
+    req_vel = atomic_read(&pid_set_point); // read desired pid set point
+    meas_vel = atomic_read(&velocity); // read speed from quad_encoder
+    direction = atomic_read(&quad_direction);
+
+    // read input speed (adjust speed10 value to 1000*percent)
+    meas_vel = (1000 * abs(current_speed10())) / NUMBER_OF_SPEEDS[mover_type];
+    if (!spin_trylock(&pid_lock)) {
+        return;
+    }
+
+    err_vel = req_vel - meas_vel; // set point - input
+//    error = calcPidError(req_vel, meas_vel); // set point - input
+
+       // descrete PID algorithm gleamed from Scott's brain
+       if (req_vel > 0){
+          base = 100;
+          if (req_vel < 50){
+            base = 175;
+          }
+       } else {
+         base = 0;
+       }
+       effort = 20 * err_vel + base;
+/*
+       if (effort > 800) {
+         effort = 800;
+       } */
+
+
+    if (req_vel == 0) {
+       effort = max(effort, 0); // minimum when stopping is 0
+    }
+    // convert effort to pwm
+    pwm_sig = pwm_from_effort(effort);
+
+   SENDUSERCONNMSG( "pid1,t,%i,e,%i,u,%i,r,%i,y,%i,p,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), err_vel, effort, req_vel, meas_vel,pwm_sig);
+   if (atomic_read(&doing_vel) == FALSE)
+       {
+       atomic_set(&doing_vel, TRUE);
+       mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
+       }
+
+    // These change the pwm duty cycle
+    __raw_writel(max(pwm_sig,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
+    __raw_writel(max(pwm_sig,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
 
     // unlock for next time
     spin_unlock(&pid_lock);
