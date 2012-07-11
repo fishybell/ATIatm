@@ -220,6 +220,7 @@ namespace EepromGUI
             {
                 conn.sendMessage("M " + move);
                 logSent("M " + move);
+                stopButton.Focus();
             }
         }
 
@@ -233,6 +234,7 @@ namespace EepromGUI
             {
                 conn.sendMessage("M " + move);
                 logSent("M " + move);
+                stopButton.Focus();
             }
         }
 

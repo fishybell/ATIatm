@@ -3360,9 +3360,9 @@
             // 
             // stopButton
             // 
-            this.stopButton.BackColor = System.Drawing.SystemColors.Highlight;
-            this.stopButton.ForeColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.stopButton.Location = new System.Drawing.Point(224, 203);
+            this.stopButton.BackColor = System.Drawing.Color.Red;
+            this.stopButton.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
+            this.stopButton.Location = new System.Drawing.Point(385, 77);
             this.stopButton.Margin = new System.Windows.Forms.Padding(4);
             this.stopButton.Name = "stopButton";
             this.stopButton.Size = new System.Drawing.Size(100, 28);
@@ -3411,7 +3411,7 @@
             this.Controls.Add(this.label16);
             this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "Form1";
-            this.Text = "Eeprom Settings";
+            this.Text = "PMA";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.form_closed);
             this.tabPage4.ResumeLayout(false);
             this.tabPage4.PerformLayout();
