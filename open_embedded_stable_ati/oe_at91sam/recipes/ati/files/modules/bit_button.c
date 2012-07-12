@@ -42,14 +42,14 @@ void handle_bit_test_long_lifter(struct nl_handle *handle, int is_on) {
     // Step 11 - Reset mfs state
     const char *scen = "\
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
-     {SetVarLast;4;;;} \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
-     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
      {SetVarLast;1;;;} \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
      {SetVarLast;2;;;} \
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
      {SetVarLast;3;;;} \
+     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
+     {SetVarLast;4;;;} \
      {SendWait;R_LIFTER;NL_C_EXPOSE;FF;500} \
      {SetVarLast;0;;;} \
      {If;0;01;%s;%s} \
@@ -139,7 +139,7 @@ void handle_bit_test_long_lifter(struct nl_handle *handle, int is_on) {
     hex_encode_attr((void*)&acc_c, sizeof(acc_c), setTherm); // use helper function to build scenario
 
     // format scenario with hex buffers, conceal message, and nothing buffer
-    snprintf(scen_buf, 2048, scen, getTherm, setTherm, getMFS, getMGL, getPHI, conceal_msg, nothing_buf, setMFS, setMGL, setPHI, nothing_buf, nothing_buf);
+    snprintf(scen_buf, 4096, scen, getTherm, setTherm, getMFS, getMGL, getPHI, conceal_msg, nothing_buf, setMFS, setMGL, setPHI, nothing_buf, nothing_buf);
 
 // printf("scen_buf (%i): %s\n", strlen(scen_buf), scen_buf); fflush(stdout);
     // send scenario
@@ -204,7 +204,7 @@ void handle_bit_test_long_mover_left(struct nl_handle *handle, int is_on) {
       {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
       {DoWait;%s;EVENT_DOWN;15000;%s}  -- Wait 15 seconds for conceal (installed below)";
 
-    char scen_buf[2048];
+    char scen_buf[4096];
     char getMFS[256];
     char setMFS[256];
     char getMGL[256];
@@ -332,7 +332,7 @@ void handle_bit_test_long_mover_right(struct nl_handle *handle, int is_on) {
       {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
       {DoWait;%s;EVENT_DOWN;15000;%s}  -- Wait 15 seconds for conceal (installed below)";
 
-    char scen_buf[2048];
+    char scen_buf[4096];
     char getMFS[256];
     char setMFS[256];
     char getMGL[256];
@@ -459,7 +459,7 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
       {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
       {DoWait;%s;EVENT_DOWN;15000;%s}  -- Wait 15 seconds for conceal (installed below)";
 
-    char scen_buf[2048];
+    char scen_buf[4096];
     char getMFS[256];
     char setMFS[256];
     char getMGL[256];
@@ -552,7 +552,7 @@ void handle_bit_test_short_mover_left(struct nl_handle *handle, int is_on) {
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
      ";
 
-    char scen_buf[2048];
+    char scen_buf[4096];
     char nothing_buf[256];
     // build internal "Nothing" message
     escape_scen_call("{Nothing;;;;}", 13, nothing_buf);
@@ -591,7 +591,7 @@ void handle_bit_test_short_mover_right(struct nl_handle *handle, int is_on) {
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
      ";
 
-    char scen_buf[2048];
+    char scen_buf[4096];
     char nothing_buf[256];
     // build internal "Nothing" message
     escape_scen_call("{Nothing;;;;}", 13, nothing_buf);
@@ -630,7 +630,7 @@ void handle_bit_test_short_mover(struct nl_handle *handle, int is_on) {
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
      ";
 
-    char scen_buf[2048];
+    char scen_buf[4096];
     char nothing_buf[256];
     // build internal "Nothing" message
     escape_scen_call("{Nothing;;;;}", 13, nothing_buf);
