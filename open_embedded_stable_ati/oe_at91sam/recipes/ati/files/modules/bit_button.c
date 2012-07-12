@@ -41,33 +41,33 @@ void handle_bit_test_long_lifter(struct nl_handle *handle, int is_on) {
     // Step 10 - Wait for conceal
     // Step 11 - Reset mfs state
     const char *scen = "\
-     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request Thermal state (installed below, \
-     {SetVarLast;4;;;}                         -- Set response value to register 4 \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} -- Enable Thermal (data installed below) \
-     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request MFS state (installed below) \
-     {SetVarLast;1;;;} -- Set response value to register 1 \
-     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request MGL state (installed below) \
-     {SetVarLast;2;;;} -- Set response value to register 2 \
-     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} -- Request PHI state (installed below) \
-     {SetVarLast;3;;;} -- Set response value to register 3 \
-     {SendWait;R_LIFTER;NL_C_EXPOSE;FF;500} -- Send 'Get Exposure' to lifter  \
-     {SetVarLast;0;;;} -- Set response value to register 0 \
-     {If;0;01;%s;%s} -- If register 0 is '01', conceal (installed below) \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} -- Enable MFS (data installed below) \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} -- Enable MGL (data installed below) \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} -- Enable PHI (data installed below) \
-     {Send;R_LIFTER;NL_C_EXPOSE;1;01} -- Send Expose to lifter \
-     {Delay;10000;;;} -- Wait 10 seconds \
-     {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
-     {DoWait;%s;EVENT_DOWN;15000;%s} -- Wait 15 seconds for conceal (installed below) \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_1} -- Set MFS to old state \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_2} -- Set MGL to old state \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_3} -- Set PHI to old state \
-     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_4} -- Set THM to old state \
+     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
+     {SetVarLast;4;;;} \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
+     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
+     {SetVarLast;1;;;} \
+     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
+     {SetVarLast;2;;;} \
+     {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
+     {SetVarLast;3;;;} \
+     {SendWait;R_LIFTER;NL_C_EXPOSE;FF;500} \
+     {SetVarLast;0;;;} \
+     {If;0;01;%s;%s} \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
+     {Send;R_LIFTER;NL_C_EXPOSE;1;01} \
+     {Delay;10000;;;} \
+     {Send;R_LIFTER;NL_C_EXPOSE;1;00} \
+     {DoWait;%s;EVENT_DOWN;15000;%s} \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_1} \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_2} \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_3} \
+     {Send;R_LIFTER;NL_C_ACCESSORY;1;REG_4} \
       ";
     const char *scen2 = "\
-      {Send;R_LIFTER;NL_C_EXPOSE;1;00} -- Send Conceal to lifter \
-      {DoWait;%s;EVENT_DOWN;15000;%s} -- Wait 15 seconds for conceal (installed below)";
+      {Send;R_LIFTER;NL_C_EXPOSE;1;00} \
+      {DoWait;%s;EVENT_DOWN;15000;%s}";
 
     char scen_buf[4096];
     char hex_buf_1[256];
