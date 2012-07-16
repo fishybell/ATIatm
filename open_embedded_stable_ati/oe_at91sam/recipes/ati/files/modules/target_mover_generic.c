@@ -239,6 +239,7 @@ static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false, false};
 //---------------------------------------------------------------------------
 // These atomic variables is use to indicate global position changes
 //---------------------------------------------------------------------------
+atomic_t dockTryCount = ATOMIC_INIT(0);
 atomic_t continuous_speed = ATOMIC_INIT(0);
 atomic_t last_reported_speed = ATOMIC_INIT(0);
 atomic_t last_direction = ATOMIC_INIT(0);
@@ -941,6 +942,12 @@ static int mover_speed_set(int speed) {
 
    // first select desired movement movement
    if (speed < 0) {
+      if(isMoverAtDock()){
+         if (dock_loc == 0){ // Dock on left of track
+            do_fault(ERR_invalid_direction_req);
+            return 0;
+         }
+      }
       // if we are home, do not allow reverse
       if (atomic_read(&last_sensor) == MOVER_SENSOR_HOME) {
          if (atomic_read(&find_dock_atomic) == 0){
@@ -950,6 +957,12 @@ static int mover_speed_set(int speed) {
       }
       hardware_movement_set(MOVER_DIRECTION_REVERSE);
    } else if (speed > 0) {
+      if(isMoverAtDock()){
+         if (dock_loc == 1){ // Dock on right of track
+            do_fault(ERR_invalid_direction_req);
+            return 0;
+         }
+      }
       // if we are at the end, do not allow forward
       if (atomic_read(&last_sensor) == MOVER_SENSOR_END) {
          if (atomic_read(&find_dock_atomic) == 0){
@@ -1366,6 +1379,7 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
     do_fault(ERR_stop_left_limit); // triggered on home limit
     mover_speed_stop();
     continuous_timeout_start();
+    atomic_set(&dockTryCount, 0);
     dock_timeout_start(5000);
 
     return IRQ_HANDLED;
@@ -1403,6 +1417,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     do_fault(ERR_stop_right_limit); // triggered on home limit
     mover_speed_stop();
     continuous_timeout_start();
+    atomic_set(&dockTryCount, 0);
     dock_timeout_start(5000);
 
     return IRQ_HANDLED;
@@ -2253,11 +2268,12 @@ int isMoverAtDock(void){
 }
 
 void mover_find_dock(void) {
-   if (isMoverAtDock() != 0) {
+   if (isMoverAtDock() != 0 || atomic_read(&dockTryCount) > 5) {
       return;
    } // At the dock already
    if (mover_type == IS_MAT || mover_type == IS_MIT){
       atomic_set(&find_dock_atomic, 1);
+      atomic_inc(&dockTryCount);
       if (dock_loc == 1) { // Dock at end away from home
          mover_speed_set(1); // Go Slow
       } else if (dock_loc == 0) { // Dock at home end
