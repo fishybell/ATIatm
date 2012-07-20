@@ -114,7 +114,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          }
       ); // end of CHECK_TIMER for response state timer
 
-#if 1 /* old fast/slow timer code */
+#if 0 /* old fast/slow timer code */
       CHECK_TIMER (minion->S.rf_t, fast_timer, fast_flags, 
          DDCMSG(D_MSTATE, BLACK, "Now checking fast timer flags: %i", minion->S.rf_t.fast_flags);
          switch (minion->S.rf_t.fast_flags) {
@@ -196,6 +196,55 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
       ); // end of CHECK_TIMER for slow state timer
 #endif /* end of old fast/slow timer code */
 
+      CHECK_TIMER (minion->S.rf_t, fast_timer, fast_flags, 
+         DDCMSG(D_MSTATE, BLACK, "Now checking fast timer flags: %i", minion->S.rf_t.fast_flags);
+         switch (minion->S.rf_t.fast_flags) {
+            case F_fast_start: {
+               // each time we send a status request assume we've missed
+               if (++minion->S.rf_t.fast_missed > FAST_TIME_MAX_MISS) {
+                  // we've missed too many times
+                  DISCONNECT;
+               } else {
+                  SEND_STATUS_REQUEST(&LB_buf);
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start); // same state over and over (short interval)
+               }
+            } break;
+            case F_fast_wait: {
+               if (minion->S.rf_t.slow_flags == F_slow_none) { // we haven't switched timers
+                  // we waited to long to cancel the fast timer, resume it
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start);
+               }
+            } break;
+            default: {
+               DDCMSG(D_MSTATE, RED, "Default reached in fast flags: %i", minion->S.rf_t.fast_flags);
+            }
+         }
+      ); // end of CHECK_TIMER for fast state timer
+
+      CHECK_TIMER (minion->S.rf_t, slow_timer, slow_flags, 
+         DDCMSG(D_MSTATE, BLACK, "Now checking slow timer flags: %i", minion->S.rf_t.slow_flags);
+         switch (minion->S.rf_t.slow_flags) {
+            case F_slow_start: {
+               // each time we send a status request assume we've missed
+               if (++minion->S.rf_t.slow_missed > SLOW_TIME_MAX_MISS) {
+                  // we've missed too many times
+                  DISCONNECT;
+               } else {
+                  SEND_STATUS_REQUEST(&LB_buf);
+                  setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start); // same state over and over (short interval)
+               }
+            } break;
+            case F_slow_wait: {
+               if (minion->S.rf_t.fast_flags == F_fast_none) { // we haven't switched timers
+                  // we waited to long to cancel the slow timer, resume it
+                  setTimerTo(minion->S.rf_t, slow_timer, slow_flags, FAST_TIME, F_slow_start);
+               }
+            } break;
+            default: {
+               DDCMSG(D_MSTATE, RED, "Default reached in slow flags: %i", minion->S.rf_t.slow_flags);
+            }
+         }
+      ); // end of CHECK_TIMER for slow state timer
       CHECK_TIMER (minion->S.exp, exp_timer, exp_flags, 
          DDCMSG(D_MSTATE, BLACK, "Now checking expose timer flags: %i", minion->S.exp.exp_flags);
          switch (minion->S.exp.exp_flags) {
@@ -219,7 +268,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                      wait = SAT_TRANSITION_TIME; // time it takes a light armor lifter to lift
                      break;
                }
-               minion->S.ignoring_response ^= 1; // not ignoring responses due to exposure (bit 1)
                // sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102 -- removed in favor of change_states()
                //DDCMSG(D_POINTER|D_NEW, YELLOW, "calling change_states(%s) @ %s:%i", step_words[TS_con_to_exp], __FILE__, __LINE__);
                change_states(minion, mt, TS_con_to_exp, 0);
@@ -259,7 +307,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                      wait = SAT_TRANSITION_TIME; // time it takes a light armor lifter to lift
                      break;
                }
-               minion->S.ignoring_response ^= 1; // not ignoring responses due to exposure (bit 1)
                // sendStatus2102(0,mb->header,minion,mt); // forces sending of a 2102 -- removed in favor of change_states()
                //DDCMSG(D_POINTER|D_NEW, YELLOW, "calling change_states(%s) @ %s:%i", step_words[TS_exp_to_con], __FILE__, __LINE__);
                change_states(minion, mt, TS_exp_to_con, 0);
@@ -285,7 +332,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                minion->S.speed.data = 0.0; // we're not moving
                minion->S.move.data = minion->S.move.newdata; // but we're going to move a direction
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
-               minion->S.ignoring_response ^= 2; // not ignoring responses due to movement (bit 2)
 
                DDCMSG(D_POINTER, GRAY, "Should start fake movement for minion %i", minion->mID);
                switch (minion->S.dev_type) {

@@ -103,14 +103,22 @@ int __ptype(int cmd) {
       case LBC_ILLEGAL: return 0;
       case LBC_REQUEST_NEW: return 1;
       case LBC_STATUS_REQ: return 2;
-      case LB_CONTROL_QUEUE: return 4;
-      case LB_CONTROL_SENT: return 4;
-      case LB_CONTROL_REMOVED: return 4;
-      case LBC_QUICK_GROUP: return 5;
-      case LBC_QUICK_GROUP_BIG: return 5;
-      case LBC_QCONCEAL: return 6;
-      case LBC_EXPOSE: return 6;
-      case LBC_MOVE: return 6;
+      case LB_CONTROL_QUEUE:
+      case LB_CONTROL_SENT:
+      case LB_CONTROL_REMOVED:
+         return 4;
+      case LBC_QUICK_GROUP:
+      case LBC_QUICK_GROUP_BIG:
+         return 5;
+      case LBC_CONFIGURE_HIT:
+      case LBC_HIT_BLANKING:
+      case LBC_ACCESSORY:
+      case LBC_QCONCEAL:
+      case LBC_QEXPOSE:
+      case LBC_EXPOSE:
+      case LBC_MOVE:
+      case LBC_ASSIGN_ADDR:
+         return 6;
       default: return 3;
    }
 }
@@ -918,6 +926,7 @@ int queueBurst(queue_item_t *Rx, queue_item_t *Tx, char *buf, int *bsize, int *r
          should_repeat = 1;
          QI2BUF(qi, buf);
          MOVE_Q(qi, tail);
+         // TODO -- quick groups with ptype 6 as actual command
       } else {
          // no, just look at next item
          qi = qi->next;

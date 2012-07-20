@@ -204,6 +204,14 @@ typedef struct state_response_item {
    int last_speed;
    int last_position;
    int last_hit;
+   // overall "did we ever do this" statuses
+   int ever_exp;
+   int ever_con;
+   int ever_left;
+   int ever_right;
+   int ever_stop;
+   int ever_hit;
+   int ever_move;
    uint16 flags;
    uint16 old_flags;
    uint16 timer;
@@ -353,15 +361,13 @@ enum {
 enum {
    F_fast_none = 0, /* no state, doing nothing */
    F_fast_start, /* starts fast lookup, goes to fast start */
-   F_fast_medium, /* starts medium fast lookup, goes to fast medium */
-   F_fast_once, /* starts fast lookup, goes to fast end */
-   F_fast_end, /* ends fast lookup, goes to slow start */
+   F_fast_wait, /* pauses fast lookup, goes to fast start */
 };
 
 enum {
    F_slow_none = 0, /* no state, doing nothing */
-   F_slow_start, /* starts slow lookup, goes to slow continue */
-   F_slow_continue, /* continues slow lookup, goes to slow start */
+   F_slow_start, /* starts slow lookup, goes to slow start */
+   F_slow_wait, /* pauses slow lookup, goes to slow start */
 };
 
 enum {
@@ -609,12 +615,12 @@ typedef enum rf_target_type {
 }
 
 // common timer values
-#define FAST_SOON_TIME        5   /* 1/2 second */
-#define FAST_TIME             40  /* 4 seconds */
-#define FAST_RESPONSE_TIME    90  /* 9 seconds */
-#define SLOW_SOON_TIME        5   /* 1/2 second */
+#define FAST_SOON_TIME        10  /* 1 second */
+#define FAST_WAIT_TIME        300 /* 30 seconds */
+#define FAST_TIME             90  /* 9 seconds */
+#define SLOW_SOON_TIME        10  /* 1 second */
+#define SLOW_WAIT_TIME        300 /* 30 seconds */
 #define SLOW_TIME             600 /* 1 minute */
-#define SLOW_RESPONSE_TIME    90  /* 9 seconds */
 #define EVENT_SOON_TIME       5   /* 1/2 second */
 #define TRANSMISSION_TIME     4   /* 4/10 second */
 #define SIT_TRANSITION_TIME   4   /* 4/10 second */
@@ -624,12 +630,56 @@ typedef enum rf_target_type {
 #define MAT_MOVE_START_TIME   120 /* 12 seconds */
 #define RESP_TIME             2   /* 2/10 second */
 
+#if 0 /* old timer stuff */
+enum {
+   F_fast_none = 0, /* no state, doing nothing */
+   F_fast_start, /* starts fast lookup, goes to fast start */
+   F_fast_medium, /* starts medium fast lookup, goes to fast medium */
+   F_fast_once, /* starts fast lookup, goes to fast end */
+   F_fast_end, /* ends fast lookup, goes to slow start */
+};
+
+enum {
+   F_slow_none = 0, /* no state, doing nothing */
+   F_slow_start, /* starts slow lookup, goes to slow continue */
+   F_slow_continue, /* continues slow lookup, goes to slow start */
+};
+
+#define FAST_SOON_TIME        5   /* 1/2 second */
+#define FAST_TIME             40  /* 4 seconds */
+#define SLOW_SOON_TIME        5   /* 1/2 second */
+#define SLOW_TIME             600 /* 1 minute */
+#define FAST_RESPONSE_TIME    90  /* 9 seconds */
+#define SLOW_RESPONSE_TIME    90  /* 9 seconds */
+#define START_STANDARD_LOOKUP(S) {\
+   /* ensure we're doing some sort of slow lookup */ \
+   if (S.rf_t.slow_flags == F_slow_none) { \
+      /* wasn't going slow, so either it was going fast and we should change it, or it is already doing the fast lookup */ \
+      if (!(S.rf_t.fast_flags == F_fast_once || \
+            S.rf_t.fast_flags == F_fast_end)) { \
+         /* wasn't already going slow and wasn't doing fast lookup, go slow, but first time fast */ \
+         stopTimer(S.rf_t, fast_timer, fast_flags); \
+         setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_once); \
+         DDCMSG(D_MSTATE, GRAY, "Started lookup timer: rf_t.fast=%i.%i rf_t.slow=%i.%i", S.rf_t.fast_timer, S.rf_t.fast_flags, S.rf_t.slow_timer, S.rf_t.slow_flags); \
+      } else { \
+         /* is already doing fast lookup .... will be slow soon */ \
+         DDCMSG(D_MSTATE, GRAY, "Didn't do anything with lookup timers because fast: rf_t.fast=%i.%i rf_t.slow=%i.%i", S.rf_t.fast_timer, S.rf_t.fast_flags, S.rf_t.slow_timer, S.rf_t.slow_flags); \
+      } \
+   } else { \
+      /* is already going slow... */ \
+      DDCMSG(D_MSTATE, GRAY, "Didn't do anything with lookup timers because slow: rf_t.fast=%i.%i rf_t.slow=%i.%i", S.rf_t.fast_timer, S.rf_t.fast_flags, S.rf_t.slow_timer, S.rf_t.slow_flags); \
+   } \
+}
+
+#endif
+
 #define RF_BURST_DELAY 150 /* the amount of time to wait between sending bursts of data */
 #define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
-#define FAST_TIME_MAX_MISS 800 /* maximum value of the "missed message" counter */
-#define SLOW_TIME_MAX_MISS 800 /* maximum value of the "missed message" counter */
+#define MAX_MISS_TIME 3 /* maximimum number of minutes to go without a response */
+#define FAST_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / FAST_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
+#define SLOW_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / SLOW_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_UNREPORT (4*15) /* max number of reports per burst * max number of non-reports before vacuum */
 
@@ -652,23 +702,32 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
    /* start move simulation */ \
    setTimerTo(S.move, timer, flags, TRANSMISSION_TIME, F_move_start_movement); \
 }
-#define START_STANDARD_LOOKUP(S) {\
-   /* ensure we're doing some sort of slow lookup */ \
-   if (S.rf_t.slow_flags == F_slow_none) { \
-      /* wasn't going slow, so either it was going fast and we should change it, or it is already doing the fast lookup */ \
-      if (!(S.rf_t.fast_flags == F_fast_once || \
-            S.rf_t.fast_flags == F_fast_end)) { \
-         /* wasn't already going slow and wasn't doing fast lookup, go slow, but first time fast */ \
-         stopTimer(S.rf_t, fast_timer, fast_flags); \
-         setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_once); \
-         DDCMSG(D_MSTATE, GRAY, "Started lookup timer: rf_t.fast=%i.%i rf_t.slow=%i.%i", S.rf_t.fast_timer, S.rf_t.fast_flags, S.rf_t.slow_timer, S.rf_t.slow_flags); \
-      } else { \
-         /* is already doing fast lookup .... will be slow soon */ \
-         DDCMSG(D_MSTATE, GRAY, "Didn't do anything with lookup timers because fast: rf_t.fast=%i.%i rf_t.slow=%i.%i", S.rf_t.fast_timer, S.rf_t.fast_flags, S.rf_t.slow_timer, S.rf_t.slow_flags); \
-      } \
+#define DO_FAST_LOOKUP(S) {\
+   S.rf_t.fast_missed = 0; \
+   stopTimer(S.rf_t, slow_timer, slow_flags); \
+   if (S.rf_t.fast_flags == F_fast_none) { \
+      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
    } else { \
-      /* is already going slow... */ \
-      DDCMSG(D_MSTATE, GRAY, "Didn't do anything with lookup timers because slow: rf_t.fast=%i.%i rf_t.slow=%i.%i", S.rf_t.fast_timer, S.rf_t.fast_flags, S.rf_t.slow_timer, S.rf_t.slow_flags); \
+      /* is already going fast */ \
+   } \
+}
+#define DO_SLOW_LOOKUP(S) {\
+   S.rf_t.slow_missed = 0; \
+   stopTimer(S.rf_t, fast_timer, fast_flags); \
+   if (S.rf_t.slow_flags == F_slow_none) { \
+      setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
+   } else { \
+      /* is already going slow */ \
+   } \
+}
+#define STOP_FAST_LOOKUP(S) {\
+   if (S.rf_t.fast_flags != F_fast_none) { \
+      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_WAIT_TIME, F_fast_wait); \
+   } \
+}
+#define STOP_SLOW_LOOKUP(S) {\
+   if (S.rf_t.slow_flags != F_slow_none) { \
+      setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_WAIT_TIME, F_slow_wait); \
    } \
 }
 
@@ -712,12 +771,14 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
    L->addr=minion->RF_addr; \
    DDCMSG(D_MSTATE,GREEN,"Minion %i:   build and send L LBC_STATUS_REQ", minion->mID); \
    result= psend_mcp(minion,LB_buf); \
+   Cancel_Status_Resp_Timer(minion); /* our current response data is now stale */ \
 }
 
 
 void sendStatus2102(int force, FASIT_header *hdr, thread_data_t *minion, minion_time_t *mt);
 void change_states_internal(thread_data_t *minion, minion_time_t *mt, trans_step_t step, int force);
 void inform_state(thread_data_t *minion, minion_time_t *mt, FASIT_header *hdr);
+void Cancel_Status_Resp_Timer(thread_data_t *minion);
 void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt);
 
 int psend_mcp(thread_data_t *minion,void *Lc);

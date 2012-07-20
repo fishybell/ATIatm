@@ -688,9 +688,10 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.did_exp_cmd = fc->did_exp_cmd == 3 ? 1 : 0; // only fully-over-finished task counts
    s.event = fc->current_event;
    DDCMSG(D_RF|D_VERY,BLACK, "Fault encountered: %04X %02X", fc->last_fault, s.fault);
-   if (s.fault) {
-      fc->last_fault = 0; // clear out fault
-   }
+   // don't clear out 
+   //if (s.fault) {
+   //   fc->last_fault = 0; // clear out fault
+   //}
    // we don't know if they received the last response, so send everything every time
    // copy current status to last status and send it
    fc->last_status = s;
@@ -1260,6 +1261,7 @@ int handle_ASSIGN_ADDR(fasit_connection_t *fc, int start, int end) {
       log_ResetHits_All(fc);
    } // should end on fc->current_event of -1
    fc->current_event = 0; // ... make it a 0 again
+   fc->last_fault = 0; // clear out fault
    return doNothing;
 }
 
