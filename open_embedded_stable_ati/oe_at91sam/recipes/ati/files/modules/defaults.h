@@ -495,10 +495,15 @@
 #define MAJOR_VERSION_LOC 0x564
 #define MAJOR_VERSION_SIZE 0x8
 
-// Parial Flash Version
+// Partial Flash Version
 #define MINOR_VERSION "00000000" /* format: YYYYMMDD */
 #define MINOR_VERSION_LOC 0x56C
 #define MINOR_VERSION_SIZE 0x8
+
+// Mover track length
+#define TRACK_LENGTH 5
+#define TRACK_LENGTH_LOC 0x574
+#define TRACK_LENGTH_SIZE 0x4
 
 
 // ,.. defaults
