@@ -471,7 +471,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
 
                      // no longer in Rx queue; un-mark
                      DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: %i currently in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
-                     Queue_Contains[LB->addr] ^= (1<<LB->cmd);
+                     Queue_Contains[LB->addr] &= ~(1<<LB->cmd);
                      DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: %i no longer in queue for addr %i (%p)", LB->cmd, LB->addr, Queue_Contains[LB->addr]);
                   }                         
                   ReQueue(Tx,Rx,RF_size(LB->cmd));      // move it to the Tx queue
@@ -602,7 +602,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                      if (qi->ptype == 2 && (Queue_Contains[qi->addr] & (1<<qi->cmd))) {
                         // no longer in Rx queue; un-mark
                         DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: %i currently in queue for addr %i (%p)", qi->cmd, qi->addr, Queue_Contains[qi->addr]);
-                        Queue_Contains[qi->addr] ^= (1<<qi->cmd);
+                        Queue_Contains[qi->addr] &= ~(1<<qi->cmd);
                         DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: %i no longer in queue for addr %i (%p)", qi->cmd, qi->addr, Queue_Contains[qi->addr]);
                      }
                      sentItem(qi, tbuf, &t);
@@ -1054,7 +1054,7 @@ void HandleRF(int MCPsock,int risock, int *riclient,int RFfd,int child){
                            Rx->tail -= RF_size(lb->cmd); // move the tail down
                            LB=(LB_packet_t *)Rx->tail;   // re-map the header in to the new tail position
                            DDCMSG(D_QUEUE,MAGENTA,"QUEUE_CONTAINS: Removed from queue (...=%i)", queueLength(Rx));
-                           Queue_Contains[LB->addr] ^= (1<<LBC_STATUS_REQ);
+                           Queue_Contains[LB->addr] &= ~(1<<LBC_STATUS_REQ);
                         } else {
                   DDCMSG(D_POINTER, GREEN, "Here...%s:%i with %p", __FILE__, __LINE__, ts);
                            ts += RF_size(lb->cmd); // not this message, maybe the next?

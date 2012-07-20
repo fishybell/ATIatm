@@ -85,7 +85,7 @@ uint8 set_forget_bits(int low_dev,int high_dev,addr_t *addr_pool,int max_addr){
    while (addr<max_addr){       // spin through our addresses
       testid=addr_pool[addr].devid;
       if (addr_pool[addr].inuse&&(testid>=low_dev)&&(testid<=high_dev)){       // we have match
-         bits^=BV(testid-low_dev);      // turn off the forget bit for this devid
+         bits&=~BV(testid-low_dev);      // turn off the forget bit for this devid
       }
       DDCMSG(D_MEGA,BLUE,"SFB:  addr=%d testid=%x  bits=0x%8x",addr,testid,bits);
       addr++;           // try the next address
