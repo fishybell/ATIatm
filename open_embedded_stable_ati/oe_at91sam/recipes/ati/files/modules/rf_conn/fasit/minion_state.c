@@ -107,9 +107,11 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
          switch (minion->S.resp.flags) {
             case F_resp_handle: {
                Handle_Status_Resp(minion, mt); // if everything went well, no 2102 will be created
+               stopTimer(minion->S.resp, timer, flags);
             } break;
             default: {
                DDCMSG(D_MSTATE, RED, "Default reached in response flags: %i", minion->S.resp.flags);
+               stopTimer(minion->S.resp, timer, flags);
             }
          }
       ); // end of CHECK_TIMER for response state timer
@@ -217,6 +219,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             } break;
             default: {
                DDCMSG(D_MSTATE, RED, "Default reached in fast flags: %i", minion->S.rf_t.fast_flags);
+               stopTimer(minion->S.rf_t, fast_timer, fast_flags);
             }
          }
       ); // end of CHECK_TIMER for fast state timer
@@ -242,6 +245,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             } break;
             default: {
                DDCMSG(D_MSTATE, RED, "Default reached in slow flags: %i", minion->S.rf_t.slow_flags);
+               stopTimer(minion->S.rf_t, slow_timer, slow_flags);
             }
          }
       ); // end of CHECK_TIMER for slow state timer
@@ -280,6 +284,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             } break;
             default: {
                DDCMSG(D_MSTATE, RED, "Default reached in expose flags: %i", minion->S.exp.exp_flags);
+               stopTimer(minion->S.exp, exp_timer, exp_flags);
             }
          }
       ); // end of CHECK_TIMER for expose state timer
@@ -319,6 +324,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             } break;
             default: {
                DDCMSG(D_MSTATE, RED, "Default reached in conceal flags: %i", minion->S.exp.con_flags);
+               stopTimer(minion->S.exp, con_timer, con_flags);
             }
          }
       ); // end of CHECK_TIMER for conceal state timer
@@ -557,6 +563,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             } break;
             default: {
                DDCMSG(D_MSTATE, RED, "Default reached in move flags: %i", minion->S.move.flags);
+               stopTimer(minion->S.move, timer, flags);
             }
          }
       ); // end of CHECK_TIMER for move state timer
@@ -606,6 +613,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
    Set_Timer(minion->S.rf_t.fast_timer); // timer for fast status check
    Set_Timer(minion->S.rf_t.slow_timer); // timer for slow status check
    Set_Timer(minion->S.move.timer); // timer for movement state
+   Set_Timer(minion->S.resp.timer); // timer for response state
 
    DDCMSG(D_MSTATE,GRAY,"Minion %i:   Set_Timer=%i   exp.exp=%i exp.con=%i rf_t.fast=%i rt_t.slow=%i move=%i (or event timer)",
           minion->mID,minion->S.state_timer, minion->S.exp.exp_timer, minion->S.exp.con_timer, minion->S.rf_t.fast_timer, minion->S.rf_t.slow_timer, minion->S.move.timer);
