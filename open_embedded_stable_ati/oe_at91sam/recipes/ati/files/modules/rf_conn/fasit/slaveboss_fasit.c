@@ -441,6 +441,9 @@ int send_2100_movement(fasit_connection_t *fc, int move, float speed) {
       case 5:
          bdy.cid = CID_Gohome;
          break;
+      case 6:
+         bdy.cid = CID_MoveAway;
+         break;
    }
 
    // send

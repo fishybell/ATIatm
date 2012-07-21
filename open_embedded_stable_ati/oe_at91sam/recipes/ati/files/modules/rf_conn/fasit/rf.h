@@ -393,7 +393,7 @@ typedef struct LB_move {
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
    uint32 pad:2 __attribute__ ((packed));
-   uint32 move:3 __attribute__ ((packed));       // 0=stop, 1=Move a direction, 2=Move other direction, 3=continuous, 4 = dock, 5 = go home
+   uint32 move:3 __attribute__ ((packed));       // 0=stop, 1=Move a direction, 2=Move other direction, 3=continuous, 4 = dock, 5 = go home, 6 = go away (future thing)
    uint32 speed:11 __attribute__ ((packed));
 
    uint32 crc:8 __attribute__ ((packed));
