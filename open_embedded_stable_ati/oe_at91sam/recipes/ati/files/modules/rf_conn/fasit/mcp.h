@@ -175,6 +175,7 @@ enum {
    move_right,
    move_continuous,
    move_dock,
+   move_away,
    lift_expose,
    lift_conceal,
 };
@@ -207,8 +208,8 @@ typedef struct state_response_item {
    // overall "did we ever do this" statuses
    int ever_exp;
    int ever_con;
-   int ever_left;
-   int ever_right;
+   int ever_move_left;
+   int ever_move_right;
    int ever_stop;
    int ever_hit;
    int ever_move;
@@ -615,10 +616,10 @@ typedef enum rf_target_type {
 }
 
 // common timer values
-#define FAST_SOON_TIME        10  /* 1 second */
+#define FAST_SOON_TIME        45  /* 4 1/2 seconds */
 #define FAST_WAIT_TIME        300 /* 30 seconds */
 #define FAST_TIME             90  /* 9 seconds */
-#define SLOW_SOON_TIME        10  /* 1 second */
+#define SLOW_SOON_TIME        45  /* 4 1/2 seconds */
 #define SLOW_WAIT_TIME        300 /* 30 seconds */
 #define SLOW_TIME             600 /* 1 minute */
 #define EVENT_SOON_TIME       5   /* 1/2 second */
@@ -677,7 +678,7 @@ enum {
 #define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
-#define MAX_MISS_TIME 3 /* maximimum number of minutes to go without a response */
+#define MAX_MISS_TIME 5 /* maximimum number of minutes to go without a response */
 #define FAST_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / FAST_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
 #define SLOW_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / SLOW_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
@@ -759,7 +760,7 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
       case TS_too_far: st = "TS_too_far"; break; \
       default: st = "Nothing I expected"; break; \
    } \
-   DDCMSG(D_NEW, RED, "called change_states(..., %s=%s, %s=%i) @ %s:%i", #S, st, #F, F, __FILE__, __LINE__); \
+   DDCMSG(D_POINTER, RED, "called change_states(%i, %s=%s, %s=%i) @ %s:%i", M->mID, #S, st, #F, F, __FILE__, __LINE__); \
    change_states_internal(M, T, S, F); \
 }
 
@@ -767,19 +768,36 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
 #define SEND_STATUS_REQUEST(LB_buf) { \
    /* send out a request for actual position */ \
    LB_status_req_t *L=(LB_status_req_t *)LB_buf; \
+   LB_status_req_t *_L; \
+   sequence_tracker_t *t; \
    L->cmd=LBC_STATUS_REQ;          /* start filling in the packet */ \
    L->addr=minion->RF_addr; \
    DDCMSG(D_MSTATE,GREEN,"Minion %i:   build and send L LBC_STATUS_REQ", minion->mID); \
-   result= psend_mcp(minion,LB_buf); \
-   Cancel_Status_Resp_Timer(minion); /* our current response data is now stale */ \
+   result = psend_mcp_seq(minion,L); \
+   /* fill in tracker info */ \
+   t = malloc(sizeof(sequence_tracker_t)); \
+   t->sequence = minion->S.last_sequence_sent; \
+   _L = malloc(sizeof(LB_status_req_t)); /* turn link into allocated data */ \
+   memcpy(_L, L, sizeof(LB_status_req_t)); \
+   t->pkt = (char*)_L; \
+   t->data = NULL; \
+   t->sent_callback = StatusReqSentCallback; \
+   t->removed_callback = StatusReqRemovedCallback; \
+   t->missed = 50; /* after we don't get a callback for this message X times, but we do for other messages, give up */ \
+   /* place at head of chain */ \
+   t->next = minion->S.tracker; \
+   minion->S.tracker = t; \
 }
 
 
-void sendStatus2102(int force, FASIT_header *hdr, thread_data_t *minion, minion_time_t *mt);
+void sendStatus2102(int response, FASIT_header *hdr, thread_data_t *minion, minion_time_t *mt);
 void change_states_internal(thread_data_t *minion, minion_time_t *mt, trans_step_t step, int force);
 void inform_state(thread_data_t *minion, minion_time_t *mt, FASIT_header *hdr);
 void Cancel_Status_Resp_Timer(thread_data_t *minion);
 void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt);
+
+void StatusReqSentCallback(thread_data_t *minion, minion_time_t *mt, char *msg, void *data);
+void StatusReqRemovedCallback(thread_data_t *minion, minion_time_t *mt, char *msg, void *data);
 
 int psend_mcp(thread_data_t *minion,void *Lc);
 int psend_mcp_seq(thread_data_t *minion,void *Lc);
