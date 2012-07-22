@@ -222,7 +222,7 @@ int RF_size(int cmd){
          return (11);
 
       case  LBC_DEVICE_REG:
-         return (12);
+         return (13);
 
       case  LBC_QUICK_GROUP:
          return (65);
@@ -319,7 +319,7 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
          {
             LB_device_reg_t *L=(LB_device_reg_t *)LB;
             strcpy(cmdname,"Device_Reg");
-            sprintf(hbuf,"devid=%3x devtype=%d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d",L->devid,L->dev_type,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault);
+            sprintf(hbuf,"devid=%3x devtype=%d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d uptime=%d",L->devid,L->dev_type,L->expose,L->speed,L->move,L->react,L->location,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault, L->uptime);
             color=MAGENTA;
          }
          break;

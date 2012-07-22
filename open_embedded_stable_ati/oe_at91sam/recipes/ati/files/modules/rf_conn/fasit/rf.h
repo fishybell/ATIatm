@@ -226,7 +226,10 @@ typedef struct LB_device_reg_t {
    uint32 sensitivity:4 __attribute__ ((packed));
    uint32 timehits:4 __attribute__ ((packed));
    uint32 fault:8 __attribute__ ((packed));
+   uint32 uptime:8 __attribute__ ((packed)); // uptime in minutes (max 255, doesn't wrap back to 0 at 256)
+
    uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:24 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_device_reg_t;
 
 // LBC_ASSIGN_ADDR packet
