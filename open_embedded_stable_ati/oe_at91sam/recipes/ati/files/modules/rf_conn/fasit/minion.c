@@ -297,8 +297,8 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
          DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x went down unexpectedly", minion->devid);
          // went up and back down
          fake_transition_down();
-         // ...but was it killed (or hit and in bob mode) ?
-         if (killed || minion->S.react.newdata == react_bob) {
+         // ...but was it still alive or (!hit and not in bob mode) ?
+         if (!killed || (!minion->S.resp.ever_hit && minion->S.react.newdata != react_bob)) {
             create_fail_status(ERR_not_leave_expose); // for logging only
             create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
          }
@@ -2229,8 +2229,6 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
 
             /* handle "move away" the same as a move request */
             case CID_MoveAway:
-               // in the future make this fall through
-               break;
             /* handle emergency stop the same as a move request */               
             case CID_Stop: 
             /* handle continous move the same as a move request */               
@@ -3099,7 +3097,7 @@ void *minion_thread(thread_data_t *minion){
                      if (L->qualified) {
                         // qualified hits occured between valid expose and conceal logs, use those times
                         end_time_m = minion->S.exp.log_end_time[L->event];
-                        //DDCMSG(D_POINTER, GREEN, "Qual hit...%s:%i cmd end time (changing %3i.%03i to %i)", __FILE__, __LINE__, DEBUG_MS(minion->S.exp.log_end_time[L->event]), end_time_m);
+                        DDCMSG(D_POINTER, GREEN, "Qual hit...%s:%i cmd end time (changing %3i.%03i to %i)", __FILE__, __LINE__, DEBUG_MS(minion->S.exp.log_end_time[L->event]), end_time_m);
                         send_hit = 1; // yes, send the hit time message
                      } else {
                         //DDCMSG(D_POINTER, GREEN, "Checking qual...%s:%i", __FILE__, __LINE__);
@@ -3107,12 +3105,12 @@ void *minion_thread(thread_data_t *minion){
                         end_time_m = now_m; // end time for unqualified is now
                         // ... or has it? if it has, don't do anything now...wait for the hit to change to qualified
                         if (minion->S.exp.cmd_end_time[L->event] == 0) {
-                           //DDCMSG(D_POINTER, GREEN, "Unqual hit...%s:%i", __FILE__, __LINE__);
+                           DDCMSG(D_POINTER, GREEN, "Unqual hit...%s:%i", __FILE__, __LINE__);
                            // no conceal sent, this hit is now qualified
                            send_hit = 1;
                         } else {
                            // conceal sent, let the target decide if the hit was qualified or not
-                           //DDCMSG(D_POINTER, GREEN, "Requal unhit...%s:%i", __FILE__, __LINE__);
+                           DDCMSG(D_POINTER, GREEN, "Requal unhit...%s:%i", __FILE__, __LINE__);
                            send_hit = 0;
                         }
                      }
