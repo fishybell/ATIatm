@@ -23,8 +23,10 @@ extern int close_nicely;
 
 int psend_mcp(thread_data_t *minion,void *Lc);
 
-void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
+void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
 
+   static minion_time_t mt_t;
+   static minion_time_t *mt=NULL;
    long elapsed_tenths;
    int result;
    int i;
@@ -41,24 +43,29 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
     ***      some item[s] in the state need some action.
     ***/
 
-#if 1
-   timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);
-   DDCMSG(D_TIME,CYAN,"MINION %i: Begin timer updates at %3i.%03i timestamp, delta=%3i.%03i"
-          ,minion->mID, DEBUG_TS(mt->elapsed_time), DEBUG_TS(mt->delta_time));
-
-   elapsed_tenths = mt->elapsed_time.tv_sec*10+(mt->elapsed_time.tv_nsec/100000000L);
-
-   if (elapsed_tenths==0){
-      // set the next timeout
-      mt->timeout.tv_sec=0;
-      mt->timeout.tv_usec=(100000000L-mt->elapsed_time.tv_nsec)*1000; // remainder of 1 decisecond in microseconds
-
-   } else {
-      // set the next timeout
-      mt->timeout.tv_sec=0;
-      mt->timeout.tv_usec=100000; // 1 tenth later
+   if (mt == NULL) {
+      // initialize state machine times
+      clock_gettime(CLOCK_MONOTONIC,&mt_t.istart_time);
+      mt=&mt_t;
    }
-#endif
+
+   timestamp(mt);
+   DDCMSG(D_MSTATE,CYAN,"Minion one=%2x: Begin timer updates at %3i.%03i timestamp, delta=%3i.%03i"
+          ,minion->devid, DEBUG_TS(mt->elapsed_time), DEBUG_TS(mt->delta_time));
+
+   elapsed_tenths = mt->delta_time.tv_sec*10+(mt->delta_time.tv_nsec/100000000L);
+
+// --- this whole section was/is unused, we set mt.timeout via minion->S.state_timer in minion.c (~2822)
+//   if (elapsed_tenths==0){
+//      // set the next timeout
+//      mt->timeout.tv_sec=0;
+//      mt->timeout.tv_usec=(100000000L-mt->elapsed_time.tv_nsec)*1000; // remainder of 1 decisecond in microseconds
+//
+//   } else {
+//      // set the next timeout
+//      mt->timeout.tv_sec=0;
+//      mt->timeout.tv_usec=100000; // 1 tenth later
+//   }
 
    /**********    now update all the time related bits
     **
@@ -87,16 +94,17 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                minion->S.exp.exp_flags, minion->S.exp.exp_timer,
                minion->S.exp.con_flags, minion->S.exp.con_timer,
                minion->S.move.flags, minion->S.move.timer);
+   //}
 
       // check each timer, running its state code if it is needed, moving its timer otherwise
       #define CHECK_TIMER(S, T, F, CODE) { \
          if (S.F) { \
-            DDCMSG(D_MSTATE, GREEN, "Checking timer " #F ": %i/%i @ %s.%i", S.T, S.F, __FILE__, __LINE__); \
+            DDCMSG(D_MSTATE, GREEN, "Checking timer " #F ": %i/%i @ %s.%i against %i", S.T, S.F, __FILE__, __LINE__, elapsed_tenths); \
             if (S.T>elapsed_tenths) { \
                S.T-=elapsed_tenths;   /* not timed out yet.  but decrement out timer */ \
-               DDCMSG(D_MSTATE, MAGENTA, "Altered timer " #F ": %i/%i @ %s.%i", S.T, S.F, __FILE__, __LINE__); \
+               DDCMSG(D_MSTATE, MAGENTA, "Altered timer " #F ": %i/%i @ %s.%i against %i", S.T, S.F, __FILE__, __LINE__, elapsed_tenths); \
             } else { \
-            DDCMSG(D_MSTATE, YELLOW, "Running timer " #F ": %i/%i @ %s.%i", S.T, S.F, __FILE__, __LINE__); \
+               DDCMSG(D_MSTATE, YELLOW, "Running timer " #F ": %i/%i @ %s.%i against %i", S.T, S.F, __FILE__, __LINE__, elapsed_tenths); \
                CODE \
             } \
          } \
@@ -240,7 +248,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
             case F_slow_wait: {
                if (minion->S.rf_t.fast_flags == F_fast_none) { // we haven't switched timers
                   // we waited to long to cancel the slow timer, resume it
-                  setTimerTo(minion->S.rf_t, slow_timer, slow_flags, FAST_TIME, F_slow_start);
+                  setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start);
                }
             } break;
             default: {
@@ -339,7 +347,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                minion->S.move.data = minion->S.move.newdata; // but we're going to move a direction
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
 
-               DDCMSG(D_POINTER, GRAY, "Should start fake movement for minion %i", minion->mID);
+               //DDCMSG(D_POINTER, GRAY, "Should start fake movement for minion %i", minion->mID);
                switch (minion->S.dev_type) {
                   default:
                   case Type_MIT:
@@ -349,7 +357,6 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                      setTimerTo(minion->S.move, timer, flags, MAT_MOVE_START_TIME, F_move_continue_movement);
                      break;
                }
-               timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);      
                minion->S.last_move_time = ts2ms(&mt->elapsed_time);
                minion->S.speed.last_index = 0;
             } break;
@@ -361,8 +368,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                int accel;
                int dir;
                float cs;
-               DDCMSG(D_POINTER, GRAY, "Started fake movement for minion %i", minion->mID);
-               timestamp(&mt->elapsed_time,&mt->istart_time,&mt->delta_time);      
+               //DDCMSG(D_POINTER, GRAY, "Started fake movement for minion %i", minion->mID);
                nt = ts2ms(&mt->elapsed_time);
                dt = (nt - minion->S.last_move_time); // diff = now - last
                minion->S.last_move_time = nt; // last is now, now
@@ -410,17 +416,17 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                minion->S.speed.fpos = minion->S.speed.lastfpos + /* in meters */
                                     ((float)(dir) * ((float)(vel) / 1000.0) * ((float)(dt) / 1000.0)) + /* convert to meters and seconds */
                                     (((float)(accel) / 1000.0) * ((float)(dt) / 1000.0) * ((float)(dt) / 1000.0)); /* convert to meters and seconds */
-               DDCMSG(D_POINTER, GREEN, "pos: %f = %f + ((%i * %i * %i) / 1000000) + ((%i * %i * %i) / 1000000000)",
+               /*DDCMSG(D_POINTER, GREEN, "pos: %f = %f + ((%i * %i * %i) / 1000000) + ((%i * %i * %i) / 1000000000)",
                                          minion->S.speed.fpos, minion->S.speed.lastfpos,
-                                         dir, vel, dt, accel, dt, dt);
+                                         dir, vel, dt, accel, dt, dt);*/
 
                // speed = last speed + acceleration * time
                if (minion->S.speed.lastdata != cs) {
                   minion->S.speed.data = minion->S.speed.lastdata + /* in mph */
                                          ((((float)(accel) / 1000.0) * 2.237) * /* convert to m/s then to mph */
                                           ((float)(dt) / 1000.0)); /* convert to seconds */
-                  DDCMSG(D_POINTER, GREEN, "speed: %f = %f + (((%i / 1000.0) * 2.237) * (%i / 1000.0))",
-                                            minion->S.speed.data, minion->S.speed.lastdata, accel, dt);
+                  /*DDCMSG(D_POINTER, GREEN, "speed: %f = %f + (((%i / 1000.0) * 2.237) * (%i / 1000.0))",
+                                            minion->S.speed.data, minion->S.speed.lastdata, accel, dt);*/
                   if (minion->S.speed.data >= cs) {
                      // we've overshot our "correct" goal speed
                      minion->S.speed.data = cs;
@@ -461,17 +467,17 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                }
 
                // tell the good news
-               DDCMSG(D_POINTER, GRAY, "Calculated movement values from dt=%i: pos:%i mph:%f move:%i", dt,
-                      minion->S.position.data, minion->S.speed.data, minion->S.move.data);
+               /*DDCMSG(D_POINTER, GRAY, "Calculated movement values from dt=%i: pos:%i mph:%f move:%i", dt,
+                      minion->S.position.data, minion->S.speed.data, minion->S.move.data);*/
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
-               DDCMSG(D_POINTER, GRAY, "Possibly sent 2102 to FASIT server from minion %i", minion->mID);
+               //DDCMSG(D_POINTER, GRAY, "Possibly sent 2102 to FASIT server from minion %i", minion->mID);
 
                // remember what has transpired
                switch (minion->S.dev_type) {
                   default:
                   case Type_MIT:
                      // look at average speed (in mph) between speed index set points
-                     DDCMSG(D_POINTER, GRAY, "Finding last_index from mph %f", minion->S.speed.data);
+                     //DDCMSG(D_POINTER, GRAY, "Finding last_index from mph %f", minion->S.speed.data);
                      if (minion->S.speed.data > 0.0) {
                         if (minion->S.speed.data > 2.33) {
                            if (minion->S.speed.data > 4.35) {
@@ -494,10 +500,10 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                         // not moving at all, so we'll use 0
                         minion->S.speed.last_index = 0;
                      }
-                     DDCMSG(D_POINTER, GRAY, "Found last_index %i from mph %f", minion->S.speed.last_index, minion->S.speed.data);
+                     //DDCMSG(D_POINTER, GRAY, "Found last_index %i from mph %f", minion->S.speed.last_index, minion->S.speed.data);
                      break;
                   case Type_MAT:
-                     DDCMSG(D_POINTER, GRAY, "Finding last_index from mph %f", minion->S.speed.data);
+                     //DDCMSG(D_POINTER, GRAY, "Finding last_index from mph %f", minion->S.speed.data);
                      // look at average speed (in mph) between speed index set points
                      if (minion->S.speed.data > 0.0) {
                         if (minion->S.speed.data > 8.23) {
@@ -521,7 +527,7 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                         // not moving at all, so we'll use 0
                         minion->S.speed.last_index = 0;
                      }
-                     DDCMSG(D_POINTER, GRAY, "Found last_index %i from mph %f", minion->S.speed.last_index, minion->S.speed.data);
+                     //DDCMSG(D_POINTER, GRAY, "Found last_index %i from mph %f", minion->S.speed.last_index, minion->S.speed.data);
                      break;
                }
 
@@ -543,12 +549,12 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
                   // come back after we've moved 1/2 meters
                   float t = 0.75 * (0.44 * minion->S.speed.data); // find number of seconds to go 3/4 meter (converting mph to m/s first) -- spec want every 2 meters, but as we're faking it, we may as well make it look smooth
                   setTimerTo(minion->S.move, timer, flags, (int)(t * 10.0), F_move_continue_movement); // convert time to deciseconds
-                  DDCMSG(D_POINTER, GRAY, "Coming back in %i deciseconds (%f seconds)", (int)(t * 10.0), t);
+                  //DDCMSG(D_POINTER, GRAY, "Coming back in %i deciseconds (%f seconds)", (int)(t * 10.0), t);
                }
             } break;
             case F_move_end_movement: {
                // Clean up movement data
-               DDCMSG(D_POINTER, GRAY, "Minion %i is ending movement", minion->mID);
+               //DDCMSG(D_POINTER, GRAY, "Minion %i is ending movement", minion->mID);
                minion->S.speed.towards_index = 0;
                minion->S.speed.last_index = 0;
                minion->S.speed.lastdata = -1; // force cache to be dirty
@@ -600,7 +606,9 @@ void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb) {
    
 
         // run through all the timers and get the next time we need to process
-#define Set_Timer(T) { if ((T>0)&&(T<minion->S.state_timer)) minion->S.state_timer=T; }
+#define Set_Timer(T) { \
+   if ((T>0)&&(T<minion->S.state_timer)) { minion->S.state_timer=T; } \
+}
    minion->S.state_timer = 900;    // put in a worst case starting value of 90 seconds
    // if arg is >0 and <timer, it is the new timer
    Set_Timer(minion->S.exp.exp_timer); // timer for expose state

@@ -112,7 +112,8 @@ int main(int argc, char **argv) {
    addr_t addr_pool[2048];      // 0 and 2047 cannot be used
    int max_addr;                //  count of our max_addr given out
    int hunttime,slave_hunting,low,hunt_rotate=0, delta;
-   struct timespec elapsed_time, start_time, istart_time,delta_time, dwait_time;
+   struct timespec dwait_time;
+   minion_time_t mt;
    int tempslot = 0; // keep track if of what we're adding to our timeout based on having the slavehunt not overlap normal commands:requests
    int mit_length, mat_length, mit_home, mat_home, mit_end, mat_end;
    int forever = 0;
@@ -126,8 +127,8 @@ int main(int argc, char **argv) {
    //signal(SIGINT, quitproc);
    //signal(SIGQUIT, quitproc);
 
-   clock_gettime(CLOCK_MONOTONIC,&istart_time); // get the intial current time
-   timestamp(&elapsed_time,&istart_time,&delta_time);   // make sure the delta_time gets set    
+   clock_gettime(CLOCK_MONOTONIC,&mt.istart_time); // get the intial current time
+   timestamp(&mt);   // make sure the delta_time gets set    
 
    // process the arguments
    //  -f 192.168.10.203   RCC ip address
@@ -263,7 +264,7 @@ int main(int argc, char **argv) {
       EXIT(-1);
    } else {
 
-      DCMSG(RED,"MCP: slottime=%d  low_dev=0x%x high_dev=0x%x  total_slots=%d",slottime,low_dev,high_dev,total_slots);
+      DCMSG(RED,"MCP: hunttime=%d inittime=%d slottime=%d  low_dev=0x%x high_dev=0x%x  total_slots=%d",hunttime, inittime, slottime,low_dev,high_dev,total_slots);
    }
 
    /****************************************************************
@@ -319,10 +320,10 @@ int main(int argc, char **argv) {
    // loop until we lose connection to the rfmaster.
    while(!close_nicely) {
       // grab timestamp before epoll..
-      timestamp(&elapsed_time,&istart_time,&delta_time);
+      timestamp(&mt);
       // now add my delta to my dwait 
-      dwait_time.tv_sec+=delta_time.tv_sec;	 // add seconds
-      dwait_time.tv_nsec+=delta_time.tv_nsec; // add nanoseconds
+      dwait_time.tv_sec+=mt.delta_time.tv_sec;	 // add seconds
+      dwait_time.tv_nsec+=mt.delta_time.tv_nsec; // add nanoseconds
       if (dwait_time.tv_nsec>=1000000000L) {  // fix nanoseconds
          dwait_time.tv_sec++;
          dwait_time.tv_nsec-=1000000000L;
@@ -336,10 +337,10 @@ int main(int argc, char **argv) {
       DDCMSG(D_POLL,RED,"MCP: epoll_wait over   ready_fd_count = %d",ready_fd_count);
 
       // ...and grab timestamp after epoll (without this second one the times don't stay properly set)
-      timestamp(&elapsed_time,&istart_time,&delta_time);
+      timestamp(&mt);
       // now add my delta to my dwait 
-      dwait_time.tv_sec+=delta_time.tv_sec;	 // add seconds
-      dwait_time.tv_nsec+=delta_time.tv_nsec; // add nanoseconds
+      dwait_time.tv_sec+=mt.delta_time.tv_sec;	 // add seconds
+      dwait_time.tv_nsec+=mt.delta_time.tv_nsec; // add nanoseconds
       if (dwait_time.tv_nsec>=1000000000L) {  // fix nanoseconds
          dwait_time.tv_sec++;
          dwait_time.tv_nsec-=1000000000L;
@@ -358,7 +359,7 @@ int main(int argc, char **argv) {
             low=low_dev;
             slave_hunting++;
          } else if (slave_hunting>1&&slave_hunting<(((high_dev-low_dev)/8)+2)){
-            low=low_dev+((slave_hunting-1)*8); // step through 16 at a time after the first 2
+            low=low_dev+(slave_hunting*8); // step through 8 at a time after the first 1
             if (low>=high_dev) low=low_dev;             // if we went to far, redo the bottom end
             slave_hunting++;
          } else {
@@ -614,28 +615,28 @@ int main(int argc, char **argv) {
                         minions[mID].S.move.data = LB_devreg->move;
                         minions[mID].S.react.data = LB_devreg->react;
                         minions[mID].S.position.data = LB_devreg->location;
-                        DDCMSG(D_POINTER, GRAY, "\n\n----------------------\nPosition from LB: %i", LB_devreg->location);
+                        //DDCMSG(D_POINTER, GRAY, "\n\n----------------------\nPosition from LB: %i", LB_devreg->location);
                         /*if (minions[mID].S.position.data > 512) {
                            DDCMSG(D_POINTER, GRAY, "converting to negative: %i", minions[mID].S.position.data);
                            minions[mID].S.position.data -= 1024; // we are a negative
                            DDCMSG(D_POINTER, GRAY, "converted to negative: %i", minions[mID].S.position.data);
                         }*/
                         if (minions[mID].S.dev_type == Type_MIT) {
-                           DDCMSG(D_POINTER, GRAY, "clamping to mit lengths: %i", minions[mID].S.position.data);
+                           //DDCMSG(D_POINTER, GRAY, "clamping to mit lengths: %i", minions[mID].S.position.data);
                            minions[mID].S.position.data = max(0, min(minions[mID].S.position.data, mit_length));
-                           DDCMSG(D_POINTER, GRAY, "clamped to mit lengths: %i", minions[mID].S.position.data);
+                           //DDCMSG(D_POINTER, GRAY, "clamped to mit lengths: %i", minions[mID].S.position.data);
                         } else if (minions[mID].S.dev_type == Type_MAT) {
-                           DDCMSG(D_POINTER, GRAY, "clamping to mat lengths: %i", minions[mID].S.position.data);
+                           //DDCMSG(D_POINTER, GRAY, "clamping to mat lengths: %i", minions[mID].S.position.data);
                            minions[mID].S.position.data = max(0, min(minions[mID].S.position.data, mat_length));
-                           DDCMSG(D_POINTER, GRAY, "clamped to mat lengths: %i", minions[mID].S.position.data);
+                           //DDCMSG(D_POINTER, GRAY, "clamped to mat lengths: %i", minions[mID].S.position.data);
                         } else {
-                           DDCMSG(D_POINTER, GRAY, "resetting to 0 from %i", minions[mID].S.position.data);
+                           //DDCMSG(D_POINTER, GRAY, "resetting to 0 from %i", minions[mID].S.position.data);
                            minions[mID].S.position.data = 0;
-                           DDCMSG(D_POINTER, GRAY, "reset to 0;");
+                           //DDCMSG(D_POINTER, GRAY, "reset to 0;");
                         }
                         minions[mID].S.speed.fpos = (float)minions[mID].S.position.data;
                         minions[mID].S.speed.lastfpos = (float)minions[mID].S.position.data;
-                        DDCMSG(D_POINTER, GRAY, "Starting fpos:%f from pos:%i", minions[mID].S.speed.fpos, minions[mID].S.position.data);
+                        //DDCMSG(D_POINTER, GRAY, "Starting fpos:%f from pos:%i", minions[mID].S.speed.fpos, minions[mID].S.position.data);
                         minions[mID].S.mode.data = LB_devreg->hitmode;
                         minions[mID].S.burst.newdata = LB_devreg->timehits;        // not sure what this is, it is in an ext response packet
 
@@ -786,7 +787,7 @@ int main(int argc, char **argv) {
                minion=(thread_data_t *)events[ready_fd].data.ptr;
                minion_fd=minion->minion;                    
                //mID=minion->mID; don't overwrite this value, we are keeping track of stuff elsewhere with it
-DDCMSG(D_POINTER|D_MEGA, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\tEPOLLERR:%i\tEPOLLHUP:%i", minion->mID, (events[ready_fd].events&EPOLLIN)!=0, (events[ready_fd].events&EPOLLPRI)!=0, (events[ready_fd].events&EPOLLRDHUP)!=0, (events[ready_fd].events&EPOLLERR)!=0, (events[ready_fd].events&EPOLLHUP)!=0);
+//DDCMSG(D_POINTER|D_MEGA, GRAY, "Events for %i:\tEPOLLIN:%i\tEPOLLPRI:%i\tEPOLLRDHUP:%i\tEPOLLERR:%i\tEPOLLHUP:%i", minion->mID, (events[ready_fd].events&EPOLLIN)!=0, (events[ready_fd].events&EPOLLPRI)!=0, (events[ready_fd].events&EPOLLRDHUP)!=0, (events[ready_fd].events&EPOLLERR)!=0, (events[ready_fd].events&EPOLLHUP)!=0);
                DDCMSG(D_POLL,RED,"MCP: events[ready_fd=%d] minion->minion=%d for minion %d ready  [RF_addr=%d]  -}",
                       ready_fd,minion_fd,minion->mID,minion->RF_addr);             
 

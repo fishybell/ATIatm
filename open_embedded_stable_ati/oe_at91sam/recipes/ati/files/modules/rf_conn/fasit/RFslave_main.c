@@ -11,7 +11,8 @@ int verbose = 0;    // so debugging works right in all modules
 int last_slot = -1; // last slot used starts at no slot used
 
 
-struct timespec elapsed_time, start_time, istart_time,delta_time; // global timers
+struct timespec start_time; // global timers
+minion_time_t mt;
 
 #define MAX_EVENTS 16
 #define BAUDRATE B19200
@@ -214,8 +215,8 @@ int main(int argc, char **argv) {
    DCMSG(BLACK,"RFSLAVE: RF tty = %s", ttyport);
 
    // initialize timers
-   clock_gettime(CLOCK_MONOTONIC,&istart_time); // get the intial current time
-   timestamp(&elapsed_time,&istart_time,&delta_time);   // make sure the delta_time gets set    
+   clock_gettime(CLOCK_MONOTONIC,&mt.istart_time); // get the intial current time
+   timestamp(&mt);   // make sure the delta_time gets set    
 
    // open a bidirectional pipe for communication with the child
    if (socketpair(AF_UNIX,SOCK_STREAM,0,((int *) &rf_pair.parent))){

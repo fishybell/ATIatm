@@ -68,7 +68,8 @@ int rfSource(void *buf) {
 
 
 int main(int argc, char **argv) {
-    struct timespec elapsed_time, start_time, istart_time,delta_time;
+    struct timespec start_time; 
+    minion_time_t mt;
     int serversock;			/* Socket descriptor for server connection */
     int MCPsock;			/* Socket descriptor to use */
     int RFfd;				/* File descriptor for RFmodem serial port */
@@ -170,7 +171,7 @@ int main(int argc, char **argv) {
    set_crc8(RQ);
 
     /**   loop until we lose connection  **/
-   clock_gettime(CLOCK_MONOTONIC,&istart_time);	// get the intial current time
+   clock_gettime(CLOCK_MONOTONIC,&mt.istart_time);	// get the intial current time
 
    memset(buf,0,100);
 //   sprintf(buf,"Segfaults without this line.  Rbuf = ");
@@ -184,8 +185,8 @@ int main(int argc, char **argv) {
        // now send it to the RF master
        result=write(RFfd,RQ,size);
 
-       timestamp(&elapsed_time,&istart_time,&delta_time);
-       sprintf(buf,"%4ld.%03ld  Xmit-> [%d:%d]   ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,size,result);
+       timestamp(&mt);
+       sprintf(buf,"%4ld.%03ld  Xmit-> [%d:%d]   ",mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000,size,result);
        printf("\x1B[3%d;%dm%s",(BLUE)&7,((BLUE)>>3)&1,buf);
        for (int i=0; i<2; i++) printf("%02x.", ((uint8 *)RQ)[i]);
        printf("%02x\n", ((uint8 *)RQ)[3]);
@@ -194,8 +195,8 @@ int main(int argc, char **argv) {
        gathered = gather_rf(RFfd,Rptr,300);
 
        if (gathered>0) {
-	   timestamp(&elapsed_time,&istart_time,&delta_time);
-	   sprintf(buf,"%4ld.%03ld  %2d    ",elapsed_time.tv_sec, elapsed_time.tv_nsec/1000000,gathered);
+	   timestamp(&mt);
+	   sprintf(buf,"%4ld.%03ld  %2d    ",mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec/1000000,gathered);
 
 //	   printf("\x1B[3%d;%dm%s",(GREEN)&7,((GREEN)>>3)&1,buf);
            printf("%s",buf);

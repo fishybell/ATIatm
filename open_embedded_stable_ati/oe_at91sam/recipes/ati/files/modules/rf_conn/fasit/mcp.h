@@ -384,7 +384,7 @@ enum {
 
 uint64 htonll( uint64 id);
 int open_port(char *sport, int blocking);
-void timestamp(struct timespec *elapsed_time, struct timespec *istart_time, struct timespec *time_diff);
+//void timestamp(struct timespec *elapsed_time, struct timespec *istart_time, struct timespec *time_diff);
 int ts2ms(struct timespec *ts); // convert timespec to milliseconds
 void ms2ts(int ms, struct timespec *ts); // convert milliseconds to timespec
 void ts_minus_ts(struct timespec *in1, struct timespec *in2, struct timespec *out); // out = in1 - in2, sub-ms precision is lost
@@ -443,6 +443,7 @@ typedef struct minion_time {
    struct timespec elapsed_time, delta_time;
    struct timespec istart_time;
    struct timeval timeout;
+   struct timespec last_time; // don't use directly
 } minion_time_t;
 
 /* create the structure type to use for minion state timing */
@@ -452,7 +453,7 @@ typedef struct minion_bufs {
    char hbuf[100];
 } minion_bufs_t;
 
-void minion_state(thread_data_t *minion, minion_time_t *mt, minion_bufs_t *mb);
+void minion_state(thread_data_t *minion, minion_bufs_t *mb);
 
 // command tracking to do stuff (whatever stuff really) when a packet is actually sent from the radio
 typedef void (*tracker_callback)(thread_data_t*, minion_time_t*, char*, void*);
@@ -678,7 +679,7 @@ enum {
 #define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
-#define MAX_MISS_TIME 15 /* maximimum number of minutes to go without a response */
+#define MAX_MISS_TIME 5 /* maximimum number of minutes to go without a response */
 #define FAST_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / FAST_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
 #define SLOW_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / SLOW_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
@@ -707,9 +708,11 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
    S.rf_t.fast_missed = 0; \
    stopTimer(S.rf_t, slow_timer, slow_flags); \
    if (S.rf_t.fast_flags == F_fast_none) { \
+      DDCMSG(D_POINTER, GRAY,"Minion %i:%2x DO_FAST_LOOKUP success @ %s:%i", minion->mID, minion->devid, __FILE__, __LINE__); \
       setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
    } else { \
       /* is already going fast */ \
+      DDCMSG(D_POINTER, GRAY,"Minion %i:%2x DO_FAST_LOOKUP attempt @ %s:%i", minion->mID, minion->devid, __FILE__, __LINE__); \
    } \
 }
 #define DO_SLOW_LOOKUP(S) {\
@@ -717,8 +720,10 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
    stopTimer(S.rf_t, fast_timer, fast_flags); \
    if (S.rf_t.slow_flags == F_slow_none) { \
       setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
+      DDCMSG(D_POINTER, GRAY,"Minion %i:%2x DO_SLOW_LOOKUP success @ %s:%i", minion->mID, minion->devid, __FILE__, __LINE__); \
    } else { \
       /* is already going slow */ \
+      DDCMSG(D_POINTER, GRAY,"Minion %i:%2x DO_SLOW_LOOKUP attempt @ %s:%i", minion->mID, minion->devid, __FILE__, __LINE__); \
    } \
 }
 #define STOP_FAST_LOOKUP(S) {\
@@ -760,7 +765,7 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
       case TS_too_far: st = "TS_too_far"; break; \
       default: st = "Nothing I expected"; break; \
    } \
-   DDCMSG(D_POINTER, RED, "called change_states(%i, %s=%s, %s=%i) @ %s:%i", M->mID, #S, st, #F, F, __FILE__, __LINE__); \
+   /*DDCMSG(D_POINTER, RED, "called change_states(%i, %s=%s, %s=%i) @ %s:%i", M->mID, #S, st, #F, F, __FILE__, __LINE__);*/ \
    change_states_internal(M, T, S, F); \
 }
 
@@ -801,4 +806,7 @@ void StatusReqRemovedCallback(thread_data_t *minion, minion_time_t *mt, char *ms
 
 int psend_mcp(thread_data_t *minion,void *Lc);
 int psend_mcp_seq(thread_data_t *minion,void *Lc);
+
+void timestamp(minion_time_t *mt);
+
 #endif

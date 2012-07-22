@@ -2,7 +2,8 @@
 #include "rf_debug.h"
 #include "RFslave.h"
 
-extern struct timespec elapsed_time, start_time, istart_time,delta_time; // global timers
+extern struct timespec start_time; // global timers
+extern minion_time_t mt;
 
 // cancel the outbound rf queue and everything that uses it
 void clearTxQ(rf_connection_t *rc) {
@@ -131,8 +132,8 @@ int getTimeout(rf_connection_t *rc) {
    // check to see if we're past our allowed timeslot
    if (tv > rc->timeout_end) {
       DDCMSG(D_TIME, YELLOW, "Waited too long, infinite timeout now");
-      timestamp(&elapsed_time,&istart_time,&delta_time);
-      DDCMSG(D_POINTER, MAGENTA, "Waited too long @ %3i.%03i (d:%i.%03i)", DEBUG_TS(elapsed_time), DEBUG_TS(delta_time));
+      timestamp(&mt);
+      DDCMSG(D_POINTER, MAGENTA, "Waited too long @ %3i.%03i (d:%i.%03i)", DEBUG_TS(mt.elapsed_time), DEBUG_TS(mt.delta_time));
       // flush output tty buffer because we missed our timeslot
       //DCMSG(RED, "clearTxQ @ %s:%i", __FILE__, __LINE__);
       clearTxQ(rc);
@@ -203,10 +204,10 @@ int rcRead(rf_connection_t *rc, int tty) {
    dests = read(tty ? rc->child : rc->sock, dest, RF_BUF_SIZE); // the child process does the actual tty reading
    err = errno; // save errno
 
-   timestamp(&elapsed_time,&istart_time,&delta_time);
-   DDCMSG(D_NEW, tty ? CYAN : BLUE, "%s READ %i BYTES @ time %5ld.%09ld", tty ? "TTY" : "SOCKET", dests, elapsed_time.tv_sec, elapsed_time.tv_nsec);
+   timestamp(&mt);
+   DDCMSG(D_NEW, tty ? CYAN : BLUE, "%s READ %i BYTES @ time %5ld.%09ld", tty ? "TTY" : "SOCKET", dests, mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec);
    if (verbose&D_POINTER && tty) {
-      DDCMSG(D_POINTER, CYAN, "TTY RX %i BYTES @ time %3i.%03i (d:%3i.%03i)", dests, DEBUG_TS(elapsed_time), DEBUG_TS(delta_time));
+      DDCMSG(D_POINTER, CYAN, "TTY RX %i BYTES @ time %3i.%03i (d:%3i.%03i)", dests, DEBUG_TS(mt.elapsed_time), DEBUG_TS(mt.delta_time));
       DDpacket(dest, dests);
    }
 
@@ -277,11 +278,11 @@ int rcWrite(rf_connection_t *rc, int tty) {
       s = write(rc->sock, rc->sock_obuf, rc->sock_olen);
    }
    err = errno; // save errno
-   timestamp(&elapsed_time,&istart_time,&delta_time);
-   DDCMSG(D_NEW, tty ? cyan : blue, "%s WROTE %i BYTES @ time %5ld.%09ld", tty ? "TTY" : "SOCKET", s, elapsed_time.tv_sec, elapsed_time.tv_nsec);
+   timestamp(&mt);
+   DDCMSG(D_NEW, tty ? cyan : blue, "%s WROTE %i BYTES @ time %5ld.%09ld", tty ? "TTY" : "SOCKET", s, mt.elapsed_time.tv_sec, mt.elapsed_time.tv_nsec);
    debugRF(tty ? cyan : blue, tty ? rc->tty_obuf : rc->sock_obuf, tty ? rc->tty_olen : rc->sock_olen);
    if (verbose&D_POINTER && tty) {
-      DDCMSG(D_POINTER, GRAY, "TTY TX %i BYTES @ time %3i.%03i (d:%3i.%03i)", s, DEBUG_TS(elapsed_time), DEBUG_TS(delta_time));
+      DDCMSG(D_POINTER, GRAY, "TTY TX %i BYTES @ time %3i.%03i (d:%3i.%03i)", s, DEBUG_TS(mt.elapsed_time), DEBUG_TS(mt.delta_time));
       DDpacket(rc->tty_obuf, s);
    }
 
