@@ -617,11 +617,11 @@ typedef enum rf_target_type {
 
 // common timer values
 #define FAST_SOON_TIME        45  /* 4 1/2 seconds */
-#define FAST_WAIT_TIME        300 /* 30 seconds */
-#define FAST_TIME             90  /* 9 seconds */
+#define FAST_WAIT_TIME        900 /* 90 seconds */
+#define FAST_TIME             130 /* 13 seconds */
 #define SLOW_SOON_TIME        45  /* 4 1/2 seconds */
-#define SLOW_WAIT_TIME        300 /* 30 seconds */
-#define SLOW_TIME             600 /* 1 minute */
+#define SLOW_WAIT_TIME        900 /* 90 seconds */
+#define SLOW_TIME             300 /* 30 seconds */
 #define EVENT_SOON_TIME       5   /* 1/2 second */
 #define TRANSMISSION_TIME     4   /* 4/10 second */
 #define SIT_TRANSITION_TIME   4   /* 4/10 second */
@@ -629,7 +629,7 @@ typedef enum rf_target_type {
 #define HSAT_TRANSITION_TIME  115 /* 11 1/2 second */
 #define MIT_MOVE_START_TIME   8   /* 4/5 second */
 #define MAT_MOVE_START_TIME   120 /* 12 seconds */
-#define RESP_TIME             2   /* 2/10 second */
+#define RESP_TIME             8   /* 8/10 second */
 
 #if 0 /* old timer stuff */
 enum {
@@ -678,7 +678,7 @@ enum {
 #define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
-#define MAX_MISS_TIME 5 /* maximimum number of minutes to go without a response */
+#define MAX_MISS_TIME 15 /* maximimum number of minutes to go without a response */
 #define FAST_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / FAST_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
 #define SLOW_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / SLOW_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
@@ -723,12 +723,12 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
 }
 #define STOP_FAST_LOOKUP(S) {\
    if (S.rf_t.fast_flags != F_fast_none) { \
-      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_WAIT_TIME, F_fast_wait); \
+      /* setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_WAIT_TIME, F_fast_wait); */ \
    } \
 }
 #define STOP_SLOW_LOOKUP(S) {\
    if (S.rf_t.slow_flags != F_slow_none) { \
-      setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_WAIT_TIME, F_slow_wait); \
+      /* setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_WAIT_TIME, F_slow_wait); */ \
    } \
 }
 
