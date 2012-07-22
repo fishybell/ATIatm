@@ -818,9 +818,15 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
 
    // change event
    if (fc->current_event != pkt->event) { // only reset hits on changed event (very likely on when expose == 1)
+      long take_away = 25000000; // taking 25 milliseconds off the start time to include quick hits
       fc->current_event = pkt->event;
       log_ResetHits_All(fc); // clear out everything for this event
       clock_gettime(CLOCK_MONOTONIC,&fc->event_starts[fc->current_event]);
+      if (fc->event_starts[fc->current_event].tv_nsec < take_away) { // tv_nsec too small to subtract 25 ms
+         fc->event_starts[fc->current_event].tv_sec--; // take away a second
+         fc->event_starts[fc->current_event].tv_nsec += 1000000000l;// and put it here
+      }
+      fc->event_starts[fc->current_event].tv_nsec -= take_away;// take away the 25 ms
    }
    if (pkt->expose) {
       fc->future_exp = 90;
@@ -1170,6 +1176,36 @@ int handle_QCONCEAL(fasit_connection_t *fc, int start, int end) {
    return send_2100_exposure(fc, 0); // 0^ = concealed
 }
 
+int uptime() {
+   char data[128];
+   int seconds;
+   FILE *fp;
+   int status, index=0, r=1;
+   
+   // open pipe
+   fp = popen("cat /proc/uptime | cut -f1 -d.", "r");
+   if (fp == NULL) {
+      return 0;
+   }
+
+   // read/write
+   while (index < 128 && r > 0) {
+      r = fread(data + index, 128, sizeof(char), fp);
+      index += r;
+   }
+
+   // close pipe
+   status = pclose(fp);
+
+	// convert the data to an int
+   if (sscanf(data, "%i", &seconds) != 1) {
+	   seconds = 0;
+   }
+
+   // convert to minutes
+   return seconds / 60;
+}
+
 int send_DEVICE_REG(fasit_connection_t *fc) {
    // create a message packet with most significant bytes of the FASIT device ID
    LB_device_reg_t bdy;
@@ -1211,6 +1247,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
    bdy.timehits = fc->hit_burst;
    bdy.fault = fc->last_fault;
    bdy.tokill = fc->hit_tokill;
+   bdy.uptime = min(uptime(),255);
    
    // copy this info to last sent status
    //fc->last_status.hits = bdy.hits;
