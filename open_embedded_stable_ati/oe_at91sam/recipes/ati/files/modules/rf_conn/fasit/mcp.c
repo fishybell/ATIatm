@@ -355,11 +355,8 @@ int main(int argc, char **argv) {
       //  send_LB();   // send it
       //
       if (!ready_fd_count /* || idle long enough */  ){
-         if (slave_hunting==1){
-            low=low_dev;
-            slave_hunting++;
-         } else if (slave_hunting>1&&slave_hunting<(((high_dev-low_dev)/8)+2)){
-            low=low_dev+(slave_hunting*8); // step through 8 at a time after the first 1
+         if (slave_hunting>0&&slave_hunting<(((high_dev-low_dev)/8)+2)){
+            low=low_dev+((slave_hunting-1)*8); // step through 8 at a time after the first 1
             if (low>=high_dev) low=low_dev;             // if we went to far, redo the bottom end
             slave_hunting++;
          } else {
