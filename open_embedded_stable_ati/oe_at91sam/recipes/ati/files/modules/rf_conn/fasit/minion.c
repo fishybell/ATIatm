@@ -217,11 +217,13 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    }
    #define fake_transition_up() { \
       if (!faking_up) { \
+         minion->S.resp.lifter_command = lift_expose; \
          START_EXPOSE_TIMER(minion->S); \
       } \
    }
    #define fake_transition_down() { \
       if (!faking_down) { \
+         minion->S.resp.lifter_command = lift_conceal; \
          START_CONCEAL_TIMER(minion->S); \
       } \
    }
@@ -233,6 +235,12 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    // quick-lookup-variables used in many locations
    int killed = minion->S.resp.data < 0 ? 1 : 0; // target is currently "killed"
    int faking_left, faking_right, faking_stopped, faking_up, faking_down; // what we've told the FASIT server
+   int looking_fast; // either 1 for looking fast, or 0 for looking slow
+   if (minion->S.rf_t.fast_flags == F_fast_none) {
+      looking_fast = 0;
+   } else {
+      looking_fast = 1;
+   }
    switch (minion->S.exp.last_step) {
       default:
       case TS_exp_to_con:
@@ -289,6 +297,7 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    /* check target states that need only one RF response, but are okay with more       */
    /************************************************************************************/
 
+#if 0
    if (badFault(minion->S.fault.data) != 1) {
       // target unexpectedly went down without being killed?
       if (minion->S.resp.lifter_command == lift_expose &&
@@ -298,7 +307,9 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
          // went up and back down
          fake_transition_down();
          // ...but was it still alive or (!hit and not in bob mode) ?
-         if (!killed || (!minion->S.resp.ever_hit && minion->S.react.newdata != react_bob)) {
+         if (looking_fast && (!killed || (!minion->S.resp.ever_hit && minion->S.react.newdata != react_bob))) {
+            // (this error shouldn't be created if we got the answer from a slow-lookup status request)
+            DDCMSG(D_POINTER, MAGENTA, "Dev %3x went down...but shouldn't have", minion->devid);
             create_fail_status(ERR_not_leave_expose); // for logging only
             create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
          }
@@ -312,39 +323,48 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
          fake_transition_down();
       }
    }
+#endif
 
    /************************************************************************************/
    /* check target states that need only one RF response, but aren't okay with more    */
    /************************************************************************************/
    if (!minion->S.resp.lastdata) {
+      DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x first status response", minion->devid);
       if (badFault(minion->S.fault.data) != 1) {
          // target missed command to expose?
          if (minion->S.resp.lifter_command == lift_expose &&
-             !minion->S.resp.ever_exp &&
              minion->S.resp.current_exp == 0) {
-            DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x missed expose command", minion->devid);
+            DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x concealed unexpectedly", minion->devid);
             // never went up, show correctly as down in FASIT server
             fake_transition_down();
-            create_fail_status(ERR_not_leave_conceal); // for logging only
-            create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
+            // ...but was it still alive or (!hit and not in bob mode) ?
+            if (!minion->S.resp.ever_exp && looking_fast && (!killed || (!minion->S.resp.ever_hit && minion->S.react.newdata != react_bob))) {
+               // (this error shouldn't be created if we got the answer from a slow-lookup status request)
+               DDCMSG(D_POINTER, MAGENTA, "Dev %3x went down...but shouldn't have", minion->devid);
+               create_fail_status(ERR_not_leave_conceal); // for logging only
+               create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
+            }
          }
          // target missed command to conceal?
          if (minion->S.resp.lifter_command == lift_conceal &&
-             !minion->S.resp.ever_con &&
              minion->S.resp.current_exp == 90) {
-            DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x missed conceal command", minion->devid);
+            DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x exposed unexpectedly", minion->devid);
             // never went down, show correctly as up in FASIT server
             fake_transition_up();
-            create_fail_status(ERR_not_leave_expose); // for logging only
-            create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
+            if (!minion->S.resp.ever_con && looking_fast) {
+               // (this error shouldn't be created if we got the answer from a slow-lookup status request)
+               create_fail_status(ERR_not_leave_expose); // for logging only
+               create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
+            }
          }
       }
    }
 
    /************************************************************************************/
-   /* check target states that need only at least two RF responses                     */
+   /* check target states that need at least two RF responses                     */
    /************************************************************************************/
    else {
+      DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x another status response", minion->devid);
    }
 
    // send status, if it's updated, to FASIT server
@@ -1116,7 +1136,7 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion, minion_t
    msg.body.pstatus = 0; // always "shore" power
    // CACHE_CHECK(minion->S.fault); -- fault.lastdata has a different meaning, don't use CACHE_CHECK on it
    if (minion->S.fault.data != ERR_normal) {
-      DDCMSG(D_POINTER, GRAY, "Minion %i forced sending due to fault %i", minion->mID, minion->S.fault.data);
+      //DDCMSG(D_POINTER, GRAY, "Minion %i forced sending due to fault %i", minion->mID, minion->S.fault.data);
       force=1; // all errors/statuses that get here should be sent
    }
    msg.body.fault = htons(minion->S.fault.data);
@@ -1770,7 +1790,7 @@ void send_LB_exp(thread_data_t *minion, int expose, minion_time_t *mt) {
       minion->S.exp.cmd_end_time[minion->S.exp.event] = 0; // reset cmd end time
       minion->S.exp.log_end_time[minion->S.exp.event] = 0; // reset log end time
       // set our response cache kill and expose data as fresh
-      minion->S.resp.data = minion->S.tokill.newdata - 1; // minus one so when we're killed it tests differently than the initial state of zero (killed == -1 or less)
+      minion->S.resp.data = min(minion->S.tokill.newdata, 1) - 1; // minus one so when we're killed it tests differently than the initial state of zero (killed == -1 or less)
       minion->S.resp.last_exp = -1; // won't match as "same" next time
    } else {
       LB_exp->event=minion->S.exp.event;  // just fill in the event
@@ -1800,7 +1820,7 @@ void send_LB_exp(thread_data_t *minion, int expose, minion_time_t *mt) {
    // TODO -- LB_exp->mfs = 3 // random burst/single ?
    LB_exp->thermal=0; // TODO -- thermals (what about thermal delay?)
    DDCMSG(D_NEW,BLUE,"Minion %i:  LB_exp cmd=%i", minion->mID,LB_exp->cmd);
-   if (expose) {
+   if (1 || expose) { // always track
       // keep track of command if it's doing something
       sequence_tracker_t *t;
       psend_mcp_seq(minion,LB_exp);
@@ -2043,12 +2063,14 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                   DDCMSG(D_PACKET,BLUE,"Minion %i:  going up (exp=%i)",minion->mID,message_2100->exp);
                   DDCMSG(D_PACKET,BLACK,"Minion %i: we seem to work here******************* &LB_buf=%p",minion->mID,&LB_buf);
                         //DDCMSG(D_POINTER|D_NEW, black, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\ncalling send_LB_exp @ %i", __LINE__);
-                  send_LB_exp(minion, 1, mt); // do an expose, don't just change states and send "event" message
                   // new timer stuff
                   minion->S.resp.lifter_command = lift_expose;
                   minion->S.ignoring_response = 1; // ignoring responses due to exposure
                   STOP_SLOW_LOOKUP(minion->S);
                   Cancel_Status_Resp_Timer(minion);
+
+                  // psend is inside here:
+                  send_LB_exp(minion, 1, mt); // do an expose, don't just change states and send "event" message
                } else {
                   int uptime;
                   DDCMSG(D_PACKET,BLACK,"Minion %i: going down(exp=%i)",minion->mID,message_2100->exp);
@@ -2111,7 +2133,15 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                   LB_qcon->addr=minion->RF_addr;
                   LB_qcon->event=minion->S.exp.event;
                   LB_qcon->uptime=uptime;
-                  
+ 
+                  // new timer stuff
+                  minion->S.resp.lifter_command = lift_conceal;
+                  if (minion->S.resp.current_speed == 0) { // not moving
+                     minion->S.ignoring_response = 1; // ignoring responses due to exposure
+                     STOP_FAST_LOOKUP(minion->S);
+                     Cancel_Status_Resp_Timer(minion);
+                  }
+                 
                   DDCMSG(D_PACKET,BLUE,"Minion %i:  LB_qcon cmd=%i", minion->mID,LB_qcon->cmd);
                   {
                      // keep track of command if it's doing something
@@ -2162,14 +2192,6 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                   minion->S.exp.data = 45;  // make the current positon in movement
                   DDCMSG(D_NEW, GRAY, "Send 2100 expose: S.exp.newdata=%i, S.exp.data=%i @ %i", minion->S.exp.newdata, minion->S.exp.data, __LINE__);
                   //DDCMSG(D_POINTER|D_NEW, MAGENTA, "starting con timer @ %s:%i", __FILE__, __LINE__);
-
-                  // new timer stuff
-                  minion->S.resp.lifter_command = lift_conceal;
-                  if (minion->S.resp.current_speed == 0) { // not moving
-                     minion->S.ignoring_response = 1; // ignoring responses due to exposure
-                     STOP_FAST_LOOKUP(minion->S);
-                     Cancel_Status_Resp_Timer(minion);
-                  }
                }
 
                // send 2101 ack  (2102's will be generated at start and stop of actuator)
@@ -2329,7 +2351,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
 
                // now send it to the MCP master
                DDCMSG(D_PACKET,BLUE,"Minion %i:  LB_move cmd=%i", minion->mID,LB_move->cmd);
-               if (LB_move->speed < 2047 && minion->S.move.data == 0) {
+               //if (LB_move->speed < 2047 && minion->S.move.data == 0)
+               {
                   // keep track of command if it's doing something
                   sequence_tracker_t *t;
                   psend_mcp_seq(minion,LB_move);
@@ -2352,10 +2375,10 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                   // get ready to fake movement
                   minion->S.last_move_time = -1; // not sent for this movement message
                   //DDCMSG(D_POINTER,BLUE,"Moving minion %i with sequence %i because %i and %i", minion->mID, minion->S.last_sequence_sent, LB_move->speed, minion->S.move.data);
-               } else {
-                  // send changes
-                  psend_mcp(minion,LB_move);
-                  //DDCMSG(D_POINTER,BLUE,"Moving minion %i without sequence because %i and %i", minion->mID, LB_move->speed, minion->S.move.data);
+               // } else {
+               //   // send changes
+               //   psend_mcp(minion,LB_move);
+               //   //DDCMSG(D_POINTER,BLUE,"Moving minion %i without sequence because %i and %i", minion->mID, LB_move->speed, minion->S.move.data);
                }
 
                // send 2101 ack  (2102's will be generated at start and stop of actuator)
@@ -3018,7 +3041,7 @@ void *minion_thread(thread_data_t *minion){
                   LB_event_report_t *L=(LB_event_report_t *)(LB);       // map our bitfields in
 
                   //minion->S.hit.newdata+=L->hits;       // we need to add it to hit.newdata, it will be reset by SR or TRACR when they want to -- TODO -- new hit time message
-                  DDCMSG(D_PARSE,YELLOW,"Minion %i: (Rf_addr=%i) parsed 'Event_report'. hits=%i  sending 2102 status",
+                  DDCMSG(D_POINTER,YELLOW,"Minion %i: (Rf_addr=%i) parsed 'Event_report'. hits=%i  sending 2102 status",
                          minion->mID,minion->RF_addr,L->hits);
 
                   //DCMSG(RED, "****************\nFound expose: before:exp.data=%i, after:exp.newdata=%i\n**************** @ %i", minion->S.exp.data, minion->S.exp.newdata, __LINE__);
@@ -3204,11 +3227,11 @@ void *minion_thread(thread_data_t *minion){
                   }
                   if (minion->S.ignoring_response) {
                      if (badFault(L->fault) != 1) { // non-faults can be ignored
-                        DDCMSG(D_POINTER, CYAN, "Ignored LBC_STATUS_RESP for now...");
+                        DDCMSG(D_POINTER, CYAN, "Dev %2x Ignored LBC_STATUS_RESP for now...%i", minion->devid, minion->S.ignoring_response);
                         //DDpacket((char*)LB, RF_size(LBC_STATUS_RESP));
                      } else { // type 1 (faults) can't be ignored
                         if (minion->S.fault.lastdata == L->fault) { // ...but we ignore repeats
-                           DDCMSG(D_POINTER, CYAN, "Ignored LBC_STATUS_RESP for now...");
+                           DDCMSG(D_POINTER, CYAN, "Dev %2x Ignored LBC_STATUS_RESP for now...%i", minion->devid, minion->S.ignoring_response);
                            //DDpacket((char*)LB, RF_size(LBC_STATUS_RESP));
                         } else {
                            minion->S.fault.data = L->fault; // will get handled eventually
@@ -3245,6 +3268,9 @@ void *minion_thread(thread_data_t *minion){
                   if (!L->expose) { minion->S.resp.ever_con = 1; }
                   if (L->did_exp_cmd && !L->expose) {
                      minion->S.resp.ever_exp = 1;
+                  }
+                  if (L->did_exp_cmd && L->expose) {
+                     minion->S.resp.ever_con = 1;
                   }
                   if (L->speed == 0) { minion->S.resp.ever_stop = 1; }
                   if (minion->S.resp.lastdata) {
