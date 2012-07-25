@@ -221,7 +221,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
             } break;
             case F_fast_wait: {
                if (minion->S.rf_t.slow_flags == F_slow_none) { // we haven't switched timers
-                  // we waited to long to cancel the fast timer, resume it
+                  // we waited too long to cancel the fast timer, resume it
                   setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start);
                }
             } break;
@@ -247,7 +247,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
             } break;
             case F_slow_wait: {
                if (minion->S.rf_t.fast_flags == F_fast_none) { // we haven't switched timers
-                  // we waited to long to cancel the slow timer, resume it
+                  // we waited too long to cancel the slow timer, resume it
                   setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start);
                }
             } break;
