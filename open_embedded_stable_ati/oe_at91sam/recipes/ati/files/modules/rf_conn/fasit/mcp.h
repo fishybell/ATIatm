@@ -622,7 +622,7 @@ typedef enum rf_target_type {
 #define FAST_TIME             130 /* 13 seconds */
 #define SLOW_SOON_TIME        45  /* 4 1/2 seconds */
 #define SLOW_WAIT_TIME        900 /* 90 seconds */
-#define SLOW_TIME             300 /* 30 seconds */
+#define SLOW_TIME             1200 /* 2 minutes */
 #define EVENT_SOON_TIME       5   /* 1/2 second */
 #define TRANSMISSION_TIME     4   /* 4/10 second */
 #define SIT_TRANSITION_TIME   4   /* 4/10 second */
@@ -679,9 +679,9 @@ enum {
 #define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
-#define MAX_MISS_TIME 5 /* maximimum number of minutes to go without a response */
+#define MAX_MISS_TIME 2 /* maximimum number of minutes to go without a response */
 #define FAST_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / FAST_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
-#define SLOW_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / SLOW_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
+#define SLOW_TIME_MAX_MISS 5 /* maximum value of the "missed message" counter, not based on X minutes */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_UNREPORT (4*15) /* max number of reports per burst * max number of non-reports before vacuum */
 
@@ -707,7 +707,7 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
 #define DO_FAST_LOOKUP(S) {\
    S.rf_t.fast_missed = 0; \
    stopTimer(S.rf_t, slow_timer, slow_flags); \
-   if (S.rf_t.fast_flags == F_fast_none) { \
+   if (S.rf_t.fast_flags == F_fast_none || S.rf_t.fast_flags == F_fast_wait) { \
       DDCMSG(D_POINTER, GRAY,"Minion %i:%2x DO_FAST_LOOKUP success @ %s:%i", minion->mID, minion->devid, __FILE__, __LINE__); \
       setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_SOON_TIME, F_fast_start); \
    } else { \
@@ -718,7 +718,7 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
 #define DO_SLOW_LOOKUP(S) {\
    S.rf_t.slow_missed = 0; \
    stopTimer(S.rf_t, fast_timer, fast_flags); \
-   if (S.rf_t.slow_flags == F_slow_none) { \
+   if (S.rf_t.slow_flags == F_slow_none || S.rf_t.slow_flags == F_slow_wait) { \
       setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_SOON_TIME, F_slow_start); \
       DDCMSG(D_POINTER, GRAY,"Minion %i:%2x DO_SLOW_LOOKUP success @ %s:%i", minion->mID, minion->devid, __FILE__, __LINE__); \
    } else { \
@@ -728,12 +728,14 @@ extern int MAT_ACCEL[];  // in meters per second per second (times 1000)
 }
 #define STOP_FAST_LOOKUP(S) {\
    if (S.rf_t.fast_flags != F_fast_none) { \
-      /* setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_WAIT_TIME, F_fast_wait); */ \
+      setTimerTo(S.rf_t, fast_timer, fast_flags, FAST_WAIT_TIME, F_fast_wait); \
+      /* stopTimer(S.rf_t, fast_timer, fast_flags); */ \
    } \
 }
 #define STOP_SLOW_LOOKUP(S) {\
    if (S.rf_t.slow_flags != F_slow_none) { \
-      /* setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_WAIT_TIME, F_slow_wait); */ \
+      setTimerTo(S.rf_t, slow_timer, slow_flags, SLOW_WAIT_TIME, F_slow_wait); \
+      /* stopTimer(S.rf_t, slow_timer, slow_flags); */ \
    } \
 }
 
