@@ -28,7 +28,7 @@
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
 //#define DEBUG_PRINT
-#define DEBUG_SEND
+//#define DEBUG_SEND
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
