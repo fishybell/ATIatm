@@ -380,7 +380,7 @@ int handle_REPORT_ACK(fasit_connection_t *fc, int start, int end) {
    
    // reset the given amount of hits for the event in question
    log_ResetHits_Some(fc, pkt->event, pkt->hits, pkt->report);
-   DDCMSG(D_POINTER, black, "handled REPORT ACK for %i %i %i", pkt->event, pkt->hits, pkt->report);
+   DCMSG(black, "handled REPORT ACK for %i %i %i", pkt->event, pkt->hits, pkt->report);
    return doNothing;
 }
 
@@ -422,7 +422,7 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
    for (i=0; i < MAX_HITS; i++) {
       if (!(fc->hit_times[i].time.tv_sec == 0 && fc->hit_times[i].time.tv_nsec == 0l)) {
    DDCMSG(D_POINTER, GREEN, "Looking @ %s:%i with %i", __FILE__, __LINE__, i);
-   DDCMSG(D_POINTER, GREEN, "...found hit @ time %3i.%03i event %i, report %i, event reported: %i, event new rpt: %i",
+   DCMSG(GREEN, "...looking at hit @ time %3i.%03i event %i, report %i, event reported: %i, event new rpt: %i",
          fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l,
          fc->hit_times[i].event, fc->hit_times[i].report,
          fc->hit_event_sum[fc->hit_times[i].event].reported, fc->hit_event_sum[fc->hit_times[i].event].new_report);
@@ -470,13 +470,13 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
                   fc->hit_times[i].report = temp->report; // assign correct report number to hit
                   found = 1;
                } else {
-   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+   DCMSG(GREEN, "Shouldn't Be Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
                   // we need to create a new report for this event
                   // TODO -- we should never get here as it implies we recently created a report, but can't find it -- we need to prove that we can't get here or do something more drastic here
                   found = 0;
                }
             } else {
-   DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
+   DCMSG(GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
                // the hit as been reported, or both have been reported, either way, create a new link
                found = 0;
             }
@@ -543,16 +543,21 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %i:%p", __FILE__, __LINE__, i, this);
       } else if (fc->hit_times[i].event || fc->hit_times[i].report) {
    DDCMSG(D_POINTER, GREEN, "Didn't look @ %s:%i with %i", __FILE__, __LINE__, i);
-   DDCMSG(D_POINTER, GREEN, "...skipped hit @ time %3i.%03i event %i, report %i, event reported: %i, event new rpt: %i",
+   DCMSG(GREEN, "...skipped hit @ time %3i.%03i event %i, report %i, event reported: %i, event new rpt: %i",
          fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l,
          fc->hit_times[i].event, fc->hit_times[i].report,
          fc->hit_event_sum[fc->hit_times[i].event].reported, fc->hit_event_sum[fc->hit_times[i].event].new_report);
-      } else if (i < 10) {
+      } else if (fc->hit_times[i].time.tv_sec != 0 || fc->hit_times[i].time.tv_nsec != 0l ||
+         fc->hit_times[i].event != 0 || fc->hit_times[i].report != 0 ||
+         fc->hit_event_sum[fc->hit_times[i].event].reported != 0 || fc->hit_event_sum[fc->hit_times[i].event].new_report != -1) {
+         // no hit at this index, but it's got ~some~ data in it, so let's print it
 //   DDCMSG(D_POINTER, GREEN, "Completely ignored @ %s:%i with %i", __FILE__, __LINE__, i);
-//   DDCMSG(D_POINTER, GREEN, "...ignored hit @ time %3i.%03i event %i, report %i, event reported: %i, event new rpt: %i",
-//         fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l,
-//         fc->hit_times[i].event, fc->hit_times[i].report,
-//         fc->hit_event_sum[fc->hit_times[i].event].reported, fc->hit_event_sum[fc->hit_times[i].event].new_report);
+   DCMSG(GREEN, "...ignored hit @ time %3i.%03i event %i, report %i, event reported: %i, event new rpt: %i",
+         fc->hit_times[i].time.tv_sec, fc->hit_times[i].time.tv_nsec/1000000l,
+         fc->hit_times[i].event, fc->hit_times[i].report,
+         fc->hit_event_sum[fc->hit_times[i].event].reported, fc->hit_event_sum[fc->hit_times[i].event].new_report);
+      } else {
+         // no hit data at all
       }
    }
 
@@ -562,7 +567,7 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
    while (this != NULL) {
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
       if (this->pkt.hits > 0) {
-   DDCMSG(D_POINTER, GREEN, "Sending @ %s:%i with %p %i %i %i", __FILE__, __LINE__, this, this->pkt.event, this->pkt.report,this->pkt.hits);
+   DCMSG(GREEN, "Sending @ %s:%i with %p %i %i %i", __FILE__, __LINE__, this, this->pkt.event, this->pkt.report,this->pkt.hits);
          // finish and send
          set_crc8(&this->pkt);
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i with %p", __FILE__, __LINE__, this);
@@ -818,15 +823,13 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
 
    // change event
    if (fc->current_event != pkt->event) { // only reset hits on changed event (very likely on when expose == 1)
-      long take_away = 25000000; // taking 25 milliseconds off the start time to include quick hits
       fc->current_event = pkt->event;
       log_ResetHits_All(fc); // clear out everything for this event
+      // set start time to now
       clock_gettime(CLOCK_MONOTONIC,&fc->event_starts[fc->current_event]);
-      if (fc->event_starts[fc->current_event].tv_nsec < take_away) { // tv_nsec too small to subtract 25 ms
-         fc->event_starts[fc->current_event].tv_sec--; // take away a second
-         fc->event_starts[fc->current_event].tv_nsec += 1000000000l;// and put it here
-      }
-      fc->event_starts[fc->current_event].tv_nsec -= take_away;// take away the 25 ms
+      // and end time to "hasn't happened yet"
+      fc->event_ends[fc->current_event].tv_sec = 0;
+      fc->event_ends[fc->current_event].tv_nsec = 0l;
    }
    if (pkt->expose) {
       fc->future_exp = 90;
