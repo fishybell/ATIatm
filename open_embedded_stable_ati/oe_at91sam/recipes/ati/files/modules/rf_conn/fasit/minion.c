@@ -325,39 +325,27 @@ void Handle_Status_Resp(thread_data_t *minion, minion_time_t *mt) {
    }
 #endif
 
+   if (badFault(minion->S.fault.data) != 1) {
+      // target missed command to expose?
+      if (minion->S.resp.lifter_command == lift_expose &&
+          minion->S.resp.current_exp == 0) {
+         DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x concealed unexpectedly", minion->devid);
+         // never went up, show correctly as down in FASIT server
+         fake_transition_down();
+      }
+      // target missed command to conceal?
+      if (minion->S.resp.lifter_command == lift_conceal &&
+          minion->S.resp.current_exp == 90) {
+         DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x exposed unexpectedly", minion->devid);
+         // never went down, show correctly as up in FASIT server
+         fake_transition_up();
+      }
+   }
+
    /************************************************************************************/
    /* check target states that need only one RF response, but aren't okay with more    */
    /************************************************************************************/
    if (!minion->S.resp.lastdata) {
-      DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x first status response", minion->devid);
-      if (badFault(minion->S.fault.data) != 1) {
-         // target missed command to expose?
-         if (minion->S.resp.lifter_command == lift_expose &&
-             minion->S.resp.current_exp == 0) {
-            DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x concealed unexpectedly", minion->devid);
-            // never went up, show correctly as down in FASIT server
-            fake_transition_down();
-            // ...but was it still alive or (!hit and not in bob mode) ?
-            if (!minion->S.resp.ever_exp && looking_fast && (!killed || (!minion->S.resp.ever_hit && minion->S.react.newdata != react_bob))) {
-               // (this error shouldn't be created if we got the answer from a slow-lookup status request)
-               DDCMSG(D_POINTER, MAGENTA, "Dev %3x went down...but shouldn't have", minion->devid);
-               create_fail_status(ERR_not_leave_conceal); // for logging only
-               create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
-            }
-         }
-         // target missed command to conceal?
-         if (minion->S.resp.lifter_command == lift_conceal &&
-             minion->S.resp.current_exp == 90) {
-            DDCMSG(D_POINTER, MAGENTA, "-----------------------------\nDev %3x exposed unexpectedly", minion->devid);
-            // never went down, show correctly as up in FASIT server
-            fake_transition_up();
-            if (!minion->S.resp.ever_con && looking_fast) {
-               // (this error shouldn't be created if we got the answer from a slow-lookup status request)
-               create_fail_status(ERR_not_leave_expose); // for logging only
-               create_fail_status(ERR_bad_RF_packet); // all errors created by the minions directly are RF by definition
-            }
-         }
-      }
    }
 
    /************************************************************************************/
