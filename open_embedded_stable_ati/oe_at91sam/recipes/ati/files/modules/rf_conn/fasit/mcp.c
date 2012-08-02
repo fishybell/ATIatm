@@ -1,7 +1,9 @@
 #include <signal.h>
+#include <sys/stat.h>
 #include "mcp.h"
 #include "fasit_c.h"
 #include "rf.h"
+#include "md5sum.h"
 
 const char *__PROGRAM__ = "MCP ";
 
@@ -42,6 +44,11 @@ void print_help(int exval) {
    printf("  -d 0x20       Lowest devID to find\n");
    printf("  -D 0x30       Highest devID to find\n");
    printf("  -H            Hunt forever. Only use for debugging.\n");
+   printf("  -F <name>     send file over RF (will exit when finished, requires C and c, E&R optional)\n");
+   printf("  -C <path>     full path name of destination file on device\n");
+   printf("  -E            have device execute file after it has been transferred\n");
+   printf("  -R            have device reboot after the file has been transferred\n");
+   printf("  -c 40         wait for this number of devices to connect before starting transfer\n");
    print_verbosity();
    exit(exval);
 }
@@ -116,12 +123,18 @@ int main(int argc, char **argv) {
    minion_time_t mt;
    int tempslot = 0; // keep track if of what we're adding to our timeout based on having the slavehunt not overlap normal commands:requests
    int mit_length, mat_length, mit_home, mat_home, mit_end, mat_end;
-   int forever = 0;
+   int forever = 0, send_mode = 0, execute = 0, reboot = 0, wait_devices = 0, num_devices = 0;
+   int sent_chunk = -1, number_of_chunks = 0, total_size = 0, send_fd = -1, send_id, sent_finishes = 0;
+   int *chunk_resends = NULL, chunk_resends_count = 0;
 
    LB_packet_t *LB,LB_buf;
    LB_request_new_t *LB_new;
    LB_device_reg_t *LB_devreg;
    LB_assign_addr_t *LB_addr;
+
+   char src_path[257], dest_path[41], md5[16];
+   src_path[0] = '\0';
+   dest_path[0] = '\0';
 
    // install signal handlers
    //signal(SIGINT, quitproc);
@@ -160,7 +173,7 @@ int main(int argc, char **argv) {
    RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");            // RFmaster server the MCP connects to
    RF_addr.sin_port = htons(4004);                              // RFmaster server port number
 
-   while((opt = getopt(argc, argv, "hHv:m:r:i:p:f:s:d:D:t:q:Q:l:L:x:X:")) != -1) {
+   while((opt = getopt(argc, argv, "hHERv:m:r:i:p:f:s:d:D:t:q:Q:l:L:x:X:F:C:c:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
@@ -168,6 +181,38 @@ int main(int argc, char **argv) {
 
          case 'H':
             forever = 1;
+            break;
+
+         case 'E':
+            execute = 1;
+            break;
+
+         case 'R':
+            reboot = 1;
+            break;
+
+         case 'F':
+            send_mode = 1;
+            if (strnlen(optarg, 257) >= 257) {
+               DCMSG(black, "Wrong size of -F argument. Max of 256 characters, but found %i", strlen(optarg));
+               EXIT(-1);
+            }
+            strncpy(src_path, optarg, 256);
+            src_path[256] = '\0'; // force null termination
+            break;
+
+         case 'C':
+            if (strnlen(optarg, 41) >= 41) {
+               DCMSG(black, "Wrong size of -C argument. Max of 40 characters, but found %i", strlen(optarg));
+               EXIT(-1);
+            }
+            strncpy(dest_path, optarg, 40);
+            dest_path[40] = '\0'; // force null termination
+            break;
+
+         case 'c':
+            wait_devices = atoi(optarg);
+            num_devices = wait_devices;
             break;
 
          case 'v':
@@ -250,6 +295,44 @@ int main(int argc, char **argv) {
    DCMSG(BLUE,"MCP: FASIT SERVER address = %s:%d", inet_ntoa(fasit_addr.sin_addr),htons(fasit_addr.sin_port));
    DCMSG(BLUE,"MCP: RFmaster SERVER address = %s:%d", inet_ntoa(RF_addr.sin_addr),htons(RF_addr.sin_port));
    print_verbosity_bits();
+
+   if (send_mode) {
+      if (num_devices <=0 ||
+          strnlen(src_path, 256) <= 0 ||
+          strnlen(dest_path, 40) <= 0) {
+         DCMSG(black, "Failed to provide necessary parameters for sending a file");
+         print_help(-1);
+      } else {
+         // prepare file for reading
+         struct stat buf;
+         if (stat(src_path, &buf) == 0) {
+            // check size
+            intmax_t fsize = buf.st_size;
+            if (fsize >= (CHUNK_SIZE * 65535)) {
+               DCMSG(black, "File too big. Max size is %i", CHUNK_SIZE * 65535);
+               EXIT(-1);
+            }
+            number_of_chunks = fsize / CHUNK_SIZE;
+            if (fsize % CHUNK_SIZE != 0) {
+               number_of_chunks++;
+            }
+            total_size = fsize;
+            // open file for reading
+            send_fd = open(src_path, O_RDONLY);
+            if (send_fd == -1) {
+               DCMSG(black, "Failed to open file %s", src_path);
+               EXIT(-1);
+            } 
+            if (!md5sum(src_path, md5)) {
+               DCMSG(black, "Failed to get md5sum of file %s", src_path);
+               EXIT(-1);
+            }
+         } else {
+            DCMSG(black, "Failed to stat file %s", src_path);
+            EXIT(-1);
+         }
+      }
+   }
 
    // zero the address pool
    for(i=0; i<2048; i++) {
@@ -355,56 +438,163 @@ int main(int argc, char **argv) {
       //  send_LB();   // send it
       //
       if (!ready_fd_count /* || idle long enough */  ){
-         if (slave_hunting>0&&slave_hunting<(((high_dev-low_dev)/8)+2)){
-            low=low_dev+((slave_hunting-1)*8); // step through 8 at a time after the first 1
-            if (low>=high_dev) low=low_dev;             // if we went to far, redo the bottom end
-            slave_hunting++;
-         } else {
-            // the hunt is over, for now
-            slave_hunting=1;
-            low=low_dev;                // restart the hunt at the beginning
-            if (!forever) {
-               hunt_rotate = 1; // don't rotate if we're not hunting forever
+         if (send_mode == 1 && wait_devices <= 0) { // TODO -- do we actually have to wait for devices? we don't care about them connecting and talking, and we don't look at the address of the response, so why wait?
+            if (chunk_resends != NULL) {
+               // check what chunks were missed and change sent_chunk to match
+               int cr;
+               for (cr = 0; cr < chunk_resends_count; cr++) {
+                  if (chunk_resends[cr] != -1) {
+                     sent_chunk = chunk_resends[cr]; // the targets report their last seen, so pretend that's the last one we sent
+                     chunk_resends[cr] = -1; // don't resend this one until we're told to again
+                     break; // finish loop
+                  }
+               }
+               if (cr >= chunk_resends_count) {
+                  // looked through entire loop, but we've resent them all
+                  sent_chunk = number_of_chunks; // send FINISH messages again
+               }
             }
-         } 
+            if (sent_chunk == -1) {
+               // start new file tranfer
+               LB_data_start_t ds;
+               DCMSG(CYAN, "Finished waiting for devices, will start file transfer now");
+               memset(&ds, 0, RF_size(LBC_DATA_START));
+               ds.cmd = LBC_DATA_START;
+               ds.execute = execute ? 1 : 0;
+               ds.reboot = reboot ? 1 : 0;
+               ds.id = 1 + (rand() % 33554431); // 25 bits (use +1 so id = 1 -> 33554432, as 0 = don't have any id)
+               send_id = ds.id;
+               memcpy(ds.name, dest_path, min(strnlen(dest_path, 41), 40)); // variable length
+               memcpy(ds.md5sum, md5, 16); // always 16 bytes
+               ds.size = number_of_chunks;
+               set_crc8(&ds);
+               result=write(RF_sock,&ds,RF_size(ds.cmd));
+               if (verbose&D_RF){     // don't do the sprintf if we don't need to
+                  sprintf(hbuf,"MCP: sent %d (%d) bytes  LB data start  ",result,RF_size(ds.cmd));
+                  DDCMSG_HEXB(D_RF,YELLOW,hbuf, &ds, RF_size(ds.cmd));
+               }
+               sent_chunk = 0; // next time send a chunk of data
+               timeout = RF_COLLECT_DELAY * 2; // RFmaster will collect messages for 200ms minimum, so send another then, plus another collect delay to give the radio some breathing room
+               // adjust dwait_time to the time to nothing, as we haven't waited anything yet
+               dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
 
-         // reset our pseudo-burst slot value
-         tempslot = 0;
+               DDCMSG(D_RF,RED,"MCP:  Build a LB data start message. timeout=%d slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld",timeout,slave_hunting,low,hunttime, dwait_time.tv_sec, dwait_time.tv_nsec);
+            } else if (sent_chunk >= number_of_chunks) {
+               // finish file transfer
+               LB_data_finish_t df;
+               DCMSG(CYAN, "Finished sending file -- wait to see if I failed to send last chunk");
+               if (sent_finishes++ >= 5) {
+                  DCMSG(CYAN, "Waited 5 times, and no responses, we're done here.");
+                  EXIT(0);
+               }
+               memset(&df, 0, RF_size(LBC_DATA_FINISH));
+               df.cmd = LBC_DATA_FINISH;
+               df.id = send_id;
+               set_crc8(&df);
+               result=write(RF_sock,&df,RF_size(df.cmd));
+               if (verbose&D_RF){     // don't do the sprintf if we don't need to
+                  sprintf(hbuf,"MCP: sent %d (%d) bytes  LB data finish  ",result,RF_size(df.cmd));
+                  DDCMSG_HEXB(D_RF,YELLOW,hbuf, &df, RF_size(df.cmd));
+               }
+               timeout = (inittime * num_devices) + RF_COLLECT_DELAY; // give num_devices total slots of available response time (RFmaster will collect messages for 200ms minimum)
+               // adjust dwait_time to the time to nothing, as we haven't waited anything yet
+               dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
 
-         // if we've rotated through the hunt, use the hunttime, otherwise use slottime
-         if (hunt_rotate) {
-            timeout=hunttime*1000;      // idle time to wait for next go around
+               DDCMSG(D_RF,RED,"MCP:  Build a LB data start message. timeout=%d slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld",timeout,slave_hunting,low,hunttime, dwait_time.tv_sec, dwait_time.tv_nsec);
+            } else if (sent_chunk >= 0) {
+               // transfer file chunk
+               LB_data_chunk_t dc;
+               int should_read = CHUNK_SIZE;
+               char md5_t[16];
+               memset(&dc, 0, RF_size(LBC_DATA_CHUNK));
+               lseek(send_fd, CHUNK_SIZE*sent_chunk++, SEEK_SET);
+               DCMSG(CYAN, "Should send chunk %i here", sent_chunk);
+               dc.cmd = LBC_DATA_CHUNK;
+               dc.id = send_id;
+               if (sent_chunk == number_of_chunks) {
+                  should_read = total_size % CHUNK_SIZE;
+               }
+               while (dc.size < should_read) {
+                  int r = read(send_fd, dc.data+dc.size, should_read);
+                  if (r < 0) {
+                     char ebuf[256];
+                     strerror_r(errno, ebuf, 256);
+                     DCMSG(GRAY, "Error reading chunk %i: %s", sent_chunk, ebuf);
+                     EXIT(-1);
+                  }
+                  dc.size += r;
+               }
+               if (!md5sum_data(dc.data, dc.size, md5_t)) {
+                  DCMSG(GRAY, "Error getting md5sum of chunk %i", sent_chunk);
+                  EXIT(-1);
+               }
+               memcpy(dc.md5sum, md5_t, 16);
+               dc.chunk = sent_chunk;
+               set_crc8(&dc);
+               result=write(RF_sock,&dc,RF_size(dc.cmd));
+               if (verbose&D_RF){     // don't do the sprintf if we don't need to
+                  sprintf(hbuf,"MCP: sent %d (%d) bytes  LB data chunk  ",result,RF_size(dc.cmd));
+                  DDCMSG_HEXB(D_RF,YELLOW,hbuf, &dc, RF_size(dc.cmd));
+                  DDpacket((void*)&dc, RF_size(dc.cmd));
+               }
+               timeout = (inittime * 10) + RF_COLLECT_DELAY * 2; // give 10 total slots of available response time (RFmaster will collect messages for 200ms minimum)
+               // adjust dwait_time to the time to nothing, as we haven't waited anything yet
+               dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
+
+               DDCMSG(D_RF,RED,"MCP:  Build a LB data start message. timeout=%d slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld",timeout,slave_hunting,low,hunttime, dwait_time.tv_sec, dwait_time.tv_nsec);
+            }
          } else {
-            timeout=slottime*10;        // idle time to wait for next go around
-         }
-         timeout+=(inittime + RF_COLLECT_DELAY); // add initial time and just a little bit more so the RFmaster can keep up (RFmaster will collect messages for 200ms minimum)
-         // adjust dwait_time to the time to nothing, as we haven't waited anything yet
-         dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
+            if (slave_hunting>0&&slave_hunting<(((high_dev-low_dev)/8)+2)){
+               low=low_dev+((slave_hunting-1)*8); // step through 8 at a time after the first 1
+               if (low>=high_dev) low=low_dev;             // if we went to far, redo the bottom end
+               slave_hunting++;
+            } else {
+               // the hunt is over, for now
+               slave_hunting=1;
+               low=low_dev;                // restart the hunt at the beginning
+               if (!forever) {
+                  hunt_rotate = 1; // don't rotate if we're not hunting forever
+               }
+            } 
 
-         DDCMSG(D_RF,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld",timeout,slave_hunting,low,hunttime, dwait_time.tv_sec, dwait_time.tv_nsec);
-         /***  we need to use the range we were invoked with
-          ***  we need to handle a range greater than 32
-          ***  the forget_addr needs to be set by looking at the addr_pool
-          ***     call a function to get the forget bits - so we can reduce code clutter
-          ***  */
+            // reset our pseudo-burst slot value
+            tempslot = 0;
 
-         //   for now the request new devices will just use payload len=0
-         LB_new=(LB_request_new_t *) &LB_buf;
-         LB_new->cmd=LBC_REQUEST_NEW;
+            // if we've rotated through the hunt, use the hunttime, otherwise use slottime
+            if (hunt_rotate) {
+               timeout=hunttime*1000;      // idle time to wait for next go around
+            } else {
+               timeout=slottime*10;        // idle time to wait for next go around
+            }
+            timeout+=(inittime + RF_COLLECT_DELAY); // add initial time and just a little bit more so the RFmaster can keep up (RFmaster will collect messages for 200ms minimum)
+            // adjust dwait_time to the time to nothing, as we haven't waited anything yet
+            dwait_time.tv_sec=0; dwait_time.tv_nsec=0;
 
-         LB_new->forget_addr=set_forget_bits(low,high_dev,addr_pool,max_addr);  // tell everybody to forget
-         LB_new->low_dev=low;
-         LB_new->inittime=inittime/5;   // adjust to 5ms granularity
-         LB_new->slottime=slottime/5;   // adjust to 5ms granularity
+            DDCMSG(D_RF,RED,"MCP:  Build a LB request new devices messages. timeout=%d slave_hunting=%d low=%x hunttime=%d, dwait=%5ld.%09ld",timeout,slave_hunting,low,hunttime, dwait_time.tv_sec, dwait_time.tv_nsec);
+            /***  we need to use the range we were invoked with
+             ***  we need to handle a range greater than 32
+             ***  the forget_addr needs to be set by looking at the addr_pool
+             ***     call a function to get the forget bits - so we can reduce code clutter
+             ***  */
 
-         // calculates the correct CRC and adds it to the end of the packet payload
-         // also fills in the length field
-         set_crc8(LB_new);
-         // now send it to the RF master
-         result=write(RF_sock,LB_new,RF_size(LB_new->cmd));
-         if (verbose&D_RF){     // don't do the sprintf if we don't need to
-            sprintf(hbuf,"MCP: sent %d (%d) bytes  LB request_newdev  ",result,RF_size(LB_new->cmd));
-            DDCMSG_HEXB(D_RF,YELLOW,hbuf,LB_new, RF_size(LB_new->cmd));
+            //   for now the request new devices will just use payload len=0
+            LB_new=(LB_request_new_t *) &LB_buf;
+            LB_new->cmd=LBC_REQUEST_NEW;
+
+            LB_new->forget_addr=set_forget_bits(low,high_dev,addr_pool,max_addr);  // tell everybody to forget
+            LB_new->low_dev=low;
+            LB_new->inittime=inittime/5;   // adjust to 5ms granularity
+            LB_new->slottime=slottime/5;   // adjust to 5ms granularity
+
+            // calculates the correct CRC and adds it to the end of the packet payload
+            // also fills in the length field
+            set_crc8(LB_new);
+            // now send it to the RF master
+            result=write(RF_sock,LB_new,RF_size(LB_new->cmd));
+            if (verbose&D_RF){     // don't do the sprintf if we don't need to
+               sprintf(hbuf,"MCP: sent %d (%d) bytes  LB request_newdev  ",result,RF_size(LB_new->cmd));
+               DDCMSG_HEXB(D_RF,YELLOW,hbuf,LB_new, RF_size(LB_new->cmd));
+            }
          }
       } else { // we have some fd's ready
          // check for ready minions or RF
@@ -471,6 +661,10 @@ int main(int argc, char **argv) {
 
                   DDCMSG(D_RF,YELLOW,"MCP: RFslave sent LB_DEVICE_REG packet.   devtype=%d devid=0x%06x"
                          ,LB_devreg->dev_type,LB_devreg->devid);
+                  if (send_mode) {
+                     wait_devices--;
+                     continue; // move on to next ready fd
+                  }
 
                   /***
                    ***   AFTER CHECKING if we already have a minion for this devid slave
@@ -739,7 +933,35 @@ int main(int argc, char **argv) {
                   DDCMSG(D_RF,RED,"MCP: regX Sent %d bytes to RF fd=%d",result,RF_sock);
 
                   // done handling the device_reg packet
-               } else { // it is any other command than dev regx
+               } else if (LB->cmd == LBC_DATA_NACK) { // it is a data nack
+                  LB_data_nack_t *dn = (LB_data_nack_t*)LB;
+                  DCMSG(CYAN, "Found a nack for file transfer");
+                  DDpacket((void*)dn, RF_size(dn->cmd));
+                  int ic;
+                  if (sent_finishes > 0) {
+                     sent_finishes = 0; // reset how many sent messages we have sent, as we'll need to start over
+                     if (chunk_resends == NULL) {
+                        chunk_resends = realloc(chunk_resends, sizeof(int) * num_devices);
+                     } else {
+                        chunk_resends = malloc(sizeof(int) * num_devices);
+                     }
+                     // nothing seen yet, set them all as invalid
+                     chunk_resends_count = 0;
+                     for (ic = 0; ic < num_devices; ic++) {
+                        chunk_resends[ic] = -1;
+                     }
+                  }
+                  for (ic = 0; ic < chunk_resends_count; ic++) {
+                     if (chunk_resends[ic] == dn->chunk) {
+                        break; // found it, so we'll skip out of our loop and not count it towards our total
+                     }
+                  }
+                  if (ic >= chunk_resends_count && ic < num_devices) {
+                     // didn't find a match, set this chunk as missed
+                     chunk_resends[ic] = dn->chunk;
+                     chunk_resends_count++;
+                  }
+               } else { // it is any other command than device register or data nack
                   // which means we just copy it on to the minion so it can process it
 
                   ////   There WAS/is? a bug here where we (the MCP) was sending the packet to the wrong minion

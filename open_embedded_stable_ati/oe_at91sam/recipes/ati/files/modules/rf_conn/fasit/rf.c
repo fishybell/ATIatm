@@ -101,15 +101,15 @@ void ReQueue(queue_t *Mdst,queue_t *Msrc,int count){
 int __ptype(int cmd) {
    switch (cmd) {
       case LBC_ILLEGAL: return 0;
-      case LBC_REQUEST_NEW: return 1;
-      case LBC_STATUS_REQ: return 2;
+      case LBC_REQUEST_NEW: return 1; // message expects many respsonses
+      case LBC_STATUS_REQ: return 2; // message expects 1 response
       case LB_CONTROL_QUEUE:
       case LB_CONTROL_SENT:
       case LB_CONTROL_REMOVED:
-         return 4;
+         return 4; // control messages
       case LBC_QUICK_GROUP:
       case LBC_QUICK_GROUP_BIG:
-         return 5;
+         return 5; // group messages
       case LBC_CONFIGURE_HIT:
       case LBC_HIT_BLANKING:
       case LBC_ACCESSORY:
@@ -118,8 +118,10 @@ int __ptype(int cmd) {
       case LBC_EXPOSE:
       case LBC_MOVE:
       case LBC_ASSIGN_ADDR:
-         return 6;
-      default: return 3;
+      case LBC_RESET:
+      case LBC_DATA_START:
+         return 6; // repeat these messages
+      default: return 3; // standard message, sent once
    }
 }
 
@@ -201,6 +203,7 @@ int RF_size(int cmd){
       case  LB_CONTROL_QUEUE:
       case  LB_CONTROL_SENT:
       case  LB_CONTROL_REMOVED:
+      case  LBC_DATA_FINISH:
          return (5);
 
       case  LBC_AUDIO_CONTROL:
@@ -219,13 +222,20 @@ int RF_size(int cmd){
          return (8);
 
       case  LBC_STATUS_RESP:
+      case  LBC_DATA_NACK:
          return (11);
 
       case  LBC_DEVICE_REG:
          return (13);
 
+      case  LBC_DATA_START:
+         return (63);
+
       case  LBC_QUICK_GROUP:
          return (65);
+
+      case  LBC_DATA_CHUNK:
+         return (CHUNK_SIZE + 24);
 
       case  LBC_QUICK_GROUP_BIG:
          return (165);
@@ -482,6 +492,45 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
             LB_control_removed_t *L=(LB_control_removed_t *)LB;
             strcpy(cmdname,"Control*Removed");
             sprintf(hbuf,"RFaddr=%3d sequence:%i",L->addr,L->sequence);
+         }
+         break;
+
+         case LBC_DATA_START:
+         {
+            LB_data_start_t *L=(LB_data_start_t *)LB;
+            char _name[41];
+            unsigned int _md5sum[4];
+            memcpy(_name, L->name, 40);
+            _name[40] = '\0';
+            memcpy(_md5sum, L->md5sum, 16);
+            strcpy(cmdname,"Data*Start");
+            sprintf(hbuf,"execute=%i reboot=%i id=%d name=%s md5sum=%08x%08x%08x%08x size=%i", L->execute, L->reboot, L->id, _name, _md5sum[0], _md5sum[1], _md5sum[2], _md5sum[3], L->size);
+         }
+         break;
+
+         case LBC_DATA_CHUNK:
+         {
+            LB_data_chunk_t *L=(LB_data_chunk_t *)LB;
+            unsigned int _md5sum[4];
+            memcpy(_md5sum, L->md5sum, 16);
+            strcpy(cmdname,"Data*Chunk");
+            sprintf(hbuf,"id=%d md5sum=%08x%08x%08x%08x chunk=%i size=%i", L->id, _md5sum[0], _md5sum[1], _md5sum[2], _md5sum[3], L->chunk, L->size);
+         }
+         break;
+
+         case LBC_DATA_NACK:
+         {
+            LB_data_nack_t *L=(LB_data_nack_t *)LB;
+            strcpy(cmdname,"Data*Nack");
+            sprintf(hbuf,"id=% devid=%3x chunk=%i", L->id, L->devid, L->chunk);
+         }
+         break;
+
+         case LBC_DATA_FINISH:
+         {
+            LB_data_nack_t *L=(LB_data_nack_t *)LB;
+            strcpy(cmdname,"Data*Nack");
+            sprintf(hbuf,"id=%i", L->id);
          }
          break;
 

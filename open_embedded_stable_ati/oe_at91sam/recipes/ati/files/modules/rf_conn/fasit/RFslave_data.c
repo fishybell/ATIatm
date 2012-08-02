@@ -1,6 +1,9 @@
+#include <sys/stat.h>
 #include "mcp.h"
 #include "rf_debug.h"
 #include "RFslave.h"
+
+size_t strnlen(const char *s, size_t maxlen);	// make the compiler happier
 
 extern struct timespec start_time; // global timers
 extern minion_time_t mt;
@@ -87,6 +90,9 @@ static int validMessage(rf_connection_t *rc, int *start, int *end, int tty) {
          case LBC_QCONCEAL:
          case LBC_EVENT_REPORT:
          case LBC_REQUEST_NEW:
+         case LBC_DATA_START:
+         case LBC_DATA_CHUNK:
+         case LBC_DATA_NACK:
             if (crc8(hdr) == 0) {
                DDCMSG(D_RF, tty ? cyan : blue, "%s VALID CRC", tty ? "TTY" : "SOCKET");
                return hdr->cmd;
@@ -706,6 +712,60 @@ int tty2sock(rf_connection_t *rc) {
          t2s_HANDLE_RF (REQUEST_NEW); // keep track of devids
          t2s_HANDLE_RF (ASSIGN_ADDR); // keep track of ids? no
          t2s_HANDLE_RF (RESET); // keep track of ids? no
+         case LBC_DATA_NACK: {
+            // if we heard someone else nack the same chunk I'm missing, there's no need for me to nack
+            LB_data_nack_t *dn = (LB_data_nack_t*)(rc->tty_ibuf + start);
+            if (dn->id == rc->file_id && rc->file_chunks_seen != NULL) {
+               if (rc->file_chunks_seen[dn->chunk] == 2) { // 
+               }
+            }
+         } break;
+         case LBC_DATA_START: {
+            struct stat sbuf;
+            LB_data_start_t *ds = (LB_data_start_t*)(rc->tty_ibuf + start);
+            // check if we've already seen this
+            if (ds->id == rc->file_id) {
+               // same id = same file
+               break;
+            }
+            // check against last.transferred file to see if we've already received this file
+            if (stat(LAST_DATA, &sbuf) == 0) {
+               // file exists, check contents
+               char lt_data[256], lt_name[256]; // should both be much less, but better safer than sorry
+               int lt_fd = open(LAST_DATA, O_RDONLY);
+               if (lt_fd != -1) {
+                  unsigned int t_md5[4];
+                  read(lt_fd, lt_data, 256);
+                  close(lt_fd);
+
+                  sscanf(lt_data, "%x %x %x %x %s", &t_md5[0], &t_md5[1], &t_md5[2], &t_md5[3], lt_name);
+                  if (strncmp(lt_name, ds->name, strnlen(lt_name, 41)) == 0 &&
+                      memcmp(ds->md5sum, t_md5, 16) == 0) {
+                     rc->file_ignore = 1;
+                     break;
+                  }
+               }
+            }
+            // setup file_* variables
+            rc->file_id = ds->id;
+            rc->file_last_id = ds->id;
+            memset(rc->file_name, 0, 41);
+            memcpy(rc->file_name, ds->name, 40);
+            memset(rc->file_md5sum, 0, 16);
+            memcpy(rc->file_md5sum, ds->md5sum, 16);
+            rc->file_execute = ds->execute;
+            rc->file_reboot = ds->reboot;
+            rc->file_size = ds->size;
+            if (rc->file_chunks_seen != NULL) {
+               rc->file_chunks_seen = realloc(rc->file_chunks_seen, sizeof(int) * rc->file_size);
+            } else {
+               rc->file_chunks_seen = malloc(sizeof(int) * rc->file_size);
+            }
+            memset(rc->file_chunks_seen, 0, sizeof(int) * rc->file_size);
+         } break;
+         case LBC_DATA_CHUNK: {
+            // TODO -- process chunk of data into file if I haven't already correctly received this chunk
+         } break;
          case LBC_BURST: { // keep track of packets
             LB_burst_t *pkt = (LB_burst_t *)(rc->tty_ibuf + start);
             rc->packets = pkt->number;

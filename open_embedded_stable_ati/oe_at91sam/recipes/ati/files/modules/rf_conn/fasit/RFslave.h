@@ -15,6 +15,8 @@
 
 #define INFINITE -1
 
+#define LAST_DATA "/home/root/last.transferred"
+
 typedef struct rfpair {
    int parent;
    int child;
@@ -59,6 +61,22 @@ typedef struct rf_connection {
    int last_sequence; // the last sequence received from an LBC_BURST packet
    int last_number; // the last number ....
    int ignoring; // 1 = the last sequence/number combo is a repeat, ignoring, 0 = not ignoring
+
+   // file transfer stuff
+   int file_id; // id we're watching for (one I've seen a START packet for)
+   int file_last_id; // id # of last chunk received
+   char file_name[41];
+   unsigned int file_md5sum[4];
+   int file_execute;
+   int file_reboot;
+   int file_size; // size, in chunks, of the final final file (and of file_chunks_seen array)
+   int *file_chunks_seen; // list of which chunks I've seen (allocated only when we start transfer)
+                          // 0 = have not seen this chunk
+                          // 1 = received correctly
+                          // 2 = receive failed, haven't sent nack message
+                          // 3 = receive failed, have sent nack message
+   int file_last_chunk; // the number of the last chunk seen
+   int file_ignore; // ignore the file chunks for this id, or use them
 } rf_connection_t;
 
 extern int verbose;

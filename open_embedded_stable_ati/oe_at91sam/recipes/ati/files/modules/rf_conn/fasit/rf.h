@@ -122,6 +122,7 @@ void print_verbosity_bits(void);
 
 #define LBC_RESET                       12
 
+                                     /* 14 ... defined below */
 #define LBC_QUICK_GROUP                 15 /* automatically created group for repeat messages to multiple targets */
 #define LBC_QEXPOSE                     16
 #define LBC_QCONCEAL                    17
@@ -131,6 +132,11 @@ void print_verbosity_bits(void);
 
 #define LBC_EVENT_REPORT                20
 #define LBC_REPORT_ACK                  21
+
+#define LBC_DATA_START                  22 /* has metadata on file to be transferred */
+#define LBC_DATA_CHUNK                  23 /* has a chunk of data to be transferred */
+#define LBC_DATA_NACK                   24 /* a client didn't get a chunk of data correctly */
+#define LBC_DATA_FINISH                 14 /* the server is finished sending, and either expects nacks or the devices to execute/reboot/finish */
 
 #define LBC_BURST                   25
 
@@ -388,6 +394,66 @@ typedef struct LB_report_ack {
    uint32 padding:8 __attribute__ ((packed));
 
 } __attribute__ ((packed))  LB_report_ack_t;
+
+//                                                  LBC_DATA_START packet
+//   LBC_DATA_START packet
+typedef struct LB_data_start {
+   // 63 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 execute:1 __attribute__ ((packed)); // execute the copied file after verification
+   uint32 reboot:1 __attribute__ ((packed)); // reboot after verification
+   uint32 id:25 __attribute__ ((packed)); // random id for this file transfer
+
+   uint8 name[40]; // full path name of destination file
+   uint8 md5sum[16]; // md5sum of final file
+   uint32 size:16 __attribute ((packed)); // number of CHUNK_SIZE byte chunks that will be sent (max of 65535 chunks, so 12.5mb)
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 padding:8 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_data_start_t;
+
+#define CHUNK_SIZE 210
+//                                                  LBC_DATA_CHUNK packet
+//   LBC_DATA_CHUNK packet
+typedef struct LB_data_chunk {
+   // CHUNK_SIZE + 24 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 padding:2 __attribute__ ((packed));
+   uint32 id:25 __attribute__ ((packed)); // random id for this file transfer (same as in LBC_DATA_START)
+
+   uint8 data[CHUNK_SIZE];
+   uint8 md5sum[16]; // md5sum of this chunk
+   uint32 chunk:16 __attribute ((packed)); // amount of actual data in this CHUNK_SIZE byte chunk
+   uint32 size:8 __attribute ((packed)); // amount of actual data in this CHUNK_SIZE byte chunk
+   uint32 crc:8 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_data_chunk_t;
+
+//                                                  LBC_DATA_NACK packet
+//   LBC_DATA_NACK packet
+typedef struct LB_data_nack {
+   // 11 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 padding:2 __attribute__ ((packed));
+   uint32 id:25 __attribute__ ((packed)); // random id for this file transfer (same as in LBC_DATA_START)
+
+   uint32 devid:24 __attribute__ ((packed)); // so we can look in a data dump and see exactly which target didn't receive the data
+   uint32 padding2:8 __attribute__ ((packed));
+
+   uint32 chunk:16 __attribute ((packed)); // which chunk it last received correctly (or 0 if didn't hear START)
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 pad:8 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_data_nack_t;
+
+//                                                  LBC_DATA_FINISH packet
+//   LBC_DATA_FINISH packet
+typedef struct LB_data_finish {
+   // 5 bytes
+   uint32 cmd:5 __attribute__ ((packed));
+   uint32 padding:2 __attribute__ ((packed));
+   uint32 id:25 __attribute__ ((packed)); // random id for this file transfer (same as in LBC_DATA_START)
+
+   uint32 crc:8 __attribute__ ((packed));
+   uint32 pad:24 __attribute__ ((packed));
+} __attribute__ ((packed))  LB_data_finish_t;
 
 // LBC_MOVE
 //    we still have 4 more bits
