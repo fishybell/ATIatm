@@ -49,7 +49,7 @@ bcast_server: ${EC_DIR}/bcast_server.c ${EC_DIR}/bcast.h
 atifirmware: 
 	date +mver=\"%Y%m%d\" > ../../../ati2/files/be_minor_version
 	cat ../../../ati2/files/make_minor_version >> ../../../ati2/files/be_minor_version
-	tar -cvzf atifirmware.tar --exclude=be_major_version *.ko *.arm ${BFILES} \
+	tar -cvjf atifirmware.tar --exclude=be_major_version *.ko *.arm ${BFILES} \
 			../../../ati2/files/be_* \
 			../../../ati2/files/has_* \
 			../../../ati2/files/is_* \

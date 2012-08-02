@@ -13,7 +13,7 @@ THIS=`pwd`/$0
 echo "Extracting Files"
 echo ""
 
-tail -n +$SKIP $THIS | tar -xz
+tail -n +$SKIP $THIS | tar -xj
 
 echo "Changing Owner and Group"
 echo ""
