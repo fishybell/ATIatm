@@ -374,7 +374,7 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
             client = accept(listener, (struct sockaddr *) &local,
                         &addrlen);
             IMSG("Accepted new client %i\n", client)
-            if(client <= 0){
+            if(client < 0){
                perror("accept");
                continue;
             }
