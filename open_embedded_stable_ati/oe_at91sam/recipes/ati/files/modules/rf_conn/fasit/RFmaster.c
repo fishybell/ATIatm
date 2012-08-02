@@ -1476,6 +1476,22 @@ int main(int argc, char **argv) {
       DieWithError("socketpair() failed");
    }
 
+    // turn power to high for the radio A/B pin
+    RFfd=open("/sys/class/gpio/export",O_WRONLY,"w");
+    write(RFfd,"39",1);
+    close(RFfd);
+    RFfd=open("/sys/class/gpio/gpio39/direction",O_WRONLY,"w");
+    write(RFfd,"out",3);
+    close(RFfd);
+    RFfd=open("/sys/class/gpio/gpio39/value",O_WRONLY,"w");
+    write(RFfd,"1",1);		// a "0" here would turn on low power
+    close(RFfd);
+    RFfd=open("/sys/class/gpio/unexport",O_WRONLY,"w");
+    write(RFfd,"39",1);		// this lets any kernel modules use the pin from now on
+    close(RFfd);
+    
+    DCMSG(YELLOW,"A/B set for High power.\n");
+
    //   fork child process for reading, and leave parent for writing, or have single process do both
    if (child) {
       if ((child = fork()) == -1) {

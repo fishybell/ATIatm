@@ -277,7 +277,7 @@ int main(int argc, char **argv) {
    setnonblocking(rc.sock, 1); // socket first time
    DDCMSG(D_MEGA, BLACK,"RFSLAVE: RF socket fd: %i", rc.sock);
 
-    // turn power to low for the radio A/B pin
+    // turn power to high for the radio A/B pin
     rc.tty=open("/sys/class/gpio/export",O_WRONLY,"w");
     write(rc.tty,"39",1);
     close(rc.tty);
@@ -285,13 +285,13 @@ int main(int argc, char **argv) {
     write(rc.tty,"out",3);
     close(rc.tty);
     rc.tty=open("/sys/class/gpio/gpio39/value",O_WRONLY,"w");
-    write(rc.tty,"0",1);		// a "1" here would turn on high power
+    write(rc.tty,"1",1);		// a "0" here would turn on low power
     close(rc.tty);
     rc.tty=open("/sys/class/gpio/unexport",O_WRONLY,"w");
     write(rc.tty,"39",1);		// this lets any kernel modules use the pin from now on
     close(rc.tty);
     
-    DCMSG(YELLOW,"A/B set for Low power.\n");
+    DCMSG(YELLOW,"A/B set for High power.\n");
     // open tty and setup the serial device
    rc.tty=open_port(ttyport, 4|2|0x10); // bits 4 (IGNBRK | IGNCR), 2 (blocking), and 9 (write-only) on
 
