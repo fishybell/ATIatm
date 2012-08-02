@@ -10,15 +10,18 @@ SYSROOT=$(OE)/tmp/staging/armv5te-angstrom-linux-gnueabi
 XGCC = $(OE)/tmp/cross/armv5te/bin/arm-angstrom-linux-gnueabi-gcc
 
 HFILES = mcp.h fasit_c.h rf.h colors.h
-MCFILES = serial.c timestamp.c htonll.c rf.c
+MCFILES = serial.c timestamp.c htonll.c rf.c md5sum.c
 
 
 
 #default: mcp RFmaster RFmaster.arm RFslave RFslave.arm RFdump RFdump.arm
-default: qtest mcp RFmaster RFmaster.arm RFdump RFdump.arm RFslave.new RFslave.new.arm slaveboss.arm
+default: test_md5sum qtest mcp RFmaster RFmaster.arm RFdump RFdump.arm RFslave.new RFslave.new.arm slaveboss.arm
 
 qtest : qtest.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o qtest qtest.c $(MCFILES)
+
+test_md5sum : test_md5sum.c md5sum.c
+	gcc -lrt -std=gnu99 -o test_md5sum test_md5sum.c md5sum.c
 
 mcp : mcp.c minion_state.c minion.c $(HFILES) $(MCFILES)
 	gcc -lrt -std=gnu99 -o mcp mcp.c minion_state.c minion.c $(MCFILES)
