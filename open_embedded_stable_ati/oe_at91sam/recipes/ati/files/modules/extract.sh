@@ -42,19 +42,27 @@ mv /usr/bin/fasit_conn /usr/bin/fasit_conn.old
 mv fasit_conn /usr/bin
 mv /usr/bin/user_conn /usr/bin/user_conn.old
 mv user_conn /usr/bin
+mv ati2/files/interfaces /etc/network
 mv ati2/files/* /usr/bin
 mv sysvinit/sysvinit/inittab /etc
 
 echo "Finished Copying Files"
 echo ""
 
-#if [ "$(eeprom_rw read -addr 0x550 -size 3)" -lt 200 ] ; then
+#if [ "$(eeprom_rw read -addr 0x550 -size 3)" -lt 240 ] ; then
 #   echo "Changing radio to maximum awesomeness"
 #   echo ""
 #
+#   echo "140.000" | eeprom_rw write -addr 0x500 -size 8 -blank 0x40
 #   echo "255" | eeprom_rw write -addr 0x550 -size 3 -blank 4
 #   echo "255" | eeprom_rw write -addr 0x554 -size 3 -blank 4
 #   echo "25" | eeprom_rw write -addr 0x558 -size 2 -blank 2
+#fi
+
+#if [ "$(is_board)" == "SIT" ] ; then
+#   echo "Fixing SIT locality"
+#   be_local
+#   echo -n "auto" | /usr/bin/eeprom_rw write -addr 0xC0 -size 5 -blank 0x3F
 #fi
 
 echo "Restarting Device"
