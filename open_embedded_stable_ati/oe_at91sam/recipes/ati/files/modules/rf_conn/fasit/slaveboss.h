@@ -77,6 +77,7 @@ typedef struct fasit_connection {
    int has_MFS;
    int last_mfs;
    int last_mfs_s; // remember single of burst mode
+   int last_2102_hit; // remember what our last hit value that we counted was
    int mfsSDelay;
    int mfsRDelay;
    FASIT_2005 f2005_resp;
