@@ -67,6 +67,7 @@ atifirmware:
 			../../../ati2/files/BASE \
 			../../../ati2/files/HHC \
 			../../../ati2/files/TTMT \
+			../../../ati2/files/interfaces \
 			../../../ati2/files/atiradiotest.sh \
 			../../../sysvinit/sysvinit/inittab
 	cat extract.sh atifirmware.tar > atifirmware.sh
