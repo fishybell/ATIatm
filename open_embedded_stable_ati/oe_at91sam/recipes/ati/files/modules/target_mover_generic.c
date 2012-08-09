@@ -38,11 +38,11 @@
 
 #ifdef DEBUG_PRINT
 #define DELAY_PRINTK  delay_printk
+static void sendUserConnMsg( char *fmt, ...);
 #else
 #define DELAY_PRINTK(...)  //
 #endif
 
-static void sendUserConnMsg( char *fmt, ...);
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ static int dock_loc = 2; // 0 = home end of track, 1 = end away from home, 2 = n
 // This is for the "Home" location, where everything starts from.
 // This may or may not be the same place as the dock
 static int home_loc = 0; // 0 = home end of track, 1 = end away from home
-static int track_len = 5; // default to 10 meters
+static int track_len = 10; // default to 10 meters
 module_param(mover_type, int, S_IRUGO);
 module_param(dock_loc, int, S_IRUGO);
 module_param(home_loc, int, S_IRUGO);
@@ -77,6 +77,8 @@ static int CONTINUE_ON[] = {2,1,2,2,0}; // leg = 1, quad = 2, both = 3, neither 
 static int TIMEOUT_IN_MSECONDS[] = {1000,12000,1000,1000,0};
 static int MOVER_DELAY_MULT[] = {6,2,6,6,0};
 
+static int DOCK_RETRY_COUNT[] = {5, 20, 5, 5, 0};
+
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
 #define MOVER_POSITION_END			2
@@ -92,7 +94,7 @@ static int MOVER_DELAY_MULT[] = {6,2,6,6,0};
 #define MOVER_SENSOR_DOCK  3
 
 #define MOVER_SPEED_SELECTIONS  5
-static int MIT_SPEEDS[] = {0,7,15,23,33,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
+// not used? -- static int MIT_SPEEDS[] = {0,7,15,23,33,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 // the maximum allowed speed ticks
 //static int NUMBER_OF_SPEEDS[] = {10,20,10,10,0};
 static int NUMBER_OF_SPEEDS[] = {100,200,200,200,0};
@@ -104,14 +106,14 @@ static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0};
 
 // the parameters needed for PID speed control
 // old method
-static int PID_HZ[]        = {20,32767,20,20,1};
-static int PID_DELTA_T[]   = {50,10,50,50,1}; // inversely proportial to HZ (ie 100 dt = 1000 ms / 100 hz)
-static int PID_GAIN_MULT[] = {10,1000,1,1,0}; // proportional gain numerator
-static int PID_GAIN_DIV[]  = {275,1000,15,15,1}; // proportional gain denominator
-static int PID_TI_MULT[]   = {25,1,2500,2500,1}; // time integral numerator
-static int PID_TI_DIV[]    = {1,1,1,1,1}; // time integral denominator
-static int PID_TD_MULT[]   = {1,1,2,1,1}; // time derivitive numerator
-static int PID_TD_DIV[]    = {10,1,1,1,1}; // time derivitive denominator
+// not used? -- static int PID_HZ[]        = {20,32767,20,20,1};
+// not used? -- static int PID_DELTA_T[]   = {50,10,50,50,1}; // inversely proportial to HZ (ie 100 dt = 1000 ms / 100 hz)
+// not used? -- static int PID_GAIN_MULT[] = {10,1000,1,1,0}; // proportional gain numerator
+// not used? -- static int PID_GAIN_DIV[]  = {275,1000,15,15,1}; // proportional gain denominator
+// not used? -- static int PID_TI_MULT[]   = {25,1,2500,2500,1}; // time integral numerator
+// not used? -- static int PID_TI_DIV[]    = {1,1,1,1,1}; // time integral denominator
+// not used? -- static int PID_TD_MULT[]   = {1,1,2,1,1}; // time derivitive numerator
+// not used? -- static int PID_TD_DIV[]    = {10,1,1,1,1}; // time derivitive denominator
 // end old method
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- standard
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- standard
@@ -134,9 +136,9 @@ static int MIN_EFFORT[]    = {1000, 1000, 1000, 1000, 0}; // minimum effort give
 #else
 static int MIN_EFFORT[]    = {115, 175, 1, 1, 0}; // minimum effort given to ensure motor moves
 #endif
-static int SPEED_AFTER[]   = {1, 3, 1, 1, 0}; // clamp effort if we hit this many correct values in a row
-static int SPEED_CHANGE[]  = {40, 30, 40, 1, 0}; // unclamp if the error is bigger than this
-static int ADJUST_PID_P[]  = {0, 0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
+// not used? -- static int SPEED_AFTER[]   = {1, 3, 1, 1, 0}; // clamp effort if we hit this many correct values in a row
+// not used? -- static int SPEED_CHANGE[]  = {40, 30, 40, 1, 0}; // unclamp if the error is bigger than this
+// not used? -- static int ADJUST_PID_P[]  = {0, 0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
 static int MAX_ACCEL[]     = {500, 1000, 1000, 1000, 0}; // maximum effort change in one step
 static int MAX_DECCEL[]     = {500, 1000, 1000, 1000, 0}; // maximum effort change in one step
 
@@ -182,13 +184,13 @@ static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,0};		// channel 0 matches TIOA0 to TIO
 static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
 static int ENC_PER_REV[] = {2, 360, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
 static int VELO_K[] = {1680, 1344, 1680, 1680, 0}; // rpm/mph*10
-static int INCHES_PER_TICK[] = {628, 786, 628, 628, 0}; // 5:1 ratio 10 inch, 2:1 ratio 5 inch, etc.
+static int INCHES_PER_REV[] = {628, 786, 628, 628, 0}; // 5:1 ratio 10 inch, 2:1 ratio 5 inch, etc. = inches per revolution
 static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 0}; // 5:1 ratio 10 inch wheel 6 ft leg, 2:1 ratio 5 inch wheel 6 ft leg, etc.
 #define TICKS_DIV 100
 
 // to keep updates to the file system in check somewhat
-#define POSITION_DELAY_IN_MSECONDS	200
-#define VELOCITY_DELAY_IN_MSECONDS	200
+#define POSITION_DELAY_IN_MSECONDS	500
+#define VELOCITY_DELAY_IN_MSECONDS	500
 #define DOCK_TIMEOUT_IN_MILLISECONDS 200
 #define SPEED_TIMEOUT_IN_MILLISECONDS 2000
 #define PID_TIMEOUT_IN_MILLISECONDS 1000
@@ -302,7 +304,9 @@ atomic_t driver_id = ATOMIC_INIT(-1);
 // Forward definition of pid function
 //---------------------------------------------------------------------------
 static void pid_step(void); 
+#if 0 /* new method not yet used */
 static void pid_step1(void); 
+#endif
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to indicate that we are awake/asleep
@@ -722,7 +726,8 @@ static int hardware_motor_off(void)
 
 static void setPidSettings(int new_speed)
 {
-   int Ku = 0, Pu = 1000, Kp = 0, Tu = 100;
+   int Ku = 0, Kp = 0, Tu = 100;
+   // not used? -- int Pu = 1000;
     if (mover_type == IS_MAT) { // MAT
       Ku = new_speed;
 //      Kp = Ku * 10 / 6; //Classic
@@ -852,7 +857,7 @@ static int hardware_movement_stop(int stop_timer)
     return 0;
     }
 
-static int mover_speed_stop() {
+static int mover_speed_stop(void) {
    SENDUSERCONNMSG( "randy mover_speed_stop");
     do_event(EVENT_STOP); // started stopping
     atomic_set(&goal_atomic, 0); // reset goal speed
@@ -1008,6 +1013,7 @@ static void dock_timeout_start(int ms)
    if (ms <= 0) ms = DOCK_TIMEOUT_IN_MILLISECONDS;
 	mod_timer(&dock_timeout_list, jiffies+(ms*HZ/1000));
    SENDUSERCONNMSG( "randy dock_timeout_start,%i" ,ms);
+   timeout_timer_start(ms/1000); // reset timeout timer so we don't go all "oh no! I'm not moving" while I'm still trying to dock
 	}
 
 //---------------------------------------------------------------------------
@@ -1041,7 +1047,7 @@ static void dock_timeout_fire(unsigned long data)
                ){
             mover_find_dock();
          } else {
-            dock_timeout_start(60000);
+            dock_timeout_start(5000);
          }
        }
     } else if (dock_loc == 1){ // Dock at right
@@ -1053,7 +1059,7 @@ static void dock_timeout_fire(unsigned long data)
                ){
             mover_find_dock();
          } else {
-            dock_timeout_start(60000);
+            dock_timeout_start(5000);
          }
        }
     } else {
@@ -1064,10 +1070,13 @@ static void dock_timeout_fire(unsigned long data)
 static void speed_timeout_start(int ms, int speed)
 	{
 	   if (speed != 0){
-   	      if (ms <= 0) ms = SPEED_TIMEOUT_IN_MILLISECONDS;
+   	      if (ms <= 0) {
+               ms = min(TIMEOUT_IN_MSECONDS[mover_type], SPEED_TIMEOUT_IN_MILLISECONDS); // move again before our "no movement detected" timeout fires
+            }
 	      mod_timer(&speed_timeout_list, jiffies+(ms*HZ/1000));
    	      SENDUSERCONNMSG( "randy speed_timeout_start,%i" ,ms);
 	      atomic_set(&timeout_speed, speed);
+         timeout_timer_start(1); // reset timeout timer so we don't go all "oh no! I'm not moving" while I'm still trying to start moving
 	   }
 	}
 
@@ -1305,7 +1314,8 @@ irqreturn_t leg_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
 //---------------------------------------------------------------------------
 irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
     {
-    u32 status, rb, cv, this_t; //, dn1, dn2;
+    u32 status, this_t; //, dn1, dn2;
+    // not used? -- u32 rb, cv;
     int dn1, dn2, oc;
     if (!atomic_read(&full_init))
         {
@@ -1432,7 +1442,7 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
     mover_speed_stop();
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
-    dock_timeout_start(5000);
+    dock_timeout_start(1500);
 
     return IRQ_HANDLED;
     }
@@ -1472,7 +1482,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     mover_speed_stop();
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
-    dock_timeout_start(5000);
+    dock_timeout_start(1500);
 
     return IRQ_HANDLED;
     }
@@ -1498,9 +1508,9 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
        enable_battery_check(1);
        battery_check_is_docked(1);
        if (dock_loc == 0) { // Dock at left
-          atomic_set(&position, -12);
+          atomic_set(&position, -12); // convert from meters to ticks
        } else { // Dock at right
-          atomic_set(&position, (track_len+1) * 12);
+          atomic_set(&position, (track_len+1) * 12); // convert from meters to ticks
        }
     } else {
        // Not on dock
@@ -2150,6 +2160,7 @@ static int calcPidError( int new, int input){
     return pidError;
 }
 
+#if 0 /* not used? */
 static int calcTargetRatio( int input, int new){
    int rtnVal = 0;
    int ratio = input * 100;
@@ -2184,6 +2195,7 @@ static int calcTargetRatio( int input, int new){
 
    return rtnVal;
 }
+#endif
 
 //---------------------------------------------------------------------------
 // Get/set functions for external control from within kernel
@@ -2329,7 +2341,7 @@ extern int mover_position_get() {
     if (TICKS_DIV <= 0 || ENC_PER_REV[mover_type] <= 0) {
        return 0; // bad data, return 0
     }
-    return ((INCHES_PER_TICK[mover_type]*pos)/(ENC_PER_REV[mover_type]*TICKS_DIV))/12; // inches to feet
+    return ((INCHES_PER_REV[mover_type]*pos)/(ENC_PER_REV[mover_type]*TICKS_DIV))/12; // inches to feet
 }
 EXPORT_SYMBOL(mover_position_get);
 
@@ -2344,7 +2356,7 @@ int isMoverAtDock(void){
 void mover_find_dock(void) {
 
    SENDUSERCONNMSG( "randy mover_find_dock,%i" ,atomic_read(&dockTryCount));
-   if (isMoverAtDock() != 0 || atomic_read(&dockTryCount) > 5) {
+   if (isMoverAtDock() != 0 || atomic_read(&dockTryCount) > DOCK_RETRY_COUNT[mover_type]) {
       return;
    } // At the dock already
    if (mover_type == IS_MAT || mover_type == IS_MIT){
@@ -2352,10 +2364,10 @@ void mover_find_dock(void) {
       atomic_inc(&dockTryCount);
       if (dock_loc == 1) { // Dock at end away from home
          mover_speed_set(1); // Go Slow
-         dock_timeout_start(60000);
+         dock_timeout_start(5000);
       } else if (dock_loc == 0) { // Dock at home end
          mover_speed_set(-1); // Go Slow
-         dock_timeout_start(60000);
+         dock_timeout_start(5000);
       } else {
          atomic_set(&find_dock_atomic, 0); // No dock, stop looking
       }
@@ -3027,10 +3039,12 @@ static void movement_change(struct work_struct * work)
     target_sysfs_notify(&target_device_mover_generic, "movement");
     }
 
+#ifdef DEBUG_PRINT
 void sendUserConnMsg( char *fmt, ...){
     va_list ap;
+    char *msg;
     va_start(ap, fmt);
-     char *msg = kmalloc(256, GFP_KERNEL);
+     msg = kmalloc(256, GFP_KERNEL);
      if (msg){
          vsnprintf(msg, 256, fmt, ap);
          DELAY_PRINTK(msg);
@@ -3039,14 +3053,18 @@ void sendUserConnMsg( char *fmt, ...){
      }
    va_end(ap);
 }
+#endif
 
 // new method
 static void pid_step() {
     int new_speed=1, input_speed=0, error_sum=0, i, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
-   int using_ticks, direction, targetRatio, delta;
-   int a, b, c;
+   int using_ticks, direction, delta;
+   // not used? -- targetRatio;
+   // not used? -- int a, b, c;
+#ifdef DEBUG_PRINT
    struct timespec time_now = current_kernel_time();
    struct timespec time_d = timespec_sub(time_now, time_start);
+#endif
 
    SENDUSERCONNMSG( " randy - pid_step");
     // not initialized or exiting?
@@ -3173,14 +3191,19 @@ static void pid_step() {
     spin_unlock(&pid_lock);
 }
 
+#if 0 /* new method not currently used */
 // new method
 static void pid_step1() {
-    int req_vel=1, meas_vel=0, error_sum=0, i, effort=0, pid_p=0, pid_i=0, pid_d=0;
+    int req_vel=1, meas_vel=0, effort=0;
+    // not used? -- int error_sum=0, i, pid_p=0, pid_i=0, pid_d=0;
    int pwm_sig = 0, err_vel=0, base = 0;
-   int using_ticks, direction, targetRatio, delta;
-   int a, b, c;
+   int using_ticks, direction;
+   // not used? -- int targetRatio, delta;
+   // not used? -- int a, b, c;
+#ifdef DEBUG_PRINT
    struct timespec time_now = current_kernel_time();
    struct timespec time_d = timespec_sub(time_now, time_start);
+#endif
 
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
@@ -3238,6 +3261,7 @@ static void pid_step1() {
     // unlock for next time
     spin_unlock(&pid_lock);
 }
+#endif
 
 
 //---------------------------------------------------------------------------
@@ -3245,9 +3269,9 @@ static void pid_step1() {
 //---------------------------------------------------------------------------
 static int __init target_mover_generic_init(void)
     {
-    struct heartbeat_object hb_obj;
-    int d_id;
-    struct nl_driver driver = {&hb_obj, NULL, 0, NULL}; // only heartbeat object
+    // not used? -- struct heartbeat_object hb_obj;
+    // not used? -- int d_id;
+    // not used? -- struct nl_driver driver = {&hb_obj, NULL, 0, NULL}; // only heartbeat object
     int retval;
 
     // for debug
