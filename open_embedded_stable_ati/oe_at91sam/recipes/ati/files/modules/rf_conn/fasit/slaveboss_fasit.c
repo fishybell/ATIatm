@@ -348,7 +348,7 @@ int send_2100_status_req(fasit_connection_t *fc) {
    FASIT_header hdr;
    FASIT_2100 bdy;
    DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_status_req(%08X)", fc);
-   DDCMSG(D_NEW, RED, "send_2100_status_req(%08X)", fc);
+   DCMSG(RED, "send_2100_status_req(%08X)", fc);
    defHeader(fc, 2100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
 
@@ -383,6 +383,7 @@ int send_2100_exposure(fasit_connection_t *fc, int exp) {
    FASIT_header hdr;
    FASIT_2100 bdy;
    DDCMSG(D_PACKET|D_VERY,CYAN, "send_2100_exposure(%8p, %i)", fc, exp);
+   DCMSG(CYAN, "send_2100_exposure(%8p, %i)", fc, exp);
    defHeader(fc, 2100, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2100));
 
@@ -562,7 +563,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    fc->hit_mode = fc->f2102_resp.body.hit_conf.mode;
    fc->hit_burst = htons(fc->f2102_resp.body.hit_conf.burst);
    // check for new hits
-   if (htons(fc->f2102_resp.body.hit) > 0) {
+   if (htons(fc->f2102_resp.body.hit) > 0  && htons(fc->f2102_resp.body.hit) != fc->last_2102_hit) { // only for greater than 0 and not the same as last time
       // log...
       log_NewHits(fc, htons(fc->f2102_resp.body.hit));
       // ...then reset back to fasit client
@@ -574,6 +575,7 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
                                    fc->hit_mode, /* remembered hit mode */
                                    fc->hit_burst); /* remembered hit burst seperation */
    }
+   fc->last_2102_hit = htons(fc->f2102_resp.body.hit);
 
    // remember fault status, but don't clear out existing faults unless there is a new one
    if (htons(fc->f2102_resp.body.fault)) {
