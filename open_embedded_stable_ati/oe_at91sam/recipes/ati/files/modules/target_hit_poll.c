@@ -247,11 +247,10 @@ static void hit_kyle(void) {
 
     // invert if needed
     if (sensors[line].invert) {
-        spin_unlock(&sensors[line].lock);
         in_val = !in_val;
     }
 
-    // we only need transitions
+    // we only need transitions once we're established
     if (in_val == sensors[line].establish_val) {
         spin_unlock(&sensors[line].lock);
         return;
@@ -270,15 +269,15 @@ mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return l
 
     // determine established value
     if (--sensors[line].l_count == 0) { // tests if the new value is 0 or not
-        sensors[line].establish_val = in_val; // set as established
         // was it a hit?
-        if (in_val == 1) {
+        if (sensors[line].establish_val == 0 && in_val == 1) { // was established as low, and now established as high: this means we have a hit
             if (hit_callback == NULL) {
                 delay_printk("K"); // simple print out if no callback set
             } else {
                 hit_callback(line); // the hit sensor polling will wait for this to finish
             }
         } 
+        sensors[line].establish_val = in_val; // set as established
     }
 
     // remember this value as the new last value
