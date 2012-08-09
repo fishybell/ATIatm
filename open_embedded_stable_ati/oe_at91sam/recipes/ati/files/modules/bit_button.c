@@ -305,7 +305,7 @@ void handle_bit_test_long_mover_right(struct nl_handle *handle, int is_on) {
     // Step 15  - Move @ 3 mph
     // Step 16 - Wait for stopped
     const char *scen = "\
-     {Send;R_MOVER;NL_C_MOVE;1;EA7F} \
+     {Send;R_MOVER;NL_C_MOVE;1;F07F} \
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
      {SendWait;R_LIFTER;NL_C_ACCESSORY;%s;500} \
      {SetVarLast;1;;;} \
@@ -320,7 +320,7 @@ void handle_bit_test_long_mover_right(struct nl_handle *handle, int is_on) {
      {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
      {Send;R_LIFTER;NL_C_ACCESSORY;1;%s} \
      {Send;R_LIFTER;NL_C_EXPOSE;1;01} \
-     {Send;R_MOVER;NL_C_MOVE;1;1080} \
+     {Send;R_MOVER;NL_C_MOVE;1;1680} \
      {DoWait;%s;EVENT_STOPPED;15000;%s} \
      {Send;R_LIFTER;NL_C_EXPOSE;1;00} \
      {DoWait;%s;EVENT_DOWN;15000;%s} \
@@ -539,6 +539,10 @@ void handle_bit_test_long_mover(struct nl_handle *handle, int is_on) {
 
 // bit test long for mover
 void handle_bit_test_short_mover_left(struct nl_handle *handle, int is_on) {
+    // new short version: just do the long bit as we would on a lifter to test communication
+    handle_bit_test_long_lifter(handle, is_on);
+    return;
+#if 0
     // build scenario
     // TODO -- thermals
     // Step 1  - Move "away" @ 1.5 mph
@@ -574,10 +578,15 @@ void handle_bit_test_short_mover_left(struct nl_handle *handle, int is_on) {
 
     // Free message
     nlmsg_free(msg);
+#endif
 }
 
 // bit test long for mover
 void handle_bit_test_short_mover_right(struct nl_handle *handle, int is_on) {
+    // new short version: just do the long bit as we would on a lifter to test communication
+    handle_bit_test_long_lifter(handle, is_on);
+    return;
+#if 0
     // build scenario
     // TODO -- thermals
     // Step 1  - Move "away" @ 1.5 mph
@@ -613,10 +622,15 @@ void handle_bit_test_short_mover_right(struct nl_handle *handle, int is_on) {
 
     // Free message
     nlmsg_free(msg);
+#endif
 }
 
 // bit test long for mover
 void handle_bit_test_short_mover(struct nl_handle *handle, int is_on) {
+    // new short version: just do the long bit as we would on a lifter to test communication
+    handle_bit_test_long_lifter(handle, is_on);
+    return;
+#if 0
     // build scenario
     // TODO -- thermals
     // Step 1  - Move "away" @ 1.5 mph
@@ -652,6 +666,7 @@ void handle_bit_test_short_mover(struct nl_handle *handle, int is_on) {
 
     // Free message
     nlmsg_free(msg);
+#endif
 }
 
 // bit button has been pressed (long-press)
@@ -711,7 +726,7 @@ void handle_bit_move(struct nl_handle *handle, int type) {
     // move button pressed? send the correct command back to the kernel
     struct nl_msg *msg;
     msg = nlmsg_alloc();
-    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_MOVEAWAY, 1);
+    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, NL_C_MOVE, 1);
 
     //mover_sleep_set(DOCK_COMMAND);
     // fill with the correct movement data
@@ -729,6 +744,7 @@ void handle_bit_move(struct nl_handle *handle, int type) {
             nla_put_u16(msg, GEN_INT16_A_MSG, VELOCITY_STOP); // stop
             break;
         case BIT_GOTO_DOCK:
+            // cannot create this state, so move forward
             nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 20); // fwd at 1.5 mph
 //            nla_put_u8(msg, GEN_INT8_A_MSG, 3);  // 3 is the command to dock
             break;
