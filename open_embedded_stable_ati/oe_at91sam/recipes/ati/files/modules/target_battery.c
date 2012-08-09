@@ -50,8 +50,9 @@ int error_mfh(struct sk_buff *skb, void *msg) {
 
 void sendUserConnMsg( char *fmt, ...){
     va_list ap;
+    char *msg;
     va_start(ap, fmt);
-     char *msg = kmalloc(256, GFP_KERNEL);
+     msg = kmalloc(256, GFP_KERNEL);
      if (msg){
          vsnprintf(msg, 256, fmt, ap);
          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
@@ -240,6 +241,7 @@ atomic_t adc_startup = ATOMIC_INIT(1);  // we're still starting up
 // in one blinking set.
 //---------------------------------------------------------------------------
 atomic_t blink_count = ATOMIC_INIT(0);
+atomic_t fast_blink = ATOMIC_INIT(1); // start using fast blink until we have our first adc value
 
 //---------------------------------------------------------------------------
 // This delayed work queue item is used to notify user-space that the adc
@@ -435,6 +437,7 @@ static void timeout_fire(unsigned long data) {
     if (atomic_read(&check_atomic)) {
         // start the adc reading
         hardware_adc_read_start();
+        atomic_set(&fast_blink, 0);
     }
 
     // Restart the timeout timer
@@ -573,7 +576,12 @@ static void charging_fire(unsigned long data)
 //---------------------------------------------------------------------------
 static void led_blink_fire(unsigned long data)
     {
-    int count, value;
+    int count, value, blink_div = 1;
+    
+    // should we blink fast, to show we've booted?
+    if (atomic_read(&fast_blink) == 1) {
+       blink_div = 2; // blink faster for first 60 seconds
+    }
 
     // are we still low?
     value = atomic_read(&adc_atomic);
@@ -602,14 +610,14 @@ static void led_blink_fire(unsigned long data)
             at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
             atomic_set(&blink_count, --count);
             }
-        mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
+        mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/(1000*blink_div)));
         }
     else
         {
         // stop blinking...for now
-        atomic_set(&blink_count, LED_BLINK_COUNT);
+        atomic_set(&blink_count, LED_BLINK_COUNT*blink_div);
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
-        mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_OFF_IN_MSECONDS*HZ)/1000));
+        mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_OFF_IN_MSECONDS*HZ)/(1000*blink_div)));
         }
     }
 
@@ -680,8 +688,8 @@ static int hardware_init(void)
     atomic_set(&blink_count, LED_BLINK_COUNT);
     mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
 
-    // check the value for the first time after 90 second
-    mod_timer(&timeout_timer_list, jiffies+(90*HZ));
+    // check the value for the first time after 60 second
+    mod_timer(&timeout_timer_list, jiffies+(60*HZ));
     check_charging_start(1);
 
     // configure interrupt
