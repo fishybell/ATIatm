@@ -859,6 +859,8 @@ static int hardware_movement_stop(int stop_timer)
 
 static int mover_speed_stop(void) {
    SENDUSERCONNMSG( "randy mover_speed_stop");
+    dock_timeout_stop();
+    speed_timeout_stop();
     do_event(EVENT_STOP); // started stopping
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(TRUE); // always true here, so always stops timing out when we stop the mover
@@ -1013,7 +1015,7 @@ static void dock_timeout_start(int ms)
    if (ms <= 0) ms = DOCK_TIMEOUT_IN_MILLISECONDS;
 	mod_timer(&dock_timeout_list, jiffies+(ms*HZ/1000));
    SENDUSERCONNMSG( "randy dock_timeout_start,%i" ,ms);
-   timeout_timer_start(ms/1000); // reset timeout timer so we don't go all "oh no! I'm not moving" while I'm still trying to dock
+   // stupid, stupid nathan. don't this here...here we are stopped, and we won't go until after this timer times out...timeout_timer_start(ms/1000); // reset timeout timer so we don't go all "oh no! I'm not moving" while I'm still trying to dock
 	}
 
 //---------------------------------------------------------------------------
@@ -2310,8 +2312,13 @@ int mover_set_move_speed(int speed) {
          return 0;
    }
    SENDUSERCONNMSG( "randy mover_set_move_speed %i", speed);
-   speed_timeout_start(0, speed);
-   return mover_speed_set( speed );
+   if (speed != 0) {
+      speed_timeout_start(0, speed);
+      return mover_speed_set( speed );
+   } else {
+      mover_speed_stop();
+      return 1;
+   }
 }
 EXPORT_SYMBOL(mover_set_move_speed);
 
@@ -2329,8 +2336,6 @@ EXPORT_SYMBOL(set_lifter_fault);
 
 int mover_set_speed_stop() {
     atomic_set(&continuous_speed, 0);
-    dock_timeout_stop();
-    speed_timeout_stop();
     mover_speed_stop();
     return 1;
 }
