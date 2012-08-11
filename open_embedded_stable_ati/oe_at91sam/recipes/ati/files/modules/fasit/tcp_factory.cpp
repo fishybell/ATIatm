@@ -91,6 +91,7 @@ FUNCTION_INT("::newClientSock()", -1)
          if (!inet_aton(buf, &server.sin_addr)) {
             // didn't read, set back to bad address
             inet_aton("0.0.0.0", &server.sin_addr);
+            return -1;
          }
          DCMSG(BLUE, "Auto-IP found address %s\n", inet_ntoa(server.sin_addr));
       } else {
