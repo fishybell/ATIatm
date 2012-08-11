@@ -295,7 +295,7 @@ int main(int argc, char **argv) {
     // open tty and setup the serial device
    rc.tty=open_port(ttyport, 4|2|0x10); // bits 4 (IGNBRK | IGNCR), 2 (blocking), and 9 (write-only) on
 
-   if (rc.tty <= 0) {
+   if (rc.tty < 0) {
       DieWithError("Is unhappy tty");
    }
    DDCMSG(D_MEGA, BLACK,"RFSLAVE: RF tty fd: %i", rc.tty);
