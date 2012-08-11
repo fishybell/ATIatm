@@ -476,15 +476,22 @@ int error_mfh(struct sk_buff *skb, void *msg) {
 //---------------------------------------------------------------------------
 static void timeout_timer_start(int mult) {
     int to;
-    if (mult <= 1) {
-        to = TIMEOUT_IN_MSECONDS[mover_type];
-        // standard timer
-         if (isMoverAtDock() != 0) { to *= 5; }
-        mod_timer(&timeout_timer_list, jiffies+((to*HZ)/1000));
+    unsigned long new_exp;
+    to = TIMEOUT_IN_MSECONDS[mover_type];
+    if (isMoverAtDock() != 0) { to *= 5; } // multiply by five if we have to fight the dock
 
+    // find new expire time
+    if (mult <= 1) {
+        // standard timer
+        new_exp = jiffies+((to*HZ)/1000);
     } else {
         // (timer + horn) * mult
-        mod_timer(&timeout_timer_list, jiffies+((mult*(HORN_ON_IN_MSECONDS[mover_type]+TIMEOUT_IN_MSECONDS[mover_type])*HZ)/1000));
+        new_exp = jiffies+((mult*(HORN_ON_IN_MSECONDS[mover_type]+to)*HZ)/1000);
+    }
+
+    // update timer if necessary
+    if (timeout_timer_list.expires < new_exp) {
+       mod_timer(&timeout_timer_list, new_exp);
     }
 }
 
@@ -942,7 +949,6 @@ static int mover_speed_set(int speed) {
    SENDUSERCONNMSG( "randy before mover_speed_stop 2");
       mover_speed_stop();
       mover_speed_reverse(speed);
-      timeout_timer_start(2);
       return 1;
    }
 
@@ -1015,7 +1021,6 @@ static void dock_timeout_start(int ms)
    if (ms <= 0) ms = DOCK_TIMEOUT_IN_MILLISECONDS;
 	mod_timer(&dock_timeout_list, jiffies+(ms*HZ/1000));
    SENDUSERCONNMSG( "randy dock_timeout_start,%i" ,ms);
-   // stupid, stupid nathan. don't this here...here we are stopped, and we won't go until after this timer times out...timeout_timer_start(ms/1000); // reset timeout timer so we don't go all "oh no! I'm not moving" while I'm still trying to dock
 	}
 
 //---------------------------------------------------------------------------
@@ -1078,7 +1083,6 @@ static void speed_timeout_start(int ms, int speed)
 	      mod_timer(&speed_timeout_list, jiffies+(ms*HZ/1000));
    	      SENDUSERCONNMSG( "randy speed_timeout_start,%i" ,ms);
 	      atomic_set(&timeout_speed, speed);
-         timeout_timer_start(1); // reset timeout timer so we don't go all "oh no! I'm not moving" while I'm still trying to start moving
 	   }
 	}
 
@@ -1251,8 +1255,13 @@ static void timeout_fire(unsigned long data)
     if (atomic_read(&goal_atomic) == 0) {
        do_event(EVENT_STOPPED); // timeout was part of coasting or stopping
     } else {
-       do_event(EVENT_ERROR); // timeout wasn't part of coasting
-       do_fault(ERR_no_movement);
+       if (atomic_read(&find_dock_atomic) == 1) {
+          do_event(EVENT_ERROR); // timeout wasn't part of coasting
+          do_fault(ERR_did_not_dock);
+       } else {
+          do_event(EVENT_ERROR); // timeout wasn't part of coasting
+          do_fault(ERR_no_movement);
+       }
     }
 
     mover_speed_stop();
