@@ -87,10 +87,15 @@ FUNCTION_INT("::newClientSock()", -1)
       int err = errno; // save errno
 
       // check that we read an IP
+      struct sockaddr_in fake;
+      inet_aton("0.0.0.0", &fake.sin_addr);
       if (rsize > 0) {
          if (!inet_aton(buf, &server.sin_addr)) {
-            // didn't read, set back to bad address
+            // didn't read, set back to bad address and try again later
             inet_aton("0.0.0.0", &server.sin_addr);
+            return -1;
+         } else if (memcmp(&server.sin_addr, &fake.sin_addr, sizeof(fake.sin_addr)) == 0) {
+            // read a bad address, try again later
             return -1;
          }
          DCMSG(BLUE, "Auto-IP found address %s\n", inet_ntoa(server.sin_addr));
