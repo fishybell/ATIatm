@@ -276,6 +276,7 @@ atomic_t tc_clock = ATOMIC_INIT(2);
 // invalid direction request. If we are home we do not want to 
 // allow reverse.
 atomic_t last_sensor = ATOMIC_INIT(MOVER_SENSOR_UNKNOWN);
+atomic_t last_last_sensor = ATOMIC_INIT(MOVER_SENSOR_UNKNOWN);
 
 
 atomic_t lifter_position = ATOMIC_INIT(LIFTER_POSITION_DOWN);
@@ -989,6 +990,15 @@ static int mover_speed_set(int speed) {
       reset_pid(); // reset pid variables
    }
    
+   // moving away from dock when we were trying to find dock?
+   if (atomic_read(&find_dock_atomic) == 1) {
+      if (speed > 0 && dock_loc == 0) { // going right, dock on left?
+         atomic_set(&find_dock_atomic, 0); // moving away from left dock
+      } else if (speed < 0 && dock_loc == 1) { // going left, dock on right?
+         atomic_set(&find_dock_atomic, 0); // moving away from right dock
+      }
+   }
+   
    // special function for reversing
    atomic_set(&reverse_speed, 0);
    SENDUSERCONNMSG( "randy before mover_speed_set o_speed %i, speed %i", o_speed, speed);
@@ -1057,8 +1067,11 @@ static int mover_speed_set(int speed) {
 #endif
    }
 
-// Since we are moving the last_sensor needs to be unknown
-   atomic_set(&last_sensor, MOVER_SENSOR_UNKNOWN);
+   if (speed != 0) {
+      // if we are moving the last_sensor needs to be unknown
+      atomic_set(&last_last_sensor, atomic_read(&last_sensor)); // remember what we were, in case we timeout before getting past a sensor
+      atomic_set(&last_sensor, MOVER_SENSOR_UNKNOWN);
+   }
 
    hardware_speed_set(abs(speed));
 
@@ -1304,6 +1317,10 @@ static void timeout_fire(unsigned long data) {
    DELAY_PRINTK(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME[mover_type], __func__);
 
     do_event(EVENT_TIMED_OUT); // reached timeout
+
+    if (atomic_read(&last_sensor) == MOVER_SENSOR_UNKNOWN && atomic_read(&last_last_sensor) != MOVER_SENSOR_UNKNOWN) {
+       atomic_set(&last_sensor, atomic_read(&last_last_sensor));
+    }
     
    SENDUSERCONNMSG( "nathan timeout_fire: goal %i dock %i", atomic_read(&goal_atomic), atomic_read(&find_dock_atomic));
     if (atomic_read(&goal_atomic) == 0) {
@@ -1317,14 +1334,18 @@ static void timeout_fire(unsigned long data) {
 //          kfree(msg);
           // finish reversing now
           mover_speed_set(rev_speed);
+       } else {
+          // if we're not reversing, dock
+          atomic_set(&dockTryCount, 0);
+          dock_timeout_start(1500);
        }
     } else {
        if (atomic_read(&find_dock_atomic) == 1) {
           //do_event(EVENT_ERROR); // timeout wasn't part of coasting
           //do_fault(ERR_did_not_dock);
           // TODO -- when failure to find dock isn't a mechanical design flaw, undo the comments above
-          mover_speed_stop();
           mover_speed_stop(); // after event_error
+          atomic_set(&find_dock_atomic, 0); // we're not finding anymore
        } else {
           do_event(EVENT_ERROR); // timeout wasn't part of coasting
           do_fault(ERR_no_movement);
@@ -1481,6 +1502,9 @@ irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
 
    DELAY_PRINTK("%s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&movement_atomic));
 
+   // reset last last sensor (doesn't matter which way we crossed this sensor)
+   atomic_set(&last_last_sensor, MOVER_SENSOR_UNKNOWN);
+
     // reset to "home" position
     if (atomic_read(&found_home) == 0) {
 #ifndef DEBUG_PID
@@ -1527,6 +1551,9 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
    DELAY_PRINTK("%s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&movement_atomic));
+
+   // reset last last sensor (doesn't matter which way we crossed this sensor)
+   atomic_set(&last_last_sensor, MOVER_SENSOR_UNKNOWN);
 
    SENDUSERCONNMSG( "randy end_int %i", atomic_read(&movement_atomic));
     // check to see if this one needs to be ignored
