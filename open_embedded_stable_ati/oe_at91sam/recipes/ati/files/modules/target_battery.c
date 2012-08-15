@@ -20,7 +20,7 @@
 // and use of more than one ADC channel at a time.
 
 // various timer timeouts
-#define CHECK_CHARGING_IN_SECONDS   600
+#define CHECK_CHARGING_IN_SECONDS   3600 /* 1 hour */
 #define TIMEOUT_IN_SECONDS				120	// 2 minutes
 #define ADC_READ_DELAY_IN_MSECONDS		20
 #define LED_BLINK_ON_IN_MSECONDS		100
@@ -470,12 +470,12 @@ static void check_charging_fire(unsigned long data) {
       // Turn off charging and wait 10 seconds
      chargingCheckStep ++;
      at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
-     check_charging_start(10);
+     check_charging_start(1);
    } else if (chargingCheckStep == 1){
       // Start ADC check and wait 10 seconds
       chargingCheckStep ++;
       hardware_adc_read_start();
-      check_charging_start(10);
+      check_charging_start(1);
    } else if (chargingCheckStep == 2){
       // Get the value when off, turn on charging and wait 10 seconds
 		chargingOffADCVal = atomic_read(&adc_atomic);
@@ -688,8 +688,8 @@ static int hardware_init(void)
     atomic_set(&blink_count, LED_BLINK_COUNT);
     mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
 
-    // check the value for the first time after 60 second
-    mod_timer(&timeout_timer_list, jiffies+(60*HZ));
+    // check the value for the first time after 30 second
+    mod_timer(&timeout_timer_list, jiffies+(30*HZ));
     check_charging_start(1);
 
     // configure interrupt
