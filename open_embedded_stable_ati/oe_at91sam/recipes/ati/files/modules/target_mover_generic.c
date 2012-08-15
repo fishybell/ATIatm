@@ -1291,6 +1291,7 @@ static void velocity_fire(unsigned long data)
     schedule_work(&velocity_work); // notify the system
     }
 
+
 //---------------------------------------------------------------------------
 // The function that gets called when the timeout fires.
 //---------------------------------------------------------------------------
