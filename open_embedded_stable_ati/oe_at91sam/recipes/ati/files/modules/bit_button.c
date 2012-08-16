@@ -733,11 +733,11 @@ void handle_bit_move(struct nl_handle *handle, int type) {
     switch (type) {
         case BIT_MOVE_FWD:
 //printf("BIT: sending FWD\n");
-            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 20); // fwd at 1.5 mph
+            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 1); // fwd at slowest speed
             break;
         case BIT_MOVE_REV:
 //printf("BIT: sending REV\n");
-            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 - 20); // rev at 1.5 mph
+            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 - 1); // rev at slowest speed
             break;
         case BIT_MOVE_STOP:
 //printf("BIT: sending STOP\n");
@@ -745,7 +745,7 @@ void handle_bit_move(struct nl_handle *handle, int type) {
             break;
         case BIT_GOTO_DOCK:
             // cannot create this state, so move forward
-            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 20); // fwd at 1.5 mph
+            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 1); // fwd at slowest speed
 //            nla_put_u8(msg, GEN_INT8_A_MSG, 3);  // 3 is the command to dock
             break;
     }
