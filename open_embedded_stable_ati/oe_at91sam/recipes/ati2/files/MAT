@@ -21,7 +21,7 @@ start () {
       matd=2
    fi
    if [ "$track" == "" ] ; then
-      track=5
+      track=250
    fi
 
    # load modules
