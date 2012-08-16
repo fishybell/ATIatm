@@ -1110,11 +1110,7 @@ void sendStatus2102(int force, FASIT_header *hdr,thread_data_t *minion, minion_t
          CACHE_CHECK(minion->S.move);
          msg.body.move = minion->S.move.data;
          CACHE_CHECK(minion->S.position);
-         if (msg.body.type == Type_MIT) {
-            msg.body.pos = htons(minion->S.position.data - minion->mit_home); // offset so "home" shows as 0 in SR
-         } else {
-            msg.body.pos = htons(minion->S.position.data - minion->mat_home); // offset so "home" shows as 0 in SR
-         }
+         msg.body.pos = htons(minion->S.position.data);
 //         DDCMSG(D_NEW,MAGENTA,"\n_____________________________________________________\nMinion %i: building 2102 status.   S.position.data=%i msg.body.pos=%i  htons(...)=%i ",
 //                minion->mID,minion->S.position.data,msg.body.pos,htons(msg.body.pos));
          break;
@@ -2988,7 +2984,7 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.resp.current_exp = LB_devreg->expose ? 90 : 0;
                   minion->S.resp.current_direction = LB_devreg->move ? 1 : 2;
                   minion->S.resp.current_speed = LB_devreg->speed; // unmodified, but still treat as modified
-                  minion->S.resp.current_position = LB_devreg->location; // unmodified, but still treat as modified
+                  minion->S.resp.current_position = LB_devreg->location + 0x200; // add back in sign
                   minion->S.resp.last_exp = -1;
                   minion->S.resp.last_direction = -1;
                   minion->S.resp.last_speed = -1;
@@ -3449,7 +3445,7 @@ void *minion_thread(thread_data_t *minion){
                      minion->S.tokill.newdata = L->tokill;
                      minion->S.mode.newdata = L->hitmode ? 2 : 1; // back to burst/single
                      minion->S.sens.newdata = L->sensitivity;
-                     minion->S.position.data = L->location;
+                     minion->S.position.data = L->location + 0x200; // add back in sign
                      minion->S.speed.fpos = (float)minion->S.position.data;
                      minion->S.speed.lastfpos = (float)minion->S.position.data;
                      minion->S.burst.newdata = L->timehits * 5; // convert back

@@ -649,8 +649,8 @@ int send_EVENT_REPORTs(fasit_connection_t *fc) {
    } else {
       return doNothing;
    }
-#endif
    DDCMSG(D_POINTER, GREEN, "Here @ %s:%i", __FILE__, __LINE__);
+#endif
 }
 
 int send_STATUS_RESP(fasit_connection_t *fc) {
@@ -682,7 +682,7 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
          s.move = 1; // convert fasit to rf
          break;
    }
-   s.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
+   s.location = htons(fc->f2102_resp.body.pos) + 0x200; // remove sign by adding 0x200
    //DCMSG(MAGENTA, "++++++++++++++++++++++++++++++\ns.location %i from position %i while moving @ %i\n++++++++++++++++++++++++++++++", s.location, htons(fc->f2102_resp.body.pos), s.speed);
    s.hitmode = fc->hit_mode;
    s.react = fc->hit_react;
@@ -1242,7 +1242,7 @@ int send_DEVICE_REG(fasit_connection_t *fc) {
          bdy.move = 1; // convert fasit to rf
          break;
    }
-   bdy.location = htons(fc->f2102_resp.body.pos) & 0x7ff;
+   bdy.location = htons(fc->f2102_resp.body.pos) + 0x200; // remove sign by adding 0x200
    //DCMSG(MAGENTA, "++++++++++++++++++++++++++++++\nbdy.location %i from position %i while moving @ %i\n++++++++++++++++++++++++++++++", bdy.location, htons(fc->f2102_resp.body.pos), bdy.speed);
    bdy.hitmode = fc->hit_mode;
    bdy.react = fc->hit_react;
