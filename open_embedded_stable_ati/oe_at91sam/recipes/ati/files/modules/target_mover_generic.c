@@ -28,8 +28,9 @@
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
 //#define DEBUG_PRINT
-//#define DEBUG_SEND 1
+//#define DEBUG_SEND
 //#define SEND_PID
+//#define SEND_POS
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -131,12 +132,12 @@ static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0};
 // static int PID_KD_DIV[]    = {4, 5, 4, 4, 0}; // derivitive gain denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot -- due to throttle cut-off from motor controller, had to adjust by hand afterwards
-static int PID_KP_MULT[]   = {1, 2, 1, 1, 0}; // proportional gain numerator
+static int PID_KP_MULT[]   = {1, 2, 20, 1, 0}; // proportional gain numerator
 static int PID_KP_DIV[]    = {4, 15, 1, 5, 0}; // proportional gain denominator
-static int PID_KI_MULT[]   = {15, 1, 1, 15, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {475150, 184320, 7, 47515, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {190060, 32768, 150, 190060, 0}; // derivitive gain numerator
-static int PID_KD_DIV[]    = {15, 15, 35, 15, 0}; // derivitive gain denominator
+static int PID_KI_MULT[]   = {15, 1, 0, 15, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {475150, 184320, 1, 47515, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {190060, 32768, 0, 190060, 0}; // derivitive gain numerator
+static int PID_KD_DIV[]    = {15, 15, 1, 1, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
 static int MIN_EFFORT[]    = {1000, 1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
@@ -147,6 +148,10 @@ static int MIN_EFFORT[]    = {115, 175, 1, 1, 0}; // minimum effort given to ens
 // not used? -- static int ADJUST_PID_P[]  = {0, 0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
 static int MAX_ACCEL[]     = {500, 1000, 1000, 1000, 0}; // maximum effort change in one step
 static int MAX_DECCEL[]     = {500, 1000, 1000, 1000, 0}; // maximum effort change in one step
+
+// variables for setting the initial position if it's on the dock or not
+static int DOCK_FEET_FROM_LIMIT[] = {6, 18, 6, 6, 0}; // home many feet away the dock is past the limit
+static int COAST_FEET_FROM_LIMIT[] = {4, 12, 4, 4, 0}; // home many feet away it *typically* coasts past the limit
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -190,7 +195,7 @@ static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,0};		// channel 0 matches TIOA0 to TIO
 static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
 static int ENC_PER_REV[] = {2, 360, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
 static int VELO_K[] = {1680, 1344, 1680, 1680, 0}; // rpm/mph*10
-static int INCHES_PER_REV[] = {628, 786, 628, 628, 0}; // 5:1 ratio 10 inch, 2:1 ratio 5 inch, etc. = inches per revolution
+static int INCHES_PER_REV[] = {314, 157, 314, 314, 0}; // 10 inch, 5 inch, etc. = inches per wheel revolution
 static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 0}; // 5:1 ratio 10 inch wheel 6 ft leg, 2:1 ratio 5 inch wheel 6 ft leg, etc.
 #define TICKS_DIV 100
 
@@ -201,6 +206,8 @@ static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 0}; // 5:1 ratio 10 inch w
 #define SPEED_TIMEOUT_IN_MILLISECONDS 2000
 #define PID_TIMEOUT_IN_MILLISECONDS 1000
 #define CONTINUOUS_TIMEOUT_IN_MILLISECONDS 1000
+
+static int COAST_FACTOR[]  = {20, 10, 20, 20, 1}; // divisor to PID_TIMEOUT_IN_MILLISECONDS, tuned for how well the target coasts (smaller for coasts better? bigger for brakes better?)
 
 // speed charts (TODO -- update with mover on track with load)
 // static in MOVER0_PWM_TABLE = ?
@@ -269,6 +276,7 @@ atomic_t quad_direction = ATOMIC_INIT(0);
 atomic_t doing_pos = ATOMIC_INIT(FALSE);
 atomic_t doing_vel = ATOMIC_INIT(FALSE);
 atomic_t tc_clock = ATOMIC_INIT(2);
+atomic_t pid_vel = ATOMIC_INIT(0);
 //atomic_t getting_going = ATOMIC_INIT(0);
 //atomic_t going_base = ATOMIC_INIT(0);
 
@@ -416,8 +424,8 @@ static int pwm_from_effort(int effort);		// absolute pwm, calculated
 // Variables for PID speed control
 //---------------------------------------------------------------------------
 spinlock_t pid_lock = SPIN_LOCK_UNLOCKED;
-//#define MAX_PID_ERRORS 30000 /* TODO -- keep ALL errors between start and stop */
-//int pid_errors[MAX_PID_ERRORS];  // previous errors (fully calculated for use in summing integral part of PID)
+#define MAX_PID_ERRORS 5
+int pid_errors[MAX_PID_ERRORS];  // previous errors (fully calculated for use in summing integral part of PID)
 int pid_total_error = 0;   // total effort since we started moving
 //int pidEffortCounter = 0;			// prior effort
 //int pid_ticks = 0;			// prior effort
@@ -430,9 +438,10 @@ int pid_error = 0;					// current error
 atomic_t pid_set_point = ATOMIC_INIT(0); // set point for speed to maintain
 //int pid_auto_calibration_mult = 0;    // auto-calibration factor to apply to effort
 //int pid_auto_calibration_div = 0;    // auto-calibration factor to apply to effort
-int pid_reset_error = 1;      // we should reset the error when we detect movement
+/*int pid_reset_error = 1;      // we should reset the error when we detect movement
 int pid_last_speed = 1;       // what we detected last time we ran pid_step()
 int wheel_too_tight = -1;     // we should never reset the error, because our wheel is too tightly connected, thus requiring full force (ie. don't reset after getting going, but still do "normal" halving of total error once moving) -- -1 = haven't checked, -2 = check next time, 1 = too tight, 0 = not too tight
+*/
 
 //int last_pid_speed;
 int pid_last_speeds[3];          // prior speeds (for detecting wobble)
@@ -457,20 +466,41 @@ static struct timer_list pid_timeout_list = TIMER_INITIALIZER(pid_timeout_fire, 
 // Timer for continuous movement
 static struct timer_list continuous_timeout_list = TIMER_INITIALIZER(continuous_timeout_fire, 0, 0);
 
+// helper function to convert feet to meters
+inline int feetToMeters(int feet) {
+   // fixed point feet/3.28
+   int meters = feet * 100;
+   meters /= 328;
+   return meters;
+}
+
+// helper function to convert meters to feet
+inline int metersToFeet(int meters) {
+   // fixed point meters*3.28
+   int feet = meters * 328;
+   feet /= 100;
+   return feet;
+}
+
+
 //---------------------------------------------------------------------------
 // Reset pid variables
 //---------------------------------------------------------------------------
 static void reset_pid(void) {
+    int i;
     pid_total_error = 0;
     pid_last_effort = 0;
     pid_last_error = 0;
     pid_last_last_error = 0;
     //pid_auto_calibration_mult = 0;
     //pid_auto_calibration_div = 0;
-    pid_reset_error = 1;
+    /*pid_reset_error = 1;
     pid_last_speed = 0;
     if (wheel_too_tight < 0) {
        wheel_too_tight = -1; // if we didn't complete checking for tightness, start over next time around
+    }*/
+    for (i=0; i<MAX_PID_ERRORS; i++) {
+       pid_errors[i] = 0;
     }
 }
 
@@ -532,7 +562,7 @@ static void timeout_timer_start(int mult) {
     }
 
     // timer if necessary
-    SENDUSERCONNMSG( "nathan timeout_start: dock %i mult %i", isMoverAtDock(), mult);
+    //SENDUSERCONNMSG( "nathan timeout_start: dock %i mult %i", isMoverAtDock(), mult);
     mod_timer(&timeout_timer_list, new_exp);
 }
 
@@ -902,14 +932,14 @@ static int hardware_movement_stop(int stop_timer)
 
     // notify user-space
     schedule_work(&movement_work);
-    dock_timeout_start(1500);
+    dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
 
     return 0;
     }
 
 static int mover_speed_stop(void) {
    SENDUSERCONNMSG( "randy mover_speed_stop");
-    dock_timeout_start(1500);
+    dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
     speed_timeout_stop();
     do_event(EVENT_STOP); // started stopping
     atomic_set(&goal_atomic, 0); // reset goal speed
@@ -966,11 +996,23 @@ static int mover_speed_set(int speed) {
    if (speed != 0){
       if (mover_type == IS_MIT){
          selectSpeed = abs(speed);
-         if (selectSpeed <= 5) tmpSpeed = 8; // 0.8 mph
-         else if (selectSpeed <= 10) tmpSpeed = 15; // 1.5 mph
-         else if (selectSpeed <= 20) tmpSpeed = 32; // 3.2 mph
-         else if (selectSpeed <= 30) tmpSpeed = 56; // 5.6 mph
-         else tmpSpeed = 82; // 8.2 mph
+         if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
+         else if (selectSpeed <= 10) tmpSpeed = 13; // 1.3 mph (to meet 1-3 kph)
+         else if (selectSpeed <= 20) tmpSpeed = 31; // 3.2 mph (to meet 4-6 kph)
+         else if (selectSpeed <= 30) tmpSpeed = 56; // 5.6 mph (to meet 8-10 kph)
+         else tmpSpeed = 81; // 8.1 mph (to meet 12-14 kph)
+//         if (selectSpeed > MOVER_SPEED_SELECTIONS) selectSpeed = MOVER_SPEED_SELECTIONS;
+//         tmpSpeed = MIT_SPEEDS[selectSpeed];
+         if (speed < 0) tmpSpeed *= -1;
+         speed = tmpSpeed;
+      }
+      if (mover_type == IS_MAT){
+         selectSpeed = abs(speed);
+         if (selectSpeed <= 5) tmpSpeed = 10; // 1.0 mph (to dock slowly, or manual movement)
+         else if (selectSpeed <= 10) tmpSpeed = 65; // 6.5 mph (to meet 8-13 kph)
+         else if (selectSpeed <= 20) tmpSpeed = 99; // 9.9 mph (to meet 14-18 kph)
+         else if (selectSpeed <= 30) tmpSpeed = 134; // 13.4 mph (to meet 19-24 kph)
+         else tmpSpeed = 177; // 17.7 mph (to meet 25-32 kph)
 //         if (selectSpeed > MOVER_SPEED_SELECTIONS) selectSpeed = MOVER_SPEED_SELECTIONS;
 //         tmpSpeed = MIT_SPEEDS[selectSpeed];
          if (speed < 0) tmpSpeed *= -1;
@@ -1006,6 +1048,7 @@ static int mover_speed_set(int speed) {
       // can't use a scenario, because a scenario may cause a reverse
       timeout_timer_stop();
    SENDUSERCONNMSG( "randy before mover_speed_stop 2");
+      atomic_set(&find_dock_atomic, 0); // we never reverse to the dock
       mover_speed_stop();
       mover_speed_reverse(speed);
       return 1;
@@ -1180,7 +1223,8 @@ static void pid_timeout_start()
       //timeout /= 10; // 10 times a second (starting point)
       //timeout /= 3; // 3 times a second (gives the motor controller time to think?)
       //timeout /= 2; // twice a second (gives the motor controller extra time to think?)
-      timeout /= 25; // 25 times a second (cause that's next)
+      //timeout /= 25; // 25 times a second (cause that's next)
+      timeout /= COAST_FACTOR[mover_type]; // adjusted to let it coast nice and smoothly between power pushes
       //timeout /= 250; // 250 times a second (cause that's next)
 /*      if (new_speed < 50) {
          timeout /=2;
@@ -1337,7 +1381,7 @@ static void timeout_fire(unsigned long data) {
        } else {
           // if we're not reversing, dock
           atomic_set(&dockTryCount, 0);
-          dock_timeout_start(1500);
+          dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
        }
     } else {
        if (atomic_read(&find_dock_atomic) == 1) {
@@ -1351,7 +1395,7 @@ static void timeout_fire(unsigned long data) {
           do_fault(ERR_no_movement);
           mover_speed_stop(); // after event_error
           atomic_set(&dockTryCount, 0);
-          dock_timeout_start(1500);
+          dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
        }
     }
 }
@@ -1471,24 +1515,27 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         dn1 = atomic_read(&delta_t);
         dn2 = atomic_read(&quad_direction);
         atomic_set(&velocity, dn1 * dn2);
-        }
-    else
-        {
+        atomic_set(&pid_vel, dn1 * dn2);
+    } else {
         // Pin A did not go high
-        if ( atomic_read(&o_count) >= MAX_OVER )
-            {
+        if ( atomic_read(&o_count) >= MAX_OVER ) {
 //               mover_speed_stop();
             atomic_set(&velocity, 0);
-            if (atomic_read(&doing_vel) == FALSE)
-                {
-                atomic_set(&doing_vel, TRUE);
-                mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
-                }
-            }
             atomic_set(&quad_direction, 0);
         }
-    return IRQ_HANDLED;
     }
+
+   // do position and velocity
+   if (atomic_read(&doing_vel) == FALSE) {
+      atomic_set(&doing_vel, TRUE);
+      mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
+   }
+   if (atomic_read(&doing_pos) == FALSE) {
+      atomic_set(&doing_pos, TRUE);
+      mod_timer(&position_timer_list, jiffies+((POSITION_DELAY_IN_MSECONDS*HZ)/1000));
+   }
+   return IRQ_HANDLED;
+}
 
 //---------------------------------------------------------------------------
 // track sensor "home"
@@ -1535,7 +1582,7 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
     mover_speed_stop();
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
-    dock_timeout_start(1500);
+    dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
 
     return IRQ_HANDLED;
     }
@@ -1578,7 +1625,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     mover_speed_stop();
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
-    dock_timeout_start(1500);
+    dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
 
     return IRQ_HANDLED;
     }
@@ -1603,10 +1650,13 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
        atomic_set(&find_dock_atomic, 0);
        enable_battery_check(1);
        battery_check_is_docked(1);
-       if (dock_loc == 0) { // Dock at left
-          atomic_set(&position, -12); // convert from meters to ticks
-       } else { // Dock at right
-          atomic_set(&position, (track_len+1) * 12); // convert from meters to ticks
+       if (atomic_read(&found_home) == 0) { // if we haven't found our home position, find it via the dock
+          if (dock_loc == 0) { // Dock at left
+             atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * DOCK_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we're docked behind home, calculate ticks
+          } else { // Dock at right
+             atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + DOCK_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we're docked past end, calculate ticks
+          }
+          atomic_set(&found_home, 1);
        }
     } else {
        // Not on dock
@@ -1924,13 +1974,20 @@ static int hardware_init(void)
       battery_check_is_docked(1);
       enable_battery_check(1);
       if (dock_loc == 0) { // Dock at left
-         atomic_set(&position, -12);
-      } else { // Dock at right
-         atomic_set(&position, (track_len+1) * 12);
+         atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * DOCK_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we're docked behind home, calculate ticks
+      } else { // assume Dock at right
+         atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + DOCK_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we're docked past end, calculate ticks
       }
+      atomic_set(&found_home, 1); // we don't need to look for home, we found the dock
     } else {
       do_event(EVENT_UNDOCKED);
       battery_check_is_docked(0);
+      // assume we're on the opposite side from the dock
+      if (dock_loc == 0) { // Dock at left
+         atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + COAST_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we coasted past end, calculate ticks
+      } else { // assume Dock at right
+         atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * COAST_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we coasted behind home, calculate ticks
+      }
     }
 
     // de-assert the pwm line
@@ -2119,14 +2176,6 @@ static int percent_from_speed(int speed) {
 // Helper function to map pwm values from effort values
 //---------------------------------------------------------------------------
 static int pwm_from_effort(int effort) {
-    // limit to max effort
-    if (effort > 1000) {
-        effort = 1000;
-    }
-    // limit to min effort
-    if (effort < 0) {
-        effort = 0;
-    }
     // use straight percentage
     return MOTOR_PWM_RB_DEFAULT[mover_type] + (
       (effort * (MOTOR_PWM_END[mover_type] - MOTOR_PWM_RB_DEFAULT[mover_type]))
@@ -2202,6 +2251,29 @@ static int speed_from_pwm(int ra) {
 
 static int current_speed10() {
     int vel = atomic_read(&velocity);
+#if 0
+        char *msg = kmalloc(256, GFP_KERNEL);
+        //snprintf(msg, 128, "setpoint:%i; detect:%i", new_speed, meas_vel);
+        snprintf(msg, 256, "cs10: (100*(%i/%i)/%i)/%i", RPM_K[mover_type],ENC_PER_REV[mover_type],vel,VELO_K[mover_type]);
+        send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+        kfree(msg);
+#endif
+//    if (vel != 0) {
+//        vel = (100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel)/VELO_K[mover_type];
+//    }
+    if (VELO_K[mover_type] <= 0) {
+       return 0; // bad data, 0 effort
+    }
+    if (vel > 0) {
+        vel = (100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel)/VELO_K[mover_type];
+    } else if (vel < 0) {
+        vel = -1 * ((100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/abs(vel))/VELO_K[mover_type]);
+    }
+    return vel;
+}
+
+static int current_pid_speed10(void) {
+    int vel = atomic_read(&pid_vel);
 #if 0
         char *msg = kmalloc(256, GFP_KERNEL);
         //snprintf(msg, 128, "setpoint:%i; detect:%i", new_speed, meas_vel);
@@ -2442,10 +2514,10 @@ EXPORT_SYMBOL(mover_set_speed_stop);
 
 extern int mover_position_get() {
     int pos = atomic_read(&position);
-    if (TICKS_DIV <= 0 || ENC_PER_REV[mover_type] <= 0) {
+    if (TICKS_DIV <= 0) {
        return 0; // bad data, return 0
     }
-    return ((INCHES_PER_REV[mover_type]*pos)/(ENC_PER_REV[mover_type]*TICKS_DIV))/12; // inches to feet
+    return ((INCHES_PER_REV[mover_type]*pos)/(TICKS_DIV))/12; // inches to feet
 }
 EXPORT_SYMBOL(mover_position_get);
 
@@ -3040,14 +3112,15 @@ static void do_position(struct work_struct * work)
          int dir;
          int len;
          int pos;
+         struct timespec time_now = current_kernel_time();
+         struct timespec time_d = timespec_sub(time_now, time_start);
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
     }
 
         // only notify sysfs if we've move at least half a leg
-        if (abs(atomic_read(&position_old) - atomic_read(&position)) > (TICKS_PER_LEG[mover_type]/TICKS_DIV/2))
-            {
+        if (abs(atomic_read(&position_old) - atomic_read(&position)) > (TICKS_PER_LEG[mover_type]/TICKS_DIV/2)) {
             atomic_set(&position_old, atomic_read(&position)); 
 #ifndef WOBBLE_DETECT
 #ifndef ACCEL_TEST
@@ -3055,7 +3128,11 @@ static void do_position(struct work_struct * work)
 #endif
 #endif
             target_sysfs_notify(&target_device_mover_generic, "position");
-            }
+#ifdef SEND_POS
+        SENDUSERCONNMSG( "pid6,t,%i,e,0,u,0,r,0,y,0,o,0,P,0,I,0,D,0,l,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), atomic_read(&position)); // use the same output format as the SEND_PID message, so it's easier to parse
+#endif
+        }
+
             // See if our position is out of bounds
             // The numbers 100 and -100 are randomly picked 
             dir = atomic_read(&movement_atomic);
@@ -3130,9 +3207,9 @@ void sendUserConnMsg( char *fmt, ...){
 
 // new method
 static void pid_step() {
-    int new_speed=1, input_speed=0, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
+    int new_speed=1, input_speed=0, i, error_sum=0, input_speed_old=0, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
    int direction, delta;
-   // not used? -- using_ticks, i, error_sum
+   // not used? -- using_ticks
    // not used? -- targetRatio;
    // not used? -- int a, b, c;
    struct timespec time_now = current_kernel_time();
@@ -3148,7 +3225,7 @@ static void pid_step() {
     //pid_ticks = 0;
     
     new_speed = atomic_read(&pid_set_point); // read desired pid set point
-    input_speed = atomic_read(&velocity); // read speed from quad_encoder
+    input_speed_old = percent_from_speed(abs(current_speed10())); // ex on MIT : 0-20mph => 0-1000, so 5mph = 250, 2.5 mph = 125, etc.
     direction = atomic_read(&quad_direction);
     
     // delta is time since last pid_step, which used to be just delta_t, now it is time_d...units don't matter as we will adjust the D gain abitrarily anyway
@@ -3165,7 +3242,8 @@ static void pid_step() {
     // old delta was speed dependent, new delta should always be about the same
 
     // read input speed (adjust speed10 value to 1000*percent)
-    input_speed = percent_from_speed(abs(current_speed10())); // ex on MIT : 0-20mph => 0-1000, so 5mph = 250, 2.5 mph = 125, etc.
+    input_speed = percent_from_speed(abs(current_pid_speed10())); // ex on MIT : 0-20mph => 0-1000, so 5mph = 250, 2.5 mph = 125, etc.
+    atomic_set(&pid_vel, 0);
     if (!spin_trylock(&pid_lock)) {
         return;
     }
@@ -3174,14 +3252,15 @@ static void pid_step() {
     pid_error = calcPidError(new_speed, input_speed); // set point - input
 
     // put calculated current error to end of list
-//    pid_errors[MAX_PID_ERRORS-1] = (delta_t * (pid_last_error - pid_error)) / 2;
-//    pid_errors[MAX_PID_ERRORS-1] = pid_error;
+    if (input_speed != 0) {
+       pid_errors[MAX_PID_ERRORS-1] = pid_error;
+    }
     //pid_total_error += pid_error;
 
-//    // calculate sum of past errors
-//    for (i=0; i<MAX_PID_ERRORS; i++) {
-//       error_sum += pid_errors[i];
-//    }
+    // calculate sum of past errors
+    for (i=0; i<MAX_PID_ERRORS; i++) {
+       error_sum += pid_errors[i];
+    }
     //error_sum = pid_total_error;
     //if (error_sum < (pid_error * 5)) error_sum = pid_error * 5;
 
@@ -3195,7 +3274,8 @@ static void pid_step() {
          pid_p = ((1000 * kp_m * pid_error) / 1000);
        }
        if (ki_d > 0){
-         pid_i = (((1000 * ki_m * pid_total_error) / ki_d) / 1000); // re-calculate entire error in one step
+         //pid_i = (((1000 * ki_m * pid_total_error) / ki_d) / 1000); // re-calculate entire error in one step
+         pid_i = (((1000 * ki_m * error_sum) / ki_d) / 1000); // re-calculate recent error in one step
        }
 
 /*       a = 1000 * kd_m;
@@ -3206,8 +3286,9 @@ static void pid_step() {
           //pid_d = ((((1000 * kd_m) * (pid_last_last_error - pid_error)) / (kd_d * delta)) / 1000); // last last error
           //pid_d = ((((1000 * kd_m) * (pid_last_error - pid_error)) / (kd_d * delta)) / 1000); // last error
           //pid_d = ((((1000 * kd_m) * (pid_last_last_error - pid_error)) / (kd_d * 1)) / 1000); // last last error (pre-calculated, constant delta) -- POSITIVE
-          pid_d = ((((1000 * kd_m) * (pid_error - pid_last_last_error)) / (kd_d * 1)) / 1000); // last last error (pre-calculated, constant delta) -- NEGATIVE
+          //pid_d = ((((1000 * kd_m) * (pid_error - pid_last_last_error)) / (kd_d * 1)) / 1000); // last last error (pre-calculated, constant delta) -- NEGATIVE
           //pid_d = ((((1000 * kd_m) * (pid_last_error - pid_error)) / (kd_d * 1)) / 1000); // last error (pre-calculated, constant delta) -- POSITIVE (normal) VERSION negates changes in pid_p
+          pid_d = ((((1000 * kd_m) * (pid_last_last_error - pid_last_error)) / (kd_d * 1)) / 1000); // last error (pre-calculated, constant delta) -- POSITIVE (past error) VERSION negates changes in pid_p
           //pid_d = ((((1000 * kd_m) * (pid_error - pid_last_error)) / (kd_d * 40)) / 1000); // last error (pre-calculated, constant delta) -- NEGATIVE VERSION negates changes in pid_i rather than pid_p
           //pid_d = ((((1000 * kd_m) * ((pid_p+pid_i) - pid_last_effort)) / (kd_d * 40)) / 1000); // last error (pre-calculated, constant delta) -- NON-STANDARD VERSION negates changes in effort
           //pid_d /= 2; // average the last and last last errors
@@ -3278,6 +3359,7 @@ static void pid_step() {
       */
 
    }
+   /*
     // check wheel tightness by observing the first dip in speed after the error reset
     if (new_speed > 10 && wheel_too_tight == -1 && !pid_reset_error && input_speed <  pid_last_speed) {
        wheel_too_tight = -2; // check our values when the input speed is greater than the last speed...
@@ -3289,20 +3371,27 @@ static void pid_step() {
           // we're fine, adjust the total error as normal
           wheel_too_tight = 0;
        }
-    }
+    }*/
 
     // move errors back
-    if (pid_last_error != pid_last_last_error || pid_last_error == 0) {
-       pid_last_last_error = pid_last_error; // used to get closer to actual derivitive, as pid_last_error stays stagnant for too long
+//    if (pid_last_error != pid_last_last_error || pid_last_error == 0) {
+//       pid_last_last_error = pid_last_error; // used to get closer to actual derivitive, as pid_last_error stays stagnant for too long
+//    }
+    if (input_speed != 0) {
+       pid_last_last_error = pid_last_error; // used to get closer to actual derivitive
+       pid_last_error = pid_error;
     }
-    pid_last_error = pid_error;
+    /*
     if (pid_last_speed != input_speed) {
        pid_last_speed = input_speed;
+    }*/
+    // move past errors back in error buffer
+    if (input_speed != 0) {
+       for (i=0; i<MAX_PID_ERRORS-1; i++) {
+          pid_errors[i] = pid_errors[i+1];
+       }
     }
-//    // move past errors back in error buffer
-//    for (i=0; i<MAX_PID_ERRORS-1; i++) {
-//       pid_errors[i] = pid_errors[i+1];
-//    }
+    /*
     if (!pid_reset_error) {
        if (wheel_too_tight != 1) { // don't reset total error if our wheel is attached too tightly
           pid_error /= 2; // once we've got through our initial stuff, add in only half the error so "I" reacts slower
@@ -3311,9 +3400,11 @@ static void pid_step() {
           pid_error *= 2; // once we've got through our initial stuff, add in only half the error so "I" reacts slower
           pid_error /= 3; // once we've got through our initial stuff, add in only half the error so "I" reacts slower
        }
-    }
-    pid_total_error += pid_error;
-    if (pid_reset_error && input_speed > new_speed) {
+    }*/
+//    if (input_speed != 0) {
+//       pid_total_error += pid_error;
+//    }
+    /*if (pid_reset_error && input_speed > new_speed) {
        if (wheel_too_tight != 1) { // don't reset total error if our wheel is attached too tightly
           pid_total_error /= 2; // most of our time spent accelerating was waiting for the motor controller
        } else {
@@ -3322,9 +3413,9 @@ static void pid_step() {
           pid_total_error /= 3; // most of our time spent accelerating was waiting for the motor controller
        }
        pid_reset_error = 0; // ... but only do it once per move
-    }
+    }*/
     if (new_speed == 0) {
-       pid_effort = min(pid_effort, 0); // minimum when stopping is 0
+       pid_effort = 0; // when stopping is 0
     } else {
 #if 0
       if (mover_type == IS_MIT) {
@@ -3342,12 +3433,15 @@ static void pid_step() {
          }
       }
 #endif
+       // clamp effort
+       pid_effort = max(min(pid_effort, 1000), 20); // non-zero min to always be touching the throttle line, so the motor controller doesn't reset its timer
     }
+    
          
 #ifdef SEND_PID
     //if ((pid_count++ % 10) == 0) {
        //SENDUSERCONNMSG( "pid4,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i,P,%i,I,%i,D,%i,*,%i,/,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, max(min(pid_effort, 1000), 0), new_speed, input_speed,delta, pid_p, pid_i, pid_d, pid_auto_calibration_mult, pid_auto_calibration_div);
-       SENDUSERCONNMSG( "pid5,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i,P,%i,I,%i,D,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, max(min(pid_effort, 1000), 0), new_speed, input_speed,delta, pid_p, pid_i, pid_d);
+       SENDUSERCONNMSG( "pid5,t,%i,e,%i,u,%i,r,%i,y,%i,o,%i,P,%i,I,%i,D,%i,l,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed, input_speed_old, pid_p, pid_i, pid_d, atomic_read(&position));
     //}
 #endif
 /*
@@ -3362,11 +3456,6 @@ static void pid_step() {
       pidEffortCounter = 0;
     }
 */
-   if (atomic_read(&doing_vel) == FALSE)
-       {
-       atomic_set(&doing_vel, TRUE);
-       mod_timer(&velocity_timer_list, jiffies+((VELOCITY_DELAY_IN_MSECONDS*HZ)/1000));
-       }
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
 
@@ -3375,8 +3464,7 @@ static void pid_step() {
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
 
     // move effort values
-    pid_last_effort = min(pid_effort, 1000); // we didn't actually give more than 100% effort
-    pid_last_effort = max(pid_last_effort, 0); // we didn't actually give less than 0% effort
+    pid_last_effort = pid_effort;
 
     // unlock for next time
     spin_unlock(&pid_lock);
