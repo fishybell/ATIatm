@@ -805,7 +805,7 @@ int main(int argc, char **argv) {
                         minions[mID].S.speed.data = LB_devreg->speed*100.0;
                         minions[mID].S.move.data = LB_devreg->move;
                         minions[mID].S.react.data = LB_devreg->react;
-                        minions[mID].S.position.data = LB_devreg->location;
+                        minions[mID].S.position.data = LB_devreg->location + 0x200; // add back in sign
                         //DDCMSG(D_POINTER, GRAY, "\n\n----------------------\nPosition from LB: %i", LB_devreg->location);
                         /*if (minions[mID].S.position.data > 512) {
                            DDCMSG(D_POINTER, GRAY, "converting to negative: %i", minions[mID].S.position.data);
