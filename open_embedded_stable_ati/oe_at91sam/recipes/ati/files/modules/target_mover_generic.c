@@ -20,6 +20,7 @@
 // Mover type defines
 #define IS_MAT 1
 #define IS_MIT 2
+#define IS_MITP 3
 
 //#define TESTING_ON_EVAL
 //#define TESTING_MAX
@@ -27,12 +28,12 @@
 //#define WOBBLE_DETECT
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
-//#define DEBUG_PRINT
-//#define DEBUG_SEND
-//#define SEND_PID
-//#define SEND_POS
+//#define PRINT_DEBUG
+#define SEND_DEBUG
+#define SEND_PID
+#define SEND_POS
 
-#ifdef DEBUG_SEND
+#ifdef SEND_DEBUG
 #define SENDUSERCONNMSG  sendUserConnMsg
 static void sendUserConnMsg( char *fmt, ...);
 #else
@@ -69,17 +70,17 @@ module_param(min_effort, int, S_IRUGO);
 module_param(max_accel, int, S_IRUGO);
 module_param(max_deccel, int, S_IRUGO);
 
-static char* TARGET_NAME[] = {"old infantry mover","armor mover","48v infantry mover","48v soft-reverse infantry mover","error"};
-static char* MOVER_TYPE[] = {"infantry","armor","infantry","infantry","error"};
+static char* TARGET_NAME[] = {"old infantry mover","armor mover","48v infantry mover","48v infantry mover portable", "48v soft-reverse infantry mover","error"};
+static char* MOVER_TYPE[] = {"infantry","armor","infantry","infantry","infantry","error"};
 
 // continue moving on leg or quad interrupt or neither
-static int CONTINUE_ON[] = {2,1,2,2,0}; // leg = 1, quad = 2, both = 3, neither = 0
+static int CONTINUE_ON[] = {2,1,2,2,2,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
-static int TIMEOUT_IN_MSECONDS[] = {2000,12000,2000,2000,0};
-static int MOVER_DELAY_MULT[] = {2,2,2,2,0};
+static int TIMEOUT_IN_MSECONDS[] = {2000,12000,2000,2000,2000,0};
+static int MOVER_DELAY_MULT[] = {2,2,2,2,2,0};
 
-static int DOCK_RETRY_COUNT[] = {5, 20, 5, 5, 0};
+static int DOCK_RETRY_COUNT[] = {5, 20, 5, 5, 5, 0};
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -99,12 +100,12 @@ static int DOCK_RETRY_COUNT[] = {5, 20, 5, 5, 0};
 // not used? -- static int MIT_SPEEDS[] = {0,7,15,23,33,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 // the maximum allowed speed ticks
 //static int NUMBER_OF_SPEEDS[] = {10,20,10,10,0};
-static int NUMBER_OF_SPEEDS[] = {100,200,200,200,0};
-static int MIN_SPEED[] = {15,10,7,10,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
+static int NUMBER_OF_SPEEDS[] = {100,200,200,200,200,0};
+static int MIN_SPEED[] = {15,10,7,3,10,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
-static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0,0};
-static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0};
+static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0,0,0};
+static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0,0};
 
 // getting going effort stuff
 //static int UNDER_WAY[] = {5, 5, 1, 5, 0}; /* how many encoder clicks before we let go of the getting going effort */
@@ -132,26 +133,26 @@ static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0};
 // static int PID_KD_DIV[]    = {4, 5, 4, 4, 0}; // derivitive gain denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot -- due to throttle cut-off from motor controller, had to adjust by hand afterwards
-static int PID_KP_MULT[]   = {1, 2, 20, 1, 0}; // proportional gain numerator
-static int PID_KP_DIV[]    = {4, 15, 1, 5, 0}; // proportional gain denominator
-static int PID_KI_MULT[]   = {15, 1, 0, 15, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {475150, 184320, 1, 47515, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {190060, 32768, 0, 190060, 0}; // derivitive gain numerator
-static int PID_KD_DIV[]    = {15, 15, 1, 1, 0}; // derivitive gain denominator
+static int PID_KP_MULT[]   = {1, 2, 20, 10, 1, 0}; // proportional gain numerator
+static int PID_KP_DIV[]    = {4, 15, 1, 1, 5, 0}; // proportional gain denominator
+static int PID_KI_MULT[]   = {15, 1, 0, 0, 15, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {475150, 184320, 1, 1, 47515, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {190060, 32768, 0, 0, 190060, 0}; // derivitive gain numerator
+static int PID_KD_DIV[]    = {15, 15, 1, 1, 1, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
-static int MIN_EFFORT[]    = {1000, 1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {1000, 1000, 1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
-static int MIN_EFFORT[]    = {115, 175, 1, 1, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {115, 175, 1, 1, 1, 0}; // minimum effort given to ensure motor moves
 #endif
 // not used? -- static int SPEED_AFTER[]   = {1, 3, 1, 1, 0}; // clamp effort if we hit this many correct values in a row
 // not used? -- static int SPEED_CHANGE[]  = {40, 30, 40, 1, 0}; // unclamp if the error is bigger than this
 // not used? -- static int ADJUST_PID_P[]  = {0, 0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
-static int MAX_ACCEL[]     = {500, 1000, 1000, 1000, 0}; // maximum effort change in one step
-static int MAX_DECCEL[]     = {500, 1000, 1000, 1000, 0}; // maximum effort change in one step
+static int MAX_ACCEL[]     = {500, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
+static int MAX_DECCEL[]     = {500, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
 
 // variables for setting the initial position if it's on the dock or not
-static int DOCK_FEET_FROM_LIMIT[] = {6, 18, 6, 6, 0}; // home many feet away the dock is past the limit
-static int COAST_FEET_FROM_LIMIT[] = {4, 12, 4, 4, 0}; // home many feet away it *typically* coasts past the limit
+static int DOCK_FEET_FROM_LIMIT[] = {6, 18, 6, 6, 6, 0}; // home many feet away the dock is past the limit
+static int COAST_FEET_FROM_LIMIT[] = {4, 12, 4, 4, 4, 0}; // home many feet away it *typically* coasts past the limit
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -178,25 +179,25 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
 // RA - low time setting - cannot exceed RC
 // RB - low time setting - cannot exceed RC
-static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0x1180,0};
-static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0x1180,0};
+static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0x1180,0x1180,0};
+static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0x1180,0x1180,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x0001,0x001,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x0001,0x001,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x0001,0x0001,0x001,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x0001,0x0001,0x001,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
-static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,0};		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,1,0};		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 #define ENCODER_PWM_CHANNEL		0				// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 
 #define MAX_TIME	0x10000
 #define MAX_OVER	0x10000
-static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
-static int ENC_PER_REV[] = {2, 360, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
-static int VELO_K[] = {1680, 1344, 1680, 1680, 0}; // rpm/mph*10
-static int INCHES_PER_REV[] = {314, 157, 314, 314, 0}; // 10 inch, 5 inch, etc. = inches per wheel revolution
-static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 0}; // 5:1 ratio 10 inch wheel 6 ft leg, 2:1 ratio 5 inch wheel 6 ft leg, etc.
+static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
+static int ENC_PER_REV[] = {2, 360, 2, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
+static int VELO_K[] = {1680, 1344, 1680, 1680, 1680, 0}; // rpm/mph*10
+static int INCHES_PER_REV[] = {314, 157, 314, 314, 314, 0}; // 10 inch, 5 inch, etc. = inches per wheel revolution
+static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 2292, 0}; // 5:1 ratio 10 inch wheel 6 ft leg, 2:1 ratio 5 inch wheel 6 ft leg, etc.
 #define TICKS_DIV 100
 
 // to keep updates to the file system in check somewhat
@@ -207,7 +208,7 @@ static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 0}; // 5:1 ratio 10 inch w
 #define PID_TIMEOUT_IN_MILLISECONDS 1000
 #define CONTINUOUS_TIMEOUT_IN_MILLISECONDS 1000
 
-static int COAST_FACTOR[]  = {20, 10, 20, 20, 1}; // divisor to PID_TIMEOUT_IN_MILLISECONDS, tuned for how well the target coasts (smaller for coasts better? bigger for brakes better?)
+static int COAST_FACTOR[]  = {20, 10, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_IN_MILLISECONDS, tuned for how well the target coasts (smaller for coasts better? bigger for brakes better?)
 
 // speed charts (TODO -- update with mover on track with load)
 // static in MOVER0_PWM_TABLE = ?
@@ -238,11 +239,11 @@ module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only 
 #define INPUT_MOVER_DOCK_ACTIVE_STATE	INPUT_CHARGING_BAT_ACTIVE_STATE
 #define LIFTER_POSITION_DOWN 0
 
-static bool PWM_H_BRIDGE[] = {false,false,false,false,false};
-static bool DIRECTIONAL_H_BRIDGE[] = {false,true,true,false,false};
-static bool USE_BRAKE[] = {true,false,false,true,false};
-static bool CONTACTOR_H_BRIDGE[] = {false, false, false, true, false};
-static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false, false};
+static bool PWM_H_BRIDGE[] = {false,false,false,false,false,false};
+static bool DIRECTIONAL_H_BRIDGE[] = {false,true,true,true,false,false};
+static bool USE_BRAKE[] = {true,false,false,false,true,false};
+static bool CONTACTOR_H_BRIDGE[] = {false, false, false, false, true, false};
+static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false, false, false};
 
 // Non-H-Bridge : map motor controller reverse and forward signals based on the 'reverse' parameter
 #define OUTPUT_MOVER_FORWARD	(reverse ? OUTPUT_MOVER_DIRECTION_REVERSE : OUTPUT_MOVER_DIRECTION_FORWARD)
@@ -994,13 +995,13 @@ static int mover_speed_set(int speed) {
 
    SENDUSERCONNMSG( "randy mover_speed_set %i", speed);
    if (speed != 0){
-      if (mover_type == IS_MIT){
+      if (mover_type == IS_MIT || mover_type == IS_MITP){
          selectSpeed = abs(speed);
          if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
          else if (selectSpeed <= 10) tmpSpeed = 13; // 1.3 mph (to meet 1-3 kph)
          else if (selectSpeed <= 20) tmpSpeed = 31; // 3.2 mph (to meet 4-6 kph)
-         else if (selectSpeed <= 30) tmpSpeed = 56; // 5.6 mph (to meet 8-10 kph)
-         else tmpSpeed = 81; // 8.1 mph (to meet 12-14 kph)
+         else if (selectSpeed <= 30) tmpSpeed = 60; // 5.6 mph (to meet 8-10 kph)
+         else tmpSpeed = 85; // 8.1 mph (to meet 12-14 kph)
 //         if (selectSpeed > MOVER_SPEED_SELECTIONS) selectSpeed = MOVER_SPEED_SELECTIONS;
 //         tmpSpeed = MIT_SPEEDS[selectSpeed];
          if (speed < 0) tmpSpeed *= -1;
@@ -1852,7 +1853,7 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
 
         case IS_MAT:
         // initialize armor clock
-        case 3:
+        case 4:
         // initialize infantry/48v soft-reverse clock
         __raw_writel(ATMEL_TC_TIMER_CLOCK2			// Master clock/8 = 132MHz/8 ~ 16MHz
                     | ATMEL_TC_WAVE					// output mode
@@ -1865,6 +1866,7 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
                     tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
         break;
         case IS_MIT:
+        case IS_MITP:
         // initialize infantry/48-v hard-reverse clock
         __raw_writel(ATMEL_TC_TIMER_CLOCK4			// Master clock/128 = 132MHz/128 ~ 1MHz
                     | ATMEL_TC_WAVE					// output mode
@@ -2530,12 +2532,11 @@ int isMoverAtDock(void){
 }
 
 void mover_find_dock(void) {
-
    SENDUSERCONNMSG( "randy mover_find_dock,%i" ,atomic_read(&dockTryCount));
    if (isMoverAtDock() != 0 || atomic_read(&dockTryCount) > DOCK_RETRY_COUNT[mover_type]) {
       return;
    } // At the dock already
-   if (mover_type == IS_MAT || mover_type == IS_MIT){
+   if (mover_type == IS_MAT || mover_type == IS_MIT || mover_type == IS_MITP){
       atomic_set(&find_dock_atomic, 1);
       atomic_inc(&dockTryCount);
       if (dock_loc == 1) { // Dock at end away from home
@@ -2554,7 +2555,7 @@ void mover_go_home(void) {
    atomic_set(&continuous_speed, 0);
    atomic_set(&find_dock_atomic, 0);
    dock_timeout_stop();
-   if (mover_type == IS_MIT){
+   if (mover_type == IS_MIT || mover_type == IS_MITP){
       if (home_loc == 1) { // Dock at end away from home
          if (atomic_read(&last_sensor) != MOVER_SENSOR_END){
                mover_speed_set(28); // Get there kind of fast
@@ -2856,6 +2857,7 @@ static ssize_t clock_store(struct device *dev, struct device_attribute *attr, co
                     tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
         break;
         case IS_MIT:
+        case IS_MITP:
         // initialize infantry/h-bridge clock
         __raw_writel(value			// new clock
                     | ATMEL_TC_WAVE					// output mode
@@ -2993,6 +2995,7 @@ DELAY_PRINTK("changing clock to %i\n", nc);
                     tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
         break;
         case IS_MIT:
+        case IS_MITP:
         // initialize infantry/h-bridge clock
         __raw_writel(nc			// new clock
                     | ATMEL_TC_WAVE					// output mode
@@ -3189,7 +3192,7 @@ static void movement_change(struct work_struct * work)
     target_sysfs_notify(&target_device_mover_generic, "movement");
     }
 
-#ifdef DEBUG_SEND
+#ifdef SEND_DEBUG
 void sendUserConnMsg( char *fmt, ...){
     va_list ap;
     char *msg;
@@ -3479,7 +3482,7 @@ static void pid_step1() {
    int using_ticks, direction;
    // not used? -- int targetRatio, delta;
    // not used? -- int a, b, c;
-#ifdef DEBUG_SEND
+#ifdef SEND_DEBUG
    struct timespec time_now = current_kernel_time();
    struct timespec time_d = timespec_sub(time_now, time_start);
 #endif
@@ -3559,6 +3562,7 @@ static int __init target_mover_generic_init(void)
         case 0: atomic_set(&tc_clock, 1); break;
         case IS_MAT: atomic_set(&tc_clock, 2); break;
         case IS_MIT: atomic_set(&tc_clock, 4); break;
+        case IS_MITP: atomic_set(&tc_clock, 4); break;
     }
 
     // find actual PID values to use based on given mover type or manually given module parameters
