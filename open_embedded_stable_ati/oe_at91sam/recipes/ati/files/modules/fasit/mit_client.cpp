@@ -399,6 +399,9 @@ FUNCTION_START("::handle_2100(int start, int end)")
          doMoveAway(ntohf(msg->speed), 1);
          needPass = false; // don't pass this message to the attached SIT
          break;
+      case CID_Expose_Request:
+         printf("-------------------------\nMIT received Expose: %i, might pass on: %i:%i\n-------------------------\n", msg->exp, needPass, hasSIT());
+         break;
    }
 
    // pass lift commands to SIT

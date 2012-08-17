@@ -152,6 +152,7 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
 
     // hit record
     msg->body.hit = htons(hits);     
+    printf("Setting 2102 hit to %i\n", hits);
     switch (lastHitCal.enable_on) {
         case BLANK_ALWAYS: msg->body.hit_conf.on = 0; break; // off
         case ENABLE_ALWAYS: msg->body.hit_conf.on = 1; break; // on
@@ -539,6 +540,7 @@ int SIT_Client::handle_2100(int start, int end) {
 
         case CID_Status_Request:
             DCMSG(RED,"CID_Status_Request") ; 
+            printf("CID_Status_Request\n") ; 
             break;
 
         case CID_Expose_Request:
@@ -555,6 +557,7 @@ int SIT_Client::handle_2100(int start, int end) {
 
         case CID_Config_Hit_Sensor:
             DCMSG(RED,"CID_Config_Hit_Sensor") ;                
+            printf("CID_Config_Hit_Sensor: %i\n", msg->hit) ;
             break;
 
         case CID_GPS_Location_Request:
