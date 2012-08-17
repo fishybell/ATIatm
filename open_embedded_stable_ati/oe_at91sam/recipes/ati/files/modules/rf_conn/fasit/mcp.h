@@ -401,6 +401,7 @@ typedef struct _thread_data_t {
    int PID;
    int mID;             // minion ID which matches the slave registration
    int rcc_sock;        // socket to RCC
+   int rcc_connected;
    int seq;             // sequence number for the next packet this minion sends as a fasit message
    int RF_addr; // current RF address 
    uint32 devid;        // mac address of this minion which we got back from the RF
