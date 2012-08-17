@@ -59,7 +59,7 @@ void log_NewHits(fasit_connection_t *fc, int new_hits) {
    struct timespec tv;
    int i=0;
    clock_gettime(CLOCK_MONOTONIC,&tv);
-   DDCMSG(D_PACKET, YELLOW, "Remembering %i new hits", new_hits);
+   DCMSG(YELLOW, "Remembering %i new hits", new_hits);
    
    // log each hit time individually
    while (new_hits-- > 0) {
