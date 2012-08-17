@@ -329,7 +329,7 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
          {
             LB_device_reg_t *L=(LB_device_reg_t *)LB;
             strcpy(cmdname,"Device_Reg");
-            sprintf(hbuf,"devid=%3x devtype=%d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d uptime=%d",L->devid,L->dev_type,L->expose,L->speed,L->move,L->react,L->location+0x200,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault, L->uptime);
+            sprintf(hbuf,"devid=%3x devtype=%d exp=%d speed=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d uptime=%d",L->devid,L->dev_type,L->expose,L->speed,L->move,L->react,signPosition(L->location),L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault, L->uptime);
             color=MAGENTA;
          }
          break;
@@ -440,7 +440,7 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
          {
             LB_status_resp_t *L=(LB_status_resp_t *)LB;
             strcpy(cmdname,"Status_Resp_Ext");
-            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d did_exp_cmd=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d event=%d",L->addr,L->expose,L->speed,L->did_exp_cmd,L->move,L->react,L->location+0x200,L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault,L->event);
+            sprintf(hbuf,"RFaddr=%3d exp=%d speed=%d did_exp_cmd=%d move=%d react:%d loc=%d hm=%d tk=%d sens=%d th=%d fault=%d event=%d",L->addr,L->expose,L->speed,L->did_exp_cmd,L->move,L->react,signPosition(L->location),L->hitmode,L->tokill,L->sensitivity,L->timehits,L->fault,L->event);
             color=MAGENTA;
          }
             break;
@@ -1287,4 +1287,25 @@ int setItemsQR(void *msg, int *addrs, int num) {
    }
    return leftover;
 }
+
+// remove sign from a position value (return value will take up 10 bits)
+int unsignPosition(int pos) {
+   LB_status_resp_t lb;
+   int ret;
+   lb.location = pos;
+   ret = lb.location;
+   ret -= 0x200; // do calculation outside of 10-bit space so it wraps
+   return ret;
+}
+
+// add a sign from a position value (return value will take up more than bits)
+int signPosition(int pos) {
+   LB_status_resp_t lb;
+   int ret;
+   lb.location = pos;
+   lb.location += 0x200; // do calculation inside of 10-bit space so it doesn't wrap
+   ret = lb.location;
+   return ret;
+}
+
 

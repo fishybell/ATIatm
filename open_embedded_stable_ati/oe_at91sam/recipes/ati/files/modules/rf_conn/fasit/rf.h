@@ -635,5 +635,7 @@ int __ptype(int cmd);
 int getItemsQR(void *pkt, int *addrs); // get address from quick report packet (big or small) - passed in addrs pointer should have enough space for 8*14 addresses (big) or 3*14 address (normal)
 int setItemsQR(void *pkt, int *addrs, int num); // set address for quick report packet (big or small) - passed in addrs packet pointer should already be allocated and set to the correct big/normal command (will enfore maximum of 3*14 & 8*14 and return however many didn't fit; ideally 0)
 
+int unsignPosition(int pos); // remove sign from a position value (return value will take up 10 bits)
+int signPosition(int pos); // add a sign from a position value (return value will take up more than bits)
 
 #endif
