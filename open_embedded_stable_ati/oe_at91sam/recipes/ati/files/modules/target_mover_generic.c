@@ -29,18 +29,18 @@
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
 //#define PRINT_DEBUG
-#define SEND_DEBUG
-#define SEND_PID
-#define SEND_POS
+//#define SEND_DEBUG
+//#define SEND_PID
+//#define SEND_POS
 
-#ifdef SEND_DEBUG
+#if defined(SEND_DEBUG) || defined(SEND_PID) || defined(SEND_POS)
 #define SENDUSERCONNMSG  sendUserConnMsg
 static void sendUserConnMsg( char *fmt, ...);
 #else
 #define SENDUSERCONNMSG(...)  //
 #endif
 
-#ifdef DEBUG_PRINT
+#ifdef PRINT_DEBUG 
 #define DELAY_PRINTK  delay_printk
 #else
 #define DELAY_PRINTK(...)  //
@@ -2475,6 +2475,8 @@ int mover_set_moveaway_move(int c) {
 EXPORT_SYMBOL(mover_set_moveaway_move);
 
 int mover_set_move_speed(int speed) {
+   SENDUSERCONNMSG( "randy mover_set_move_speed %i at start", speed);
+DELAY_PRINTK("randy mover_set_mover_speed(%i) at start\n", speed);
    atomic_set(&continuous_speed, 0);
    atomic_set(&find_dock_atomic, 0);
    // check to see if we're sleeping or not
@@ -3192,7 +3194,7 @@ static void movement_change(struct work_struct * work)
     target_sysfs_notify(&target_device_mover_generic, "movement");
     }
 
-#ifdef SEND_DEBUG
+#if defined(SEND_DEBUG) || defined(SEND_PID) || defined(SEND_POS)
 void sendUserConnMsg( char *fmt, ...){
     va_list ap;
     char *msg;
