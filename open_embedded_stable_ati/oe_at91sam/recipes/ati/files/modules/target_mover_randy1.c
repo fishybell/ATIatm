@@ -3235,7 +3235,8 @@ static void pid_step() {
       }
     }
          
-   SENDUSERCONNMSG( "pid1,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed,delta);
+   //SENDUSERCONNMSG( "pid1,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed,delta);
+   SENDUSERCONNMSG( "pid5,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i,P,%i,I,%i,D,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, max(min(pid_effort, 1000), 0), new_speed, input_speed,delta, pid_p, pid_i, pid_d);
 /*
     if (pid_effort > 800){
       pidEffortCounter ++;
@@ -3367,7 +3368,8 @@ static void pid_step_randy() {
 
    pid_effort = get_pwm_effort(pid_effort, pid_error);
          
-   SENDUSERCONNMSG( "pid1 randy,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed,delta);
+   //SENDUSERCONNMSG( "pid1 randy,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed,delta);
+   SENDUSERCONNMSG( "pid5,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i,P,%i,I,%i,D,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, max(min(pid_effort, 1000), 0), new_speed, input_speed,delta, pid_p, pid_i, pid_d);
    if (atomic_read(&doing_vel) == FALSE)
        {
        atomic_set(&doing_vel, TRUE);
