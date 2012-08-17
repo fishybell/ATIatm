@@ -2781,6 +2781,7 @@ void *minion_thread(thread_data_t *minion){
 
    clock_gettime(CLOCK_MONOTONIC,&mt.istart_time);  // get the intial current time
    minion->rcc_sock=-1; // mark the socket so we know to open again
+   minion->rcc_connected = 0; // we've never connected to the rcc before
    while(!close_nicely) {
 
       if (minion->rcc_sock<0) {
@@ -2984,7 +2985,7 @@ void *minion_thread(thread_data_t *minion){
                   minion->S.resp.current_exp = LB_devreg->expose ? 90 : 0;
                   minion->S.resp.current_direction = LB_devreg->move ? 1 : 2;
                   minion->S.resp.current_speed = LB_devreg->speed; // unmodified, but still treat as modified
-                  minion->S.resp.current_position = LB_devreg->location + 0x200; // add back in sign
+                  minion->S.resp.current_position = signPosition(LB_devreg->location);
                   minion->S.resp.last_exp = -1;
                   minion->S.resp.last_direction = -1;
                   minion->S.resp.last_speed = -1;
@@ -3008,6 +3009,18 @@ void *minion_thread(thread_data_t *minion){
                   } else {
                      // moving and/or exposed = fast lookup
                      DO_FAST_LOOKUP(minion->S);
+                  }
+                  // check to see if this is a reconnect or the original connect
+                  if (minion->rcc_connected) {
+                     // we've connected before, so create a reconnect event on the rcc by disconnecting here...
+                     close(minion->rcc_sock);
+                     minion->rcc_sock=-1;     // make sure it is marked as closed
+                     sleep(1);                // adding a little extra wait
+                     // ... and reconnecting at the beginning of the loop
+                     ///// don't mess with rcc_connected as we won't get a LBC_DEVICE_REG packet later /////
+                  } else {
+                     // we've now connected (although technically we connected at the beginning of the minion loop)
+                     minion->rcc_connected = 1;
                   }
                } break;
 
@@ -3445,7 +3458,7 @@ void *minion_thread(thread_data_t *minion){
                      minion->S.tokill.newdata = L->tokill;
                      minion->S.mode.newdata = L->hitmode ? 2 : 1; // back to burst/single
                      minion->S.sens.newdata = L->sensitivity;
-                     minion->S.position.data = L->location + 0x200; // add back in sign
+                     minion->S.position.data = signPosition(L->location);
                      minion->S.speed.fpos = (float)minion->S.position.data;
                      minion->S.speed.lastfpos = (float)minion->S.position.data;
                      minion->S.burst.newdata = L->timehits * 5; // convert back
@@ -3526,8 +3539,9 @@ void *minion_thread(thread_data_t *minion){
             strerror_r(errno,mb.buf,BufSize);
             DDCMSG(D_PACKET,RED,"Minion %i: read_FASIT_msg returned %i and Error: %s", minion->mID,result,mb.buf);
             DDCMSG(D_PACKET,RED,"Minion %i: which means it likely has closed!", minion->mID);
+            close(minion->rcc_sock);
             minion->rcc_sock=-1;        // mark the socket so we know to open again
-
+            minion->rcc_connected = 0; // as we've now disconnected, pretend that we've never connected to the rcc before
          }
          timestamp(&mt);    
          DDCMSG(D_TIME,CYAN,"Minion %i: End of RCC Parse at %i.%03iet, delta=%i.%03i"
