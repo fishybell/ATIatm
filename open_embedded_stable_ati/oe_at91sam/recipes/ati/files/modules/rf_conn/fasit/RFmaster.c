@@ -1206,7 +1206,7 @@ int main(int argc, char **argv) {
    SRport = smartrangePORT;
    strcpy(ttyport,"/dev/ttyS0");
    hardflow=6;
-   repeat_count = 2; // repeat twice by default
+   repeat_count = 4; // repeat twice by default
    repeat_wait = 500; // repeat every 500 ms by default (enough time to wait for full 255 byte packet to transmit)
    
    while((opt = getopt(argc, argv, "hv:r:i:f:t:p:s:x:l:d:D:c:w:j:J:")) != -1) {
