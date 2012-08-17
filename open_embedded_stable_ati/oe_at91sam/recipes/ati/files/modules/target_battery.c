@@ -162,7 +162,7 @@ module_param(minvoltval, int, S_IRUGO);
 const int BATTERY_NORMAL[] = {45, 90, 135, 180, 255};	// at or above this value is considered normal
 const int BATTERY_LOW[] =    {42, 84, 126, 168, 4};		// at or above this value (and below above) is considered low
 const int BATTERY_CRIT[] =   {41, 82, 123, 164, 3};		// at or above this value (and below above) is considered critical
-const int BATTERY_HALT[] =   {40, 80, 120, 160, 2};		// at or below this value (and above below) requires immediate halt of device -- should be around 10v, 20v, 30v, 40v
+const int BATTERY_HALT[] =   {40, 80, 120, 40, 2};		// at or below this value (and above below) requires immediate halt of device -- should be around 10v, 20v, 30v, 10v (movers drop power very low during run)
 const int BATTERY_WAIT[] =   {5, 5, 5, 5, 1};			// at or below this value signifies an invalid battery value...ignore
 
 //---------------------------------------------------------------------------
