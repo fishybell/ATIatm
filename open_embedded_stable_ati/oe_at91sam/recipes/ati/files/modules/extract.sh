@@ -42,13 +42,16 @@ mv /usr/bin/fasit_conn /usr/bin/fasit_conn.old
 mv fasit_conn /usr/bin
 mv /usr/bin/user_conn /usr/bin/user_conn.old
 mv user_conn /usr/bin
-mv ati2/files/interfaces /etc/network
+mv ati2/files/fixhost /etc/init.d
+mv ati2/files/start_up /etc/init.d
+#--mv ati2/files/interfaces /etc/network -- don't uncomment unless you want to break manually changed IP settings -- TODO -- make a fix_interfaces file like the fixhost file to do it before start_up is ran so we can change the IP settings via eeprom
 mv ati2/files/* /usr/bin
 mv sysvinit/sysvinit/inittab /etc
 
 echo "Finished Copying Files"
 echo ""
 
+# uncomment this block to change radio settings
 #if [ "$(eeprom_rw read -addr 0x550 -size 3)" -lt 240 ] ; then
 #   echo "Changing radio to maximum awesomeness"
 #   echo ""
@@ -59,10 +62,17 @@ echo ""
 #   echo "25" | eeprom_rw write -addr 0x558 -size 2 -blank 2
 #fi
 
+# uncomment this block to change a SIT on a MIT to be a SIT on a MIT correctly
 #if [ "$(is_board)" == "SIT" ] ; then
 #   echo "Fixing SIT locality"
 #   be_local
 #   echo -n "auto" | /usr/bin/eeprom_rw write -addr 0xC0 -size 5 -blank 0x3F
+#fi
+
+# uncomment this block to change a MAT to a MATOLD
+#if [ "$(is_board)" == "MAT" ] ; then
+#   echo "Old-ifying MAT"
+#   be_MATOLD
 #fi
 
 echo "Restarting Device"
