@@ -10,9 +10,10 @@ using namespace std;
 #include "timers.h"
 #include "tcp_factory.h"
 
-FASIT_TCP::FASIT_TCP(int fd) : Connection(fd) {
+FASIT_TCP::FASIT_TCP(int fd, bool armor) : Connection(fd) {
 FUNCTION_START("::FASIT_TCP(int fd) : Connection(fd)");
    seq = 0;
+   this->armor = armor;
 
    // initialize the client connection later
    client = NULL;
@@ -22,10 +23,11 @@ FUNCTION_END("::FASIT_TCP(int fd) : Connection(fd)");
 }
 
 // special case when initializing as a client
-FASIT_TCP::FASIT_TCP(int fd, int tnum) : Connection(fd) {
+FASIT_TCP::FASIT_TCP(int fd, int tnum, bool armor) : Connection(fd) {
 FUNCTION_START("::FASIT_TCP(int fd) : Connection(fd)");
    seq = 0;
    setTnum(tnum);
+   this->armor = armor;
 
 FUNCTION_END("::FASIT_TCP(int fd) : Connection(fd)");
 }

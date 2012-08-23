@@ -22,7 +22,7 @@ const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,
 /***********************************************************
  *                     SIT_Client Class                     *
  ***********************************************************/
-SIT_Client::SIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
+SIT_Client::SIT_Client(int fd, int tnum, bool armor) : TCP_Client(fd, tnum, armor) {
     FUNCTION_START("::SIT_Client(int fd, int tnum) : Connection(fd)");
 
     // we have not yet connected to SmartRange/TRACR
@@ -145,7 +145,11 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
     }
 
     // device type
-    msg->body.type = 1; // SIT. TODO -- SIT vs. SAT vs. HSAT
+    if (armor) {
+       msg->body.type = 3; // SAT -- TODO -- HSAT vs. SAT?
+    } else {
+       msg->body.type = 1; // SIT
+    }
 
     //   DCMSG(YELLOW,"before  doHits(-1)   hits = %d",hits) ;    
     //doHits(-1);  // request the hit count ... or not, it isn't needed or wanted 

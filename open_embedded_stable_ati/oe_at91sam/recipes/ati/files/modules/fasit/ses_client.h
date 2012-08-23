@@ -20,7 +20,7 @@ extern int start_config;
 // parses SES messages
 class SES_Client : public TCP_Client {
 public :
-   SES_Client(int fd, int tnum);
+   SES_Client(int fd, int tnum, bool armor);
    virtual ~SES_Client();
 
    // individual commands

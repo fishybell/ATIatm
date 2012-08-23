@@ -33,8 +33,8 @@ extern volatile int KERN_ROLE; // the role this kernel handles
 // for handling the tcp connection
 class Kernel_TCP : public Connection {
 public :
-   Kernel_TCP(int fd, int tnum); // instantiated as client
-   Kernel_TCP(int fd);           // instantiated as server
+   Kernel_TCP(int fd, int tnum, bool armor); // instantiated as client
+   Kernel_TCP(int fd, bool armor);           // instantiated as server
    virtual ~Kernel_TCP();
    virtual int parseData(int rsize, const char *rbuf);
 

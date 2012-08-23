@@ -7,7 +7,7 @@
 
 class TCP_Factory : public Connection { // we only use Connection for the use of its epoll file descriptor
 public :
-   TCP_Factory(const char *destIP, int port);
+   TCP_Factory(const char *destIP, int port, bool armor);
    ~TCP_Factory();
 
    template <class TCP_Class> // class needs to be similar to or inherit TCP_Client
@@ -21,6 +21,7 @@ protected :
    int handleRead(const epoll_event *ev) { return 0; };
    int parseData(int rsize, const char *rbuf) { return 0; };
    bool auto_ip;
+   bool armor;
 
 #ifdef EVENT_CONN
    public:

@@ -199,13 +199,16 @@ PROG_START
    bool startSIT = false;
    bool startMIT = false;
    bool startSES = false;
+   bool armor = false;
    
 const char *usage = "Usage: %s [options]\n\
 \t-l X   -- listen on port X rather than the default \n\
 \t-p X   -- connect to port X rather than the default \n\
 \t-i X   -- connect to IP address X\n\
 \t-S     -- instantiate a SIT handler\n\
+\t-s     -- instantiate a (H)SAT handler\n\
 \t-M     -- instantiate a MIT handler\n\
+\t-m     -- instantiate a MAT handler\n\
 \t-E     -- instantiate an SES handler\n\
 \t-v     -- Enable ERROR messages\n\
 \t-vv    -- Enable ERROR, INFO messages\n\
@@ -224,9 +227,15 @@ const char *usage = "Usage: %s [options]\n\
          case 'E' :
             startSES = true;
             break;
+         case 's' :
+            armor = true;
+            // fall through as we don't a SAT_client class, just a generic lifter class called SIT_client
          case 'S' :
             startSIT = true;
             break;
+         case 'm' :
+            armor = true;
+            // fall through as we don't a MAT_client class, just a generic mover class called MIT_client
          case 'M' :
             startMIT = true;
             break;
@@ -322,9 +331,9 @@ const char *usage = "Usage: %s [options]\n\
 
    /* start the factory */
    if (base != 0) {
-      factory = new TCP_Factory(argv[base], cport); // parameter based IP address
+      factory = new TCP_Factory(argv[base], cport, armor); // parameter based IP address
    } else {
-      factory = new TCP_Factory(defIP, cport); // default IP address according to FASIT spec
+      factory = new TCP_Factory(defIP, cport, armor); // default IP address according to FASIT spec
    }
    Connection::Init(factory, kdpfd);
 
@@ -390,7 +399,7 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
                IMSG("Attached SIT to MIT\n")
             } else {
                // connect new client as proxy
-               fasit_tcp = new FASIT_TCP(client);
+               fasit_tcp = new FASIT_TCP(client, armor);
             }
             // connect new client and add to epoll
             memset(&ev, 0, sizeof(ev));

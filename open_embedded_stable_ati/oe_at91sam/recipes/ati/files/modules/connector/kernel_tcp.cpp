@@ -21,7 +21,7 @@ using namespace std;
 /***********************************************************
 *                     Kernel_TCP Class                     *
 ***********************************************************/
-Kernel_TCP::Kernel_TCP(int fd) : Connection(fd) {
+Kernel_TCP::Kernel_TCP(int fd, bool armor) : Connection(fd) {
 FUNCTION_START("::Kernel_TCP(int fd) : Connection(fd)")
    // connect our netlink connection
    kern_conn = NL_Conn::newConn<Kern_Conn>(this);
@@ -34,7 +34,7 @@ FUNCTION_START("::Kernel_TCP(int fd) : Connection(fd)")
 FUNCTION_END("::Kernel_TCP(int fd) : Connection(fd)")
 }
 
-Kernel_TCP::Kernel_TCP(int fd, int tnum) : Connection(fd) {
+Kernel_TCP::Kernel_TCP(int fd, int tnum, bool armor) : Connection(fd) {
 FUNCTION_START("::Kernel_TCP(int fd, int tnum) : Connection(fd)")
    setTnum(tnum);
 

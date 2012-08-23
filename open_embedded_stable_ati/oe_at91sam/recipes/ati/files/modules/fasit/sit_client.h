@@ -16,7 +16,7 @@ extern int start_config;
 // parses SIT messages
 class SIT_Client : public TCP_Client {
 public :
-   SIT_Client(int fd, int tnum);
+   SIT_Client(int fd, int tnum, bool armor);
    virtual ~SIT_Client();
 
    // individual commands

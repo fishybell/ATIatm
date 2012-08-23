@@ -10,7 +10,7 @@ using namespace std;
 #include "common.h"
 #include "timers.h"
 
-TCP_Client::TCP_Client(int fd, int tnum) : FASIT_TCP(fd, tnum) {
+TCP_Client::TCP_Client(int fd, int tnum, bool armor) : FASIT_TCP(fd, tnum, armor) {
 FUNCTION_START("::TCP_Client(int fd, int tnum) : Connection(fd)")
    server = NULL;
 FUNCTION_END("::TCP_Client(int fd, int tnum) : Connection(fd)")

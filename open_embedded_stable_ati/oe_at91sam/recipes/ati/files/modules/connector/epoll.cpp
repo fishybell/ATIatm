@@ -261,9 +261,9 @@ const char *usage = "Usage: %s [options]\n\
 
    /* start the factory */
    if (base != 0) {
-      factory = new TCP_Factory(argv[base], cport); // parameter based IP address
+      factory = new TCP_Factory(argv[base], cport, false); // parameter based IP address -- false = not an "armor" device
    } else {
-      factory = new TCP_Factory(defIP, cport); // default IP address
+      factory = new TCP_Factory(defIP, cport, false); // default IP address -- false = not an "armor" device
    }
    Connection::Init(factory, kdpfd);
 
@@ -317,7 +317,7 @@ DMSG("epoll_wait with %i timeout\n", msec_t);
             }
             setnonblocking(client, true); // socket
             // connect new client to kernel and add to epoll
-            Kernel_TCP *kern_tcp = new Kernel_TCP(client);
+            Kernel_TCP *kern_tcp = new Kernel_TCP(client, false); // false = not an "armor" device
             ev.events = EPOLLIN;
             ev.data.ptr = (void*)kern_tcp;
             if (epoll_ctl(kdpfd, EPOLL_CTL_ADD, client, &ev) < 0) {

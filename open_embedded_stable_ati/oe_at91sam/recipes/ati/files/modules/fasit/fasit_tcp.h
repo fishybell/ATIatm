@@ -11,8 +11,8 @@ using namespace std;
 // parses TCP messages
 class FASIT_TCP : public Connection, public FASIT {
 public :
-   FASIT_TCP(int fd, int tnum); // when initializing as a client
-   FASIT_TCP(int fd);
+   FASIT_TCP(int fd, int tnum, bool armor); // when initializing as a client
+   FASIT_TCP(int fd, bool armor);
    virtual ~FASIT_TCP();
 
    void newClient(); // creates a new TCP_Client object for this server instance
@@ -29,6 +29,7 @@ public :
 protected:
    // the correspsonding client connection for this server instance
    class TCP_Client *client;
+   bool armor;
 
    // individual message handlers, all return -1 if the connectionneeds to be
    //   deleted afterwards

@@ -21,7 +21,7 @@ const u32 MIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,
 /***********************************************************
 *                     MIT_Client Class                     *
 ***********************************************************/
-MIT_Client::MIT_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
+MIT_Client::MIT_Client(int fd, int tnum, bool armor) : TCP_Client(fd, tnum, armor) {
 FUNCTION_START("::MIT_Client(int fd, int tnum) : Connection(fd)")
    // connect a fake SIT for now
    att_SIT = new attached_SIT_Client(NULL, 0, -1); // invalid tnum
@@ -101,7 +101,11 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
    msg->body.pos = htons(feetToMeters(lastPosition));
 
    // device type
-   msg->body.type = 2; // MIT. TODO -- MIT vs. MAT
+   if (armor) {
+      msg->body.type = 4; // MAT
+   } else {
+      msg->body.type = 2; // MIT
+   }
 
    // hit record
    msg->body.hit = lastSITstatus.body.hit;

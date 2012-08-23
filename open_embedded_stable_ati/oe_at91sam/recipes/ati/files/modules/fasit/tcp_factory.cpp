@@ -23,11 +23,12 @@ using namespace std;
 
 #define MAX_CONN 1200
 
-TCP_Factory::TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF) { // always invalid fd will close with an error, but do so silently
+TCP_Factory::TCP_Factory(const char *destIP, int port, bool armor) : Connection(0xDEADBEEF) { // always invalid fd will close with an error, but do so silently
 FUNCTION_START("::TCP_Factory(const char *destIP, int port) : Connection(0xDEADBEEF)")
    memset(&server, 0, sizeof(server));
    server.sin_family = AF_INET;
    auto_ip = false;
+   this->armor = armor;
    if (!inet_aton(destIP, &server.sin_addr)) {
       // failed to get IP from given string, automatically find vai multi-cast dns
       auto_ip = true;
@@ -152,7 +153,7 @@ FUNCTION_START("::newConn()")
    int sock = newClientSock();
 
    // create new TCP_Class (with predefined tnum)
-   TCP_Class *tcp = new TCP_Class(sock, findNextTnum());
+   TCP_Class *tcp = new TCP_Class(sock, findNextTnum(), armor);
 DMSG("Created new connection %i with tnum %i\n", tcp->getFD(), tcp->getTnum())
 
    // check to see if it connected and attempt adding to epoll

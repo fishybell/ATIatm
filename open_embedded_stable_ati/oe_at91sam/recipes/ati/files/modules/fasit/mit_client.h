@@ -14,7 +14,7 @@ using namespace std;
 // parses MIT messages
 class MIT_Client : public TCP_Client {
 public :
-   MIT_Client(int fd, int tnum);
+   MIT_Client(int fd, int tnum, bool armor);
    virtual ~MIT_Client();
 
    // SIT attachment commands

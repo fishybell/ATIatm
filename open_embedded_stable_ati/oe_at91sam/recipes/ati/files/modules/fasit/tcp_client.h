@@ -12,7 +12,7 @@ using namespace std;
 // parses TCP messages
 class TCP_Client : public FASIT_TCP {
 public :
-   TCP_Client(int fd, int tnum);
+   TCP_Client(int fd, int tnum, bool armor);
    virtual ~TCP_Client();
    friend class FASIT_TCP;
 

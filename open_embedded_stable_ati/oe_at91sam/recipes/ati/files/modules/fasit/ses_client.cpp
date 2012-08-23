@@ -18,7 +18,7 @@ using namespace std;
 /***********************************************************
 *                     SES_Client Class                     *
 ***********************************************************/
-SES_Client::SES_Client(int fd, int tnum) : TCP_Client(fd, tnum) {
+SES_Client::SES_Client(int fd, int tnum, bool armor) : TCP_Client(fd, tnum, armor) {
 FUNCTION_START("::SES_Client(int fd, int tnum) : Connection(fd)")
    // connect our netlink connection
    nl_conn = NL_Conn::newConn<SES_Conn>(this);
