@@ -1,6 +1,8 @@
 #ifndef _RF_H_
 #define _RF_H_
 
+#include "../../fasit/faults.h"
+
 //  these are the verbosity bits.   fix the print_verbosity in rf.c if you change any
 #define D_NONE          0
 #define D_PACKET        1
@@ -638,4 +640,5 @@ int setItemsQR(void *pkt, int *addrs, int num); // set address for quick report 
 int unsignPosition(int pos); // remove sign from a position value (return value will take up 10 bits)
 int signPosition(int pos); // add a sign from a position value (return value will take up more than bits)
 
+int badFault(int fault); // -2 = status sent repeatedly to FASIT server, -1 = status sent once to FASIT server, 0 = status that is simulated, 1 = error
 #endif

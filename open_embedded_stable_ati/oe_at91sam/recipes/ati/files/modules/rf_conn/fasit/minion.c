@@ -2,7 +2,6 @@
 #include "rf.h"
 #include "fasit_c.h"
 #include "RFslave.h"
-#include "../../fasit/faults.h"
 
 #define S_set(ITEM,D,ND,F,T) \
     { \
@@ -103,66 +102,6 @@ void defHeader(FASIT_header *rhdr,int mnum,int seq,int length){
       case 2005:
       case 2006:
          rhdr->icd1 = htons(2);
-         break;
-   }
-}
-
-// is the fault a status (good) or a malfunction (bad) ?
-int badFault(int fault) {
-   switch(fault) {
-      default: /* future statuses that aren't in the FASIT spec won't cause a fault here by default */
-      case ERR_normal:
-      case ERR_stop_right_limit:
-      case ERR_stop_left_limit:
-      case ERR_stop_by_distance:
-      case ERR_stop:
-      case ERR_target_killed:
-      case ERR_left_dock_limit:
-      case ERR_stop_dock_limit:
-         return 0; // these are simulated and never sent directly from target to FASIT server
-         break;
-
-      /* even the ones that are actual statuses below should be treated as faults so the FASIT server sees them */
-      case ERR_critical_battery:
-      case ERR_charging_battery:
-         return -2; // non-status fields that are sent continuously to the FASIT server
-         break;
-      case ERR_normal_battery:
-      case ERR_connected_SIT:
-      case ERR_notcharging_battery:
-         return -1; // non-status fields that are sent to the FASIT server
-         break;
-
-      /* actual errors */
-      case ERR_both_limits_active:
-      case ERR_invalid_direction_req:
-      case ERR_invalid_speed_req:
-      case ERR_speed_zero_req:
-      case ERR_emergency_stop:
-      case ERR_no_movement:
-      case ERR_over_speed:
-      case ERR_unassigned:
-      case ERR_wrong_direction:
-      case ERR_lifter_stuck_at_limit:
-      case ERR_actuation_not_complete:
-      case ERR_not_leave_conceal:
-      case ERR_not_leave_expose:
-      case ERR_not_reach_expose:
-      case ERR_not_reach_conceal:
-      case ERR_low_battery:
-      case ERR_engine_stop:
-      case ERR_IR_failure:
-      case ERR_audio_failure:
-      case ERR_miles_failure:
-      case ERR_thermal_failure:
-      case ERR_hit_sensor_failure:
-      case ERR_invalid_target_type:
-      case ERR_bad_RF_packet:
-      case ERR_bad_checksum:
-      case ERR_unsupported_command:
-      case ERR_invalid_exception:
-      case ERR_disconnected_SIT:
-         return 1;
          break;
    }
 }
@@ -1604,7 +1543,13 @@ void QConcealSentCallback(thread_data_t *minion, minion_time_t *mt, char *msg, v
    START_CONCEAL_TIMER(minion->S); // pretend to start concealing
    // new timer stuff
    minion->S.ignoring_response = 2; // not ignoring responses after next request is sent
-   DO_FAST_LOOKUP(minion->S);
+   if (minion->S.resp.current_speed == 0 && minion->S.resp.current_exp == 0) {
+      // not moving and not exposed
+      DO_SLOW_LOOKUP(minion->S);
+   } else {
+      // moving and/or exposed
+      DO_FAST_LOOKUP(minion->S);
+   }
    Cancel_Status_Resp_Timer(minion);
 }
 
@@ -2280,8 +2225,11 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                         minion->S.resp.mover_command = move_right;
                      } else {
                         DDCMSG(D_PACKET,BLUE,"Minion %i: CID_Move_Request: direction 0",minion->mID);
-                        LB_move->move = 0;
                         LB_move->speed = 0;
+                     }
+                     if (LB_move->speed == 0) {
+                        DDCMSG(D_PACKET,BLUE,"Minion %i: CID_Move_Request: speed 0",minion->mID);
+                        LB_move->move = 0;
                         minion->S.resp.mover_command = move_stop;
                      }
                      break;
@@ -2312,7 +2260,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                      break;
                }
                // new timer stuff
-               if (message_2100->cid == CID_Stop) {
+               if (minion->S.resp.mover_command == move_stop) {
                   // stop request
                   if (minion->S.resp.current_exp == 0) { // not exposed
                      minion->S.ignoring_response = 1; // ignoring responses due to moving
@@ -3058,13 +3006,13 @@ void *minion_thread(thread_data_t *minion){
                   if (minion->S.rf_t.slow_flags) {
                   DDCMSG(D_POINTER, GREEN, "Reset slow...%s:%i", __FILE__, __LINE__);
                      stopTimer(minion->S.rf_t, slow_timer, slow_flags);
-                     setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start);
+                     setTimerTo(minion->S.rf_t, slow_timer, slow_flags, slow_time, F_slow_start);
                      minion->S.rf_t.slow_missed = 0;
                   }
                   if (minion->S.rf_t.fast_flags) {
                      DDCMSG(D_POINTER, GREEN, "Reset fast...%s:%i", __FILE__, __LINE__);
                      stopTimer(minion->S.rf_t, fast_timer, fast_flags);
-                     setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start);
+                     setTimerTo(minion->S.rf_t, fast_timer, fast_flags, fast_time, F_fast_start);
                      minion->S.rf_t.fast_missed = 0;
                   }
 #endif /* ...end of bad idea code */

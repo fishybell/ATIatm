@@ -14,10 +14,12 @@ const char *__PROGRAM__ = "MCP ";
 thread_data_t minions[2046];    // we do start at 0 and there cannot be more than 2046
 struct sockaddr_in fasit_addr;
 int verbose;
-int slottime,total_slots,inittime;
+int slottime=130,total_slots,inittime=50;
 int low_dev,high_dev;
 int steps_translation[] = {0, 45, 90, 45, -1}; /* translate a trans_step_t value into an exposure angle */
 const char *step_words[] = {"TS_concealed", "TS_con_to_exp", "TS_exposed", "TS_exp_to_con", "TS_too_far"};
+int fast_time = FAST_TIME;
+int slow_time = SLOW_TIME;
 
 // MIT/MAT speed constants
 int MIT_SPEEDS[] = {0, 695, 1389, 2500, 3611}; // in meters per second (times 1000)
@@ -27,28 +29,30 @@ int MAT_ACCEL[] = {0, 500, 1000, 1500, 2000};  // in meters per second per secon
 
 void print_help(int exval) {
    printf("mcp [-h] [-v num] [-f ip] [-p port] [-r ip] [-m port] [-n minioncount]\n\n");
-   printf("  -h            print this help and exit\n");
-   printf("  -f 127.0.0.1  set FASIT server IP address\n");
-   printf("  -p 4000       set FASIT server port address\n");
-   printf("  -r 127.0.0.1  set RFmaster server IP address\n");
-   printf("  -m 4004       set RFmaster server port address\n");
-   printf("  -t 50         hunttime in seconds.  Time we wait before doing a slave hunt again\n");
-   printf("  -l 10         simulated track length of MITs, in  meters\n");
-   printf("  -L 100        simulated track length of MATs, in  meters\n");
-   printf("  -q 2          simulated home track position of MITs, in meters\n");
-   printf("  -Q 4          simulated home track position of MATs, in meters\n");
-   printf("  -x 8          simulated end track position of MITs, in meters\n");
-   printf("  -X 96         simulated end track position of MATs, in meters\n");
-   printf("  -i 250        initial wait time in ms (5ms granules, 1275 ms max\n");
-   printf("  -s 150        slottime in ms (5ms granules, 1275 ms max\n");
-   printf("  -d 0x20       Lowest devID to find\n");
-   printf("  -D 0x30       Highest devID to find\n");
-   printf("  -H            Hunt forever. Only use for debugging.\n");
-   printf("  -F <name>     send file over RF (will exit when finished, requires C and c, E&R optional)\n");
-   printf("  -C <path>     full path name of destination file on device\n");
-   printf("  -E            have device execute file after it has been transferred\n");
-   printf("  -R            have device reboot after the file has been transferred\n");
-   printf("  -c 40         wait for this number of devices to connect before starting transfer\n");
+   printf("  -h              print this help and exit\n");
+   printf("  -f 192.168.1.1  set FASIT server IP address\n");
+   printf("  -p 4000         set FASIT server port address\n");
+   printf("  -r 192.168.1.2  set RFmaster server IP address\n");
+   printf("  -m 4004         set RFmaster server port address\n");
+   printf("  -j 120          Slow poll time. Time, in seconds, to poll for status on Active targets.\n");
+   printf("  -J 13           Fast poll time. Time, in seconds, to poll for status on Inactive targets.\n");
+   printf("  -t 50           hunttime in seconds.  Time we wait before doing a slave hunt again\n");
+   printf("  -l 11           simulated track length of MITs, in total drivable meters, including past limits\n");
+   printf("  -L 250          simulated track length of MATs, in total drivable meters, including past limits\n");
+   printf("  -q 2            simulated home track position of MITs, in meters from dock\n");
+   printf("  -Q 10           simulated home track position of MATs, in meters from dock\n");
+   printf("  -x 9            simulated end track position of MITs, in meters from end stop\n");
+   printf("  -X 240          simulated end track position of MATs, in meters from end stop\n");
+   printf("  -i 50           initial wait time in ms (5ms granules, 1275 ms max\n");
+   printf("  -s 130          slottime in ms (5ms granules, 1275 ms max\n");
+   printf("  -d 0x20         Lowest devID to find\n");
+   printf("  -D 0x30         Highest devID to find\n");
+   printf("  -H              Hunt forever. Only use for debugging.\n");
+   printf("  -F <name>       send file over RF (will exit when finished, requires C and c, E&R optional)\n");
+   printf("  -C <path>       full path name of destination file on device\n");
+   printf("  -E              have device execute file after it has been transferred\n");
+   printf("  -R              have device reboot after the file has been transferred\n");
+   printf("  -c 40           wait for this number of devices to connect before starting transfer\n");
    print_verbosity();
    exit(exval);
 }
@@ -144,12 +148,6 @@ int main(int argc, char **argv) {
    timestamp(&mt);   // make sure the delta_time gets set    
 
    // process the arguments
-   //  -f 192.168.10.203   RCC ip address
-   //  -p 4000          RCC port number
-   //  -r 127.0.0.1     RFmaster ip address
-   //  -m 4004          RFmaster port number
-   //  -n 1             Number of minions to fire up
-   //  -v 1             Verbosity level
 
    // MAX_NUM_Minions is defined in mcp.h, and minnum - the current number of minions.
    minnum = 0;  // now start with no minions
@@ -159,21 +157,21 @@ int main(int argc, char **argv) {
    hunttime=30;
 
    // for faking moving stuff
-   mit_length=10; mat_length=100;
-   mit_home=2; mat_home=4;
-   mit_end=8; mat_end=96;
+   mit_length=11; mat_length=250;
+   mit_home=2; mat_home=10;
+   mit_end=9; mat_end=240;
 
    /* start with a clean address structures */
    memset(&fasit_addr, 0, sizeof(struct sockaddr_in));
    fasit_addr.sin_family = AF_INET;
-   fasit_addr.sin_addr.s_addr = inet_addr("192.168.10.203");    // fasit server the minions will connect to
+   fasit_addr.sin_addr.s_addr = inet_addr("192.168.1.1");    // fasit server the minions will connect to
    fasit_addr.sin_port = htons(4000);                           // fasit server port number
    memset(&RF_addr, 0, sizeof(struct sockaddr_in));
    RF_addr.sin_family = AF_INET;
-   RF_addr.sin_addr.s_addr = inet_addr("127.0.0.1");            // RFmaster server the MCP connects to
+   RF_addr.sin_addr.s_addr = inet_addr("192.168.1.2");            // RFmaster server the MCP connects to
    RF_addr.sin_port = htons(4004);                              // RFmaster server port number
 
-   while((opt = getopt(argc, argv, "hHERv:m:r:i:p:f:s:d:D:t:q:Q:l:L:x:X:F:C:c:")) != -1) {
+   while((opt = getopt(argc, argv, "hHERv:m:r:i:p:f:s:d:D:t:q:Q:l:L:x:X:F:C:c:j:J:")) != -1) {
       switch(opt) {
          case 'h':
             print_help(0);
@@ -249,6 +247,14 @@ int main(int argc, char **argv) {
 
          case 'r':
             RF_addr.sin_addr.s_addr = inet_addr(optarg);
+            break;
+
+         case 'j':
+            slow_time = atoi(optarg);
+            break;
+
+         case 'J':
+            fast_time = atoi(optarg);
             break;
 
          case 'm':

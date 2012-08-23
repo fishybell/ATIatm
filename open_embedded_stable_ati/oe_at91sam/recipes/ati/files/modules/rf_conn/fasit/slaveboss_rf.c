@@ -693,10 +693,13 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.did_exp_cmd = fc->did_exp_cmd == 3 ? 1 : 0; // only fully-over-finished task counts
    s.event = fc->current_event;
    DDCMSG(D_RF|D_VERY,BLACK, "Fault encountered: %04X %02X", fc->last_fault, s.fault);
-   // don't clear out 
-   //if (s.fault) {
-   //   fc->last_fault = 0; // clear out fault
-   //}
+   // clear out if we've sent it X number of times
+   if (s.fault) {
+      if (++fc->sent_fault > MAX_STATUS_SENDS) {
+         fc->last_fault = 0; // clear out fault
+         fc->sent_fault = 0; // haven't sent the new one yet
+      }
+   }
    // we don't know if they received the last response, so send everything every time
    // copy current status to last status and send it
    fc->last_status = s;

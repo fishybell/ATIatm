@@ -4,6 +4,8 @@
 #include "fasit_c.h"
 #include "rf.h"
 
+#define MAX_STATUS_SENDS 5
+
 #define MAX_CONNECTIONS 16
 #define MAX_GROUPS 32
 #define MAX_HITS 1024
@@ -88,6 +90,7 @@ typedef struct fasit_connection {
    FASIT_2113 f2113_resp;
    LB_status_resp_t last_status; 
    int last_fault;
+   int sent_fault;
    int devid;
    int did_exp_cmd; // remember if we've transitioned from state a to b and back to a between rf status responses...
    int future_exp;  //...via did_exp_cmd as the flag, future_exp as the check

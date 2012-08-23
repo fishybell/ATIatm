@@ -17,6 +17,67 @@ extern int verbose;
 size_t strnlen(const char *s, size_t maxlen);
 #endif
 
+// is the fault a status (good) or a malfunction (bad) ?
+int badFault(int fault) {
+   switch(fault) {
+      default: /* future statuses that aren't in the FASIT spec won't cause a fault here by default */
+      case ERR_normal:
+      case ERR_stop_right_limit:
+      case ERR_stop_left_limit:
+      case ERR_stop_by_distance:
+      case ERR_stop:
+      case ERR_target_killed:
+      case ERR_left_dock_limit:
+      case ERR_stop_dock_limit:
+         return 0; // these are simulated and never sent directly from target to FASIT server
+         break;
+
+      /* even the ones that are actual statuses below should be treated as faults so the FASIT server sees them */
+      case ERR_critical_battery:
+      case ERR_charging_battery:
+         return -2; // non-status fields that are sent continuously to the FASIT server
+         break;
+      case ERR_normal_battery:
+      case ERR_connected_SIT:
+      case ERR_notcharging_battery:
+         return -1; // non-status fields that are sent to the FASIT server
+         break;
+
+      /* actual errors */
+      case ERR_both_limits_active:
+      case ERR_invalid_direction_req:
+      case ERR_invalid_speed_req:
+      case ERR_speed_zero_req:
+      case ERR_emergency_stop:
+      case ERR_no_movement:
+      case ERR_over_speed:
+      case ERR_unassigned:
+      case ERR_wrong_direction:
+      case ERR_lifter_stuck_at_limit:
+      case ERR_actuation_not_complete:
+      case ERR_not_leave_conceal:
+      case ERR_not_leave_expose:
+      case ERR_not_reach_expose:
+      case ERR_not_reach_conceal:
+      case ERR_low_battery:
+      case ERR_engine_stop:
+      case ERR_IR_failure:
+      case ERR_audio_failure:
+      case ERR_miles_failure:
+      case ERR_thermal_failure:
+      case ERR_hit_sensor_failure:
+      case ERR_invalid_target_type:
+      case ERR_bad_RF_packet:
+      case ERR_bad_checksum:
+      case ERR_unsupported_command:
+      case ERR_invalid_exception:
+      case ERR_disconnected_SIT:
+      case ERR_did_not_dock:
+         return 1;
+         break;
+   }
+}
+
 
 #if 0 /* old queue stuff */
 // the RFmaster may eventually benifit if these are circular buffers, but for now
@@ -147,22 +208,22 @@ int Ptype(char *buf){
 
 
 void print_verbosity(void){
-   printf("  -v xx         set verbosity bits.   Examples:\n");
-   printf("  -v 1           sets D_PACKET  for packet info\n");
-   printf("  -v 2           sets D_RF    \n");
-   printf("  -v 4           sets D_CRC   \n");
-   printf("  -v 8           sets D_POLL  \n");
-   printf("  -v 10          sets D_TIME  \n");
-   printf("  -v 20          sets D_VERY  \n");
-   printf("  -v 40          sets D_NEW  \n");
-   printf("  -v 80          sets D_MEGA  \n");
-   printf("  -v 100         sets D_MINION  \n");
-   printf("  -v 200         sets D_MSTATE  \n");
-   printf("  -v 400         sets D_QUEUE  \n");
-   printf("  -v 800         sets D_PARSE  \n");
-   printf("  -v 1000        sets D_POINTER  \n");
-   printf("  -v 2000        sets D_T_SLOT  \n");
-   printf("  -v FFFF        sets all of the above  \n");
+   printf("  -v xxxx         set verbosity bits.   Examples:\n");
+   printf("  -v 1            sets D_PACKET  for packet info\n");
+   printf("  -v 2            sets D_RF\n");
+   printf("  -v 4            sets D_CRC\n");
+   printf("  -v 8            sets D_POLL\n");
+   printf("  -v 10           sets D_TIME\n");
+   printf("  -v 20           sets D_VERY\n");
+   printf("  -v 40           sets D_NEW\n");
+   printf("  -v 80           sets D_MEGA\n");
+   printf("  -v 100          sets D_MINION\n");
+   printf("  -v 200          sets D_MSTATE\n");
+   printf("  -v 400          sets D_QUEUE\n");
+   printf("  -v 800          sets D_PARSE\n");
+   printf("  -v 1000         sets D_POINTER\n");
+   printf("  -v 2000         sets D_T_SLOT\n");
+   printf("  -v FFFF         sets all of the above\n");
 }
 
 void print_verbosity_bits(void){
@@ -265,10 +326,10 @@ int gather_rf(int fd, char *tail,int max){
 //         sleep(1);
       } else {
          strerror_r(errno,buf,100);
-         DDCMSG(D_RF, RED, "gather_rf:  read returned error %s \n", buf);
+         DDCMSG(D_RF, RED, "gather_rf:  read returned error %s\n", buf);
 
          if (errno!=EAGAIN){
-            DCMSG(RED,"gather_rf:  halting \n");
+            DCMSG(RED,"gather_rf:  halting\n");
             exit(-1);
          }
       }

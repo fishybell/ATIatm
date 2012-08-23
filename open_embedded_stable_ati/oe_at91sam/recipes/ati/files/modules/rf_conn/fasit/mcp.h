@@ -632,6 +632,7 @@ typedef enum rf_target_type {
 #define MIT_MOVE_START_TIME   8   /* 4/5 second */
 #define MAT_MOVE_START_TIME   120 /* 12 seconds */
 #define RESP_TIME             8   /* 8/10 second */
+extern int fast_time, slow_time; // global, user-configurable versions of FAST_TIME and SLOW_TIME
 
 #if 0 /* old timer stuff */
 enum {
@@ -680,8 +681,8 @@ enum {
 #define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
-#define MAX_MISS_TIME 2 /* maximimum number of minutes to go without a response */
-#define FAST_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / FAST_TIME) /* maximum value of the "missed message" counter, calculated from X minutes */
+#define MAX_MISS_TIME 3 /* maximimum number of minutes to go without a response */
+#define FAST_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / fast_time) /* maximum value of the "missed message" counter, calculated from X minutes */
 #define SLOW_TIME_MAX_MISS 5 /* maximum value of the "missed message" counter, not based on X minutes */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
 #define EVENT_MAX_UNREPORT (4*15) /* max number of reports per burst * max number of non-reports before vacuum */

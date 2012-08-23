@@ -577,9 +577,17 @@ int handle_2102(fasit_connection_t *fc, int start, int end) {
    }
    fc->last_2102_hit = htons(fc->f2102_resp.body.hit);
 
-   // remember fault status, but don't clear out existing faults unless there is a new one
-   if (htons(fc->f2102_resp.body.fault)) {
-      fc->last_fault = htons(fc->f2102_resp.body.fault);
+   // remember fault status, if it's a status worth sending over RF
+   if (badFault(htons(fc->f2102_resp.body.fault)) != 0) {
+      int f = htons(fc->f2102_resp.body.fault);
+      // only set the last_fault field if...
+      // ... there is no last fault... (old status not there, so everything is equal)
+      // ... this new fault is an error... (new status very important)
+      // ... the previous last fault was just a status (old status less than important)
+      if (fc->last_fault == 0 || badFault(f) == 1 || badFault(fc->last_fault) < 0) {
+         fc->last_fault = f;
+         fc->sent_fault = 0; // haven't sent the new one yet
+      }
    }
 
    // check to see if we have accomplished our exposure task and then switched back, all without a new command

@@ -135,7 +135,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                   DISCONNECT;
                } else {
                   SEND_STATUS_REQUEST(&LB_buf);
-                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start); // same state over and over (short interval)
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, fast_time, F_fast_start); // same state over and over (short interval)
                }
             } break;
             case F_fast_medium: {
@@ -167,7 +167,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                   // didn't miss, so go slow again
                   if (minion->S.rf_t.old_slow_flags == 0) {
                      // didn't save previous slow state, so make a new one
-                     setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start);
+                     setTimerTo(minion->S.rf_t, slow_timer, slow_flags, slow_time, F_slow_start);
                   } else {
                      // saved previous slow state, resume it
                      resumeTimer(minion->S.rf_t, slow_timer, slow_flags);
@@ -216,13 +216,13 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                   DISCONNECT;
                } else {
                   SEND_STATUS_REQUEST(&LB_buf);
-                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start); // same state over and over (short interval)
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, fast_time, F_fast_start); // same state over and over (short interval)
                }
             } break;
             case F_fast_wait: {
                if (minion->S.rf_t.slow_flags == F_slow_none) { // we haven't switched timers
                   // we waited too long to cancel the fast timer, resume it
-                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, FAST_TIME, F_fast_start);
+                  setTimerTo(minion->S.rf_t, fast_timer, fast_flags, fast_time, F_fast_start);
                }
             } break;
             default: {
@@ -242,13 +242,13 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                   DISCONNECT;
                } else {
                   SEND_STATUS_REQUEST(&LB_buf);
-                  setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start); // same state over and over (short interval)
+                  setTimerTo(minion->S.rf_t, slow_timer, slow_flags, slow_time, F_slow_start); // same state over and over (short interval)
                }
             } break;
             case F_slow_wait: {
                if (minion->S.rf_t.fast_flags == F_fast_none) { // we haven't switched timers
                   // we waited too long to cancel the slow timer, resume it
-                  setTimerTo(minion->S.rf_t, slow_timer, slow_flags, SLOW_TIME, F_slow_start);
+                  setTimerTo(minion->S.rf_t, slow_timer, slow_flags, slow_time, F_slow_start);
                }
             } break;
             default: {
