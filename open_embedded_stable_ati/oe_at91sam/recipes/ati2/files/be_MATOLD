@@ -1,0 +1,1 @@
+echo -n "MATOLD" | /usr/bin/eeprom_rw write -addr 0x00 -size 7 -blank 0x3F

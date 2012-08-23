@@ -55,10 +55,13 @@ atifirmware:
 			../../../ati2/files/is_* \
 			../../../ati2/files/load_* \
 			../../../ati2/files/unload \
+			../../../ati2/files/fixhost \
+			../../../ati2/files/start_up \
 			../../../ati2/files/start \
 			../../../ati2/files/stop \
 			../../../ati2/files/restart \
 			../../../ati2/files/MAT \
+			../../../ati2/files/MATOLD \
 			../../../ati2/files/MIT \
 			../../../ati2/files/SAT \
 			../../../ati2/files/SES \
@@ -67,7 +70,6 @@ atifirmware:
 			../../../ati2/files/BASE \
 			../../../ati2/files/HHC \
 			../../../ati2/files/TTMT \
-			../../../ati2/files/interfaces \
 			../../../ati2/files/atiradiotest.sh \
 			../../../sysvinit/sysvinit/inittab
 	cat extract.sh atifirmware.tar > atifirmware.sh
@@ -80,7 +82,7 @@ rf:
 	cp -v rf_conn/radio_edit/*.arm .
 
 clean:
-	${RM} .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers atifirmware.tar atifirmware.sh ${BFILES}
+	${RM} *.arm .*.cmd *.o *.ko -r .tmp* *.mod.c modules.order Module.symvers atifirmware.tar atifirmware.sh ${BFILES}
 	${MAKE} -C fasit clean
 	${MAKE} -C connector clean
 	${MAKE} -C rf_conn/fasit clean

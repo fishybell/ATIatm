@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# overwrite start routine...
+start () {
+   # load network
+   source /usr/bin/load_network
+
+   # MAT old is type 0
+   matm=0
+
+   matb=$(has_mat_battery)
+   matr=$(has_mover_reverse)
+   matd=$(has_dock)
+   track=$(has_track_length)
+   if [ "$matb" == "" ] ; then
+      matb=48
+   fi
+   if [ "$matr" != "0" ] && [ "$matr" != "1" ] ; then
+      matr=0
+   fi
+   if [ "$matd" == "" ] ; then
+# Assume no dock
+      matd=2
+   fi
+   if [ "$track" == "" ] ; then
+      track=250
+   fi
+
+   # load modules
+   load_modules "target_user_interface.ko mover=1" \
+                "target_battery.ko minvoltval=$matb shutdown_wait=5" \
+                "target_mover_generic.ko mover_type=$matm reverse=$matr dock_loc=$matd track_len=$track" \
+                "target_generic_output.ko" \
+                "mover.ko"
+
+   # start default programs
+   def_progs
+
+   # start fasit client
+   fasit_conn -m -l $lport -p $cport -i $ip -k &
+}
+
+# leave default stop routine
