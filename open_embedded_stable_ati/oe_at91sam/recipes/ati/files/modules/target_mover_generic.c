@@ -18,9 +18,12 @@
 #include "target_generic_output.h" /* for EVENT_### definitions */
 
 // Mover type defines
-#define IS_MAT 1
-#define IS_MIT 2
-#define IS_MITP 3
+#define MATOLD 0
+#define MAT 1
+#define MIT 2
+#define MITP 3
+#define IS_MIT ( mover_type == MIT || mover_type == MITP )
+#define IS_MAT ( mover_type == MATOLD || mover_type == MAT )
 
 //#define TESTING_ON_EVAL
 //#define TESTING_MAX
@@ -40,7 +43,7 @@ static void sendUserConnMsg( char *fmt, ...);
 #define SENDUSERCONNMSG(...)  //
 #endif
 
-#ifdef PRINT_DEBUG 
+#ifdef PRINT_DEBUG
 #define DELAY_PRINTK  delay_printk
 #else
 #define DELAY_PRINTK(...)  //
@@ -49,7 +52,7 @@ static void sendUserConnMsg( char *fmt, ...);
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
-static int mover_type = IS_MAT; // 0 = infantry/24v KBB controller, 1 = armor, 2 = infantry/48v KDZ controller, 3 = error
+static int mover_type = 1; // 0 = armor 2 ticks, 1 = armor 360 ticks, 2 = infantry/48v KDZ controller, 3 = error
 static int dock_loc = 2; // 0 = home end of track, 1 = end away from home, 2 = no dock
 // This is for the "Home" location, where everything starts from.
 // This may or may not be the same place as the dock
@@ -70,17 +73,17 @@ module_param(min_effort, int, S_IRUGO);
 module_param(max_accel, int, S_IRUGO);
 module_param(max_deccel, int, S_IRUGO);
 
-static char* TARGET_NAME[] = {"old infantry mover","armor mover","48v infantry mover","48v infantry mover portable", "48v soft-reverse infantry mover","error"};
-static char* MOVER_TYPE[] = {"infantry","armor","infantry","infantry","infantry","error"};
+static char* TARGET_NAME[] = {"armor mover 2 ticks","armor mover 360 ticks","48v infantry mover","48v infantry mover portable","48v soft-reverse infantry mover","error"};
+static char* MOVER_TYPE[] = {"armor","armor","infantry","infantry","infantry","error"};
 
 // continue moving on leg or quad interrupt or neither
-static int CONTINUE_ON[] = {2,1,2,2,2,0}; // leg = 1, quad = 2, both = 3, neither = 0
+static int CONTINUE_ON[] = {3,1,2,2,2,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
-static int TIMEOUT_IN_MSECONDS[] = {2000,12000,2000,2000,2000,0};
+static int TIMEOUT_IN_MSECONDS[] = {12000,12000,2000,2000,2000,0};
 static int MOVER_DELAY_MULT[] = {2,2,2,2,2,0};
 
-static int DOCK_RETRY_COUNT[] = {5, 20, 5, 5, 5, 0};
+static int DOCK_RETRY_COUNT[] = {2, 2, 1, 1, 1, 0}; // the more we retry, the more likely we are to trip a breaker
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -100,12 +103,12 @@ static int DOCK_RETRY_COUNT[] = {5, 20, 5, 5, 5, 0};
 // not used? -- static int MIT_SPEEDS[] = {0,7,15,23,33,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 // the maximum allowed speed ticks
 //static int NUMBER_OF_SPEEDS[] = {10,20,10,10,0};
-static int NUMBER_OF_SPEEDS[] = {100,200,200,200,200,0};
-static int MIN_SPEED[] = {15,10,7,3,10,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
+static int NUMBER_OF_SPEEDS[] = {200,200,200,200,200,0};
+static int MIN_SPEED[] = {10,10,7,3,10,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
-static int HORN_ON_IN_MSECONDS[] = {0,3500,0,0,0,0};
-static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0,0};
+static int HORN_ON_IN_MSECONDS[] = {3500,3500,0,0,0,0};
+static int HORN_OFF_IN_MSECONDS[] = {8000,8000,0,0,0,0};
 
 // getting going effort stuff
 //static int UNDER_WAY[] = {5, 5, 1, 5, 0}; /* how many encoder clicks before we let go of the getting going effort */
@@ -133,26 +136,26 @@ static int HORN_OFF_IN_MSECONDS[] = {0,8000,0,0,0,0};
 // static int PID_KD_DIV[]    = {4, 5, 4, 4, 0}; // derivitive gain denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot -- due to throttle cut-off from motor controller, had to adjust by hand afterwards
-static int PID_KP_MULT[]   = {1, 2, 20, 10, 1, 0}; // proportional gain numerator
-static int PID_KP_DIV[]    = {4, 15, 1, 1, 5, 0}; // proportional gain denominator
-static int PID_KI_MULT[]   = {15, 1, 0, 0, 15, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {475150, 184320, 1, 1, 47515, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {190060, 32768, 0, 0, 190060, 0}; // derivitive gain numerator
+static int PID_KP_MULT[]   = {3, 3, 20, 10, 1, 0}; // proportional gain numerator
+static int PID_KP_DIV[]    = {1, 1, 1, 1, 5, 0}; // proportional gain denominator
+static int PID_KI_MULT[]   = {1, 1, 0, 0, 15, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {3, 3, 1, 1, 47515, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {0, 0, 0, 0, 190060, 0}; // derivitive gain numerator
 static int PID_KD_DIV[]    = {15, 15, 1, 1, 1, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
 static int MIN_EFFORT[]    = {1000, 1000, 1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
-static int MIN_EFFORT[]    = {115, 175, 1, 1, 1, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {175, 175, 1, 1, 1, 0}; // minimum effort given to ensure motor moves
 #endif
 // not used? -- static int SPEED_AFTER[]   = {1, 3, 1, 1, 0}; // clamp effort if we hit this many correct values in a row
 // not used? -- static int SPEED_CHANGE[]  = {40, 30, 40, 1, 0}; // unclamp if the error is bigger than this
 // not used? -- static int ADJUST_PID_P[]  = {0, 0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
-static int MAX_ACCEL[]     = {500, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
-static int MAX_DECCEL[]     = {500, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
+static int MAX_ACCEL[]     = {1000, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
+static int MAX_DECCEL[]     = {1000, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
 
 // variables for setting the initial position if it's on the dock or not
-static int DOCK_FEET_FROM_LIMIT[] = {6, 18, 6, 6, 6, 0}; // home many feet away the dock is past the limit
-static int COAST_FEET_FROM_LIMIT[] = {4, 12, 4, 4, 4, 0}; // home many feet away it *typically* coasts past the limit
+static int DOCK_FEET_FROM_LIMIT[] = {18, 18, 6, 6, 6, 0}; // home many feet away the dock is past the limit
+static int COAST_FEET_FROM_LIMIT[] = {18, 12, 4, 4, 4, 0}; // home many feet away it *typically* coasts past the limit
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -170,8 +173,8 @@ static int COAST_FEET_FROM_LIMIT[] = {4, 12, 4, 4, 4, 0}; // home many feet away
 #define FAULT_WRONG_DIRECTION_DETECTED                     12
 #define FAULT_STOPPED_DUE_TO_STOP_COMMAND                  13
 
-static int MOTOR_PWM_FWD[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_FWD_POS if PWM on H-bridge
-static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_REV_POS if PWM on H-bridge
+static int MOTOR_PWM_FWD[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_FWD_POS if PWM on H-bridge
+static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_REV_POS if PWM on H-bridge
 #define MOTOR_PWM_F (reverse ? MOTOR_PWM_REV[mover_type] : MOTOR_PWM_FWD[mover_type])
 #define MOTOR_PWM_R (reverse ? MOTOR_PWM_FWD[mover_type] : MOTOR_PWM_REV[mover_type])
 
@@ -179,12 +182,12 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
 // RA - low time setting - cannot exceed RC
 // RB - low time setting - cannot exceed RC
-static int MOTOR_PWM_RC[] = {0x1180,0x3074,0x1180,0x1180,0x1180,0};
-static int MOTOR_PWM_END[] = {0x1180,0x3074,0x1180,0x1180,0x1180,0};
-//static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
-//static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x04D8,0x0000,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0320,0x0001,0x0001,0x0001,0x001,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0320,0x0001,0x0001,0x0001,0x001,0};
+static int MOTOR_PWM_RC[] = {0x3074,0x3074,0x1180,0x1180,0x1180,0};
+static int MOTOR_PWM_END[] = {0x3074,0x3074,0x1180,0x1180,0x1180,0};
+//static int MOTOR_PWM_RA_DEFAULT[] = {0x04D8,0x04D8,0x0000,0x0000,0};
+//static int MOTOR_PWM_RB_DEFAULT[] = {0x04D8,0x04D8,0x0000,0x0000,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0001,0x0001,0x0001,0x0001,0x001,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0001,0x0001,0x0001,0x0001,0x001,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
@@ -195,9 +198,9 @@ static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,1,0};		// channel 0 matches TIOA0 to T
 #define MAX_OVER	0x10000
 static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
 static int ENC_PER_REV[] = {2, 360, 2, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
-static int VELO_K[] = {1680, 1344, 1680, 1680, 1680, 0}; // rpm/mph*10
-static int INCHES_PER_REV[] = {314, 157, 314, 314, 314, 0}; // 10 inch, 5 inch, etc. = inches per wheel revolution
-static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 2292, 0}; // 5:1 ratio 10 inch wheel 6 ft leg, 2:1 ratio 5 inch wheel 6 ft leg, etc.
+static int VELO_K[] = {1344, 1344, 1680, 1680, 1680, 0}; // rpm/mph*10
+static int INCHES_PER_REV[] = {157, 157, 314, 314, 314, 0}; // 5 inch, 10 inch, etc. = inches per wheel revolution
+static int TICKS_PER_LEG[] = {1833, 1833, 2292, 2292, 2292, 0}; // 2:1 ratio 5 inch wheel 6 ft leg, 5:1 ratio 10 inch wheel 6 ft leg, etc.
 #define TICKS_DIV 100
 
 // to keep updates to the file system in check somewhat
@@ -207,8 +210,9 @@ static int TICKS_PER_LEG[] = {2292, 1833, 2292, 2292, 2292, 0}; // 5:1 ratio 10 
 #define SPEED_TIMEOUT_IN_MILLISECONDS 2000
 #define PID_TIMEOUT_IN_MILLISECONDS 1000
 #define CONTINUOUS_TIMEOUT_IN_MILLISECONDS 1000
+#define RAMP_TIMEOUT_IN_MILLISECONDS 50
 
-static int COAST_FACTOR[]  = {20, 10, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_IN_MILLISECONDS, tuned for how well the target coasts (smaller for coasts better? bigger for brakes better?)
+static int COAST_FACTOR[]  = {10, 10, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_IN_MILLISECONDS, tuned for how well the target coasts (smaller for coasts better? bigger for brakes better?)
 
 // speed charts (TODO -- update with mover on track with load)
 // static in MOVER0_PWM_TABLE = ?
@@ -216,10 +220,12 @@ static int COAST_FACTOR[]  = {20, 10, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_
 // static int MOVER2_PWM_TABLE[] = {0, 1100, 1550, 1975, 2375, 2800, 3325, 3900, 5000, 7000, 10000}; // -- first stab
 // static int MOVER2_PWM_TABLE[] = {0, 1350, 1800, 2300, 2700, 3200, 3700, 4500, 5500, 7500, 12000}; // -- second stab
 
+static int MOVER_RAMP_STEPS[] = {2, 2, 1, 1, 1, 0}; // MATs do 2 * speed, MITs do 1 * speed
+
 
 
 // external motor controller polarity
-static int OUTPUT_MOVER_PWM_SPEED_ACTIVE[] = {ACTIVE_HIGH,ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,0};
+static int OUTPUT_MOVER_PWM_SPEED_ACTIVE[] = {ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,0};
 
 // structure to access the timer counter registers
 static struct atmel_tc * tc = NULL;
@@ -240,10 +246,10 @@ module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only 
 #define LIFTER_POSITION_DOWN 0
 
 static bool PWM_H_BRIDGE[] = {false,false,false,false,false,false};
-static bool DIRECTIONAL_H_BRIDGE[] = {false,true,true,true,false,false};
-static bool USE_BRAKE[] = {true,false,false,false,true,false};
+static bool DIRECTIONAL_H_BRIDGE[] = {true,true,true,false,false,false};
+static bool USE_BRAKE[] = {false,false,false,true,true,false};
 static bool CONTACTOR_H_BRIDGE[] = {false, false, false, false, true, false};
-static bool MOTOR_CONTROL_H_BRIDGE[] = {true, false, false, false, false, false};
+static bool MOTOR_CONTROL_H_BRIDGE[] = {false, false, false, false, false, false};
 
 // Non-H-Bridge : map motor controller reverse and forward signals based on the 'reverse' parameter
 #define OUTPUT_MOVER_FORWARD	(reverse ? OUTPUT_MOVER_DIRECTION_REVERSE : OUTPUT_MOVER_DIRECTION_FORWARD)
@@ -265,6 +271,10 @@ atomic_t last_reported_speed = ATOMIC_INIT(0);
 atomic_t last_direction = ATOMIC_INIT(0);
 atomic_t lifter_fault = ATOMIC_INIT(0);
 atomic_t found_home = ATOMIC_INIT(0);
+atomic_t found_dock = ATOMIC_INIT(0);
+atomic_t dock_location = ATOMIC_INIT(0);
+atomic_t home_max = ATOMIC_INIT(-5000); // maximum value for home location (used for invalid direction detecting)
+atomic_t end_min = ATOMIC_INIT(5000); // minimum value for end location (used for invalid direction detecting)
 atomic_t velocity = ATOMIC_INIT(0);
 atomic_t last_t = ATOMIC_INIT(0);
 atomic_t o_count = ATOMIC_INIT(0);
@@ -285,7 +295,6 @@ atomic_t pid_vel = ATOMIC_INIT(0);
 // invalid direction request. If we are home we do not want to 
 // allow reverse.
 atomic_t last_sensor = ATOMIC_INIT(MOVER_SENSOR_UNKNOWN);
-atomic_t last_last_sensor = ATOMIC_INIT(MOVER_SENSOR_UNKNOWN);
 
 
 atomic_t lifter_position = ATOMIC_INIT(LIFTER_POSITION_DOWN);
@@ -335,6 +344,9 @@ atomic_t sleep_atomic = ATOMIC_INIT(0); // not sleeping
 // This atomic variable is use to indicate the goal speed
 //---------------------------------------------------------------------------
 atomic_t goal_atomic = ATOMIC_INIT(0); // final speed desired
+atomic_t ramp_start = ATOMIC_INIT(0); // final speed of ramp
+atomic_t ramp_end = ATOMIC_INIT(0); // start speed of ramp
+atomic_t ramp_step = ATOMIC_INIT(0); // number of steps determined by (MOVER_RAMP_STEPS * abs(end-start))
 
 //---------------------------------------------------------------------------
 // This atomic variable is to store the current movement,
@@ -393,6 +405,10 @@ static void pid_timeout_stop(void);
 static void continuous_timeout_fire(unsigned long data);
 static void continuous_timeout_start(void);
 static void continuous_timeout_stop(void);
+static void ramp_timeout_fire(unsigned long data);
+static void ramp_timeout_start(int new_speed, int old_speed);
+static void ramp_timeout_stop(void);
+static void ramp_timeout_continue(void);
 static void mover_find_dock(void);
 static int isMoverAtDock(void);
 
@@ -419,13 +435,14 @@ static int current_speed10(void);		// 10 * velocity/direction, measured
 // Declaration of functions related to effort/speed/pwm conversions
 //---------------------------------------------------------------------------
 static int percent_from_speed(int speed);	// 1000 * percent, calculated
+static int percent_curve_from_speed(int start, int end, int step); // 1000 * percent, calculated on a curve between start and end
 static int pwm_from_effort(int effort);		// absolute pwm, calculated
 
 //---------------------------------------------------------------------------
 // Variables for PID speed control
 //---------------------------------------------------------------------------
 spinlock_t pid_lock = SPIN_LOCK_UNLOCKED;
-#define MAX_PID_ERRORS 5
+#define MAX_PID_ERRORS 15
 int pid_errors[MAX_PID_ERRORS];  // previous errors (fully calculated for use in summing integral part of PID)
 int pid_total_error = 0;   // total effort since we started moving
 //int pidEffortCounter = 0;			// prior effort
@@ -466,6 +483,9 @@ static struct timer_list pid_timeout_list = TIMER_INITIALIZER(pid_timeout_fire, 
 
 // Timer for continuous movement
 static struct timer_list continuous_timeout_list = TIMER_INITIALIZER(continuous_timeout_fire, 0, 0);
+
+// Timer for ramping movement
+static struct timer_list ramp_timeout_list = TIMER_INITIALIZER(ramp_timeout_fire, 0, 0);
 
 // helper function to convert feet to meters
 inline int feetToMeters(int feet) {
@@ -807,7 +827,7 @@ static void setPidSettings(int new_speed)
 {
    int Ku = 0, Kp = 0, Tu = 100;
    // not used? -- int Pu = 1000;
-    if (mover_type == IS_MAT) { // MAT
+    if (IS_MAT) { // MAT
       Ku = new_speed;
 //      Kp = Ku * 10 / 6; //Classic
       if (new_speed <= 200) {
@@ -819,7 +839,7 @@ static void setPidSettings(int new_speed)
       kp_m = Ku; kp_d = 1; ki_m = Kp; ki_d = Tu; kd_m = Kp * Tu; kd_d = 3; // some overshoot
 //      ki_m = 0; // No pid_d for MITs
       kd_m = 0; // No pid_d for MITs
-    } else if (mover_type == IS_MIT) { // MIT
+    } else if (IS_MIT) { // MIT
          Ku = new_speed;
 //         Kp = Ku * 10 / 6; //Classic
          if (new_speed <= 50) {
@@ -839,7 +859,7 @@ static void setPidSettings(int new_speed)
 //---------------------------------------------------------------------------
 static int hardware_speed_set(int new_speed)
     {
-    int old_speed, ra;
+    int old_speed;
     DELAY_PRINTK("%s - %s(%i)\n",TARGET_NAME[mover_type], __func__, new_speed);
 
     // check for full initialization
@@ -874,15 +894,18 @@ static int hardware_speed_set(int new_speed)
             }
         }
 
-    // start ramp up
-    old_speed = atomic_read(&speed_atomic);
-    if (new_speed != old_speed)
-        {
+    // start speed change
+    old_speed = current_speed10();
+    if (new_speed != old_speed) {
         atomic_set(&goal_atomic, new_speed); // reset goal speed
-        atomic_set(&pid_set_point, percent_from_speed(new_speed)); // reset goal speed
+        // to ramp, or not to ramp? that is the question
+        if ((MOVER_RAMP_STEPS[mover_type] * abs(new_speed-old_speed)) == 0) {
+           atomic_set(&pid_set_point, percent_from_speed(new_speed)); // directly set from goal speed
+        } else {
+           atomic_set(&pid_set_point, percent_curve_from_speed(old_speed, new_speed, 1)); // set as first step of speed change
+           ramp_timeout_start(new_speed, old_speed);
+        }
         //setPidSettings(percent_from_speed(new_speed));
-       ra = abs(current_speed10());  //changed from current_speed
-       DELAY_PRINTK("%s - %s : old (%i), new (%i), are(%i)\n",TARGET_NAME[mover_type], __func__, old_speed, new_speed, ra);
         // create events
         if (new_speed == 0) {
             do_event(EVENT_COAST); // start of coasting
@@ -942,6 +965,7 @@ static int mover_speed_stop(void) {
    SENDUSERCONNMSG( "randy mover_speed_stop");
     dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
     speed_timeout_stop();
+    ramp_timeout_stop();
     do_event(EVENT_STOP); // started stopping
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(TRUE); // always true here, so always stops timing out when we stop the mover
@@ -950,6 +974,7 @@ static int mover_speed_stop(void) {
 }
 
 static int mover_speed_reverse(int speed) {
+   SENDUSERCONNMSG( "randy before mover_speed_stop 15");
    mover_speed_stop();
    atomic_set(&find_dock_atomic, 0);
    dock_timeout_stop();
@@ -995,19 +1020,19 @@ static int mover_speed_set(int speed) {
 
    SENDUSERCONNMSG( "randy mover_speed_set %i", speed);
    if (speed != 0){
-      if (mover_type == IS_MIT || mover_type == IS_MITP){
+      if (IS_MIT){
          selectSpeed = abs(speed);
          if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
          else if (selectSpeed <= 10) tmpSpeed = 13; // 1.3 mph (to meet 1-3 kph)
          else if (selectSpeed <= 20) tmpSpeed = 31; // 3.2 mph (to meet 4-6 kph)
-         else if (selectSpeed <= 30) tmpSpeed = 60; // 5.6 mph (to meet 8-10 kph)
-         else tmpSpeed = 85; // 8.1 mph (to meet 12-14 kph)
+         else if (selectSpeed <= 30) tmpSpeed = 60; // 6.0 mph (to meet 8-10 kph)
+         else tmpSpeed = 85; // 8.5 mph (to meet 12-14 kph)
 //         if (selectSpeed > MOVER_SPEED_SELECTIONS) selectSpeed = MOVER_SPEED_SELECTIONS;
 //         tmpSpeed = MIT_SPEEDS[selectSpeed];
          if (speed < 0) tmpSpeed *= -1;
          speed = tmpSpeed;
       }
-      if (mover_type == IS_MAT){
+      if (IS_MAT){
          selectSpeed = abs(speed);
          if (selectSpeed <= 5) tmpSpeed = 10; // 1.0 mph (to dock slowly, or manual movement)
          else if (selectSpeed <= 10) tmpSpeed = 65; // 6.5 mph (to meet 8-13 kph)
@@ -1086,6 +1111,13 @@ static int mover_speed_set(int speed) {
          return 0;
          }
       }
+      if (IS_MIT && atomic_read(&position) < atomic_read(&home_max)) {
+         if (atomic_read(&find_dock_atomic) == 0){
+   SENDUSERCONNMSG( "randy invalid dir left position: %i < %i", atomic_read(&position), atomic_read(&home_max));
+         do_fault(ERR_invalid_direction_req);
+         return 0;
+         }
+      }
       hardware_movement_set(MOVER_DIRECTION_REVERSE);
    } else if (speed > 0) {
       if(isMoverAtDock()){
@@ -1103,6 +1135,13 @@ static int mover_speed_set(int speed) {
          return 0;
          }
       }
+      if (IS_MIT && atomic_read(&position) > atomic_read(&end_min)) {
+         if (atomic_read(&find_dock_atomic) == 0){
+   SENDUSERCONNMSG( "randy invalid dir right position: %i > %i", atomic_read(&position), atomic_read(&end_min));
+         do_fault(ERR_invalid_direction_req);
+         return 0;
+         }
+      }
       hardware_movement_set(MOVER_DIRECTION_FORWARD);
    } else { 
       // setting 0 will cause the mover to "coast" if it isn't already stopped
@@ -1113,7 +1152,6 @@ static int mover_speed_set(int speed) {
 
    if (speed != 0) {
       // if we are moving the last_sensor needs to be unknown
-      atomic_set(&last_last_sensor, atomic_read(&last_sensor)); // remember what we were, in case we timeout before getting past a sensor
       atomic_set(&last_sensor, MOVER_SENSOR_UNKNOWN);
    }
 
@@ -1143,7 +1181,7 @@ static void dock_timeout_stop(void)
 //---------------------------------------------------------------------------
 static void dock_timeout_fire(unsigned long data)
     {
-   int fault;
+   int fault, speed;
     dock_timeout_stop();
     if (!atomic_read(&full_init))
         {
@@ -1151,8 +1189,20 @@ static void dock_timeout_fire(unsigned long data)
         }
    SENDUSERCONNMSG( "randy dock_timeout_fire");
 
+   // don't try to dock if we're moving
+   speed = current_speed10();
+   if (abs(speed) > 0) {
+      if (atomic_read(&find_dock_atomic) == 1) {
+         if ((dock_loc == 0 && speed > 0) || (dock_loc == 1 && speed < 0)) { // if we're moving away from the dock...
+            atomic_set(&find_dock_atomic, 0); // ...don't continue looking for the dock
+         }
+      }
+      dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
+      return;
+   }
+
     if (dock_loc == 0) { // Dock at left
-       if (atomic_read(&last_sensor) == MOVER_SENSOR_HOME || atomic_read(&dockTryCount) > 0) {
+       if (atomic_read(&last_sensor) == MOVER_SENSOR_HOME) {
          fault = atomic_read(&lifter_fault);
          if (1 || atomic_read(&lifter_position) == LIFTER_POSITION_DOWN
                || atomic_read(&sleep_atomic) != 0 
@@ -1164,7 +1214,7 @@ static void dock_timeout_fire(unsigned long data)
          }
        }
     } else if (dock_loc == 1){ // Dock at right
-       if (atomic_read(&last_sensor) == MOVER_SENSOR_END || atomic_read(&dockTryCount) > 0) {
+       if (atomic_read(&last_sensor) == MOVER_SENSOR_END) {
          fault = atomic_read(&lifter_fault);
          if (1 || atomic_read(&lifter_position) == LIFTER_POSITION_DOWN
                || atomic_read(&sleep_atomic) != 0
@@ -1182,6 +1232,8 @@ static void dock_timeout_fire(unsigned long data)
 
 static void speed_timeout_start(int ms, int speed)
 	{
+      return; // this function has the unintended consequence of causing the target to reverse coarse if the tach sensors are backwards, or if there is a sprurious detection at the wrong time (ie. caused by noise on the line) -- the only consequence of the tach sensors being backwards should be the target reporting it's speed as a negative to its actual speed
+#if 0
 	   if (speed != 0){
    	      if (ms <= 0) {
                ms = min(TIMEOUT_IN_MSECONDS[mover_type], SPEED_TIMEOUT_IN_MILLISECONDS); // move again before our "no movement detected" timeout fires
@@ -1190,6 +1242,7 @@ static void speed_timeout_start(int ms, int speed)
    	      SENDUSERCONNMSG( "randy speed_timeout_start,%i" ,ms);
 	      atomic_set(&timeout_speed, speed);
 	   }
+#endif
 	}
 
 //---------------------------------------------------------------------------
@@ -1206,13 +1259,15 @@ static void speed_timeout_stop(void)
 //---------------------------------------------------------------------------
 static void speed_timeout_fire(unsigned long data)
     {
-        return; // is this really necessary?
+        return; // is this function really necessary? with the now-working speed control, the hardware should be fixed to not need this if it's not moving. also see comment in speed_timeout_start
+#if 0
     if (!atomic_read(&full_init))
         {
         return;
         }
    SENDUSERCONNMSG( "randy speed_timeout_fire");
    mover_speed_set( atomic_read(&timeout_speed));
+#endif
 
     }
 
@@ -1277,23 +1332,20 @@ static void pid_timeout_fire(unsigned long data)
       pid_step();
       pid_timeout_start();
     }
+//---------------------------------------------------------------------------
+// Continuous timer stuff
+//---------------------------------------------------------------------------
 
 static void continuous_timeout_start()
 {
    mod_timer(&continuous_timeout_list, jiffies+(CONTINUOUS_TIMEOUT_IN_MILLISECONDS*HZ/1000));
 }
 
-//---------------------------------------------------------------------------
-// Stops the timeout timer.
-//---------------------------------------------------------------------------
 static void continuous_timeout_stop(void)
 {
 	del_timer(&continuous_timeout_list);
 }
 
-//---------------------------------------------------------------------------
-// The function that gets called when the timeout fires.
-//---------------------------------------------------------------------------
 static void continuous_timeout_fire(unsigned long data)
 {
       int vel, sensor, speed;
@@ -1320,6 +1372,50 @@ static void continuous_timeout_fire(unsigned long data)
             continuous_timeout_start();
          }
       }
+}
+
+//---------------------------------------------------------------------------
+// Ramp timer stuff
+//---------------------------------------------------------------------------
+static void ramp_timeout_stop(void) {
+   atomic_set(&ramp_step, 0);
+   atomic_set(&ramp_start, atomic_read(&goal_atomic));
+   atomic_set(&ramp_end, atomic_read(&goal_atomic));
+	del_timer(&ramp_timeout_list);
+}
+
+static void ramp_timeout_start(int new_speed, int old_speed) {
+   atomic_set(&ramp_step, (MOVER_RAMP_STEPS[mover_type] * abs(old_speed - new_speed)) - 1); // count down, start on 2nd step
+   atomic_set(&ramp_start, old_speed);
+   atomic_set(&ramp_end, new_speed);
+   mod_timer(&ramp_timeout_list, jiffies+(RAMP_TIMEOUT_IN_MILLISECONDS*HZ/1000));
+}
+
+static void ramp_timeout_continue(void) {
+   if (atomic_dec_return(&ramp_step) > 0) {
+      mod_timer(&ramp_timeout_list, jiffies+(RAMP_TIMEOUT_IN_MILLISECONDS*HZ/1000));
+   }
+}
+
+static void ramp_timeout_fire(unsigned long data) {
+      int step, start, end;
+      if (!atomic_read(&full_init))
+      {
+        return;
+      }
+
+      // next step in ramp (linear ramp)
+      //atomic_inc(&goal_atomic);
+      //atomic_set(&pid_set_point, percent_from_speed(atomic_read(&goal_atomic)));
+
+      // next step in ramp (curved ramp)
+      start = atomic_read(&ramp_start);
+      end = atomic_read(&ramp_end);
+      step = (MOVER_RAMP_STEPS[mover_type] * abs(end - start)) - atomic_read(&ramp_step);
+      atomic_set(&pid_set_point, percent_curve_from_speed(start, end, step));
+      SENDUSERCONNMSG( "nathan ramp %i %i %i %i %i", atomic_read(&ramp_start), atomic_read(&ramp_end), atomic_read(&ramp_step), step, atomic_read(&pid_set_point));
+
+      ramp_timeout_continue();
 }
 
 //---------------------------------------------------------------------------
@@ -1363,14 +1459,11 @@ static void timeout_fire(unsigned long data) {
 
     do_event(EVENT_TIMED_OUT); // reached timeout
 
-    if (atomic_read(&last_sensor) == MOVER_SENSOR_UNKNOWN && atomic_read(&last_last_sensor) != MOVER_SENSOR_UNKNOWN) {
-       atomic_set(&last_sensor, atomic_read(&last_last_sensor));
-    }
-    
    SENDUSERCONNMSG( "nathan timeout_fire: goal %i dock %i", atomic_read(&goal_atomic), atomic_read(&find_dock_atomic));
     if (atomic_read(&goal_atomic) == 0) {
        int rev_speed = atomic_read(&reverse_speed);
        do_event(EVENT_STOPPED); // timeout was part of coasting or stopping
+   SENDUSERCONNMSG( "randy before mover_speed_stop 3");
        mover_speed_stop(); // after event_stopped
        if (rev_speed != 0) {
 //          char *msg = kmalloc(128, GFP_KERNEL);
@@ -1389,11 +1482,13 @@ static void timeout_fire(unsigned long data) {
           //do_event(EVENT_ERROR); // timeout wasn't part of coasting
           //do_fault(ERR_did_not_dock);
           // TODO -- when failure to find dock isn't a mechanical design flaw, undo the comments above
+   SENDUSERCONNMSG( "randy before mover_speed_stop 4");
           mover_speed_stop(); // after event_error
           atomic_set(&find_dock_atomic, 0); // we're not finding anymore
        } else {
           do_event(EVENT_ERROR); // timeout wasn't part of coasting
           do_fault(ERR_no_movement);
+   SENDUSERCONNMSG( "randy before mover_speed_stop 5");
           mover_speed_stop(); // after event_error
           atomic_set(&dockTryCount, 0);
           dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
@@ -1460,6 +1555,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
 //    rb = __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, RB));
 //    cv = __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_CHANNEL, CV));
 
+//    SENDUSERCONNMSG( "nathan detected quad: OVER:%i A:%i B:%i TIME:%i", status & ATMEL_TC_COVFS, status & ATMEL_TC_LDRAS, status & ATMEL_TC_MTIOB, this_t);
 
     // we're getting under way
     //atomic_add_unless(&getting_going, 1, UNDER_WAY[mover_type]); // keep counting up until we under way
@@ -1511,7 +1607,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
             }
         }
         oc = atomic_read(&o_count);
-        atomic_set(&delta_t, this_t + atomic_read(&o_count));
+        atomic_set(&delta_t, this_t + oc);
         atomic_set(&o_count, 0);
         dn1 = atomic_read(&delta_t);
         dn2 = atomic_read(&quad_direction);
@@ -1522,6 +1618,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
         if ( atomic_read(&o_count) >= MAX_OVER ) {
 //               mover_speed_stop();
             atomic_set(&velocity, 0);
+            atomic_set(&pid_vel, 0);
             atomic_set(&quad_direction, 0);
         }
     }
@@ -1543,15 +1640,13 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
 //---------------------------------------------------------------------------
 irqreturn_t track_sensor_home_int(int irq, void *dev_id, struct pt_regs *regs)
     {
+    int pos = atomic_read(&position), home = atomic_read(&home_max);
     if (!atomic_read(&full_init))
         {
         return IRQ_HANDLED;
         }
 
    DELAY_PRINTK("%s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&movement_atomic));
-
-   // reset last last sensor (doesn't matter which way we crossed this sensor)
-   atomic_set(&last_last_sensor, MOVER_SENSOR_UNKNOWN);
 
     // reset to "home" position
     if (atomic_read(&found_home) == 0) {
@@ -1567,6 +1662,14 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
 #endif
     }
 
+    // reset home maximum location if necessary
+    if (pos > home) {
+       atomic_set(&home_max, pos);
+    }
+
+    // reset end minimum location (wheel slippage, testing, etc. can cause the old value to be wrong)
+    atomic_set(&end_min, 5000);
+
    SENDUSERCONNMSG( "randy home_int %i", atomic_read(&movement_atomic));
     // check to see if this one needs to be ignored
     if ((atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD) ||
@@ -1580,6 +1683,7 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
     atomic_set(&last_sensor, MOVER_SENSOR_HOME); // home sensor
     do_event(EVENT_HOME_LIMIT); // triggered on home limit
     do_fault(ERR_stop_left_limit); // triggered on home limit
+   SENDUSERCONNMSG( "randy before mover_speed_stop 6");
     mover_speed_stop();
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
@@ -1593,6 +1697,7 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
 //---------------------------------------------------------------------------
 irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     {
+    int pos = atomic_read(&position), end = atomic_read(&end_min);
     if (!atomic_read(&full_init))
         {
         return IRQ_HANDLED;
@@ -1600,8 +1705,13 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
 
    DELAY_PRINTK("%s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&movement_atomic));
 
-   // reset last last sensor (doesn't matter which way we crossed this sensor)
-   atomic_set(&last_last_sensor, MOVER_SENSOR_UNKNOWN);
+    // reset end minimum location if necessary
+    if (pos < end) {
+       atomic_set(&end_min, pos);
+    }
+    
+    // reset home maximum location (wheel slippage, testing, etc. can cause the old value to be wrong)
+    atomic_set(&home_max, -5000);
 
    SENDUSERCONNMSG( "randy end_int %i", atomic_read(&movement_atomic));
     // check to see if this one needs to be ignored
@@ -1623,6 +1733,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
 
     do_event(EVENT_END_LIMIT); // triggered on end limit
     do_fault(ERR_stop_right_limit); // triggered on home limit
+   SENDUSERCONNMSG( "randy before mover_speed_stop 7");
     mover_speed_stop();
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
@@ -1646,18 +1757,28 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
     if (isMoverAtDock() != 0) {
        do_event(EVENT_DOCK_LIMIT); // triggered on dock limit
        do_fault(ERR_stop_dock_limit); // triggered on dock limit
+   SENDUSERCONNMSG( "randy before mover_speed_stop 9");
        mover_speed_stop();
 //       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
        atomic_set(&find_dock_atomic, 0);
        enable_battery_check(1);
        battery_check_is_docked(1);
-       if (atomic_read(&found_home) == 0) { // if we haven't found our home position, find it via the dock
+       if (atomic_read(&found_home) == 0) { // if we haven't found our home position, we at least know *about* where the dock is
           if (dock_loc == 0) { // Dock at left
              atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * DOCK_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we're docked behind home, calculate ticks
           } else { // Dock at right
              atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + DOCK_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we're docked past end, calculate ticks
           }
-          atomic_set(&found_home, 1);
+       } else {
+          // we've found both home and the dock...
+          if (atomic_read(&found_dock) == 0) { // if this is our first time...
+             // ...remember where the dock is
+             atomic_set(&dock_location, atomic_read(&position));
+             atomic_set(&found_dock, 1);
+          } else { // if this is not our first time...
+             // ...reset our location to compensate for wheel spin, which causes our location to drift over time
+             atomic_set(&position, atomic_read(&dock_location));
+          }
        }
     } else {
        // Not on dock
@@ -1839,21 +1960,9 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
      switch (mover_type)
         {
         case 0:
-        // initialize infantry clock
-        __raw_writel(ATMEL_TC_TIMER_CLOCK1			// Master clock/2 = 132MHz/2 ~ 66MHz
-                    | ATMEL_TC_WAVE					// output mode
-                    | ATMEL_TC_ACPA_CLEAR			// set TIOA low when counter reaches "A"
-                    | ATMEL_TC_ACPC_SET				// set TIOA high when counter reaches "C"
-                    | ATMEL_TC_BCPB_CLEAR			// set TIOB low when counter reaches "B"
-                    | ATMEL_TC_BCPC_SET				// set TIOB high when counter reaches "C"
-                    | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
-                    | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
-                    tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
-        break;
-
-        case IS_MAT:
+        case 1:
         // initialize armor clock
-        case 4:
+        case 3:
         // initialize infantry/48v soft-reverse clock
         __raw_writel(ATMEL_TC_TIMER_CLOCK2			// Master clock/8 = 132MHz/8 ~ 16MHz
                     | ATMEL_TC_WAVE					// output mode
@@ -1865,8 +1974,7 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
                     | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
                     tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
         break;
-        case IS_MIT:
-        case IS_MITP:
+        case 2:
         // initialize infantry/48-v hard-reverse clock
         __raw_writel(ATMEL_TC_TIMER_CLOCK4			// Master clock/128 = 132MHz/128 ~ 1MHz
                     | ATMEL_TC_WAVE					// output mode
@@ -1975,12 +2083,12 @@ static int hardware_init(void)
       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
       battery_check_is_docked(1);
       enable_battery_check(1);
+      // we know *about* where the dock is, assume that location
       if (dock_loc == 0) { // Dock at left
          atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * DOCK_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we're docked behind home, calculate ticks
       } else { // assume Dock at right
          atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + DOCK_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we're docked past end, calculate ticks
       }
-      atomic_set(&found_home, 1); // we don't need to look for home, we found the dock
     } else {
       do_event(EVENT_UNDOCKED);
       battery_check_is_docked(0);
@@ -2069,6 +2177,8 @@ static int hardware_exit(void)
     del_timer(&velocity_timer_list);
     del_timer(&dock_timeout_list);
     del_timer(&speed_timeout_list);
+	 del_timer(&continuous_timeout_list);
+	 del_timer(&ramp_timeout_list);
 
 #ifndef TESTING_ON_EVAL
     free_irq(INPUT_MOVER_TRACK_HOME, NULL);
@@ -2155,6 +2265,36 @@ static void horn_off_fire(unsigned long data)
         at91_set_gpio_output(OUTPUT_MOVER_HORN, !OUTPUT_MOVER_HORN_ACTIVE_STATE);
         }
     }
+
+
+//---------------------------------------------------------------------------
+// Helper function to map 1000*percent values from speed values
+//---------------------------------------------------------------------------
+static int percent_curve_from_speed(int start, int end, int step) {
+   int result;
+   // if we can't ramp, don't
+   if ((MOVER_RAMP_STEPS[mover_type] * abs(end - start)) == 0) {
+      return percent_from_speed(end);
+   }
+
+   // start as a percent of the distance
+   result = (step*1000)/(MOVER_RAMP_STEPS[mover_type]*abs(end - start));
+
+   // fit result to curve
+   result = (result * result) / 1000;
+
+   // if we're going down, flip the curve
+   if (end < start) {
+      result = (-1 * (result)) + 1000;
+   }
+
+   // result is now a 0-1000 percent, scale it to fit between start and end, but still on a 0-1000 scale
+   result = (result / (1000/(percent_from_speed(abs(end-start))))) + percent_from_speed(min(end, start));
+
+   // return the final 0-1000 version
+   return result;
+
+}
 
 //---------------------------------------------------------------------------
 // Helper function to map 1000*percent values from speed values
@@ -2263,6 +2403,7 @@ static int current_speed10() {
 //    if (vel != 0) {
 //        vel = (100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel)/VELO_K[mover_type];
 //    }
+//    SENDUSERCONNMSG( "nathan giving velocity from: (100 * (%i / %i) / %i) / %i", RPM_K[mover_type], ENC_PER_REV[mover_type], vel, VELO_K[mover_type]);
     if (VELO_K[mover_type] <= 0) {
        return 0; // bad data, 0 effort
     }
@@ -2286,6 +2427,7 @@ static int current_pid_speed10(void) {
 //    if (vel != 0) {
 //        vel = (100*(RPM_K[mover_type]/ENC_PER_REV[mover_type])/vel)/VELO_K[mover_type];
 //    }
+//    SENDUSERCONNMSG( "nathan giving velocity from: (100 * (%i / %i) / %i) / %i", RPM_K[mover_type], ENC_PER_REV[mover_type], vel, VELO_K[mover_type]);
     if (VELO_K[mover_type] <= 0) {
        return 0; // bad data, 0 effort
     }
@@ -2341,7 +2483,7 @@ static int calcTargetRatio( int input, int new){
    if (new <= 0) {
       return 0;
    }
-   if (mover_type == IS_MAT){ //MAT
+   if (IS_MAT){ //MAT
       if (new <= 50) diff = 10;
       else if (new <= 100) diff = 10;
       else if (new <= 150) diff = 7;
@@ -2353,7 +2495,7 @@ static int calcTargetRatio( int input, int new){
       } else if (ratio < 100){
          return -1;
       }
-   } else if (mover_type == IS_MIT){ // MIT
+   } else if (IS_MIT){ // MIT
       if (new <= 35) diff = 20;
       else if (new <= 50) diff = 4;
       else if (new <= 100) diff = 4;
@@ -2428,6 +2570,7 @@ int mover_set_continuous_move(int c) {
    } else {
       atomic_set(&continuous_speed, 0);
       dock_timeout_stop();
+   SENDUSERCONNMSG( "randy before mover_speed_stop 10");
       mover_speed_stop();
    }
    return 0;
@@ -2468,6 +2611,7 @@ int mover_set_moveaway_move(int c) {
       mover_speed_set( speed );
       speed_timeout_start(0, speed);
    } else {
+   SENDUSERCONNMSG( "randy before mover_speed_stop 11");
       mover_speed_stop();
    }
    return 0;
@@ -2475,8 +2619,6 @@ int mover_set_moveaway_move(int c) {
 EXPORT_SYMBOL(mover_set_moveaway_move);
 
 int mover_set_move_speed(int speed) {
-   SENDUSERCONNMSG( "randy mover_set_move_speed %i at start", speed);
-DELAY_PRINTK("randy mover_set_mover_speed(%i) at start\n", speed);
    atomic_set(&continuous_speed, 0);
    atomic_set(&find_dock_atomic, 0);
    // check to see if we're sleeping or not
@@ -2489,6 +2631,7 @@ DELAY_PRINTK("randy mover_set_mover_speed(%i) at start\n", speed);
       speed_timeout_start(0, speed);
       return mover_speed_set( speed );
    } else {
+   SENDUSERCONNMSG( "randy before mover_speed_stop 12");
       mover_speed_stop();
       return 1;
    }
@@ -2509,6 +2652,7 @@ EXPORT_SYMBOL(set_lifter_fault);
 
 int mover_set_speed_stop() {
     atomic_set(&continuous_speed, 0);
+   SENDUSERCONNMSG( "randy before mover_speed_stop 13");
     mover_speed_stop();
     atomic_set(&find_dock_atomic, 0);
     dock_timeout_stop(); // stop docking as well
@@ -2534,11 +2678,16 @@ int isMoverAtDock(void){
 }
 
 void mover_find_dock(void) {
+
    SENDUSERCONNMSG( "randy mover_find_dock,%i" ,atomic_read(&dockTryCount));
-   if (isMoverAtDock() != 0 || atomic_read(&dockTryCount) > DOCK_RETRY_COUNT[mover_type]) {
+   if (isMoverAtDock() != 0) {
       return;
    } // At the dock already
-   if (mover_type == IS_MAT || mover_type == IS_MIT || mover_type == IS_MITP){
+   if (atomic_read(&dockTryCount) > DOCK_RETRY_COUNT[mover_type]) {
+      // atomic_set(&find_dock_atomic, 0); -- don't reset! will cause timeout_fire to not report ERR_did_not_dock!
+      return;
+   } // Tried too many times
+   if (IS_MAT || IS_MIT){
       atomic_set(&find_dock_atomic, 1);
       atomic_inc(&dockTryCount);
       if (dock_loc == 1) { // Dock at end away from home
@@ -2557,7 +2706,7 @@ void mover_go_home(void) {
    atomic_set(&continuous_speed, 0);
    atomic_set(&find_dock_atomic, 0);
    dock_timeout_stop();
-   if (mover_type == IS_MIT || mover_type == IS_MITP){
+   if (IS_MIT){
       if (home_loc == 1) { // Dock at end away from home
          if (atomic_read(&last_sensor) != MOVER_SENSOR_END){
                mover_speed_set(28); // Get there kind of fast
@@ -2691,6 +2840,7 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
         {
     DELAY_PRINTK("%s - %s() : user command stop\n",TARGET_NAME[mover_type], __func__);
 
+   SENDUSERCONNMSG( "randy before mover_speed_stop 14");
         mover_speed_stop();
         }
 
@@ -2834,19 +2984,7 @@ static ssize_t clock_store(struct device *dev, struct device_attribute *attr, co
      switch (mover_type)
         {
         case 0:
-        // initialize infantry clock
-        __raw_writel(value			// new clock
-                    | ATMEL_TC_WAVE					// output mode
-                    | ATMEL_TC_ACPA_CLEAR			// set TIOA low when counter reaches "A"
-                    | ATMEL_TC_ACPC_SET				// set TIOA high when counter reaches "C"
-                    | ATMEL_TC_BCPB_CLEAR			// set TIOB low when counter reaches "B"
-                    | ATMEL_TC_BCPC_SET				// set TIOB high when counter reaches "C"
-                    | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
-                    | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
-                    tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
-        break;
-
-        case IS_MAT:
+        case 1:
         // initialize armor clock
         __raw_writel(value			// new clock
                     | ATMEL_TC_WAVE					// output mode
@@ -2858,8 +2996,7 @@ static ssize_t clock_store(struct device *dev, struct device_attribute *attr, co
                     | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
                     tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
         break;
-        case IS_MIT:
-        case IS_MITP:
+        case 2:
         // initialize infantry/h-bridge clock
         __raw_writel(value			// new clock
                     | ATMEL_TC_WAVE					// output mode
@@ -2972,19 +3109,7 @@ DELAY_PRINTK("changing clock to %i\n", nc);
      switch (mover_type)
         {
         case 0:
-        // initialize infantry clock
-        __raw_writel(nc			// new clock
-                    | ATMEL_TC_WAVE					// output mode
-                    | ATMEL_TC_ACPA_CLEAR			// set TIOA low when counter reaches "A"
-                    | ATMEL_TC_ACPC_SET				// set TIOA high when counter reaches "C"
-                    | ATMEL_TC_BCPB_CLEAR			// set TIOB low when counter reaches "B"
-                    | ATMEL_TC_BCPC_SET				// set TIOB high when counter reaches "C"
-                    | ATMEL_TC_EEVT_XC0				// set external clock 0 as the trigger
-                    | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
-                    tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
-        break;
-
-        case IS_MAT:
+        case 1:
         // initialize armor clock
         __raw_writel(nc			// new clock
                     | ATMEL_TC_WAVE					// output mode
@@ -2996,8 +3121,7 @@ DELAY_PRINTK("changing clock to %i\n", nc);
                     | ATMEL_TC_WAVESEL_UP_AUTO,		// reset counter when counter reaches "C"
                     tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], CMR));	// CMR register for timer
         break;
-        case IS_MIT:
-        case IS_MITP:
+        case 2:
         // initialize infantry/h-bridge clock
         __raw_writel(nc			// new clock
                     | ATMEL_TC_WAVE					// output mode
@@ -3117,8 +3241,10 @@ static void do_position(struct work_struct * work)
          int dir;
          int len;
          int pos;
+#ifdef SEND_POS
          struct timespec time_now = current_kernel_time();
          struct timespec time_d = timespec_sub(time_now, time_start);
+#endif
     // not initialized or exiting?
     if (atomic_read(&full_init) != TRUE) {
         return;
@@ -3194,7 +3320,7 @@ static void movement_change(struct work_struct * work)
     target_sysfs_notify(&target_device_mover_generic, "movement");
     }
 
-#if defined(SEND_DEBUG) || defined(SEND_PID) || defined(SEND_POS)
+#ifdef SEND_DEBUG
 void sendUserConnMsg( char *fmt, ...){
     va_list ap;
     char *msg;
@@ -3257,7 +3383,7 @@ static void pid_step() {
     pid_error = calcPidError(new_speed, input_speed); // set point - input
 
     // put calculated current error to end of list
-    if (input_speed != 0) {
+    if (input_speed != 0 || IS_MAT) {
        pid_errors[MAX_PID_ERRORS-1] = pid_error;
     }
     //pid_total_error += pid_error;
@@ -3423,7 +3549,7 @@ static void pid_step() {
        pid_effort = 0; // when stopping is 0
     } else {
 #if 0
-      if (mover_type == IS_MIT) {
+      if (IS_MIT) {
          if (new_speed < 50) {
             if (pid_effort < 0) {
                pid_effort /= 4;
@@ -3438,8 +3564,14 @@ static void pid_step() {
          }
       }
 #endif
-       // clamp effort
-       pid_effort = max(min(pid_effort, 1000), 20); // non-zero min to always be touching the throttle line, so the motor controller doesn't reset its timer
+       // clamp effort to valid values
+       if (IS_MIT) {
+          pid_effort = max(min(pid_effort, 1000), atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD ? 100 : 80); // non-zero min to always be touching the throttle line, so the motor controller doesn't reset its timer, and be different forward/reverse to compensate for the gear box
+       } else if (IS_MAT) {
+          pid_effort = max(min(pid_effort, 1000), 1); // just barely touch line to not engage breaks
+       } else {
+          pid_effort = max(min(pid_effort, 1000), 25); // min of 25, max of 1000
+       }
     }
     
          
@@ -3561,10 +3693,8 @@ static int __init target_mover_generic_init(void)
     // for debug
     time_start = current_kernel_time();
     switch (mover_type) {
-        case 0: atomic_set(&tc_clock, 1); break;
-        case IS_MAT: atomic_set(&tc_clock, 2); break;
-        case IS_MIT: atomic_set(&tc_clock, 4); break;
-        case IS_MITP: atomic_set(&tc_clock, 4); break;
+        case 0: case 1: atomic_set(&tc_clock, 2); break;
+        case 2: atomic_set(&tc_clock, 4); break;
     }
 
     // find actual PID values to use based on given mover type or manually given module parameters
