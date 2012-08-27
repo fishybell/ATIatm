@@ -32,9 +32,9 @@
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
 //#define PRINT_DEBUG
-//#define SEND_DEBUG
-//#define SEND_PID
-//#define SEND_POS
+#define SEND_DEBUG
+#define SEND_PID
+#define SEND_POS
 
 #if defined(SEND_DEBUG) || defined(SEND_PID) || defined(SEND_POS)
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -182,8 +182,8 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
 // RA - low time setting - cannot exceed RC
 // RB - low time setting - cannot exceed RC
-static int MOTOR_PWM_RC[] = {0x3074,0x3074,0x1180,0x1180,0x1180,0};
-static int MOTOR_PWM_END[] = {0x3074,0x3074,0x1180,0x1180,0x1180,0};
+static int MOTOR_PWM_RC[] = {0x3074,0x3074,0x1180,0x7000,0x1180,0};
+static int MOTOR_PWM_END[] = {0x3074,0x3074,0x1180,0x7000,0x1180,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x04D8,0x04D8,0x0000,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x04D8,0x04D8,0x0000,0x0000,0};
 static int MOTOR_PWM_RA_DEFAULT[] = {0x0001,0x0001,0x0001,0x0001,0x001,0};
@@ -220,7 +220,7 @@ static int COAST_FACTOR[]  = {10, 10, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_
 // static int MOVER2_PWM_TABLE[] = {0, 1100, 1550, 1975, 2375, 2800, 3325, 3900, 5000, 7000, 10000}; // -- first stab
 // static int MOVER2_PWM_TABLE[] = {0, 1350, 1800, 2300, 2700, 3200, 3700, 4500, 5500, 7500, 12000}; // -- second stab
 
-static int MOVER_RAMP_STEPS[] = {2, 2, 1, 1, 1, 0}; // MATs do 2 * speed, MITs do 1 * speed
+static int MOVER_RAMP_STEPS[] = {2, 2, 0, 0, 1, 0}; // MATs do 2 * speed, MITs do 1 * speed
 
 
 
@@ -246,7 +246,7 @@ module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only 
 #define LIFTER_POSITION_DOWN 0
 
 static bool PWM_H_BRIDGE[] = {false,false,false,false,false,false};
-static bool DIRECTIONAL_H_BRIDGE[] = {true,true,true,false,false,false};
+static bool DIRECTIONAL_H_BRIDGE[] = {true,true,true,true,false,false};
 static bool USE_BRAKE[] = {false,false,false,true,true,false};
 static bool CONTACTOR_H_BRIDGE[] = {false, false, false, false, true, false};
 static bool MOTOR_CONTROL_H_BRIDGE[] = {false, false, false, false, false, false};
@@ -331,6 +331,8 @@ atomic_t driver_id = ATOMIC_INIT(-1);
 // Forward definition of pid function
 //---------------------------------------------------------------------------
 static void pid_step(void); 
+static void pid_step2(void); 
+static void pid_step3(void); 
 #if 0 /* new method not yet used */
 static void pid_step1(void); 
 #endif
@@ -775,10 +777,12 @@ static int hardware_motor_off(void)
 #ifndef DEBUG_PID
 //send_nl_message_multi("Brake on!", error_mfh, NL_C_FAILURE);
 #endif
+//    if(mover_type != MITP){
     at91_set_gpio_output(MOTOR_PWM_F, !OUTPUT_MOVER_PWM_SPEED_ACTIVE[mover_type]);
     at91_set_gpio_output(MOTOR_PWM_R, !OUTPUT_MOVER_PWM_SPEED_ACTIVE[mover_type]);
     __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA)); // change to smallest value
     __raw_writel(1, tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB)); // change to smallest value
+//    }
 
     // pid stop
     reset_pid(); // reset pid variables
@@ -1031,8 +1035,7 @@ static int mover_speed_set(int speed) {
 //         tmpSpeed = MIT_SPEEDS[selectSpeed];
          if (speed < 0) tmpSpeed *= -1;
          speed = tmpSpeed;
-      }
-      if (IS_MAT){
+      } else if (IS_MAT){
          selectSpeed = abs(speed);
          if (selectSpeed <= 5) tmpSpeed = 10; // 1.0 mph (to dock slowly, or manual movement)
          else if (selectSpeed <= 10) tmpSpeed = 65; // 6.5 mph (to meet 8-13 kph)
@@ -1329,7 +1332,11 @@ static void pid_timeout_fire(unsigned long data)
          }
       }
 #endif
-      pid_step();
+      if (mover_type == MITP){
+         pid_step3();
+      } else {
+         pid_step();
+      }
       pid_timeout_start();
     }
 //---------------------------------------------------------------------------
@@ -2047,7 +2054,7 @@ static int hardware_set_gpio_input_irq(int pin_number,
 //---------------------------------------------------------------------------
 static int hardware_init(void)
     {
-    int status = 0;
+    int status = 0, new_speed = 1;
    DELAY_PRINTK("%s reverse: %i\n",__func__,  reverse);
 
     // turn on brake?
@@ -3678,6 +3685,144 @@ static void pid_step1() {
     spin_unlock(&pid_lock);
 }
 #endif
+
+// new method
+// negative effort less than 50%
+// 0 effort uses 50% pid
+// positive effort more than 50%
+// 
+static void pid_step2() {
+    int new_speed=1, input_speed=0, i, error_sum=0, input_speed_old=0, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
+    int new_pid_effort = 500; // 50% effort for new controller is 0 effort
+   int direction, delta;
+   // not used? -- using_ticks
+   // not used? -- targetRatio;
+   // not used? -- int a, b, c;
+   struct timespec time_now = current_kernel_time();
+   struct timespec time_d = timespec_sub(time_now, time_start);
+   static int last_delta = -1; // invalid initial value for this static int
+   //static int pid_count = 0;
+
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    //using_ticks = pid_ticks;
+    //pid_ticks = 0;
+    
+    new_speed = atomic_read(&pid_set_point); // read desired pid set point
+    input_speed_old = percent_from_speed(abs(current_speed10())); // ex on MIT : 0-20mph => 0-1000, so 5mph = 250, 2.5 mph = 125, etc.
+    direction = atomic_read(&quad_direction);
+    
+    // delta is time since last pid_step, which used to be just delta_t, now it is time_d...units don't matter as we will adjust the D gain abitrarily anyway
+    //delta = atomic_read(&delta_t); // delta was in clock ticks...
+    delta = (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000l); // ...but is now in milliseconds
+    if (last_delta != -1) { // check that we're valid
+       int temp = delta;
+       delta = delta - last_delta; // ... and is now the time since the last time we ran pid_step
+       last_delta = temp; // remember
+    } else {
+       last_delta = delta; // remember
+       // first time around we won't mess with delta
+    }
+    // old delta was speed dependent, new delta should always be about the same
+
+    // read input speed (adjust speed10 value to 1000*percent)
+    input_speed = percent_from_speed(abs(current_pid_speed10())); // ex on MIT : 0-20mph => 0-1000, so 5mph = 250, 2.5 mph = 125, etc.
+    atomic_set(&pid_vel, 0);
+    if (!spin_trylock(&pid_lock)) {
+        return;
+    }
+    if (new_speed != 0) {
+      if ((atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)) {
+         pid_effort = -1;
+      } else {
+         pid_effort = 1;
+      }
+      new_pid_effort = 500 + (pid_effort * new_speed / 2);
+      max(min(new_pid_effort, 1000), 0);
+    }
+         
+#ifdef SEND_PID
+       SENDUSERCONNMSG( "step2,t,%i,e,%i,u,%i,r,%i,y,%i,o,%i,P,%i,I,%i,D,%i,l,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, new_pid_effort, new_speed, input_speed, input_speed_old, pid_p, pid_i, pid_d, atomic_read(&position));
+#endif
+    // convert effort to pwm
+    new_speed = pwm_from_effort(new_pid_effort);
+
+    // These change the pwm duty cycle
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
+
+    // move effort values
+    pid_last_effort = new_pid_effort;
+
+    // unlock for next time
+    spin_unlock(&pid_lock);
+}
+
+// new method
+static void pid_step3() {
+    int new_speed=1, input_speed=0, i, error_sum=0, input_speed_old=0, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
+   int direction, delta;
+   // not used? -- using_ticks
+   // not used? -- targetRatio;
+   // not used? -- int a, b, c;
+   struct timespec time_now = current_kernel_time();
+   struct timespec time_d = timespec_sub(time_now, time_start);
+   static int last_delta = -1; // invalid initial value for this static int
+   //static int pid_count = 0;
+
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    //using_ticks = pid_ticks;
+    //pid_ticks = 0;
+    
+    new_speed = atomic_read(&pid_set_point); // read desired pid set point
+    input_speed_old = percent_from_speed(abs(current_speed10())); // ex on MIT : 0-20mph => 0-1000, so 5mph = 250, 2.5 mph = 125, etc.
+    direction = atomic_read(&quad_direction);
+    
+    // delta is time since last pid_step, which used to be just delta_t, now it is time_d...units don't matter as we will adjust the D gain abitrarily anyway
+    //delta = atomic_read(&delta_t); // delta was in clock ticks...
+    delta = (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000l); // ...but is now in milliseconds
+    if (last_delta != -1) { // check that we're valid
+       int temp = delta;
+       delta = delta - last_delta; // ... and is now the time since the last time we ran pid_step
+       last_delta = temp; // remember
+    } else {
+       last_delta = delta; // remember
+       // first time around we won't mess with delta
+    }
+    // old delta was speed dependent, new delta should always be about the same
+
+    // read input speed (adjust speed10 value to 1000*percent)
+    input_speed = percent_from_speed(abs(current_pid_speed10())); // ex on MIT : 0-20mph => 0-1000, so 5mph = 250, 2.5 mph = 125, etc.
+    atomic_set(&pid_vel, 0);
+    if (!spin_trylock(&pid_lock)) {
+        return;
+    }
+    if (new_speed != 0) {
+      pid_effort = new_speed / 2;
+      max(min(pid_effort, 1000), 0);
+    }
+         
+#ifdef SEND_PID
+       SENDUSERCONNMSG( "step3,t,%i,e,%i,u,%i,r,%i,y,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed);
+#endif
+    // convert effort to pwm
+    new_speed = pwm_from_effort(pid_effort);
+
+    // These change the pwm duty cycle
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
+
+    // move effort values
+    pid_last_effort = pid_effort;
+
+    // unlock for next time
+    spin_unlock(&pid_lock);
+}
 
 
 //---------------------------------------------------------------------------
