@@ -157,6 +157,9 @@ static int MAX_DECCEL[]     = {1000, 1000, 1000, 1000, 1000, 0}; // maximum effo
 static int DOCK_FEET_FROM_LIMIT[] = {18, 18, 6, 6, 6, 0}; // home many feet away the dock is past the limit
 static int COAST_FEET_FROM_LIMIT[] = {18, 12, 4, 4, 4, 0}; // home many feet away it *typically* coasts past the limit
 
+// use only the correct speed, or use the last correct speed
+static int USE_CORRECT_SPEED_ONLY[] = {1, 1, 1, 1, 1, 0}; // MATOLD uses any speed, MAT & MITs use only correct speed
+
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
 #define FAULT_BOTH_LEFT_AND_RIGHT_LIMITS_ARE_ACTIVE        1
@@ -562,7 +565,7 @@ int error_mfh(struct sk_buff *skb, void *msg) {
 //---------------------------------------------------------------------------
 static void timeout_timer_start(int mult) {
     int to;
-    static int last_mult = -1, this_mult;
+    //static int last_mult = -1, this_mult;
     unsigned long new_exp;
     to = TIMEOUT_IN_MSECONDS[mover_type];
     if (isMoverAtDock() != 0) { mult += 1; } // additional multiplier if we have to fight the dock
@@ -3389,6 +3392,9 @@ static void pid_step() {
     atomic_set(&pid_vel, 0);
     if (!spin_trylock(&pid_lock)) {
         return;
+    }
+    if (!USE_CORRECT_SPEED_ONLY[mover_type]) {
+       input_speed = input_speed_old;
     }
 
 //    pid_error = new_speed - input_speed; // set point - input
