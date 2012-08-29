@@ -63,6 +63,7 @@ atifirmware:
 			../../../ati2/files/MAT \
 			../../../ati2/files/MATOLD \
 			../../../ati2/files/MIT \
+			../../../ati2/files/MITP \
 			../../../ati2/files/SAT \
 			../../../ati2/files/SES \
 			../../../ati2/files/SIT \
