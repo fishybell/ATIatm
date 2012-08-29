@@ -13,7 +13,7 @@ start () {
    matd=$(has_dock)
    track=$(has_track_length)
    if [ "$matb" == "" ] ; then
-      matb=48
+      matb=12
    fi
    if [ "$matr" != "0" ] && [ "$matr" != "1" ] ; then
       matr=0

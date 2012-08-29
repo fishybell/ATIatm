@@ -11,7 +11,7 @@ start () {
    mitd=$(has_dock)
    track=$(has_track_length)
    if [ "$mitb" == "" ] ; then
-      mitb=48
+      mitb=12
    fi
    if [ "$mitr" != "0" ] && [ "$mitr" != "1" ] ; then
       mitr=0
