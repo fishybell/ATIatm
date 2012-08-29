@@ -14,7 +14,7 @@ def_progs() {
 # user_conn is now started by inittab: 03/26/12 randy
 #   user_conn &
    case $board in
-      TTMT|MIT|MAT|MATOLD)
+      TTMT|MIT|MITP|MAT|MATOLD)
          mitd=$(has_dock)
          case $mitd in
              1|3)
@@ -63,7 +63,7 @@ def_progs() {
    if [ "$ip" == "auto" ] ; then
       # start event_conn early if we're auto-ip
       case $board in
-         TTMT|MIT|MAT|MATOLD)
+         TTMT|MIT|MITP|MAT|MATOLD)
             # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
             # always start stand-alone (will also act as server)
             event_conn -S -v -k -r MOVER &
@@ -87,7 +87,7 @@ def_progs() {
 
    # connect event_conns together
    case $board in
-      TTMT|MIT|MAT|MATOLD)
+      TTMT|MIT|MITP|MAT|MATOLD)
          # TODO -- TTMT needs to start multiple event_conn servers (form a triangle of connections)
          # always start stand-alone (will also act as server)
          event_conn -S -v -k -r MOVER &
@@ -114,7 +114,7 @@ def_progs() {
 
    # start auto ip server
    case $board in
-      TTMT|MAT|MATOLD|MIT)
+      TTMT|MAT|MATOLD|MIT|MITP)
          if [ "$comm" != "network" ] ; then
             bcast_server &
             # start ping if we're on a wimax network
@@ -172,7 +172,7 @@ fi
 # find default ip address (to connect to)
 if [ -z "$ip" -o "$ip" == "none" ] ; then
    case $board in
-      TTMT|MAT|MATOLD|MIT)
+      TTMT|MAT|MATOLD|MIT|MITP)
          case $comm in
             local|network|wimax|wifi)
                ip="192.168.1.1"

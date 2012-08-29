@@ -12,7 +12,7 @@ start () {
     host=$(/usr/bin/is_mac | cut -d: -f4-6 | grep : | sed -e "s/://g")
 
     case "$board" in
-        MIT|MAT|MATOLD)
+        MITP|MIT|MAT|MATOLD)
             # mover's are always radio controlled, and usually with client: be the server
             echo "server" > /etc/hostname
             ;;
