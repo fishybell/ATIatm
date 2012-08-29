@@ -32,9 +32,9 @@
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
 //#define PRINT_DEBUG
-#define SEND_DEBUG
-#define SEND_PID
-#define SEND_POS
+//#define SEND_DEBUG
+//#define SEND_PID
+//#define SEND_POS
 
 #if defined(SEND_DEBUG) || defined(SEND_PID) || defined(SEND_POS)
 #define SENDUSERCONNMSG  sendUserConnMsg
