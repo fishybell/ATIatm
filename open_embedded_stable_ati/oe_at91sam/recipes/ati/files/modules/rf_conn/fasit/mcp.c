@@ -250,11 +250,11 @@ int main(int argc, char **argv) {
             break;
 
          case 'j':
-            slow_time = atoi(optarg);
+            slow_time = atoi(optarg) * 10;
             break;
 
          case 'J':
-            fast_time = atoi(optarg);
+            fast_time = atoi(optarg) * 10;
             break;
 
          case 'm':
