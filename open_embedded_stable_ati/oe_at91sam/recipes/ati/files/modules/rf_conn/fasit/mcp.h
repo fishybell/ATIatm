@@ -619,10 +619,10 @@ typedef enum rf_target_type {
 
 // common timer values
 #define FAST_SOON_TIME        45  /* 4 1/2 seconds */
-#define FAST_WAIT_TIME        900 /* 90 seconds */
+#define FAST_WAIT_TIME        3600 /* 6 minutes */
 #define FAST_TIME             130 /* 13 seconds */
 #define SLOW_SOON_TIME        45  /* 4 1/2 seconds */
-#define SLOW_WAIT_TIME        900 /* 90 seconds */
+#define SLOW_WAIT_TIME        3600 /* 6 minutes */
 #define SLOW_TIME             1200 /* 2 minutes */
 #define EVENT_SOON_TIME       5   /* 1/2 second */
 #define TRANSMISSION_TIME     4   /* 4/10 second */
@@ -681,7 +681,7 @@ enum {
 #define RF_COLLECT_DELAY 350 /* the amount of time to wait for multiple messages to be combined together */
 
 // other state constants
-#define MAX_MISS_TIME 3 /* maximimum number of minutes to go without a response */
+#define MAX_MISS_TIME 5 /* maximimum number of minutes to go without a response */
 #define FAST_TIME_MAX_MISS ((MAX_MISS_TIME * 600) / fast_time) /* maximum value of the "missed message" counter, calculated from X minutes */
 #define SLOW_TIME_MAX_MISS 5 /* maximum value of the "missed message" counter, not based on X minutes */
 #define EVENT_MAX_MISS 10 /* maximum value of the "missed message" counter */
