@@ -32,7 +32,7 @@
 //#define SPIN_DETECT 100
 //#define STALL_DETECT
 //#define PRINT_DEBUG
-#define SEND_DEBUG
+//#define SEND_DEBUG
 //#define SEND_PID
 //#define SEND_POS
 
