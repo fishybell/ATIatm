@@ -1030,7 +1030,18 @@ static int mover_speed_set(int speed) {
    SENDUSERCONNMSG( "randy mover_speed_set %i", speed);
    if (speed != 0){
       revSpeed = speed; // we need to save the speed in case we reverse
-      if (IS_MIT){
+      if ( mover_type == MITP ){
+         selectSpeed = abs(speed);
+         if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
+         else if (selectSpeed <= 10) tmpSpeed = 13; // 1.3 mph (to meet 1-3 kph)
+         else if (selectSpeed <= 20) tmpSpeed = 31; // 3.2 mph (to meet 4-6 kph)
+         else if (selectSpeed <= 30) tmpSpeed = 60; // 6.0 mph (to meet 8-10 kph)
+         else tmpSpeed = 85; // 8.5 mph (to meet 12-14 kph)
+//         if (selectSpeed > MOVER_SPEED_SELECTIONS) selectSpeed = MOVER_SPEED_SELECTIONS;
+//         tmpSpeed = MIT_SPEEDS[selectSpeed];
+         if (speed < 0) tmpSpeed *= -1;
+         speed = tmpSpeed;
+      } else if (IS_MIT){
          selectSpeed = abs(speed);
          if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
          else if (selectSpeed <= 10) tmpSpeed = 13; // 1.3 mph (to meet 1-3 kph)
