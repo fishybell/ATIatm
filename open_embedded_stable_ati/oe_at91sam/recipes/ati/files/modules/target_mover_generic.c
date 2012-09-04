@@ -136,8 +136,8 @@ static int HORN_OFF_IN_MSECONDS[] = {8000,8000,0,0,0,0};
 // static int PID_KD_DIV[]    = {4, 5, 4, 4, 0}; // derivitive gain denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot -- due to throttle cut-off from motor controller, had to adjust by hand afterwards
-static int PID_KP_MULT[]   = {3, 3, 20, 10, 1, 0}; // proportional gain numerator
-static int PID_KP_DIV[]    = {1, 1, 1, 1, 5, 0}; // proportional gain denominator
+static int PID_KP_MULT[]   = {3, 3, 20, 3, 1, 0}; // proportional gain numerator
+static int PID_KP_DIV[]    = {1, 1, 1, 5, 5, 0}; // proportional gain denominator
 static int PID_KI_MULT[]   = {1, 1, 0, 0, 15, 0}; // integral gain numerator
 static int PID_KI_DIV[]    = {3, 3, 1, 1, 47515, 0}; // integral gain denominator
 static int PID_KD_MULT[]   = {0, 0, 0, 0, 190060, 0}; // derivitive gain numerator
@@ -210,7 +210,7 @@ static int TICKS_PER_LEG[] = {1833, 1833, 2292, 2292, 2292, 0}; // 2:1 ratio 5 i
 #define SPEED_TIMEOUT_IN_MILLISECONDS 2000
 #define PID_TIMEOUT_IN_MILLISECONDS 1000
 #define CONTINUOUS_TIMEOUT_IN_MILLISECONDS 1000
-#define RAMP_TIMEOUT_IN_MILLISECONDS 50
+#define RAMP_TIMEOUT_IN_MILLISECONDS 10
 
 static int COAST_FACTOR[]  = {10, 10, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_IN_MILLISECONDS, tuned for how well the target coasts (smaller for coasts better? bigger for brakes better?)
 
@@ -220,7 +220,7 @@ static int COAST_FACTOR[]  = {10, 10, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_
 // static int MOVER2_PWM_TABLE[] = {0, 1100, 1550, 1975, 2375, 2800, 3325, 3900, 5000, 7000, 10000}; // -- first stab
 // static int MOVER2_PWM_TABLE[] = {0, 1350, 1800, 2300, 2700, 3200, 3700, 4500, 5500, 7500, 12000}; // -- second stab
 
-static int MOVER_RAMP_STEPS[] = {2, 2, 0, 0, 1, 0}; // MATs do 2 * speed, MITs do 1 * speed
+static int MOVER_RAMP_STEPS[] = {7, 7, 0, 3, 1, 0}; // MATs do 2 * speed, MITs do 1 * speed
 
 
 
@@ -331,7 +331,7 @@ atomic_t driver_id = ATOMIC_INIT(-1);
 // Forward definition of pid function
 //---------------------------------------------------------------------------
 static void pid_step(void); 
-static void pid_step2(void); 
+//static void pid_step2(void); 
 static void pid_step3(void); 
 #if 0 /* new method not yet used */
 static void pid_step1(void); 
@@ -562,18 +562,18 @@ int error_mfh(struct sk_buff *skb, void *msg) {
 //---------------------------------------------------------------------------
 static void timeout_timer_start(int mult) {
     int to;
-    static int last_mult = -1, this_mult;
+//    static int last_mult = -1, this_mult;
     unsigned long new_exp;
     to = TIMEOUT_IN_MSECONDS[mover_type];
     if (isMoverAtDock() != 0) { mult += 1; } // additional multiplier if we have to fight the dock
 
-    if (last_mult != -1) {
-       this_mult = (mult + last_mult) / 2; // average out the multipliers over time so we don't stop quick after a long multiplier says we should wait a while
-    } else {
-       this_mult = mult;
-    }
-    last_mult = mult;
-    this_mult = max(1, this_mult);
+//    if (last_mult != -1) {
+//       this_mult = (mult + last_mult) / 2; // average out the multipliers over time so we don't stop quick after a long multiplier says we should wait a while
+//    } else {
+//       this_mult = mult;
+//    }
+//    last_mult = mult;
+//    this_mult = max(1, this_mult);
 
     // find new expire time
     if (mult <= 1) {
@@ -632,11 +632,13 @@ static void do_fault(int etype) {
 //---------------------------------------------------------------------------
 static int hardware_motor_on(int direction)
     {
-    
+
+#ifdef RANDY_GUESSING_AT_PROBLEM    
     if (atomic_read(&movement_atomic) != MOVER_DIRECTION_STOP)
     {
         return;
     }
+#endif
 // if we are currently docked tell everyone we are not anymore
 // Currently we will assume that we will get off of the dock
 // if we issue a move
@@ -968,12 +970,14 @@ static int hardware_movement_stop(int stop_timer)
     return 0;
     }
 
-static int mover_speed_stop(void) {
+static int mover_speed_stop(int started_stopping) {
    SENDUSERCONNMSG( "randy mover_speed_stop");
     dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
     speed_timeout_stop();
     ramp_timeout_stop();
-    do_event(EVENT_STOP); // started stopping
+    if (started_stopping) {
+       do_event(EVENT_STOP); // started stopping
+    }
     atomic_set(&goal_atomic, 0); // reset goal speed
     hardware_movement_stop(TRUE); // always true here, so always stops timing out when we stop the mover
     enable_battery_check(1);
@@ -983,7 +987,7 @@ static int mover_speed_stop(void) {
 static int mover_speed_reverse(int speed) {
    timeout_timer_stop();
    SENDUSERCONNMSG( "randy before mover_speed_stop 15");
-   mover_speed_stop();
+   mover_speed_stop(1);
    atomic_set(&find_dock_atomic, 0);
    dock_timeout_stop();
    atomic_set(&reverse_speed, speed);
@@ -1070,7 +1074,7 @@ static int mover_speed_set(int speed) {
    } else {
       // Stop mover if speed is 0
    SENDUSERCONNMSG( "randy before mover_speed_stop 1");
-      mover_speed_stop();
+      mover_speed_stop(1);
       return speed;
    }
 
@@ -1088,14 +1092,13 @@ static int mover_speed_set(int speed) {
    }
    
    // special function for reversing
-   atomic_set(&reverse_speed, 0);
    SENDUSERCONNMSG( "randy before mover_speed_set o_speed %i, speed %i", o_speed, speed);
    if ((o_speed > 0 && speed < 0) || (o_speed < 0 && speed > 0)) {
       // can't use a scenario, because a scenario may cause a reverse
       timeout_timer_stop();
    SENDUSERCONNMSG( "randy before mover_speed_stop 2");
       atomic_set(&find_dock_atomic, 0); // we never reverse to the dock
-      mover_speed_stop();
+      mover_speed_stop(1);
       mover_speed_reverse(revSpeed); // Use the speed passed in for the reverse
       return 1;
    }
@@ -1131,7 +1134,7 @@ static int mover_speed_set(int speed) {
          return 0;
          }
       }
-      if (IS_MIT && atomic_read(&position) < atomic_read(&home_max)) {
+      if (0 && IS_MIT && atomic_read(&position) < atomic_read(&home_max)) {
          if (atomic_read(&find_dock_atomic) == 0){
    SENDUSERCONNMSG( "randy invalid dir left position: %i < %i", atomic_read(&position), atomic_read(&home_max));
          do_fault(ERR_invalid_direction_req);
@@ -1155,7 +1158,7 @@ static int mover_speed_set(int speed) {
          return 0;
          }
       }
-      if (IS_MIT && atomic_read(&position) > atomic_read(&end_min)) {
+      if (0 && IS_MIT && atomic_read(&position) > atomic_read(&end_min)) {
          if (atomic_read(&find_dock_atomic) == 0){
    SENDUSERCONNMSG( "randy invalid dir right position: %i > %i", atomic_read(&position), atomic_read(&end_min));
          do_fault(ERR_invalid_direction_req);
@@ -1182,6 +1185,9 @@ static int mover_speed_set(int speed) {
  
 static void dock_timeout_start(int ms)
 	{
+   if (dock_loc != 0 && dock_loc != 1) {
+      return;
+   }
    if (ms <= 0) ms = DOCK_TIMEOUT_IN_MILLISECONDS;
 	mod_timer(&dock_timeout_list, jiffies+(ms*HZ/1000));
    SENDUSERCONNMSG( "randy dock_timeout_start,%i" ,ms);
@@ -1337,14 +1343,14 @@ static void pid_timeout_fire(unsigned long data)
             if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE){
                do_fault(ERR_wrong_direction);
                atomic_set(&continuous_speed, 0);
-               mover_speed_stop();
+               mover_speed_stop(1);
             }
          } else {
             // Reverse detected
             if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD){
                do_fault(ERR_wrong_direction);
                atomic_set(&continuous_speed, 0);
-               mover_speed_stop();
+               mover_speed_stop(1);
             }
          }
       }
@@ -1474,6 +1480,7 @@ static void velocity_fire(unsigned long data)
 // The function that gets called when the timeout fires.
 //---------------------------------------------------------------------------
 static void timeout_fire(unsigned long data) {
+    int rev_speed = atomic_read(&reverse_speed);
     if (!atomic_read(&full_init))
         {
         return;
@@ -1482,41 +1489,34 @@ static void timeout_fire(unsigned long data) {
    DELAY_PRINTK(KERN_ERR "%s - %s() - the operation has timed out.\n",TARGET_NAME[mover_type], __func__);
 
     do_event(EVENT_TIMED_OUT); // reached timeout
+    do_event(EVENT_STOPPED); // timeout was part of coasting or stopping
 
    SENDUSERCONNMSG( "nathan timeout_fire: goal %i dock %i", atomic_read(&goal_atomic), atomic_read(&find_dock_atomic));
-    if (atomic_read(&goal_atomic) == 0) {
-       int rev_speed = atomic_read(&reverse_speed);
-       do_event(EVENT_STOPPED); // timeout was part of coasting or stopping
+    if (rev_speed != 0) { // stopped due to reversing
    SENDUSERCONNMSG( "randy before mover_speed_stop 3, rev,%i", rev_speed);
-       mover_speed_stop(); // after event_stopped
-       if (rev_speed != 0) {
-//          char *msg = kmalloc(128, GFP_KERNEL);
-//          snprintf(msg, 128, "Finishing reverse (%i)", current_speed10());
-//          send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
-//          kfree(msg);
-          // finish reversing now
-          mover_speed_set(rev_speed);
-       } else {
-          // if we're not reversing, dock
-          atomic_set(&dockTryCount, 0);
-          dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
-       }
-    } else {
-       if (atomic_read(&find_dock_atomic) == 1) {
-          //do_event(EVENT_ERROR); // timeout wasn't part of coasting
-          //do_fault(ERR_did_not_dock);
-          // TODO -- when failure to find dock isn't a mechanical design flaw, undo the comments above
-   SENDUSERCONNMSG( "randy before mover_speed_stop 4");
-          mover_speed_stop(); // after event_error
-          atomic_set(&find_dock_atomic, 0); // we're not finding anymore
-       } else {
-          do_event(EVENT_ERROR); // timeout wasn't part of coasting
-          do_fault(ERR_no_movement);
-   SENDUSERCONNMSG( "randy before mover_speed_stop 5");
-          mover_speed_stop(); // after event_error
-          atomic_set(&dockTryCount, 0);
-          dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
-       }
+       mover_speed_stop(0); // after event_stopped
+       // finish reversing now
+       mover_speed_set(rev_speed);
+       atomic_set(&reverse_speed, 0);
+    } else if (atomic_read(&goal_atomic) == 0) { // stopped due to command
+       mover_speed_stop(0); // after event_stopped
+       // start docking now
+       atomic_set(&dockTryCount, 0);
+       dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
+    } else if (atomic_read(&find_dock_atomic) == 1) { // stopped due to docking problems
+       //do_event(EVENT_ERROR); // timeout wasn't part of coasting
+       //do_fault(ERR_did_not_dock);
+       // TODO -- when failure to find dock isn't a mechanical design flaw, undo the comments above
+SENDUSERCONNMSG( "randy before mover_speed_stop 4");
+       mover_speed_stop(0); // after event_error
+       atomic_set(&find_dock_atomic, 0); // we're not finding anymore
+    } else { // stopped due to problem moving
+       do_event(EVENT_ERROR); // timeout wasn't part of coasting
+       do_fault(ERR_no_movement);
+SENDUSERCONNMSG( "randy before mover_speed_stop 5");
+       mover_speed_stop(0); // after event_error
+       atomic_set(&dockTryCount, 0);
+       dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
     }
 }
 
@@ -1640,7 +1640,7 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
     } else {
         // Pin A did not go high
         if ( atomic_read(&o_count) >= MAX_OVER ) {
-//               mover_speed_stop();
+//               mover_speed_stop(1);
             atomic_set(&velocity, 0);
             atomic_set(&pid_vel, 0);
             atomic_set(&quad_direction, 0);
@@ -1708,7 +1708,7 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
     do_event(EVENT_HOME_LIMIT); // triggered on home limit
     do_fault(ERR_stop_left_limit); // triggered on home limit
    SENDUSERCONNMSG( "randy before mover_speed_stop 6");
-    mover_speed_stop();
+    mover_speed_stop(1);
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
     dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
@@ -1758,7 +1758,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     do_event(EVENT_END_LIMIT); // triggered on end limit
     do_fault(ERR_stop_right_limit); // triggered on home limit
    SENDUSERCONNMSG( "randy before mover_speed_stop 7");
-    mover_speed_stop();
+    mover_speed_stop(1);
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
     dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
@@ -1782,7 +1782,7 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
        do_event(EVENT_DOCK_LIMIT); // triggered on dock limit
        do_fault(ERR_stop_dock_limit); // triggered on dock limit
    SENDUSERCONNMSG( "randy before mover_speed_stop 9");
-       mover_speed_stop();
+       mover_speed_stop(1);
 //       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
        atomic_set(&find_dock_atomic, 0);
        enable_battery_check(1);
@@ -2071,7 +2071,7 @@ static int hardware_set_gpio_input_irq(int pin_number,
 //---------------------------------------------------------------------------
 static int hardware_init(void)
     {
-    int status = 0, new_speed = 1;
+    int status = 0;
    DELAY_PRINTK("%s reverse: %i\n",__func__,  reverse);
 
     // turn on brake?
@@ -2595,7 +2595,7 @@ int mover_set_continuous_move(int c) {
       atomic_set(&continuous_speed, 0);
       dock_timeout_stop();
    SENDUSERCONNMSG( "randy before mover_speed_stop 10");
-      mover_speed_stop();
+      mover_speed_stop(1);
    }
    return 0;
 }
@@ -2636,7 +2636,7 @@ int mover_set_moveaway_move(int c) {
       speed_timeout_start(0, speed);
    } else {
    SENDUSERCONNMSG( "randy before mover_speed_stop 11");
-      mover_speed_stop();
+      mover_speed_stop(1);
    }
    return 0;
 }
@@ -2656,7 +2656,7 @@ int mover_set_move_speed(int speed) {
       return mover_speed_set( speed );
    } else {
    SENDUSERCONNMSG( "randy before mover_speed_stop 12");
-      mover_speed_stop();
+      mover_speed_stop(1);
       return 1;
    }
 }
@@ -2677,7 +2677,7 @@ EXPORT_SYMBOL(set_lifter_fault);
 int mover_set_speed_stop() {
     atomic_set(&continuous_speed, 0);
    SENDUSERCONNMSG( "randy before mover_speed_stop 13");
-    mover_speed_stop();
+    mover_speed_stop(1);
     atomic_set(&find_dock_atomic, 0);
     dock_timeout_stop(); // stop docking as well
     return 1;
@@ -2760,7 +2760,7 @@ DELAY_PRINTK("mover_sleep_set(%i)\n", value);
    atomic_set(&continuous_speed, 0);
    if (value == 1) {
       // start sleeping by stopping
-//      mover_speed_stop();
+//      mover_speed_stop(1);
 //      Sleeping movers can move to the dock to charge
 //    Just move to the end of the track where the dock is.
 //    The rest happens automatically
@@ -2865,7 +2865,7 @@ static ssize_t movement_store(struct device *dev, struct device_attribute *attr,
     DELAY_PRINTK("%s - %s() : user command stop\n",TARGET_NAME[mover_type], __func__);
 
    SENDUSERCONNMSG( "randy before mover_speed_stop 14");
-        mover_speed_stop();
+        mover_speed_stop(1);
         }
 
     // check if an operation is in progress, if so ignore any command other than 'stop' above
@@ -3297,7 +3297,7 @@ static void do_position(struct work_struct * work)
                   (((dir == MOVER_DIRECTION_FORWARD) && (pos > (len + 200))) ||
                   ((dir == MOVER_DIRECTION_REVERSE) && (pos < -200)))) {
                do_fault(ERR_stop_by_distance);
-//               mover_speed_stop();
+//               mover_speed_stop(1);
             }
         }
 
@@ -3610,7 +3610,7 @@ static void pid_step() {
       pidEffortCounter ++;
       if (pidEffortCounter > 20){
    SENDUSERCONNMSG( "maximum effort exceeded");
-         mover_speed_stop();
+         mover_speed_stop(1);
          pid_effort = 0;
       }
     } else {
@@ -3708,6 +3708,7 @@ static void pid_step1() {
 // 0 effort uses 50% pid
 // positive effort more than 50%
 // 
+#if 0
 static void pid_step2() {
     int new_speed=1, input_speed=0, i, error_sum=0, input_speed_old=0, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
     int new_pid_effort = 500; // 50% effort for new controller is 0 effort
@@ -3776,10 +3777,11 @@ static void pid_step2() {
     // unlock for next time
     spin_unlock(&pid_lock);
 }
+#endif
 
 // new method
 static void pid_step3() {
-    int new_speed=1, input_speed=0, i, error_sum=0, input_speed_old=0, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
+   int new_speed=1, input_speed=0, input_speed_old=0, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
    int direction, delta;
    // not used? -- using_ticks
    // not used? -- targetRatio;
@@ -3820,12 +3822,13 @@ static void pid_step3() {
         return;
     }
     if (new_speed != 0) {
-      pid_effort = new_speed / 2;
+      //pid_effort = (kp_m * new_speed / 2;
+      pid_effort = (((1000 * kp_m * new_speed) / kp_d) / 1000);
       max(min(pid_effort, 1000), 0);
     }
          
 #ifdef SEND_PID
-       SENDUSERCONNMSG( "step3,t,%i,e,%i,u,%i,r,%i,y,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed);
+       SENDUSERCONNMSG( "step3,t,%i,e,%i,u,%i,r,%i,y,%i,o,%i,P,%i,I,%i,D,%i,l,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), 0, pid_effort, new_speed, input_speed, input_speed_old, pid_p, pid_i, pid_d, atomic_read(&position));
 #endif
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
