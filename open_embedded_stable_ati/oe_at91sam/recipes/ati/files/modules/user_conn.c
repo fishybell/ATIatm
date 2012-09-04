@@ -659,6 +659,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
         // read line from client buffer
         int i;
         char cmd[CLIENT_BUFFER];
+        memset(cmd, '\0', CLIENT_BUFFER); // zero buffer out
         for (i=0; i<CLIENT_BUFFER; i++) {
             cmd[i] = client_buf[i];
             if (cmd[i] == '\n' || cmd[i] == '\r') {
@@ -2467,8 +2468,8 @@ int main(int argc, char **argv) {
                     if (rsize == 0 || telnet_client(g_handle, client_buf, client) != 0) {
 //printf("sk %i closing\n", client);
                         close_nicely = 1; // exit loop
-                        memset(client_buf, '\0', CLIENT_BUFFER);
                     }
+                    memset(client_buf, '\0', CLIENT_BUFFER); // always clear buffer
                 }
             }
         }
