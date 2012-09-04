@@ -1037,10 +1037,10 @@ static int mover_speed_set(int speed) {
       if ( mover_type == MITP ){
          selectSpeed = abs(speed);
          if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
-         else if (selectSpeed <= 10) tmpSpeed = 13; // 1.3 mph (to meet 1-3 kph)
-         else if (selectSpeed <= 20) tmpSpeed = 31; // 3.2 mph (to meet 4-6 kph)
-         else if (selectSpeed <= 30) tmpSpeed = 60; // 6.0 mph (to meet 8-10 kph)
-         else tmpSpeed = 85; // 8.5 mph (to meet 12-14 kph)
+         else if (selectSpeed <= 10) tmpSpeed = 14; // 1.4 mph (to meet 1-3 kph)
+         else if (selectSpeed <= 20) tmpSpeed = 32; // 3.2 mph (to meet 4-6 kph)
+         else if (selectSpeed <= 30) tmpSpeed = 62; // 6.2 mph (to meet 8-10 kph)
+         else tmpSpeed = 97; // 9.7 mph (to meet 12-14 kph)
 //         if (selectSpeed > MOVER_SPEED_SELECTIONS) selectSpeed = MOVER_SPEED_SELECTIONS;
 //         tmpSpeed = MIT_SPEEDS[selectSpeed];
          if (speed < 0) tmpSpeed *= -1;
@@ -1102,6 +1102,7 @@ static int mover_speed_set(int speed) {
       mover_speed_reverse(revSpeed); // Use the speed passed in for the reverse
       return 1;
    }
+   atomic_set(&reverse_speed, 0); // we're not reversing speed, so don't reverse when we stop
 
    // can we go the requested speed?
    if (abs(speed) > NUMBER_OF_SPEEDS[mover_type]) {
@@ -2764,18 +2765,18 @@ DELAY_PRINTK("mover_sleep_set(%i)\n", value);
 //      Sleeping movers can move to the dock to charge
 //    Just move to the end of the track where the dock is.
 //    The rest happens automatically
-      if (dock_loc == 1 || dock_loc == 3) { // Dock at end away from home
+      if (dock_loc == 1) { // Dock at end away from home
          mover_speed_set(1); // Go Slow
-      } else if (dock_loc == 0 || dock_loc == 2) { // Dock at home end
-         mover_speed_set(-10); // Go Slow
+      } else if (dock_loc == 0) { // Dock at home end
+         mover_speed_set(-1); // Go Slow
       }
    } else if (value == 3) {
 //      mover_find_dock();
 //    Just move to the end of the track where the dock is.
 //    The rest happens automatically
-      if (dock_loc == 1 || dock_loc == 3) { // Dock at end away from home
-         mover_speed_set(10); // Go Slow
-      } else if (dock_loc == 0 || dock_loc == 2) { // Dock at home end
+      if (dock_loc == 1) { // Dock at end away from home
+         mover_speed_set(1); // Go Slow
+      } else if (dock_loc == 0) { // Dock at home end
          mover_speed_set(-1); // Go Slow
       }
       return 1; // Just return, we don't want to change the sleep state
