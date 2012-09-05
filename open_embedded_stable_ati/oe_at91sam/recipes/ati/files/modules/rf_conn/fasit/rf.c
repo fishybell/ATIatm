@@ -436,10 +436,12 @@ void DDpacket_internal(const char *program, uint8 *buf,int len){
          }
             break;
 
-         case LBC_CONFIGURE_HIT:
+         case LBC_CONFIGURE_HIT: {
+            LB_configure_t *L=(LB_configure_t *)LB;
             strcpy(cmdname,"Configure_Hit");
-            sprintf(hbuf,"RFaddr=%3d .....",LB->addr);
-            break;
+            sprintf(hbuf,"RFaddr=%3d mode=%d tokill=%d react=%d sens=%d timehits=%d hitcountset=%d", L->addr, L->hitmode, L->tokill, L->react, L->sensitivity, L->timehits, L->hitcountset);
+
+         }  break;
 
          case LBC_GROUP_CONTROL:
             strcpy(cmdname,"Group_Control");
