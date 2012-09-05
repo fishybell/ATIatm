@@ -2688,6 +2688,8 @@ void *minion_thread(thread_data_t *minion){
 
 
 
+   // wait a few seconds for the mcp to send the ASSIGN ADDR packet
+   sleep(5); // TODO -- have the minion send the packet, and wait for it to be sent until sending any other message to the target
 
    /*** actually, the capabilities and the devid's will come from the MCP -
     ***   it gets them when it sends out the request new devices over the RF
