@@ -9,6 +9,18 @@
 #define BAD_TNUM 0x5000
 #define BASE_STATION 0xffff
 
+                                                                                              
+typedef enum fasit_target_type {                                                              
+   Type_Default,                                                                              
+   Type_SIT,                                                                                  
+   Type_MIT,                                                                                  
+   Type_SAT,                                                                                  
+   Type_HSAT,                                                                                 
+   Type_MAT,                                                                                  
+   Type_BES,                                                                                  
+   Type_SES = 200,                                                                            
+} target_type_t;                                                                              
+
 // generic base class for parsing and generating FASIT protocol messages
 class FASIT {
 public :

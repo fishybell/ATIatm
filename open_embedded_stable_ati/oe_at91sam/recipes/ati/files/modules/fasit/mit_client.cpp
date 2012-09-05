@@ -102,9 +102,9 @@ FUNCTION_START("::fillStatus2102(FASIT_2102 *msg)")
 
    // device type
    if (armor) {
-      msg->body.type = 4; // MAT
+      msg->body.type = Type_MAT; // Moving Armor Target
    } else {
-      msg->body.type = 2; // MIT
+      msg->body.type = Type_MIT; // Moving Infantry Target
    }
 
    // hit record
