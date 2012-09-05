@@ -342,7 +342,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
          switch (minion->S.move.flags) {
             case F_move_start_movement: {
                // we haven't started moving yet, so let's prepare variables
-               minion->S.speed.lastdata = -1.0; // force cache to be dirty
+               //minion->S.speed.lastdata = -1.0; // force cache to be dirty
                minion->S.speed.data = 0.0; // we're not moving
                minion->S.move.data = minion->S.move.newdata; // but we're going to move a direction
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
@@ -370,7 +370,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                float cs;
                //DDCMSG(D_POINTER, GRAY, "Started fake movement for minion %i", minion->mID);
                nt = ts2ms(&mt->elapsed_time);
-               dt = min((nt - minion->S.last_move_time), 1); // diff = now - last (minimum of 1 millisecond)
+               dt = max((nt - minion->S.last_move_time), 1); // diff = now - last (minimum of 1 millisecond)
                minion->S.last_move_time = nt; // last is now, now
 
                // get velocity and acceleration for MIT or MAT
@@ -467,8 +467,8 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                }
 
                // tell the good news
-               /*DDCMSG(D_POINTER, GRAY, "Calculated movement values from dt=%i: pos:%i mph:%f move:%i", dt,
-                      minion->S.position.data, minion->S.speed.data, minion->S.move.data);*/
+               /*DDCMSG(D_POINTER, GRAY, "Calculated movement values from dt=%i: pos:%i(%i) mph:%f(%f) move:%i type:%i", dt,
+                      minion->S.position.data, minion->S.position.lastdata, minion->S.speed.data, minion->S.speed.lastdata, minion->S.move.data, minion->S.dev_type);*/
                sendStatus2102(0, NULL,minion,mt); // tell FASIT server
                //DDCMSG(D_POINTER, GRAY, "Possibly sent 2102 to FASIT server from minion %i", minion->mID);
 
@@ -525,7 +525,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                         }
                      } else {
                         // not moving at all, so we'll use 0
-                        // MATs take a while to get going, so leave this be -- minion->S.speed.last_index = 0;
+                        minion->S.speed.last_index = 0;
                      }
                      //DDCMSG(D_POINTER, GRAY, "Found last_index %i from mph %f", minion->S.speed.last_index, minion->S.speed.data);
                      break;
@@ -557,7 +557,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                //DDCMSG(D_POINTER, GRAY, "Minion %i is ending movement", minion->mID);
                minion->S.speed.towards_index = 0;
                minion->S.speed.last_index = 0;
-               minion->S.speed.lastdata = -1; // force cache to be dirty
+               //minion->S.speed.lastdata = -1.0; // force cache to be dirty
                minion->S.speed.data = 0.0;
                minion->S.speed.newdata = 0.0;
                minion->S.move.data = 0; // stopped, no direction
