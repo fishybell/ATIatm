@@ -455,7 +455,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                      }
                      break;
                   case Type_MAT:
-                     minion->S.position.data = max(0, min(minion->S.position.data, minion->mat_length)); // clamp at 0 to length of track
+                     minion->S.speed.fpos = max(0, min(minion->S.speed.fpos, minion->mat_length)); // clamp at 0 to length of track
                      if (minion->S.position.data <= minion->mat_home && dir < 0) {
                         minion->S.fault.data = ERR_stop_left_limit; // stopped by left limit
                         minion->S.speed.data = 0.0;
