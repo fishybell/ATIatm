@@ -370,7 +370,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                float cs;
                //DDCMSG(D_POINTER, GRAY, "Started fake movement for minion %i", minion->mID);
                nt = ts2ms(&mt->elapsed_time);
-               dt = (nt - minion->S.last_move_time); // diff = now - last
+               dt = min((nt - minion->S.last_move_time), 1); // diff = now - last (minimum of 1 millisecond)
                minion->S.last_move_time = nt; // last is now, now
 
                // get velocity and acceleration for MIT or MAT
@@ -525,7 +525,7 @@ void minion_state(thread_data_t *minion, minion_bufs_t *mb) {
                         }
                      } else {
                         // not moving at all, so we'll use 0
-                        minion->S.speed.last_index = 0;
+                        // MATs take a while to get going, so leave this be -- minion->S.speed.last_index = 0;
                      }
                      //DDCMSG(D_POINTER, GRAY, "Found last_index %i from mph %f", minion->S.speed.last_index, minion->S.speed.data);
                      break;
