@@ -180,7 +180,7 @@ typedef struct LB_status_resp_t {
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // source address (always to basestation)
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
-   uint32 move:1 __attribute__ ((packed)); // 0 = towards home, 1 = away from home
+   uint32 move:1 __attribute__ ((packed)); // 0 = towards end, 1 = towards home
    uint32 did_exp_cmd:1 __attribute__ ((packed)); // 0 = didn't change exposure between last command and now, 1 = did
    uint32 react:3 __attribute__ ((packed));
 
@@ -222,7 +222,7 @@ typedef struct LB_device_reg_t {
    uint32 devid:24 __attribute__ ((packed));
    
    uint32 speed:11 __attribute__ ((packed)); // 100 * speed in mph
-   uint32 move:1 __attribute__ ((packed)); // 0 = towards home, 1 = away from home
+   uint32 move:1 __attribute__ ((packed)); // 0 = towards end, 1 = towards home
    uint32 pad2:1 __attribute__ ((packed));
    uint32 react:3 __attribute__ ((packed));
    int32  location:10 __attribute__ ((packed)); // meters from home
