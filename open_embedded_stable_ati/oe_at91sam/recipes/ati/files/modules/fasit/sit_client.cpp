@@ -16,7 +16,9 @@ using namespace std;
 
 
 // setup calibration table
-const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,1};
+//const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,1}; -- everything was too sensitive, so I'm making up new numbers (the old ones were made up too)
+
+const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,1000,600,425,225,180,144,111,87,66,48,33,21,12,6,1}; // three times as desensitive as previous numbers (except 15, which gives the maximum sensitivity possible)
 
 
 /***********************************************************
@@ -146,9 +148,9 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
 
     // device type
     if (armor) {
-       msg->body.type = 3; // SAT -- TODO -- HSAT vs. SAT?
+       msg->body.type = Type_SAT; // Stationary Armor Target -- TODO -- HSAT vs. SAT?
     } else {
-       msg->body.type = 1; // SIT
+       msg->body.type = Type_SIT; // Stationary Infantry Target
     }
 
     //   DCMSG(YELLOW,"before  doHits(-1)   hits = %d",hits) ;    
