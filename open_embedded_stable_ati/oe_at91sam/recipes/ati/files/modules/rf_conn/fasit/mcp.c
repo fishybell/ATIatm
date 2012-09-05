@@ -25,7 +25,7 @@ int slow_time = SLOW_TIME;
 int MIT_SPEEDS[] = {0, 695, 1389, 2500, 3611}; // in meters per second (times 1000)
 int MAT_SPEEDS[] = {0, 2912, 4444, 5972, 7912}; // in meters per second (times 1000)
 int MIT_ACCEL[] = {0, 250, 500, 750, 1000};  // in meters per second per second (times 1000) -- guessed
-int MAT_ACCEL[] = {0, 500, 1000, 1500, 2000};  // in meters per second per second (times 1000) -- guessed
+int MAT_ACCEL[] = {0, 250, 500, 750, 1000};  // in meters per second per second (times 1000) -- guessed
 
 void print_help(int exval) {
    printf("mcp [-h] [-v num] [-f ip] [-p port] [-r ip] [-m port] [-n minioncount]\n\n");
