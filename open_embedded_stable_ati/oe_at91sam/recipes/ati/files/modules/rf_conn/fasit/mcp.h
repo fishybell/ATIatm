@@ -630,7 +630,7 @@ typedef enum rf_target_type {
 #define SAT_TRANSITION_TIME   90  /* 9 seconds */
 #define HSAT_TRANSITION_TIME  115 /* 11 1/2 second */
 #define MIT_MOVE_START_TIME   8   /* 4/5 second */
-#define MAT_MOVE_START_TIME   120 /* 12 seconds */
+#define MAT_MOVE_START_TIME   20 /* 2 seconds */
 #define RESP_TIME             8   /* 8/10 second */
 extern int fast_time, slow_time; // global, user-configurable versions of FAST_TIME and SLOW_TIME
 
