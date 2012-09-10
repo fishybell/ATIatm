@@ -689,6 +689,9 @@ int send_STATUS_RESP(fasit_connection_t *fc) {
    s.sensitivity = fc->hit_react;
    s.timehits = fc->hit_burst;
    s.fault = fc->last_fault;
+   if (badFault(s.fault) <= 0 && fc->sleeping == 1) {
+      s.fault = ERR_target_asleep;
+   }
    s.tokill = fc->hit_tokill;
    s.did_exp_cmd = fc->did_exp_cmd == 3 ? 1 : 0; // only fully-over-finished task counts
    s.event = fc->current_event;
