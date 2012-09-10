@@ -77,7 +77,7 @@ DDCMSG(D_RF,RED, "RF Packet outside my devid range: %x  OR forget bit not set OR
 DDCMSG(D_RF,RED, "RF Packet for my devid: %x:%x", msg->devid, fc->devid);
          return 1;
       } else if (fc->target_type == RF_Type_Unknown) {
-DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %x", msg->devid);
+DDCMSG(D_RF,RED, "RF Packet ignored based on not having finished connection: %x, %x %i", msg->devid, fc->devid, fc->target_type);
          //DCMSG(CYAN,"Ignored message %d because not finished connection", hdr->cmd);
          return 0;
       } else if (msg->new_addr == fc->id) {
@@ -331,8 +331,8 @@ int rf2fasit(fasit_connection_t *fc, char *buf, int s) {
          DDCMSG(D_RF,BLACK,"Recieved RF message %d",mnum);
          //DCMSG(GRAY,"Didn't ignore RF message %d",mnum);
          debugRF(RED, fc->rf_ibuf + start, end-start);
-         if (fc->sleeping && mnum != LBC_POWER_CONTROL) {
-            // ignore message when sleeping
+         if (fc->sleeping && !(mnum == LBC_POWER_CONTROL || mnum == LBC_STATUS_REQ || mnum == LBC_REQUEST_NEW || mnum == LBC_ASSIGN_ADDR || mnum == LBC_RESET)) {
+            // ignore most messages when sleeping
             DDCMSG(D_RF,BLACK,"Slept through RF message %d",mnum);
          } else {
             switch (mnum) {
@@ -826,6 +826,7 @@ int handle_EXPOSE(fasit_connection_t *fc, int start, int end) {
 
    // change event
    if (fc->current_event != pkt->event) { // only reset hits on changed event (very likely on when expose == 1)
+      DCMSG(GRAY, "Changing fc->current_event from %i to %i", fc->current_event, pkt->event);
       fc->current_event = pkt->event;
       log_ResetHits_All(fc); // clear out everything for this event
       // set start time to now
