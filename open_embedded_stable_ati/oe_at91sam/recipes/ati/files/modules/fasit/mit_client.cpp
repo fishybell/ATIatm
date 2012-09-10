@@ -24,7 +24,7 @@ const u32 MIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,
 MIT_Client::MIT_Client(int fd, int tnum, bool armor) : TCP_Client(fd, tnum, armor) {
 FUNCTION_START("::MIT_Client(int fd, int tnum) : Connection(fd)")
    // connect a fake SIT for now
-   att_SIT = new attached_SIT_Client(NULL, 0, -1); // invalid tnum
+   att_SIT = new attached_SIT_Client(NULL, 0, -1, armor); // invalid tnum
    server = att_SIT; // for pair()
 
    // we have not yet connected to SmartRange/TRACR
@@ -170,7 +170,7 @@ FUNCTION_START("::addSIT(int fd)")
    memset(&lastSITdevcaps, 0, sizeof(FASIT_2111));
    memset(&lastSITstatus, 0, sizeof(FASIT_2102));
    // connect with valid socket
-   att_SIT = new attached_SIT_Client(this, fd, -1); // invalid tnum
+   att_SIT = new attached_SIT_Client(this, fd, -1, armor); // invalid tnum
    server = att_SIT;
 
    // send Device Definition Request (message 100) to attached SIT client
@@ -198,7 +198,7 @@ FUNCTION_START("::delSIT()")
    memset(&lastSITdevcaps, 0, sizeof(FASIT_2111));
    memset(&lastSITstatus, 0, sizeof(FASIT_2102));
    // create a new dummy SIT 
-   att_SIT = new attached_SIT_Client(NULL, -1, -1); // invalid tnum
+   att_SIT = new attached_SIT_Client(NULL, -1, -1, armor); // invalid tnum
    server = att_SIT;
 
 FUNCTION_END("::delSIT()")
@@ -702,11 +702,11 @@ FUNCTION_END("::didStop()")
 /***********************************************************
 *                attached_SIT_Client class                 *
 ***********************************************************/
-attached_SIT_Client::attached_SIT_Client(MIT_Client *mit, int fd, int tnum)  : FASIT_TCP(fd, tnum) {
-FUNCTION_START("::attached_SIT_Client(MIT_Client *mit, int fd, int tnum)  : FASIT_TCP(fd, tnum)")
+attached_SIT_Client::attached_SIT_Client(MIT_Client *mit, int fd, int tnum, int armor)  : FASIT_TCP(fd, tnum, armor) {
+FUNCTION_START("::attached_SIT_Client(MIT_Client *mit, int fd, int tnum, int armor)  : FASIT_TCP(fd, tnum, armor)")
    mit_client = mit;
    client = mit; // for pair()
-FUNCTION_END("::attached_SIT_Client(MIT_Client *mit, int fd, int tnum)  : FASIT_TCP(fd, tnum)")
+FUNCTION_END("::attached_SIT_Client(MIT_Client *mit, int fd, int tnum, int armor)  : FASIT_TCP(fd, tnum, armor)")
 }
 
 attached_SIT_Client::~attached_SIT_Client() {

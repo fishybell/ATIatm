@@ -105,7 +105,7 @@ private:
 // parses attached SIT messages
 class attached_SIT_Client : public FASIT_TCP {
 public :
-   attached_SIT_Client(MIT_Client *mit, int fd, int tnum);
+   attached_SIT_Client(MIT_Client *mit, int fd, int tnum, int armor);
    virtual ~attached_SIT_Client();
 
    // public function to determine if a SIT is actually attached
