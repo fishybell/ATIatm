@@ -1037,10 +1037,10 @@ static int mover_speed_set(int speed) {
       if ( mover_type == MITP ){
          selectSpeed = abs(speed);
          if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
-         else if (selectSpeed <= 10) tmpSpeed = 14; // 1.4 mph (to meet 1-3 kph)
-         else if (selectSpeed <= 20) tmpSpeed = 32; // 3.2 mph (to meet 4-6 kph)
-         else if (selectSpeed <= 30) tmpSpeed = 62; // 6.2 mph (to meet 8-10 kph)
-         else tmpSpeed = 97; // 9.7 mph (to meet 12-14 kph)
+         else if (selectSpeed <= 10) tmpSpeed = 16; // mph (to meet 1-3 kph)
+         else if (selectSpeed <= 20) tmpSpeed = 35; // 3.2 mph (to meet 4-6 kph)
+         else if (selectSpeed <= 30) tmpSpeed = 66; // 6.2 mph (to meet 8-10 kph)
+         else tmpSpeed = 96; // 9.7 mph (to meet 12-14 kph)
 //         if (selectSpeed > MOVER_SPEED_SELECTIONS) selectSpeed = MOVER_SPEED_SELECTIONS;
 //         tmpSpeed = MIT_SPEEDS[selectSpeed];
          if (speed < 0) tmpSpeed *= -1;
