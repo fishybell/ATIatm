@@ -1,0 +1,4 @@
+if [ "$flver" != "`has_major_version`" ] ; then
+   size=$(echo $flver | wc -c)
+   echo -n $flver | /usr/bin/eeprom_rw write -addr 0x564 -size $size -blank 0x08
+fi
