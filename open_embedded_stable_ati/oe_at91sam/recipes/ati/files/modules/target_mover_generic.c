@@ -649,8 +649,10 @@ static int hardware_motor_on(int direction)
        enable_battery_check(0);
        do_fault(ERR_left_dock_limit);
     }
-    // Turn off charging relay
-    at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+    // Turn off charging relay (if we have a dock to charge at)
+    if (dock_loc == 0 || dock_loc == 1) {
+       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+    }
     do_fault(ERR_notcharging_battery);
     //reset_pid(); // reset pid variables
     // turn on directional lines
@@ -1777,6 +1779,11 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
         return IRQ_HANDLED;
         }
 
+    // if no dock, don't stop on an errant dock interrupt
+    if (dock_loc == 2 || dock_loc == 3) {
+       return IRQ_HANDLED;
+    }
+    
     //DELAY_PRINTK("At Dock Sensor %s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&find_dock_atomic));
 
     if (isMoverAtDock() != 0) {
@@ -1784,7 +1791,9 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
        do_fault(ERR_stop_dock_limit); // triggered on dock limit
    SENDUSERCONNMSG( "randy before mover_speed_stop 9");
        mover_speed_stop(1);
+//    if (dock_loc == 0 || dock_loc == 1) {
 //       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
+//    }
        atomic_set(&find_dock_atomic, 0);
        enable_battery_check(1);
        battery_check_is_docked(1);
@@ -1806,8 +1815,10 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
           }
        }
     } else {
-       // Not on dock
-       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+       // Not on dock (if we have a dock)
+       if (dock_loc == 0 || dock_loc == 1) {
+          at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+       }
        do_event(EVENT_UNDOCKED);
        battery_check_is_docked(0);
        enable_battery_check(0);
@@ -2102,8 +2113,18 @@ static int hardware_init(void)
             at91_set_gpio_output(OUTPUT_MOVER_MOTOR_FWD_POS, OUTPUT_MOVER_MOTOR_POS_ACTIVE_STATE); // motor controller on
         }
     }
-    // Turn on charging relay
-    if (isMoverAtDock() != 0) {
+    // Turn on charging relay if we don't have dock
+    if (dock_loc == 2 || dock_loc == 3) {
+      at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
+      battery_check_is_docked(1);
+      enable_battery_check(1);
+      // we know *about* where the home is, assume that location
+      if (dock_loc == 2) { // home at left
+         atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * DOCK_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we're "docked" behind home, calculate ticks
+      } else { // assume home at right
+         atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + DOCK_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we're "docked" past end, calculate ticks
+      }
+    } else if (isMoverAtDock() != 0) { // or if we're on it
       do_event(EVENT_DOCK_LIMIT);
       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
       battery_check_is_docked(1);
