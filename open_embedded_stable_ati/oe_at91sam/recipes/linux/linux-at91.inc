@@ -107,6 +107,7 @@ SRC_URI_append_at91sam9g20ek_2mmc = " \
 	file://mac.patch;patch=1 \
 	file://heartbeat.patch;patch=1 \
 	file://no_wm8731.patch;patch=1 \
+	file://horn.patch;patch=1 \
 	"
 #	file://mma7455l_i2c.patch;patch=1 \
 #	file://mma7455l.patch;patch=1 \

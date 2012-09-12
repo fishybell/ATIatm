@@ -1,0 +1,15 @@
+diff -ruN linux-2.6.30.orig/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c linux-2.6.30/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c
+--- linux-2.6.30.orig/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c	2011-08-04 16:32:11.973421629 -0600
++++ linux-2.6.30/arch/arm/mach-at91/board-sam9g20ek-2slot-mmc.c	2012-09-12 09:40:37.215549080 -0600
+@@ -321,9 +321,9 @@
+ 	/* Push Buttons */
+ //	ek_add_device_buttons();
+ 	/* PCK0 provides MCLK to the WM8731 */
+-	at91_set_B_periph(AT91_PIN_PB30, 0);
++	//at91_set_B_periph(AT91_PIN_PB30, 0);
+ 	/* SSC (for WM8731) (sound) */
+-	at91_add_device_ssc(AT91SAM9260_ID_SSC, ATMEL_SSC_TX);
++	//at91_add_device_ssc(AT91SAM9260_ID_SSC, ATMEL_SSC_TX);
+ }
+ 
+ MACHINE_START(AT91SAM9G20EK_2MMC, "Atmel AT91SAM9G20-EK 2 MMC Slot Mod")
