@@ -19,7 +19,7 @@ dtxm_edit : dtxm_edit.c $(HFILES) $(MCFILES)
 	gcc -lrt -I$(FASIT) -std=gnu99 -o dtxm_edit dtxm_edit.c $(MCFILES)
 
 dtxm_edit.arm : dtxm_edit.c $(HFILES) $(MCFILES)
-	$(XGCC) --sysroot=$(SYSROOT) -I$(FASIT) -lrt -std=gnu99 -o dtxm_edit.arm dtxm_edit.c $(MCFILES)
+	$(XGCC) ${CFLAGS} ${LDFLAGS} --sysroot=$(SYSROOT) -I$(FASIT) -lrt -std=gnu99 -o dtxm_edit.arm dtxm_edit.c $(MCFILES)
 
 clean:
 	$(RM) dtxm_edit *.arm *.o
