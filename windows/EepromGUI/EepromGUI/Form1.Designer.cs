@@ -1,4 +1,4 @@
-﻿namespace EepromGUI
+﻿namespace pmaGUI
 {
     partial class Form1
     {
@@ -285,6 +285,8 @@
             this.shutdownButton = new System.Windows.Forms.Button();
             this.stopButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
+            this.label19 = new System.Windows.Forms.Label();
+            this.lengthDTB = new System.Windows.Forms.TextBox();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -1709,6 +1711,8 @@
             // 
             // groupBox2
             // 
+            this.groupBox2.Controls.Add(this.lengthDTB);
+            this.groupBox2.Controls.Add(this.label19);
             this.groupBox2.Controls.Add(this.revCB);
             this.groupBox2.Controls.Add(this.HomeDCB);
             this.groupBox2.Controls.Add(this.label37);
@@ -1760,7 +1764,7 @@
             // 
             this.label39.AutoSize = true;
             this.label39.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F);
-            this.label39.Location = new System.Drawing.Point(9, 90);
+            this.label39.Location = new System.Drawing.Point(10, 93);
             this.label39.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label39.Name = "label39";
             this.label39.Size = new System.Drawing.Size(41, 17);
@@ -3386,6 +3390,26 @@
             this.tabControl1.Size = new System.Drawing.Size(849, 348);
             this.tabControl1.TabIndex = 93;
             // 
+            // label19
+            // 
+            this.label19.AutoSize = true;
+            this.label19.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F);
+            this.label19.Location = new System.Drawing.Point(2, 126);
+            this.label19.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label19.Name = "label19";
+            this.label19.Size = new System.Drawing.Size(52, 17);
+            this.label19.TabIndex = 16;
+            this.label19.Text = "Length";
+            // 
+            // lengthDTB
+            // 
+            this.lengthDTB.Location = new System.Drawing.Point(53, 123);
+            this.lengthDTB.Name = "lengthDTB";
+            this.lengthDTB.Size = new System.Drawing.Size(79, 22);
+            this.lengthDTB.TabIndex = 17;
+            this.toolTip1.SetToolTip(this.lengthDTB, "Track Length");
+            this.lengthDTB.Click += new System.EventHandler(this.lengthDTB_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -3715,6 +3739,8 @@
         private System.Windows.Forms.Label label14;
         private System.Windows.Forms.Button moveRightButton;
         private System.Windows.Forms.Button moveLeftButton;
+        private System.Windows.Forms.TextBox lengthDTB;
+        private System.Windows.Forms.Label label19;
     }
 }
 

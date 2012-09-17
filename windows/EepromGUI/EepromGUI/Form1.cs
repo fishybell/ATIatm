@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 using System.Diagnostics;
 using System.IO;
 
-namespace EepromGUI
+namespace pmaGUI
 {
     public partial class Form1 : Form
     {
@@ -357,7 +357,7 @@ namespace EepromGUI
                 conn.sendMessage("I B " + board);
                 logSent("I B " + board);
             }
-            disableEnable(boardType);
+            //disableEnable(boardType);
         }
 
         /***********************************************
@@ -1033,6 +1033,7 @@ namespace EepromGUI
             sesBTB.Text = "";
             mitBTB.Text = "";
             matBTB.Text = "";
+            lengthDTB.Text = "";
             revCB.SelectedIndex = -1;
             mfsCheck.Checked = false;
             mfsCB1.SelectedIndex = -1;
@@ -1323,7 +1324,7 @@ namespace EepromGUI
                             deviceTB.Text = board;
                             boardCB.SelectedItem = board;
                             // Enable and disable controls according to the board type
-                            disableEnable(boardType);
+                            //disableEnable(boardType);
                             targetCB.Text = machine;
                             logSent("I B " + getMessageValue(message, 4));
                             break;
@@ -1650,6 +1651,11 @@ namespace EepromGUI
                             radioCheck.ForeColor = System.Drawing.SystemColors.WindowText;
                             logSent("J C " + getMessageValue(message, 4));
                             break;
+                        case 'D':   // Track Length
+                            lengthDTB.Text = getMessageValue(message, 4);
+                            lengthDTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            logSent("J D " + getMessageValue(message, 4));
+                            break;
                     }
                     break;
                 default:
@@ -1796,6 +1802,12 @@ namespace EepromGUI
             changedList.Add(matBTB);
             matBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
         }
+
+        private void lengthDTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(lengthDTB);
+            lengthDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+        } 
 
         private void DockDCB_Click(object sender, EventArgs e)
         {
@@ -2294,6 +2306,9 @@ namespace EepromGUI
                         case "addressDTB":
                             addressDefault(textValue);
                             break;
+                        case "lengthDTB":
+                            lengthDefault(textValue);
+                            break;
                         case "freqTB":
                             freqDefault(textValue);
                             break;
@@ -2629,6 +2644,7 @@ namespace EepromGUI
                 conn.sendMessage("I Y");
                 conn.sendMessage("I Z");
                 conn.sendMessage("J C");
+                conn.sendMessage("J D");
                 logSent("I E SIT");
                 logSent("I E SAT");
                 logSent("I E SES");
@@ -2646,6 +2662,7 @@ namespace EepromGUI
                 logSent("I T");
                 logSent("I X");
                 logSent("J C");
+                logSent("J D");
             }
         }
 
@@ -2701,6 +2718,18 @@ namespace EepromGUI
             {
                 conn.sendMessage("I A " + address);
                 logSent("I A " + address);
+            }
+        }
+
+        /**************************************************
+         * Sends default track length message
+         * ***********************************************/
+        public void lengthDefault(string length)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("J D " + length);
+                logSent("J D " + length);
             }
         }
 
@@ -3000,6 +3029,6 @@ namespace EepromGUI
                 Console.WriteLine("There was an error with the file.");
             }
         }
-  
+ 
     }
 }

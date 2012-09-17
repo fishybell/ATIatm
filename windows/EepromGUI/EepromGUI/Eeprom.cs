@@ -8,7 +8,7 @@ using System.Collections.ObjectModel;
 using System.Net;
 using System.IO;
 
-namespace EepromGUI
+namespace pmaGUI
 {
     public class Eeprom
     {
