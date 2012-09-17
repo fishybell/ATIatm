@@ -33,6 +33,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_A875B042BEE9478C8165315E4F24CD12"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_BF57B6E94DCB4268BFCA262C366417EA"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -108,7 +114,7 @@
             {
             "Enabled" = "11:TRUE"
             "PromptEnabled" = "11:TRUE"
-            "PrerequisitesLocation" = "2:1"
+            "PrerequisitesLocation" = "2:2"
             "Url" = "8:"
             "ComponentsUrl" = "8:"
                 "Items"
@@ -250,6 +256,26 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_A875B042BEE9478C8165315E4F24CD12"
+            {
+            "SourcePath" = "8:PMA.ico"
+            "TargetName" = "8:PMA.ico"
+            "Tag" = "8:"
+            "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_BF57B6E94DCB4268BFCA262C366417EA"
             {
             "SourcePath" = "8:atifirmwarecopy.bat"
@@ -347,7 +373,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:PMA"
         "ProductCode" = "8:{65FAD869-F0BC-4DF8-98C9-1B9E3A6AA168}"
-        "PackageCode" = "8:{2CB748A9-ED81-4BE9-B141-4ECE5BCCBF52}"
+        "PackageCode" = "8:{0AF95473-8CC3-4731-AB62-FBA725D9FFF9}"
         "UpgradeCode" = "8:{F2195914-ABD7-48EC-9F47-962C60BD4A08}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
@@ -467,6 +493,20 @@
         }
         "Shortcut"
         {
+            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_D21A8ACCA33241E7A01BB7BC3D77586C"
+            {
+            "Name" = "8:pmaGUI"
+            "Arguments" = "8:"
+            "Description" = "8:"
+            "ShowCmd" = "3:1"
+            "IconIndex" = "3:0"
+            "Transitive" = "11:FALSE"
+            "Target" = "8:_23C6BFF8CCD349C2B9F89AFD1A1BCFF8"
+            "Folder" = "8:_185FBDFC5F5A4BB1B1E749F08887C5DE"
+            "WorkingFolder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
+            "Icon" = "8:_A875B042BEE9478C8165315E4F24CD12"
+            "Feature" = "8:"
+            }
         }
         "UserInterface"
         {
@@ -868,7 +908,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_23C6BFF8CCD349C2B9F89AFD1A1BCFF8"
             {
-            "SourcePath" = "8:..\\EepromGUI\\obj\\x86\\Release\\EepromGUI.exe"
+            "SourcePath" = "8:..\\pmaGUI\\obj\\x86\\Release\\pmaGUI.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
