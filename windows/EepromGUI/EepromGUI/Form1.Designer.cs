@@ -34,7 +34,6 @@
             this.targetCB = new System.Windows.Forms.ComboBox();
             this.label16 = new System.Windows.Forms.Label();
             this.eventCB = new System.Windows.Forms.ComboBox();
-            this.eventButton = new System.Windows.Forms.Button();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.hitcDTB3 = new System.Windows.Forms.TextBox();
             this.fallDTB = new System.Windows.Forms.TextBox();
@@ -129,6 +128,7 @@
             this.accTB7 = new System.Windows.Forms.TextBox();
             this.accTB8 = new System.Windows.Forms.TextBox();
             this.moveTB = new System.Windows.Forms.TextBox();
+            this.lengthDTB = new System.Windows.Forms.TextBox();
             this.showAllButton = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
             this.deviceTB = new System.Windows.Forms.TextBox();
@@ -147,6 +147,7 @@
             this.logTB = new System.Windows.Forms.TextBox();
             this.tabPage3 = new System.Windows.Forms.TabPage();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.label19 = new System.Windows.Forms.Label();
             this.revCB = new System.Windows.Forms.ComboBox();
             this.label37 = new System.Windows.Forms.Label();
             this.label47 = new System.Windows.Forms.Label();
@@ -213,6 +214,8 @@
             this.accCB0 = new System.Windows.Forms.ComboBox();
             this.label20 = new System.Windows.Forms.Label();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.setSettingsBTN = new System.Windows.Forms.Button();
+            this.showSettingsBTN = new System.Windows.Forms.Button();
             this.passwordPanel = new System.Windows.Forms.Panel();
             this.cancelButton = new System.Windows.Forms.Button();
             this.okButton = new System.Windows.Forms.Button();
@@ -224,25 +227,13 @@
             this.connectTB = new System.Windows.Forms.TextBox();
             this.ipTB = new System.Windows.Forms.TextBox();
             this.label6 = new System.Windows.Forms.Label();
-            this.boardShowButton = new System.Windows.Forms.Button();
-            this.boardSetButton = new System.Windows.Forms.Button();
             this.boardCB = new System.Windows.Forms.ComboBox();
             this.label7 = new System.Windows.Forms.Label();
-            this.commShowButton = new System.Windows.Forms.Button();
-            this.commSetButton = new System.Windows.Forms.Button();
             this.commCB = new System.Windows.Forms.ComboBox();
             this.label8 = new System.Windows.Forms.Label();
-            this.macShowButton = new System.Windows.Forms.Button();
-            this.macSetButton = new System.Windows.Forms.Button();
             this.label10 = new System.Windows.Forms.Label();
-            this.listenShowButton = new System.Windows.Forms.Button();
-            this.listenSetButton = new System.Windows.Forms.Button();
             this.label11 = new System.Windows.Forms.Label();
-            this.connectShowButton = new System.Windows.Forms.Button();
-            this.connectSetButton = new System.Windows.Forms.Button();
             this.label12 = new System.Windows.Forms.Label();
-            this.ipShowButton = new System.Windows.Forms.Button();
-            this.ipSetButton = new System.Windows.Forms.Button();
             this.tabPage1 = new System.Windows.Forms.TabPage();
             this.speedTB = new System.Windows.Forms.TextBox();
             this.label14 = new System.Windows.Forms.Label();
@@ -281,12 +272,10 @@
             this.label15 = new System.Windows.Forms.Label();
             this.sleepSetButton = new System.Windows.Forms.Button();
             this.sleepCB = new System.Windows.Forms.ComboBox();
-            this.rebootButton = new System.Windows.Forms.Button();
             this.shutdownButton = new System.Windows.Forms.Button();
             this.stopButton = new System.Windows.Forms.Button();
+            this.rebootButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
-            this.label19 = new System.Windows.Forms.Label();
-            this.lengthDTB = new System.Windows.Forms.TextBox();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -329,12 +318,12 @@
             // label16
             // 
             this.label16.AutoSize = true;
-            this.label16.Location = new System.Drawing.Point(421, 55);
+            this.label16.Location = new System.Drawing.Point(464, 47);
             this.label16.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label16.Name = "label16";
-            this.label16.Size = new System.Drawing.Size(110, 17);
+            this.label16.Size = new System.Drawing.Size(73, 17);
             this.label16.TabIndex = 58;
-            this.label16.Text = "Send/See Event";
+            this.label16.Text = "See Event";
             // 
             // eventCB
             // 
@@ -374,17 +363,6 @@
             this.eventCB.Size = new System.Drawing.Size(173, 24);
             this.eventCB.TabIndex = 60;
             this.eventCB.DropDown += new System.EventHandler(this.dropDown_shown);
-            // 
-            // eventButton
-            // 
-            this.eventButton.Location = new System.Drawing.Point(723, 42);
-            this.eventButton.Margin = new System.Windows.Forms.Padding(4);
-            this.eventButton.Name = "eventButton";
-            this.eventButton.Size = new System.Drawing.Size(67, 28);
-            this.eventButton.TabIndex = 61;
-            this.eventButton.Text = "Send";
-            this.eventButton.UseVisualStyleBackColor = true;
-            this.eventButton.Click += new System.EventHandler(this.eventButton_Click);
             // 
             // hitcDTB3
             // 
@@ -1529,6 +1507,15 @@
             this.moveTB.TabIndex = 9;
             this.toolTip1.SetToolTip(this.moveTB, "Enter a positive number 1-4 and click left or right.");
             // 
+            // lengthDTB
+            // 
+            this.lengthDTB.Location = new System.Drawing.Point(53, 123);
+            this.lengthDTB.Name = "lengthDTB";
+            this.lengthDTB.Size = new System.Drawing.Size(79, 22);
+            this.lengthDTB.TabIndex = 17;
+            this.toolTip1.SetToolTip(this.lengthDTB, "Track Length");
+            this.lengthDTB.Click += new System.EventHandler(this.lengthDTB_Click);
+            // 
             // showAllButton
             // 
             this.showAllButton.Enabled = false;
@@ -1590,14 +1577,14 @@
             this.clear_button.Name = "clear_button";
             this.clear_button.Size = new System.Drawing.Size(101, 29);
             this.clear_button.TabIndex = 99;
-            this.clear_button.Text = "Clear List";
+            this.clear_button.Text = "Refresh List";
             this.clear_button.UseVisualStyleBackColor = true;
             this.clear_button.Click += new System.EventHandler(this.clear_button_Click);
             // 
             // label42
             // 
             this.label42.AutoSize = true;
-            this.label42.Location = new System.Drawing.Point(421, 83);
+            this.label42.Location = new System.Drawing.Point(491, 78);
             this.label42.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label42.Name = "label42";
             this.label42.Size = new System.Drawing.Size(47, 17);
@@ -1728,6 +1715,17 @@
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Mover";
             // 
+            // label19
+            // 
+            this.label19.AutoSize = true;
+            this.label19.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F);
+            this.label19.Location = new System.Drawing.Point(2, 126);
+            this.label19.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label19.Name = "label19";
+            this.label19.Size = new System.Drawing.Size(52, 17);
+            this.label19.TabIndex = 16;
+            this.label19.Text = "Length";
+            // 
             // revCB
             // 
             this.revCB.FormattingEnabled = true;
@@ -1773,7 +1771,7 @@
             // 
             // batDSetButton
             // 
-            this.batDSetButton.Location = new System.Drawing.Point(675, 28);
+            this.batDSetButton.Location = new System.Drawing.Point(717, 17);
             this.batDSetButton.Margin = new System.Windows.Forms.Padding(4);
             this.batDSetButton.Name = "batDSetButton";
             this.batDSetButton.Size = new System.Drawing.Size(100, 28);
@@ -1784,7 +1782,7 @@
             // 
             // batDShowButton
             // 
-            this.batDShowButton.Location = new System.Drawing.Point(561, 28);
+            this.batDShowButton.Location = new System.Drawing.Point(603, 17);
             this.batDShowButton.Margin = new System.Windows.Forms.Padding(4);
             this.batDShowButton.Name = "batDShowButton";
             this.batDShowButton.Size = new System.Drawing.Size(100, 28);
@@ -2555,31 +2553,21 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.setSettingsBTN);
+            this.tabPage2.Controls.Add(this.showSettingsBTN);
             this.tabPage2.Controls.Add(this.passwordPanel);
             this.tabPage2.Controls.Add(this.macTB);
             this.tabPage2.Controls.Add(this.listenTB);
             this.tabPage2.Controls.Add(this.connectTB);
             this.tabPage2.Controls.Add(this.ipTB);
             this.tabPage2.Controls.Add(this.label6);
-            this.tabPage2.Controls.Add(this.boardShowButton);
-            this.tabPage2.Controls.Add(this.boardSetButton);
             this.tabPage2.Controls.Add(this.boardCB);
             this.tabPage2.Controls.Add(this.label7);
-            this.tabPage2.Controls.Add(this.commShowButton);
-            this.tabPage2.Controls.Add(this.commSetButton);
             this.tabPage2.Controls.Add(this.commCB);
             this.tabPage2.Controls.Add(this.label8);
-            this.tabPage2.Controls.Add(this.macShowButton);
-            this.tabPage2.Controls.Add(this.macSetButton);
             this.tabPage2.Controls.Add(this.label10);
-            this.tabPage2.Controls.Add(this.listenShowButton);
-            this.tabPage2.Controls.Add(this.listenSetButton);
             this.tabPage2.Controls.Add(this.label11);
-            this.tabPage2.Controls.Add(this.connectShowButton);
-            this.tabPage2.Controls.Add(this.connectSetButton);
             this.tabPage2.Controls.Add(this.label12);
-            this.tabPage2.Controls.Add(this.ipShowButton);
-            this.tabPage2.Controls.Add(this.ipSetButton);
             this.tabPage2.Location = new System.Drawing.Point(4, 25);
             this.tabPage2.Margin = new System.Windows.Forms.Padding(4);
             this.tabPage2.Name = "tabPage2";
@@ -2589,6 +2577,26 @@
             this.tabPage2.Text = "Settings";
             this.tabPage2.UseVisualStyleBackColor = true;
             // 
+            // setSettingsBTN
+            // 
+            this.setSettingsBTN.Location = new System.Drawing.Point(155, 262);
+            this.setSettingsBTN.Name = "setSettingsBTN";
+            this.setSettingsBTN.Size = new System.Drawing.Size(100, 28);
+            this.setSettingsBTN.TabIndex = 48;
+            this.setSettingsBTN.Text = "Set";
+            this.setSettingsBTN.UseVisualStyleBackColor = true;
+            this.setSettingsBTN.Click += new System.EventHandler(this.setSettingsBTN_Click);
+            // 
+            // showSettingsBTN
+            // 
+            this.showSettingsBTN.Location = new System.Drawing.Point(40, 262);
+            this.showSettingsBTN.Name = "showSettingsBTN";
+            this.showSettingsBTN.Size = new System.Drawing.Size(100, 28);
+            this.showSettingsBTN.TabIndex = 47;
+            this.showSettingsBTN.Text = "Show";
+            this.showSettingsBTN.UseVisualStyleBackColor = true;
+            this.showSettingsBTN.Click += new System.EventHandler(this.showSettingsBTN_Click);
+            // 
             // passwordPanel
             // 
             this.passwordPanel.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
@@ -2597,7 +2605,7 @@
             this.passwordPanel.Controls.Add(this.passwordTB);
             this.passwordPanel.Controls.Add(this.passLabel2);
             this.passwordPanel.Controls.Add(this.passLabel1);
-            this.passwordPanel.Location = new System.Drawing.Point(284, 7);
+            this.passwordPanel.Location = new System.Drawing.Point(321, 72);
             this.passwordPanel.Margin = new System.Windows.Forms.Padding(4);
             this.passwordPanel.Name = "passwordPanel";
             this.passwordPanel.Size = new System.Drawing.Size(266, 139);
@@ -2606,7 +2614,7 @@
             // 
             // cancelButton
             // 
-            this.cancelButton.Location = new System.Drawing.Point(148, 101);
+            this.cancelButton.Location = new System.Drawing.Point(147, 100);
             this.cancelButton.Margin = new System.Windows.Forms.Padding(4);
             this.cancelButton.Name = "cancelButton";
             this.cancelButton.Size = new System.Drawing.Size(67, 28);
@@ -2617,7 +2625,7 @@
             // 
             // okButton
             // 
-            this.okButton.Location = new System.Drawing.Point(55, 101);
+            this.okButton.Location = new System.Drawing.Point(54, 100);
             this.okButton.Margin = new System.Windows.Forms.Padding(4);
             this.okButton.Name = "okButton";
             this.okButton.Size = new System.Drawing.Size(67, 28);
@@ -2628,7 +2636,7 @@
             // 
             // passwordTB
             // 
-            this.passwordTB.Location = new System.Drawing.Point(67, 62);
+            this.passwordTB.Location = new System.Drawing.Point(66, 61);
             this.passwordTB.Margin = new System.Windows.Forms.Padding(4);
             this.passwordTB.Name = "passwordTB";
             this.passwordTB.PasswordChar = '*';
@@ -2639,7 +2647,7 @@
             // passLabel2
             // 
             this.passLabel2.AutoSize = true;
-            this.passLabel2.Location = new System.Drawing.Point(69, 33);
+            this.passLabel2.Location = new System.Drawing.Point(68, 32);
             this.passLabel2.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.passLabel2.Name = "passLabel2";
             this.passLabel2.Size = new System.Drawing.Size(117, 17);
@@ -2649,7 +2657,7 @@
             // passLabel1
             // 
             this.passLabel1.AutoSize = true;
-            this.passLabel1.Location = new System.Drawing.Point(17, 17);
+            this.passLabel1.Location = new System.Drawing.Point(23, 15);
             this.passLabel1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.passLabel1.Name = "passLabel1";
             this.passLabel1.Size = new System.Drawing.Size(231, 17);
@@ -2664,6 +2672,7 @@
             this.macTB.Name = "macTB";
             this.macTB.Size = new System.Drawing.Size(132, 22);
             this.macTB.TabIndex = 29;
+            this.macTB.Click += new System.EventHandler(this.macTB_Click);
             // 
             // listenTB
             // 
@@ -2672,6 +2681,7 @@
             this.listenTB.Name = "listenTB";
             this.listenTB.Size = new System.Drawing.Size(132, 22);
             this.listenTB.TabIndex = 35;
+            this.listenTB.Click += new System.EventHandler(this.listenTB_Click);
             // 
             // connectTB
             // 
@@ -2680,6 +2690,7 @@
             this.connectTB.Name = "connectTB";
             this.connectTB.Size = new System.Drawing.Size(132, 22);
             this.connectTB.TabIndex = 39;
+            this.connectTB.Click += new System.EventHandler(this.connectTB_Click);
             // 
             // ipTB
             // 
@@ -2688,6 +2699,7 @@
             this.ipTB.Name = "ipTB";
             this.ipTB.Size = new System.Drawing.Size(132, 22);
             this.ipTB.TabIndex = 43;
+            this.ipTB.Click += new System.EventHandler(this.ipTB_Click);
             // 
             // label6
             // 
@@ -2699,28 +2711,6 @@
             this.label6.TabIndex = 18;
             this.label6.Text = "Board Type";
             // 
-            // boardShowButton
-            // 
-            this.boardShowButton.Location = new System.Drawing.Point(264, 25);
-            this.boardShowButton.Margin = new System.Windows.Forms.Padding(4);
-            this.boardShowButton.Name = "boardShowButton";
-            this.boardShowButton.Size = new System.Drawing.Size(100, 28);
-            this.boardShowButton.TabIndex = 20;
-            this.boardShowButton.Text = "Show";
-            this.boardShowButton.UseVisualStyleBackColor = true;
-            this.boardShowButton.Click += new System.EventHandler(this.boardShowButton_Click);
-            // 
-            // boardSetButton
-            // 
-            this.boardSetButton.Location = new System.Drawing.Point(372, 25);
-            this.boardSetButton.Margin = new System.Windows.Forms.Padding(4);
-            this.boardSetButton.Name = "boardSetButton";
-            this.boardSetButton.Size = new System.Drawing.Size(100, 28);
-            this.boardSetButton.TabIndex = 21;
-            this.boardSetButton.Text = "Set";
-            this.boardSetButton.UseVisualStyleBackColor = true;
-            this.boardSetButton.Click += new System.EventHandler(this.boardSetButton_Click);
-            // 
             // boardCB
             // 
             this.boardCB.FormattingEnabled = true;
@@ -2728,15 +2718,18 @@
             "SIT",
             "SAT",
             "MIT",
+            "MITP",
             "MAT",
+            "MATOLD",
             "SES",
             "BASE",
             "HHC"});
-            this.boardCB.Location = new System.Drawing.Point(121, 26);
+            this.boardCB.Location = new System.Drawing.Point(121, 24);
             this.boardCB.Margin = new System.Windows.Forms.Padding(4);
             this.boardCB.Name = "boardCB";
             this.boardCB.Size = new System.Drawing.Size(133, 24);
             this.boardCB.TabIndex = 23;
+            this.boardCB.Click += new System.EventHandler(this.boardCB_Click);
             // 
             // label7
             // 
@@ -2747,28 +2740,6 @@
             this.label7.Size = new System.Drawing.Size(83, 17);
             this.label7.TabIndex = 24;
             this.label7.Text = "Comm Type";
-            // 
-            // commShowButton
-            // 
-            this.commShowButton.Location = new System.Drawing.Point(264, 60);
-            this.commShowButton.Margin = new System.Windows.Forms.Padding(4);
-            this.commShowButton.Name = "commShowButton";
-            this.commShowButton.Size = new System.Drawing.Size(100, 28);
-            this.commShowButton.TabIndex = 25;
-            this.commShowButton.Text = "Show";
-            this.commShowButton.UseVisualStyleBackColor = true;
-            this.commShowButton.Click += new System.EventHandler(this.commShowButton_Click);
-            // 
-            // commSetButton
-            // 
-            this.commSetButton.Location = new System.Drawing.Point(372, 60);
-            this.commSetButton.Margin = new System.Windows.Forms.Padding(4);
-            this.commSetButton.Name = "commSetButton";
-            this.commSetButton.Size = new System.Drawing.Size(100, 28);
-            this.commSetButton.TabIndex = 26;
-            this.commSetButton.Text = "Set";
-            this.commSetButton.UseVisualStyleBackColor = true;
-            this.commSetButton.Click += new System.EventHandler(this.commSetButton_Click);
             // 
             // commCB
             // 
@@ -2784,6 +2755,7 @@
             this.commCB.Name = "commCB";
             this.commCB.Size = new System.Drawing.Size(133, 24);
             this.commCB.TabIndex = 27;
+            this.commCB.Click += new System.EventHandler(this.commCB_Click);
             // 
             // label8
             // 
@@ -2795,28 +2767,6 @@
             this.label8.TabIndex = 28;
             this.label8.Text = "MAC";
             // 
-            // macShowButton
-            // 
-            this.macShowButton.Location = new System.Drawing.Point(264, 96);
-            this.macShowButton.Margin = new System.Windows.Forms.Padding(4);
-            this.macShowButton.Name = "macShowButton";
-            this.macShowButton.Size = new System.Drawing.Size(100, 28);
-            this.macShowButton.TabIndex = 30;
-            this.macShowButton.Text = "Show";
-            this.macShowButton.UseVisualStyleBackColor = true;
-            this.macShowButton.Click += new System.EventHandler(this.macShowButton_Click);
-            // 
-            // macSetButton
-            // 
-            this.macSetButton.Location = new System.Drawing.Point(372, 96);
-            this.macSetButton.Margin = new System.Windows.Forms.Padding(4);
-            this.macSetButton.Name = "macSetButton";
-            this.macSetButton.Size = new System.Drawing.Size(100, 28);
-            this.macSetButton.TabIndex = 31;
-            this.macSetButton.Text = "Set";
-            this.macSetButton.UseVisualStyleBackColor = true;
-            this.macSetButton.Click += new System.EventHandler(this.macSetButton_Click);
-            // 
             // label10
             // 
             this.label10.AutoSize = true;
@@ -2826,28 +2776,6 @@
             this.label10.Size = new System.Drawing.Size(76, 17);
             this.label10.TabIndex = 34;
             this.label10.Text = "Listen Port";
-            // 
-            // listenShowButton
-            // 
-            this.listenShowButton.Location = new System.Drawing.Point(264, 132);
-            this.listenShowButton.Margin = new System.Windows.Forms.Padding(4);
-            this.listenShowButton.Name = "listenShowButton";
-            this.listenShowButton.Size = new System.Drawing.Size(100, 28);
-            this.listenShowButton.TabIndex = 36;
-            this.listenShowButton.Text = "Show";
-            this.listenShowButton.UseVisualStyleBackColor = true;
-            this.listenShowButton.Click += new System.EventHandler(this.listenShowButton_Click);
-            // 
-            // listenSetButton
-            // 
-            this.listenSetButton.Location = new System.Drawing.Point(372, 132);
-            this.listenSetButton.Margin = new System.Windows.Forms.Padding(4);
-            this.listenSetButton.Name = "listenSetButton";
-            this.listenSetButton.Size = new System.Drawing.Size(100, 28);
-            this.listenSetButton.TabIndex = 37;
-            this.listenSetButton.Text = "Set";
-            this.listenSetButton.UseVisualStyleBackColor = true;
-            this.listenSetButton.Click += new System.EventHandler(this.listenSetButton_Click);
             // 
             // label11
             // 
@@ -2859,28 +2787,6 @@
             this.label11.TabIndex = 38;
             this.label11.Text = "Connect Port";
             // 
-            // connectShowButton
-            // 
-            this.connectShowButton.Location = new System.Drawing.Point(264, 167);
-            this.connectShowButton.Margin = new System.Windows.Forms.Padding(4);
-            this.connectShowButton.Name = "connectShowButton";
-            this.connectShowButton.Size = new System.Drawing.Size(100, 28);
-            this.connectShowButton.TabIndex = 40;
-            this.connectShowButton.Text = "Show";
-            this.connectShowButton.UseVisualStyleBackColor = true;
-            this.connectShowButton.Click += new System.EventHandler(this.connectShowButton_Click);
-            // 
-            // connectSetButton
-            // 
-            this.connectSetButton.Location = new System.Drawing.Point(372, 167);
-            this.connectSetButton.Margin = new System.Windows.Forms.Padding(4);
-            this.connectSetButton.Name = "connectSetButton";
-            this.connectSetButton.Size = new System.Drawing.Size(100, 28);
-            this.connectSetButton.TabIndex = 41;
-            this.connectSetButton.Text = "Set";
-            this.connectSetButton.UseVisualStyleBackColor = true;
-            this.connectSetButton.Click += new System.EventHandler(this.connectSetButton_Click);
-            // 
             // label12
             // 
             this.label12.AutoSize = true;
@@ -2890,28 +2796,6 @@
             this.label12.Size = new System.Drawing.Size(76, 17);
             this.label12.TabIndex = 42;
             this.label12.Text = "IP Address";
-            // 
-            // ipShowButton
-            // 
-            this.ipShowButton.Location = new System.Drawing.Point(264, 203);
-            this.ipShowButton.Margin = new System.Windows.Forms.Padding(4);
-            this.ipShowButton.Name = "ipShowButton";
-            this.ipShowButton.Size = new System.Drawing.Size(100, 28);
-            this.ipShowButton.TabIndex = 44;
-            this.ipShowButton.Text = "Show";
-            this.ipShowButton.UseVisualStyleBackColor = true;
-            this.ipShowButton.Click += new System.EventHandler(this.ipShowButton_Click);
-            // 
-            // ipSetButton
-            // 
-            this.ipSetButton.Location = new System.Drawing.Point(372, 203);
-            this.ipSetButton.Margin = new System.Windows.Forms.Padding(4);
-            this.ipSetButton.Name = "ipSetButton";
-            this.ipSetButton.Size = new System.Drawing.Size(100, 28);
-            this.ipSetButton.TabIndex = 45;
-            this.ipSetButton.Text = "Set";
-            this.ipSetButton.UseVisualStyleBackColor = true;
-            this.ipSetButton.Click += new System.EventHandler(this.ipSetButton_Click);
             // 
             // tabPage1
             // 
@@ -2953,7 +2837,6 @@
             this.tabPage1.Controls.Add(this.label15);
             this.tabPage1.Controls.Add(this.sleepSetButton);
             this.tabPage1.Controls.Add(this.sleepCB);
-            this.tabPage1.Controls.Add(this.rebootButton);
             this.tabPage1.Controls.Add(this.shutdownButton);
             this.tabPage1.Controls.Add(this.stopButton);
             this.tabPage1.Location = new System.Drawing.Point(4, 25);
@@ -3006,9 +2889,9 @@
             // 
             // radioButton
             // 
-            this.radioButton.Location = new System.Drawing.Point(170, 238);
+            this.radioButton.Location = new System.Drawing.Point(115, 203);
             this.radioButton.Name = "radioButton";
-            this.radioButton.Size = new System.Drawing.Size(98, 27);
+            this.radioButton.Size = new System.Drawing.Size(100, 28);
             this.radioButton.TabIndex = 97;
             this.radioButton.Text = "Test Radio";
             this.radioButton.UseVisualStyleBackColor = true;
@@ -3341,20 +3224,9 @@
             this.sleepCB.Size = new System.Drawing.Size(133, 24);
             this.sleepCB.TabIndex = 57;
             // 
-            // rebootButton
-            // 
-            this.rebootButton.Location = new System.Drawing.Point(8, 203);
-            this.rebootButton.Margin = new System.Windows.Forms.Padding(4);
-            this.rebootButton.Name = "rebootButton";
-            this.rebootButton.Size = new System.Drawing.Size(100, 28);
-            this.rebootButton.TabIndex = 77;
-            this.rebootButton.Text = "Reboot";
-            this.rebootButton.UseVisualStyleBackColor = true;
-            this.rebootButton.Click += new System.EventHandler(this.rebootButton_Click);
-            // 
             // shutdownButton
             // 
-            this.shutdownButton.Location = new System.Drawing.Point(116, 203);
+            this.shutdownButton.Location = new System.Drawing.Point(8, 203);
             this.shutdownButton.Margin = new System.Windows.Forms.Padding(4);
             this.shutdownButton.Name = "shutdownButton";
             this.shutdownButton.Size = new System.Drawing.Size(100, 28);
@@ -3376,6 +3248,19 @@
             this.stopButton.UseVisualStyleBackColor = false;
             this.stopButton.Click += new System.EventHandler(this.stopButton_Click);
             // 
+            // rebootButton
+            // 
+            this.rebootButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.rebootButton.ForeColor = System.Drawing.SystemColors.ControlText;
+            this.rebootButton.Location = new System.Drawing.Point(757, 55);
+            this.rebootButton.Margin = new System.Windows.Forms.Padding(4);
+            this.rebootButton.Name = "rebootButton";
+            this.rebootButton.Size = new System.Drawing.Size(100, 28);
+            this.rebootButton.TabIndex = 77;
+            this.rebootButton.Text = "Reboot";
+            this.rebootButton.UseVisualStyleBackColor = true;
+            this.rebootButton.Click += new System.EventHandler(this.rebootButton_Click);
+            // 
             // tabControl1
             // 
             this.tabControl1.Controls.Add(this.tabPage1);
@@ -3389,26 +3274,6 @@
             this.tabControl1.SelectedIndex = 0;
             this.tabControl1.Size = new System.Drawing.Size(849, 348);
             this.tabControl1.TabIndex = 93;
-            // 
-            // label19
-            // 
-            this.label19.AutoSize = true;
-            this.label19.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F);
-            this.label19.Location = new System.Drawing.Point(2, 126);
-            this.label19.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.label19.Name = "label19";
-            this.label19.Size = new System.Drawing.Size(52, 17);
-            this.label19.TabIndex = 16;
-            this.label19.Text = "Length";
-            // 
-            // lengthDTB
-            // 
-            this.lengthDTB.Location = new System.Drawing.Point(53, 123);
-            this.lengthDTB.Name = "lengthDTB";
-            this.lengthDTB.Size = new System.Drawing.Size(79, 22);
-            this.lengthDTB.TabIndex = 17;
-            this.toolTip1.SetToolTip(this.lengthDTB, "Track Length");
-            this.lengthDTB.Click += new System.EventHandler(this.lengthDTB_Click);
             // 
             // Form1
             // 
@@ -3432,8 +3297,8 @@
             this.Controls.Add(this.label9);
             this.Controls.Add(this.targetCB);
             this.Controls.Add(this.eventCB);
-            this.Controls.Add(this.eventButton);
             this.Controls.Add(this.label16);
+            this.Controls.Add(this.rebootButton);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "Form1";
@@ -3483,9 +3348,8 @@
 
         private System.Windows.Forms.ComboBox targetCB;
         private System.Windows.Forms.Label label16;
-        private System.Windows.Forms.ComboBox eventCB;
 
-        private System.Windows.Forms.Button eventButton;
+        private System.Windows.Forms.ComboBox eventCB;
 
         private System.Windows.Forms.ToolTip toolTip1;
         private System.Windows.Forms.Button showAllButton;
@@ -3675,25 +3539,13 @@
         private System.Windows.Forms.TextBox connectTB;
         private System.Windows.Forms.TextBox ipTB;
         private System.Windows.Forms.Label label6;
-        private System.Windows.Forms.Button boardShowButton;
-        private System.Windows.Forms.Button boardSetButton;
         private System.Windows.Forms.ComboBox boardCB;
         private System.Windows.Forms.Label label7;
-        private System.Windows.Forms.Button commShowButton;
-        private System.Windows.Forms.Button commSetButton;
         private System.Windows.Forms.ComboBox commCB;
         private System.Windows.Forms.Label label8;
-        private System.Windows.Forms.Button macShowButton;
-        private System.Windows.Forms.Button macSetButton;
         private System.Windows.Forms.Label label10;
-        private System.Windows.Forms.Button listenShowButton;
-        private System.Windows.Forms.Button listenSetButton;
         private System.Windows.Forms.Label label11;
-        private System.Windows.Forms.Button connectShowButton;
-        private System.Windows.Forms.Button connectSetButton;
         private System.Windows.Forms.Label label12;
-        private System.Windows.Forms.Button ipShowButton;
-        private System.Windows.Forms.Button ipSetButton;
         private System.Windows.Forms.TabPage tabPage1;
         private System.Windows.Forms.TextBox expSTB;
         private System.Windows.Forms.TextBox knobTB;
@@ -3741,6 +3593,8 @@
         private System.Windows.Forms.Button moveLeftButton;
         private System.Windows.Forms.TextBox lengthDTB;
         private System.Windows.Forms.Label label19;
+        private System.Windows.Forms.Button showSettingsBTN;
+        private System.Windows.Forms.Button setSettingsBTN;
     }
 }
 

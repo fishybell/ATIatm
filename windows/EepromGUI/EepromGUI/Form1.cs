@@ -20,8 +20,8 @@ namespace pmaGUI
         Eeprom conn;
         Eeprom bconn;
         String boardType = "";
-        String lastMAC = "";
         List<Control> changedList = new List<Control>();
+        List<Control> settingsList = new List<Control>();
         List<String> ipList = new List<String>();
         //Eeprom listener;
         public delegate void serviceGUIDelegate();
@@ -82,6 +82,7 @@ namespace pmaGUI
             // Clear existing text field values
             clearFields();
             changedList.Clear();
+            settingsList.Clear();
             // Make main tcp connection
             machine = (string)targetCB.SelectedItem;
             conn = new Eeprom(
@@ -175,6 +176,10 @@ namespace pmaGUI
         {
             if (conn != null)
             {
+                // Change reboot font back to normal
+                rebootButton.ForeColor = SystemColors.ControlText;
+                rebootButton.Font = new Font(rebootButton.Font, FontStyle.Regular);
+
                 conn.sendMessage("I R");
                 logSent("I R");
                 errorLBL.Text = "Rebooting, Don't press any buttons till finished...";
@@ -191,6 +196,7 @@ namespace pmaGUI
             rebootingMachine = machine;
             clearFields();
             changedList.Clear();
+            settingsList.Clear();
             conn.CloseConnection();
             conn.killThread();
             //targetCB.Items.Clear();
@@ -300,13 +306,6 @@ namespace pmaGUI
             }
         }
 
-        /***********************************************
-        * Show the board type
-        * ********************************************/
-        private void boardShowButton_Click(object sender, EventArgs e)
-        {
-            setBoardType();
-        }
 
         /***********************************************
         * Set the board type to a global variable
@@ -347,69 +346,6 @@ namespace pmaGUI
         }
 
         /***********************************************
-        * Set the board type
-        * ********************************************/
-        private void boardSetButton_Click(object sender, EventArgs e)
-        {
-            String board = (String)boardCB.SelectedItem;
-            if (conn != null)
-            {
-                conn.sendMessage("I B " + board);
-                logSent("I B " + board);
-            }
-            //disableEnable(boardType);
-        }
-
-        /***********************************************
-        * Show the communication type
-        * ********************************************/
-        private void commShowButton_Click(object sender, EventArgs e)
-        {
-            if (conn != null)
-            {
-                conn.sendMessage("I D");
-                logSent("I D");
-            }
-        }
-
-        /***********************************************
-        * Set the communication type
-        * ********************************************/
-        private void commSetButton_Click(object sender, EventArgs e)
-        {
-            String comm = (String)commCB.SelectedItem;
-            if (conn != null)
-            {
-                conn.sendMessage("I D " + comm);
-                logSent("I D " + comm);
-            }
-        }
-
-        /***********************************************
-        * Show the MAC address
-        * ********************************************/
-        private void macShowButton_Click(object sender, EventArgs e)
-        {
-            if (conn != null)
-            {
-                conn.sendMessage("I M");
-                logSent("I M");
-            }
-        }
-
-        /***********************************************
-        * Show the password popup when the mac is
-         * getting changed
-        * ********************************************/
-        private void macSetButton_Click(object sender, EventArgs e)
-        {
-            // Make a password popup box
-            passwordPanel.Visible = true;
-            passLabel1.Text = "Call Action Target customer service";
-            passLabel2.Text = "for the password.";
-        }
-
-        /***********************************************
         * Set the MAC address
         * ********************************************/
         private void okButton_Click(object sender, EventArgs e)
@@ -438,81 +374,40 @@ namespace pmaGUI
             passwordPanel.Visible = false;
         }
 
-
-
-        /*********************************************
-         * Show the listen port number
-         * ******************************************/
-        private void listenShowButton_Click(object sender, EventArgs e)
+        private void boardCB_Click(object sender, EventArgs e)
         {
-            if (conn != null)
-            {
-                conn.sendMessage("I L");
-                logSent("I L");
-            }
+            settingsList.Add(boardCB);
+            boardCB.ForeColor = SystemColors.HotTrack;
         }
 
-        /*********************************************
-         * Set the listen port number
-         * ******************************************/
-        private void listenSetButton_Click(object sender, EventArgs e)
+        private void commCB_Click(object sender, EventArgs e)
         {
-            String listen = listenTB.Text;
-            if (conn != null)
-            {
-                conn.sendMessage("I L " + listen);
-                logSent("I L " + listen);
-            }
+            settingsList.Add(commCB);
+            commCB.ForeColor = SystemColors.HotTrack;
         }
 
-        /*********************************************
-         * Show the connect port number
-         * ******************************************/
-        private void connectShowButton_Click(object sender, EventArgs e)
+        private void macTB_Click(object sender, EventArgs e)
         {
-            if (conn != null)
-            {
-                conn.sendMessage("I C");
-                logSent("I C");
-            }
+            settingsList.Add(macTB);
+            macTB.ForeColor = SystemColors.HotTrack;
         }
 
-        /*********************************************
-         * Set the connect port number
-         * ******************************************/
-        private void connectSetButton_Click(object sender, EventArgs e)
+        private void listenTB_Click(object sender, EventArgs e)
         {
-            String connect = connectTB.Text;
-            if (conn != null)
-            {
-                conn.sendMessage("I C " + connect);
-                logSent("I C " + connect);
-            }
+            settingsList.Add(listenTB);
+            listenTB.ForeColor = SystemColors.HotTrack;
         }
 
-        /*****************************************
-         * Show the IP address
-         * **************************************/
-        private void ipShowButton_Click(object sender, EventArgs e)
+        private void connectTB_Click(object sender, EventArgs e)
         {
-            if (conn != null)
-            {
-                conn.sendMessage("I I");
-                logSent("I I");
-            }
+            settingsList.Add(connectTB);
+            connectTB.ForeColor = SystemColors.HotTrack;
         }
 
-        /*****************************************
-         * Set the IP address
-         * **************************************/
-        private void ipSetButton_Click(object sender, EventArgs e)
+        private void ipTB_Click(object sender, EventArgs e)
         {
-            String ip = ipTB.Text;
-            if (conn != null)
-            {
-                conn.sendMessage("I I " + ip);
-                logSent("I I " + ip);
-            }
+            settingsList.Add(ipTB);
+            ipTB.ForeColor = SystemColors.HotTrack;
         }
 
         /********************************************************
@@ -560,7 +455,7 @@ namespace pmaGUI
          * ***********************************************/
         private void dropDown_shown(object sender, EventArgs e)
         {
-            eventCB.ForeColor = System.Drawing.SystemColors.WindowText;
+            eventCB.ForeColor = SystemColors.WindowText;
         }
 
         /*************************************************
@@ -759,6 +654,10 @@ namespace pmaGUI
          * ********************************************/
         private void showAllButton_Click(object sender, EventArgs e)
         {
+            // Show the defaults and settings tab too
+            batDShowButton_Click(sender, e);
+            showSettingsBTN_Click(sender, e);
+
             // Grab only the information available for the current board type
             targetCB.SelectedItem = machine;
             switch (boardType)
@@ -766,12 +665,12 @@ namespace pmaGUI
                 case "SES":
                     batGetButton_Click(sender, e);
                     sleepShowButton_Click(sender, e);
-                    boardShowButton_Click(sender, e);
+                    /*boardShowButton_Click(sender, e);
                     commShowButton_Click(sender, e);
                     macShowButton_Click(sender, e);
                     listenShowButton_Click(sender, e);
                     connectShowButton_Click(sender, e);
-                    ipShowButton_Click(sender, e);
+                    ipShowButton_Click(sender, e);*/
                     knobShowButton_Click(sender, e);
                     modeShowButton_Click(sender, e);
                     break;
@@ -779,12 +678,12 @@ namespace pmaGUI
                     batGetButton_Click(sender, e);
                     hitDShowButton_Click(sender, e);
                     sleepShowButton_Click(sender, e);
-                    boardShowButton_Click(sender, e);
+                    /*boardShowButton_Click(sender, e);
                     commShowButton_Click(sender, e);
                     macShowButton_Click(sender, e);
                     listenShowButton_Click(sender, e);
                     connectShowButton_Click(sender, e);
-                    ipShowButton_Click(sender, e);
+                    ipShowButton_Click(sender, e);*/
                     fallShowButton_Click(sender, e);
                     sensorShowButton_Click(sender, e);
                     calShowButton_Click(sender, e);
@@ -795,12 +694,12 @@ namespace pmaGUI
                     batGetButton_Click(sender, e);
                     hitDShowButton_Click(sender, e);
                     sleepShowButton_Click(sender, e);
-                    boardShowButton_Click(sender, e);
+                    /*boardShowButton_Click(sender, e);
                     commShowButton_Click(sender, e);
                     macShowButton_Click(sender, e);
                     listenShowButton_Click(sender, e);
                     connectShowButton_Click(sender, e);
-                    ipShowButton_Click(sender, e);
+                    ipShowButton_Click(sender, e);*/
                     fallShowButton_Click(sender, e);
                     sensorShowButton_Click(sender, e);
                     calShowButton_Click(sender, e);
@@ -812,24 +711,24 @@ namespace pmaGUI
                     batGetButton_Click(sender, e);
                     moveShowButton_Click(sender, e);
                     sleepShowButton_Click(sender, e);
-                    boardShowButton_Click(sender, e);
+                    /*boardShowButton_Click(sender, e);
                     commShowButton_Click(sender, e);
                     macShowButton_Click(sender, e);
                     listenShowButton_Click(sender, e);
                     connectShowButton_Click(sender, e);
-                    ipShowButton_Click(sender, e);
+                    ipShowButton_Click(sender, e);*/
                     posShowButton_Click(sender, e);
                     break;
                 case "MAT":
                     batGetButton_Click(sender, e);
                     moveShowButton_Click(sender, e);
                     sleepShowButton_Click(sender, e);
-                    boardShowButton_Click(sender, e);
+                    /*boardShowButton_Click(sender, e);
                     commShowButton_Click(sender, e);
                     macShowButton_Click(sender, e);
                     listenShowButton_Click(sender, e);
                     connectShowButton_Click(sender, e);
-                    ipShowButton_Click(sender, e);
+                    ipShowButton_Click(sender, e);*/
                     posShowButton_Click(sender, e);
                     break;
                 default:
@@ -926,6 +825,31 @@ namespace pmaGUI
                     accShowButton.Enabled = false;
                     //fHitShowButton.Enabled = false;
                     expSShowButton.Enabled = false;
+                    break;
+                case "BASE":
+                    enableAll();
+                    concealButton.Enabled = false;
+                    exposeButton.Enabled = false;
+                    toggleButton.Enabled = false;
+                    moveLeftButton.Enabled = false;
+                    moveRightButton.Enabled = false;
+                    hitDSetButton.Enabled = false;
+                    hitDShowButton.Enabled = false;
+                    moveShowButton.Enabled = false;
+                    posShowButton.Enabled = false;
+                    expSShowButton.Enabled = false;
+                    gpsShowButton.Enabled = false;
+                    knobShowButton.Enabled = false;
+                    modeShowButton.Enabled = false;
+                    modeSetButton.Enabled = false;
+                    fallSetButton.Enabled = false;
+                    fallShowButton.Enabled = false;
+                    sensorSetButton.Enabled = false;
+                    sensorShowButton.Enabled = false;
+                    calSetButton.Enabled = false;
+                    calShowButton.Enabled = false;
+                    accSetButton.Enabled = false;
+                    accShowButton.Enabled = false;
                     break;
             }
         }
@@ -1159,7 +1083,7 @@ namespace pmaGUI
             switch (first)
             {
                 case 'A':   // position
-                    posTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    posTB.ForeColor = SystemColors.MenuHighlight;
                     posTB.Text = getMessageValue(message, 2);
                     logSent("A " + getMessageValue(message, 2));
                     break;
@@ -1189,19 +1113,19 @@ namespace pmaGUI
                             }
                             break;
                         default:   // battery
-                            batTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                            batTB.ForeColor = SystemColors.MenuHighlight;
                             batTB.Text = getMessageValue(message, 2);
                             logSent("B " + getMessageValue(message, 2));
                             break;
                     }
                     break;
                 case 'C':   // target is concealed
-                    expSTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    expSTB.ForeColor = SystemColors.MenuHighlight;
                     expSTB.Text = "concealed";
                     logSent("C " + getMessageValue(message, 2));
                     break;
                 case 'E':   // target is exposed
-                    expSTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    expSTB.ForeColor = SystemColors.MenuHighlight;
                     expSTB.Text = "exposed";
                     logSent("E " + getMessageValue(message, 2));
                     break;
@@ -1213,7 +1137,7 @@ namespace pmaGUI
                     logSent("F " + getMessageValue(message, 2));
                     break;
                 case 'H':   // hit data
-                    hitDTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    hitDTB.ForeColor = SystemColors.MenuHighlight;
                     hitDTB.Text = getMessageValue(message, 2);
                     logSent("H " + getMessageValue(message, 2));
                     break;
@@ -1227,7 +1151,7 @@ namespace pmaGUI
                     logSent("L " + getMessageValue(message, 2));
                     break;
                 case 'M':   // move speed
-                    speedTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    speedTB.ForeColor = SystemColors.MenuHighlight;
                     speedTB.Text = getMessageValue(message, 2);
                     logSent("M " + getMessageValue(message, 2));
                     break;
@@ -1263,7 +1187,7 @@ namespace pmaGUI
                     logSent("Q " + getMessageValue(message, 2));
                     break;
                 case 'S':   // concealed or exposed status
-                    expSTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    expSTB.ForeColor = SystemColors.MenuHighlight;
                     String status = getMessageValue(message, 2);
                     if (Convert.ToInt32(status) == 0)
                     {
@@ -1280,7 +1204,7 @@ namespace pmaGUI
                     logSent("S " + getMessageValue(message, 2));
                     break;
                 case 'U':   // error messages
-                    errorTB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    errorTB.ForeColor = SystemColors.MenuHighlight;
                     String eMessage = getMessageValue(message, 2);
                     String[] eSplit = eMessage.Split(' ');
                     errorTB.Text = eMessage;
@@ -1288,7 +1212,7 @@ namespace pmaGUI
                     logSent("U " + getMessageValue(message, 2));
                     break;
                 case 'V':   // current event being called
-                    eventCB.ForeColor = System.Drawing.SystemColors.MenuHighlight;
+                    eventCB.ForeColor = SystemColors.MenuHighlight;
                     String vMessage = getMessageValue(message, 2);
                     String[] vSplit = vMessage.Split(' ');
                     int eventNum = Convert.ToInt32(vSplit[0]);
@@ -1315,7 +1239,7 @@ namespace pmaGUI
                     {
                         case 'A':   // Address
                             addressDTB.Text = getMessageValue(message, 4);
-                            addressDTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            addressDTB.ForeColor = SystemColors.WindowText;
                             logSent("I A " + getMessageValue(message, 4));
                             break;
                         case 'B':   // target type (SIT, MIT, etc.)
@@ -1324,7 +1248,7 @@ namespace pmaGUI
                             deviceTB.Text = board;
                             boardCB.SelectedItem = board;
                             // Enable and disable controls according to the board type
-                            //disableEnable(boardType);
+                            disableEnable(boardType);
                             targetCB.Text = machine;
                             logSent("I B " + getMessageValue(message, 4));
                             break;
@@ -1343,29 +1267,29 @@ namespace pmaGUI
 	                            {
                                     case "SIT":
                                         sitBTB.Text = batMovList[1];
-                                        sitBTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                        sitBTB.ForeColor = SystemColors.WindowText;
                                         break;
                                     case "SAT":
                                         satBTB.Text = batMovList[1];
-                                        satBTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                        satBTB.ForeColor = SystemColors.WindowText;
                                         break;
                                     case "SES":
                                         sesBTB.Text = batMovList[1];
-                                        sesBTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                        sesBTB.ForeColor = SystemColors.WindowText;
                                         break;
                                     case "MIT":
                                         mitBTB.Text = batMovList[1];
-                                        mitBTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                        mitBTB.ForeColor = SystemColors.WindowText;
                                         break;
                                     case "MAT":
                                         matBTB.Text = batMovList[1];
-                                        matBTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                        matBTB.ForeColor = SystemColors.WindowText;
                                         break;
                                     case "REVERSE":
                                         if (batMovList[1].Length == 1)
                                         {
                                             revCB.SelectedIndex = Convert.ToInt32(batMovList[1]);
-                                            revCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                            revCB.ForeColor = SystemColors.WindowText;
                                         }
                                         break;
                                     default:
@@ -1377,8 +1301,8 @@ namespace pmaGUI
                             String[] fallSplit = getMessageValue(message, 4).Split(' ');
                             fallDTB.Text = fallSplit[0];
                             fallDCB.SelectedIndex = Convert.ToInt32(fallSplit[1]);
-                            fallDTB.ForeColor = System.Drawing.SystemColors.WindowText;
-                            fallDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            fallDTB.ForeColor = SystemColors.WindowText;
+                            fallDCB.ForeColor = SystemColors.WindowText;
                             logSent("I F " + getMessageValue(message, 4));
                             break;
                         case 'G':   // MGL defaults
@@ -1394,17 +1318,17 @@ namespace pmaGUI
                             mglTB4.Text = mglSplit[8];
                             mglTB5.Text = mglSplit[9];
                             mglTB6.Text = mglSplit[10];
-                            mglCheck.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglCB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglCB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglCB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglCB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglTB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglTB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglTB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglTB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglTB5.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mglTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            mglCheck.ForeColor = SystemColors.WindowText;
+                            mglCB1.ForeColor = SystemColors.WindowText;
+                            mglCB2.ForeColor = SystemColors.WindowText;
+                            mglCB3.ForeColor = SystemColors.WindowText;
+                            mglCB4.ForeColor = SystemColors.WindowText;
+                            mglTB1.ForeColor = SystemColors.WindowText;
+                            mglTB2.ForeColor = SystemColors.WindowText;
+                            mglTB3.ForeColor = SystemColors.WindowText;
+                            mglTB4.ForeColor = SystemColors.WindowText;
+                            mglTB5.ForeColor = SystemColors.WindowText;
+                            mglTB6.ForeColor = SystemColors.WindowText;
                             logSent("I G " + getMessageValue(message, 4));
                             break;
                         case 'H':   // Hit calibration defaults
@@ -1413,10 +1337,10 @@ namespace pmaGUI
                             hitcDTB2.Text = calDSplit[1];
                             hitcDTB3.Text = calDSplit[2];
                             hitcCB4.SelectedIndex = Convert.ToInt32(calDSplit[3]);
-                            hitcDTB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            hitcDTB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            hitcDTB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            hitcCB4.ForeColor = System.Drawing.SystemColors.WindowText;
+                            hitcDTB1.ForeColor = SystemColors.WindowText;
+                            hitcDTB2.ForeColor = SystemColors.WindowText;
+                            hitcDTB3.ForeColor = SystemColors.WindowText;
+                            hitcCB4.ForeColor = SystemColors.WindowText;
                             logSent("I H " + getMessageValue(message, 4));
                             break;
                         case 'I':   // IP address
@@ -1436,17 +1360,17 @@ namespace pmaGUI
                             smkTB4.Text = smkSplit[8];
                             smkTB5.Text = smkSplit[9];
                             smkTB6.Text = smkSplit[10];
-                            smkCheck.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkCB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkCB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkCB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkCB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkTB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkTB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkTB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkTB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkTB5.ForeColor = System.Drawing.SystemColors.WindowText;
-                            smkTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            smkCheck.ForeColor = SystemColors.WindowText;
+                            smkCB1.ForeColor = SystemColors.WindowText;
+                            smkCB2.ForeColor = SystemColors.WindowText;
+                            smkCB3.ForeColor = SystemColors.WindowText;
+                            smkCB4.ForeColor = SystemColors.WindowText;
+                            smkTB1.ForeColor = SystemColors.WindowText;
+                            smkTB2.ForeColor = SystemColors.WindowText;
+                            smkTB3.ForeColor = SystemColors.WindowText;
+                            smkTB4.ForeColor = SystemColors.WindowText;
+                            smkTB5.ForeColor = SystemColors.WindowText;
+                            smkTB6.ForeColor = SystemColors.WindowText;
                             logSent("I K " + getMessageValue(message, 4));
                             break;
                         case 'L':   // listen port
@@ -1482,17 +1406,17 @@ namespace pmaGUI
                             mfsTB4.Text = mfsSplit[8];
                             mfsTB5.Text = mfsSplit[9];
                             mfsTB6.Text = mfsSplit[10];
-                            mfsCheck.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsCB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsCB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsCB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsCB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsTB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsTB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsTB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsTB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsTB5.ForeColor = System.Drawing.SystemColors.WindowText;
-                            mfsTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            mfsCheck.ForeColor = SystemColors.WindowText;
+                            mfsCB1.ForeColor = SystemColors.WindowText;
+                            mfsCB2.ForeColor = SystemColors.WindowText;
+                            mfsCB3.ForeColor = SystemColors.WindowText;
+                            mfsCB4.ForeColor = SystemColors.WindowText;
+                            mfsTB1.ForeColor = SystemColors.WindowText;
+                            mfsTB2.ForeColor = SystemColors.WindowText;
+                            mfsTB3.ForeColor = SystemColors.WindowText;
+                            mfsTB4.ForeColor = SystemColors.WindowText;
+                            mfsTB5.ForeColor = SystemColors.WindowText;
+                            mfsTB6.ForeColor = SystemColors.WindowText;
                             logSent("I N " + getMessageValue(message, 4));
                             break;
                         case 'O':   // Bob defaults
@@ -1500,7 +1424,7 @@ namespace pmaGUI
                             if (bobSplit[0].Length == 1)
                             {
                                 bobDCB.SelectedIndex = Convert.ToInt32(bobSplit[0]);   // crashes here when doing show all in defaults
-                                bobDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                bobDCB.ForeColor = SystemColors.WindowText;
                             }
                             logSent("I O " + getMessageValue(message, 4));
                             break;
@@ -1517,17 +1441,17 @@ namespace pmaGUI
                             phiTB4.Text = phiSplit[8];
                             phiTB5.Text = phiSplit[9];
                             phiTB6.Text = phiSplit[10];
-                            phiCheck.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiCB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiCB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiCB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiCB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiTB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiTB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiTB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiTB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiTB5.ForeColor = System.Drawing.SystemColors.WindowText;
-                            phiTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            phiCheck.ForeColor = SystemColors.WindowText;
+                            phiCB1.ForeColor = SystemColors.WindowText;
+                            phiCB2.ForeColor = SystemColors.WindowText;
+                            phiCB3.ForeColor = SystemColors.WindowText;
+                            phiCB4.ForeColor = SystemColors.WindowText;
+                            phiTB1.ForeColor = SystemColors.WindowText;
+                            phiTB2.ForeColor = SystemColors.WindowText;
+                            phiTB3.ForeColor = SystemColors.WindowText;
+                            phiTB4.ForeColor = SystemColors.WindowText;
+                            phiTB5.ForeColor = SystemColors.WindowText;
+                            phiTB6.ForeColor = SystemColors.WindowText;
                             logSent("I P " + getMessageValue(message, 4));
                             break;
                         case 'Q':   // Docking end defaults
@@ -1535,7 +1459,7 @@ namespace pmaGUI
                             if (dockSplit[0].Length == 1)
                             {
                                 DockDCB.SelectedIndex = Convert.ToInt32(dockSplit[0]);
-                                DockDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                DockDCB.ForeColor = SystemColors.WindowText;
                             }
                             logSent("I Q " + getMessageValue(message, 4));
                             break;
@@ -1543,8 +1467,8 @@ namespace pmaGUI
                             String[] hitSplit = getMessageValue(message, 4).Split(' ');
                             sensorDCB.SelectedIndex = Convert.ToInt32(hitSplit[0]);
                             sensorD2CB.SelectedIndex = Convert.ToInt32(hitSplit[1]);
-                            sensorDCB.ForeColor = System.Drawing.SystemColors.WindowText;
-                            sensorD2CB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            sensorDCB.ForeColor = SystemColors.WindowText;
+                            sensorD2CB.ForeColor = SystemColors.WindowText;
                             logSent("I S " + getMessageValue(message, 4));
                             break;
                         case 'T':   // THM defaults
@@ -1560,37 +1484,37 @@ namespace pmaGUI
                             thmTB4.Text = thmSplit[8];
                             thmTB5.Text = thmSplit[9];
                             thmTB6.Text = thmSplit[10];
-                            thmCheck.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmCB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmCB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmCB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmCB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmTB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmTB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmTB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmTB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmTB5.ForeColor = System.Drawing.SystemColors.WindowText;
-                            thmTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            thmCheck.ForeColor = SystemColors.WindowText;
+                            thmCB1.ForeColor = SystemColors.WindowText;
+                            thmCB2.ForeColor = SystemColors.WindowText;
+                            thmCB3.ForeColor = SystemColors.WindowText;
+                            thmCB4.ForeColor = SystemColors.WindowText;
+                            thmTB1.ForeColor = SystemColors.WindowText;
+                            thmTB2.ForeColor = SystemColors.WindowText;
+                            thmTB3.ForeColor = SystemColors.WindowText;
+                            thmTB4.ForeColor = SystemColors.WindowText;
+                            thmTB5.ForeColor = SystemColors.WindowText;
+                            thmTB6.ForeColor = SystemColors.WindowText;
                             logSent("I T " + getMessageValue(message, 4));
                             break;
                         case 'U':   // Radio Frequency Default
                             freqTB.Text = getMessageValue(message, 4);
-                            freqTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            freqTB.ForeColor = SystemColors.WindowText;
                             logSent("I U " + getMessageValue(message, 4));
                             break;
                         case 'V':   // Radio Low Power Default
                             lpTB.Text = getMessageValue(message, 4);
-                            lpTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            lpTB.ForeColor = SystemColors.WindowText;
                             logSent("I V " + getMessageValue(message, 4));
                             break;
                         case 'W':   // Radio Frequency Default
                             hpTB.Text = getMessageValue(message, 4);
-                            hpTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            hpTB.ForeColor = SystemColors.WindowText;
                             logSent("I W " + getMessageValue(message, 4));
                             break;
                         case 'X':   // Serial Number
                             serialDTB.Text = getMessageValue(message, 4);
-                            serialDTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            serialDTB.ForeColor = SystemColors.WindowText;
                             logSent("I X " + getMessageValue(message, 4));
                             break;
                         case 'Y':   // MSD defaults
@@ -1608,17 +1532,17 @@ namespace pmaGUI
                             msdTB6.Text = msdSplit[10];
                             msdTB7.Text = msdSplit[11];
                             msdTB8.Text = msdSplit[12];
-                            msdCheck.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdCB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdCB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdCB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdCB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdTB1.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdTB2.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdTB3.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdTB4.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdTB5.ForeColor = System.Drawing.SystemColors.WindowText;
-                            msdTB6.ForeColor = System.Drawing.SystemColors.WindowText;
+                            msdCheck.ForeColor = SystemColors.WindowText;
+                            msdCB1.ForeColor = SystemColors.WindowText;
+                            msdCB2.ForeColor = SystemColors.WindowText;
+                            msdCB3.ForeColor = SystemColors.WindowText;
+                            msdCB4.ForeColor = SystemColors.WindowText;
+                            msdTB1.ForeColor = SystemColors.WindowText;
+                            msdTB2.ForeColor = SystemColors.WindowText;
+                            msdTB3.ForeColor = SystemColors.WindowText;
+                            msdTB4.ForeColor = SystemColors.WindowText;
+                            msdTB5.ForeColor = SystemColors.WindowText;
+                            msdTB6.ForeColor = SystemColors.WindowText;
                             logSent("I Y " + getMessageValue(message, 4));
                             break;
                         case 'Z':   // Home end defaults
@@ -1626,7 +1550,7 @@ namespace pmaGUI
                             if (homeSplit[0].Length == 1)
                             {
                                 HomeDCB.SelectedIndex = Convert.ToInt32(homeSplit[0]);
-                                HomeDCB.ForeColor = System.Drawing.SystemColors.WindowText;
+                                HomeDCB.ForeColor = SystemColors.WindowText;
                             }
                             logSent("I Z " + getMessageValue(message, 4));
                             break;
@@ -1648,12 +1572,12 @@ namespace pmaGUI
                             {
                                 radioCheck.Checked = true;
                             }
-                            radioCheck.ForeColor = System.Drawing.SystemColors.WindowText;
+                            radioCheck.ForeColor = SystemColors.WindowText;
                             logSent("J C " + getMessageValue(message, 4));
                             break;
                         case 'D':   // Track Length
                             lengthDTB.Text = getMessageValue(message, 4);
-                            lengthDTB.ForeColor = System.Drawing.SystemColors.WindowText;
+                            lengthDTB.ForeColor = SystemColors.WindowText;
                             logSent("J D " + getMessageValue(message, 4));
                             break;
                     }
@@ -1709,554 +1633,554 @@ namespace pmaGUI
         private void bobDCB_Click(object sender, EventArgs e)
         {
             changedList.Add(bobDCB);
-            bobDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            bobDCB.ForeColor = SystemColors.HotTrack;
         }
 
 
         private void fallDCB_Click(object sender, EventArgs e)
         {
             changedList.Add(fallDCB);
-            fallDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            fallDCB.ForeColor = SystemColors.HotTrack;
         }
 
         private void fallDTB_Click(object sender, EventArgs e)
         {
             changedList.Add(fallDTB);
-            fallDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            fallDTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void sensorDCB_Click(object sender, EventArgs e)
         {
             changedList.Add(sensorDCB);
-            sensorDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            sensorDCB.ForeColor = SystemColors.HotTrack;
         }
 
         private void sensorD2CB_Click(object sender, EventArgs e)
         {
             changedList.Add(sensorD2CB);
-            sensorD2CB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            sensorD2CB.ForeColor = SystemColors.HotTrack;
         }
 
         private void hitcDTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(hitcDTB1);
-            hitcDTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            hitcDTB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void hitcDTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(hitcDTB2);
-            hitcDTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            hitcDTB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void hitcDTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(hitcDTB3);
-            hitcDTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            hitcDTB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void hitcCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(hitcCB4);
-            hitcCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            hitcCB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void serialDTB_Click(object sender, EventArgs e)
         {
             changedList.Add(serialDTB);
-            serialDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            serialDTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void addressDTB_Click(object sender, EventArgs e)
         {
             changedList.Add(addressDTB);
-            addressDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            addressDTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void sitBTB_Click(object sender, EventArgs e)
         {
             changedList.Add(sitBTB);
-            sitBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            sitBTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void satBTB_Click(object sender, EventArgs e)
         {
             changedList.Add(satBTB);
-            satBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            satBTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void sesBTB_Click(object sender, EventArgs e)
         {
             changedList.Add(sesBTB);
-            sesBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            sesBTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void mitBTB_Click(object sender, EventArgs e)
         {
             changedList.Add(mitBTB);
-            mitBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mitBTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void matBTB_Click(object sender, EventArgs e)
         {
             changedList.Add(matBTB);
-            matBTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            matBTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void lengthDTB_Click(object sender, EventArgs e)
         {
             changedList.Add(lengthDTB);
-            lengthDTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            lengthDTB.ForeColor = SystemColors.HotTrack;
         } 
 
         private void DockDCB_Click(object sender, EventArgs e)
         {
             changedList.Add(DockDCB);
-            DockDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            DockDCB.ForeColor = SystemColors.HotTrack;
         }
 
         private void HomeDCB_Click(object sender, EventArgs e)
         {
             changedList.Add(HomeDCB);
-            HomeDCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            HomeDCB.ForeColor = SystemColors.HotTrack;
         }
 
         private void revCB_Click(object sender, EventArgs e)
         {
             changedList.Add(revCB);
-            revCB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            revCB.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCheck);
-            mfsCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsCheck.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCB1);
-            mfsCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsCB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCB2);
-            mfsCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsCB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCB3);
-            mfsCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsCB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsCB4);
-            mfsCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsCB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB1);
-            mfsTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsTB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB2);
-            mfsTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsTB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB3);
-            mfsTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsTB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB4);
-            mfsTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsTB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB5);
-            mfsTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsTB5.ForeColor = SystemColors.HotTrack;
         }
 
         private void mfsTB6_Click(object sender, EventArgs e)
         {
             changedList.Add(mfsTB6);
-            mfsTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mfsTB6.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCheck);
-            mglCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglCheck.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCB1);
-            mglCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglCB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCB2);
-            mglCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglCB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCB3);
-            mglCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglCB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(mglCB4);
-            mglCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglCB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB1);
-            mglTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglTB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB2);
-            mglTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglTB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB3);
-            mglTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglTB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB4);
-            mglTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglTB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB5);
-            mglTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglTB5.ForeColor = SystemColors.HotTrack;
         }
 
         private void mglTB6_Click(object sender, EventArgs e)
         {
             changedList.Add(mglTB6);
-            mglTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+            mglTB6.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCheck);
-            phiCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiCheck.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCB1);
-            phiCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiCB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCB2);
-            phiCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiCB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCB3);
-            phiCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiCB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(phiCB4);
-            phiCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiCB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB1);
-            phiTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiTB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB2);
-            phiTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiTB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB3);
-            phiTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiTB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB4);
-            phiTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiTB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB5);
-            phiTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiTB5.ForeColor = SystemColors.HotTrack;
         }
 
         private void phiTB6_Click(object sender, EventArgs e)
         {
             changedList.Add(phiTB6);
-            phiTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+            phiTB6.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCheck);
-            smkCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkCheck.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCB1);
-            smkCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkCB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCB2);
-            smkCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkCB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCB3);
-            smkCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkCB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(smkCB4);
-            smkCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkCB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB1);
-            smkTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkTB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB2);
-            smkTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkTB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB3);
-            smkTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkTB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB4);
-            smkTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkTB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB5);
-            smkTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkTB5.ForeColor = SystemColors.HotTrack;
         }
 
         private void smkTB6_Click(object sender, EventArgs e)
         {
             changedList.Add(smkTB6);
-            smkTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+            smkTB6.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCheck);
-            thmCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmCheck.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCB1);
-            thmCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmCB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCB2);
-            thmCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmCB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCB3);
-            thmCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmCB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(thmCB4);
-            thmCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmCB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB1);
-            thmTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmTB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB2);
-            thmTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmTB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB3);
-            thmTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmTB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB4);
-            thmTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmTB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB5);
-            thmTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmTB5.ForeColor = SystemColors.HotTrack;
         }
 
         private void thmTB6_Click(object sender, EventArgs e)
         {
             changedList.Add(thmTB6);
-            thmTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+            thmTB6.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdCheck_Click(object sender, EventArgs e)
         {
             changedList.Add(msdCheck);
-            msdCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdCheck.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdCB1_Click(object sender, EventArgs e)
         {
             changedList.Add(msdCB1);
-            msdCB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdCB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdCB2_Click(object sender, EventArgs e)
         {
             changedList.Add(msdCB2);
-            msdCB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdCB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdCB3_Click(object sender, EventArgs e)
         {
             changedList.Add(msdCB3);
-            msdCB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdCB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdCB4_Click(object sender, EventArgs e)
         {
             changedList.Add(msdCB4);
-            msdCB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdCB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdTB1_Click(object sender, EventArgs e)
         {
             changedList.Add(msdTB1);
-            msdTB1.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdTB1.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdTB2_Click(object sender, EventArgs e)
         {
             changedList.Add(msdTB2);
-            msdTB2.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdTB2.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdTB3_Click(object sender, EventArgs e)
         {
             changedList.Add(msdTB3);
-            msdTB3.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdTB3.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdTB4_Click(object sender, EventArgs e)
         {
             changedList.Add(msdTB4);
-            msdTB4.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdTB4.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdTB5_Click(object sender, EventArgs e)
         {
             changedList.Add(msdTB5);
-            msdTB5.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdTB5.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdTB6_Click(object sender, EventArgs e)
         {
             changedList.Add(msdTB6);
-            msdTB6.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdTB6.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdTB7_Click(object sender, EventArgs e)
         {
             changedList.Add(msdTB7);
-            msdTB7.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdTB7.ForeColor = SystemColors.HotTrack;
         }
 
         private void msdTB8_Click(object sender, EventArgs e)
         {
             changedList.Add(msdTB8);
-            msdTB8.ForeColor = System.Drawing.SystemColors.HotTrack;
+            msdTB8.ForeColor = SystemColors.HotTrack;
         }
 
         private void freqTB_Click(object sender, EventArgs e)
         {
             changedList.Add(freqTB);
-            freqTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            freqTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void lpTB_Click(object sender, EventArgs e)
         {
             changedList.Add(lpTB);
-            lpTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            lpTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void hpTB_Click(object sender, EventArgs e)
         {
             changedList.Add(hpTB);
-            hpTB.ForeColor = System.Drawing.SystemColors.HotTrack;
+            hpTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void radioCheck_CheckedChanged(object sender, EventArgs e)
         {
             changedList.Add(radioCheck);
-            radioCheck.ForeColor = System.Drawing.SystemColors.HotTrack;
+            radioCheck.ForeColor = SystemColors.HotTrack;
         }
 
         /**************************************************
@@ -2268,12 +2192,17 @@ namespace pmaGUI
         {
             if (conn != null)
             {
+                // Change the reboot appearance because it needs to be clicked for
+                // the changes to take effect.
+                rebootButton.ForeColor = SystemColors.HotTrack;
+                rebootButton.Font = new Font(rebootButton.Font, FontStyle.Bold);
+
                 //Edit each control in the list only once
                 foreach (Control c in changedList.Distinct().ToList())
                 {
                     String type = c.Name;
                     String textValue = c.Text;
-                    c.ForeColor = System.Drawing.SystemColors.WindowText;
+                    c.ForeColor = SystemColors.WindowText;
                     switch (type)
                     {
                         case "sitBTB":
@@ -2666,6 +2595,27 @@ namespace pmaGUI
             }
         }
 
+        /* ***********************************************
+         * Grabs all the information for the settings
+         * ***********************************************/
+        private void showSettingsBTN_Click(object sender, EventArgs e)
+        {
+            if (conn != null)
+            {
+                setBoardType();
+                conn.sendMessage("I C");
+                conn.sendMessage("I D");
+                conn.sendMessage("I I");
+                conn.sendMessage("I L");
+                conn.sendMessage("I M");
+                logSent("I C");
+                logSent("I D");
+                logSent("I I");
+                logSent("I L");
+                logSent("I M");
+            }
+        }
+
         /**************************************************
          * Sends default battery message
          * ***********************************************/
@@ -2676,6 +2626,77 @@ namespace pmaGUI
                 conn.sendMessage("I E " + index + " " + battery);
                 logSent("I E " + index + " " + battery);
             }
+        }
+
+        /**************************************************
+         * Sends connection port message
+         * ***********************************************/
+        public void connDefaults(string connect)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I C " + connect);
+                logSent("I C " + connect);
+            }
+        }
+
+        /**************************************************
+         * Sends IP message
+         * ***********************************************/
+        public void ipDefaults(string ip)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I I " + ip);
+                logSent("I I " + ip);
+            }
+        }
+
+        /**************************************************
+         * Sends listen port message
+         * ***********************************************/
+        public void listenDefaults(string listen)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I L " + listen);
+                logSent("I L " + listen);
+            }
+        }
+
+        /**************************************************
+         * Sends board type message
+         * ***********************************************/
+        public void boardDefaults(string board)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I B " + board);
+                logSent("I B " + board);
+            }
+        }
+
+        /**************************************************
+         * Sends communication type message
+         * ***********************************************/
+        public void commDefaults(string comm)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I D " + comm);
+                logSent("I D " + comm);
+            }
+        }
+
+        /**************************************************
+         * Sends mac message
+         * ***********************************************/
+        public void macDefaults(string listen)
+        {
+            // Make a password popup box
+            passwordPanel.Visible = true;
+            passLabel1.Text = "Call Action Target customer service";
+            passLabel2.Text = "for the password.";
         }
 
         /************************************************
@@ -3029,6 +3050,49 @@ namespace pmaGUI
                 Console.WriteLine("There was an error with the file.");
             }
         }
- 
+
+        private void setSettingsBTN_Click(object sender, EventArgs e)
+        {
+            if (conn != null)
+            {
+                // Change the reboot appearance because it needs to be clicked for
+                // the changes to take effect.
+                rebootButton.ForeColor = SystemColors.HotTrack;
+                rebootButton.Font = new Font(rebootButton.Font, FontStyle.Bold);
+
+                //Edit each control in the list only once
+                foreach (Control c in settingsList.Distinct().ToList())
+                {
+                    String type = c.Name;
+                    String textValue = c.Text;
+                    c.ForeColor = SystemColors.WindowText;
+                    switch (type)
+                    {
+                        case "boardCB":
+                            boardDefaults((String)boardCB.SelectedItem);
+                            break;
+                        case "commCB":
+                            commDefaults((String)commCB.SelectedItem);
+                            break;
+                        case "macTB":
+                            macDefaults(textValue);
+                            break;
+                        case "listenTB":
+                            listenDefaults(textValue);
+                            break;
+                        case "connectTB":
+                            connDefaults(textValue);
+                            break;
+                        case "ipTB": 
+                            ipDefaults(textValue);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                settingsList.Clear();
+            }
+        }
+        
     }
 }
