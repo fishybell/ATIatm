@@ -1,6 +1,7 @@
 #!/bin/sh
 /usr/bin/dtxm_edit.arm -v f
 if [ `/usr/bin/is_comm` == "radio" ] ; then
+   killall RFmaster.arm
    killall RFslave.new.arm
    killall slaveboss.arm
 fi

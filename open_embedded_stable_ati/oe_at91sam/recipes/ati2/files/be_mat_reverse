@@ -1,4 +1,0 @@
-echo -n "Enter MAT reverse (0|1): "
-read matr
-size=$(echo $matr | wc -c)
-echo -n $matr | /usr/bin/eeprom_rw write -addr 0x434 -size $size -blank 0x03

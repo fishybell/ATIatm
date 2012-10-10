@@ -1,3 +1,0 @@
-matt=1
-size=$(echo $matt | wc -c)
-echo -n $matt | /usr/bin/eeprom_rw write -addr 0x430 -size $size -blank 0x03
