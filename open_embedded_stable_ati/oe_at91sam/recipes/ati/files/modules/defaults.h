@@ -506,7 +506,7 @@
 #define TRACK_LENGTH_SIZE 0x4
 
 // Static IP Address for movers
-#define STATIC_IP 0
+#define STATIC_IP 0.0.0.0
 #define STATIC_IP_LOC 0x578
 #define STATIC_IP_SIZE 0x20
 
