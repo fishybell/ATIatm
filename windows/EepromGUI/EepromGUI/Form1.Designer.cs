@@ -276,6 +276,8 @@
             this.stopButton = new System.Windows.Forms.Button();
             this.rebootButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
+            this.staticTB = new System.Windows.Forms.TextBox();
+            this.label36 = new System.Windows.Forms.Label();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -2553,6 +2555,8 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.staticTB);
+            this.tabPage2.Controls.Add(this.label36);
             this.tabPage2.Controls.Add(this.setSettingsBTN);
             this.tabPage2.Controls.Add(this.showSettingsBTN);
             this.tabPage2.Controls.Add(this.passwordPanel);
@@ -2579,7 +2583,7 @@
             // 
             // setSettingsBTN
             // 
-            this.setSettingsBTN.Location = new System.Drawing.Point(155, 262);
+            this.setSettingsBTN.Location = new System.Drawing.Point(155, 281);
             this.setSettingsBTN.Name = "setSettingsBTN";
             this.setSettingsBTN.Size = new System.Drawing.Size(100, 28);
             this.setSettingsBTN.TabIndex = 48;
@@ -2589,7 +2593,7 @@
             // 
             // showSettingsBTN
             // 
-            this.showSettingsBTN.Location = new System.Drawing.Point(40, 262);
+            this.showSettingsBTN.Location = new System.Drawing.Point(40, 281);
             this.showSettingsBTN.Name = "showSettingsBTN";
             this.showSettingsBTN.Size = new System.Drawing.Size(100, 28);
             this.showSettingsBTN.TabIndex = 47;
@@ -2793,9 +2797,9 @@
             this.label12.Location = new System.Drawing.Point(21, 215);
             this.label12.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label12.Name = "label12";
-            this.label12.Size = new System.Drawing.Size(76, 17);
+            this.label12.Size = new System.Drawing.Size(95, 17);
             this.label12.TabIndex = 42;
-            this.label12.Text = "IP Address";
+            this.label12.Text = "Connection IP";
             // 
             // tabPage1
             // 
@@ -3275,6 +3279,25 @@
             this.tabControl1.Size = new System.Drawing.Size(849, 348);
             this.tabControl1.TabIndex = 93;
             // 
+            // staticTB
+            // 
+            this.staticTB.Location = new System.Drawing.Point(123, 244);
+            this.staticTB.Margin = new System.Windows.Forms.Padding(4);
+            this.staticTB.Name = "staticTB";
+            this.staticTB.Size = new System.Drawing.Size(132, 22);
+            this.staticTB.TabIndex = 50;
+            this.staticTB.Click += new System.EventHandler(this.staticTB_Click);
+            // 
+            // label36
+            // 
+            this.label36.AutoSize = true;
+            this.label36.Location = new System.Drawing.Point(21, 252);
+            this.label36.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label36.Name = "label36";
+            this.label36.Size = new System.Drawing.Size(59, 17);
+            this.label36.TabIndex = 49;
+            this.label36.Text = "Static IP";
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -3595,6 +3618,8 @@
         private System.Windows.Forms.Label label19;
         private System.Windows.Forms.Button showSettingsBTN;
         private System.Windows.Forms.Button setSettingsBTN;
+        private System.Windows.Forms.TextBox staticTB;
+        private System.Windows.Forms.Label label36;
     }
 }
 

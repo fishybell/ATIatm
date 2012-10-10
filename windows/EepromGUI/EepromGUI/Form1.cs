@@ -410,6 +410,12 @@ namespace pmaGUI
             ipTB.ForeColor = SystemColors.HotTrack;
         }
 
+        private void staticTB_Click(object sender, EventArgs e)
+        {
+            settingsList.Add(staticTB);
+            staticTB.ForeColor = SystemColors.HotTrack;
+        }
+
         /********************************************************
          * Show the fall parameters
          * *****************************************************/
@@ -763,7 +769,7 @@ namespace pmaGUI
                     calShowButton.Enabled = false;
                     accSetButton.Enabled = false;
                     accShowButton.Enabled = false;
-                    //fHitShowButton.Enabled = false;
+                    staticTB.Enabled = false;
                     expSShowButton.Enabled = false;
                     break;
                 case "SIT":
@@ -773,6 +779,7 @@ namespace pmaGUI
                     knobShowButton.Enabled = false;
                     modeShowButton.Enabled = false;
                     modeSetButton.Enabled = false;
+                    staticTB.Enabled = false;
                     break;
                 case "SAT":
                     enableAll();
@@ -783,6 +790,7 @@ namespace pmaGUI
                     knobShowButton.Enabled = false;
                     modeShowButton.Enabled = false;
                     modeSetButton.Enabled = false;
+                    staticTB.Enabled = false;
                     break;
                 case "MIT":
                     enableAll();
@@ -802,7 +810,6 @@ namespace pmaGUI
                     calShowButton.Enabled = false;
                     accSetButton.Enabled = false;
                     accShowButton.Enabled = false;
-                    //fHitShowButton.Enabled = false;
                     expSShowButton.Enabled = false;
                     break;
                 case "MAT":
@@ -823,7 +830,6 @@ namespace pmaGUI
                     calShowButton.Enabled = false;
                     accSetButton.Enabled = false;
                     accShowButton.Enabled = false;
-                    //fHitShowButton.Enabled = false;
                     expSShowButton.Enabled = false;
                     break;
                 case "BASE":
@@ -850,6 +856,7 @@ namespace pmaGUI
                     calShowButton.Enabled = false;
                     accSetButton.Enabled = false;
                     accShowButton.Enabled = false;
+                    staticTB.Enabled = false;
                     break;
             }
         }
@@ -880,6 +887,7 @@ namespace pmaGUI
             accSetButton.Enabled = true;
             accShowButton.Enabled = true;
             expSShowButton.Enabled = true;
+            staticTB.Enabled = true;
         }
 
         /**************************************************
@@ -906,6 +914,7 @@ namespace pmaGUI
             listenTB.Text = "";
             connectTB.Text = "";
             ipTB.Text = "";
+            staticTB.Text = "";
             modeTB.Text = "";
             fkillTB.Text = "";
             fallCB.SelectedIndex = -1;
@@ -1579,6 +1588,10 @@ namespace pmaGUI
                             lengthDTB.Text = getMessageValue(message, 4);
                             lengthDTB.ForeColor = SystemColors.WindowText;
                             logSent("J D " + getMessageValue(message, 4));
+                            break;
+                        case 'E':   // Static IP address
+                            staticTB.Text = getMessageValue(message, 4);
+                            logSent("J E " + getMessageValue(message, 4));
                             break;
                     }
                     break;
@@ -2608,11 +2621,13 @@ namespace pmaGUI
                 conn.sendMessage("I I");
                 conn.sendMessage("I L");
                 conn.sendMessage("I M");
+                conn.sendMessage("J E");
                 logSent("I C");
                 logSent("I D");
                 logSent("I I");
                 logSent("I L");
                 logSent("I M");
+                logSent("J E");
             }
         }
 
@@ -2649,6 +2664,18 @@ namespace pmaGUI
             {
                 conn.sendMessage("I I " + ip);
                 logSent("I I " + ip);
+            }
+        }
+
+        /**************************************************
+         * Sends Static IP message
+         * ***********************************************/
+        public void staticDefaults(string ip)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("J E " + ip);
+                logSent("J E " + ip);
             }
         }
 
@@ -3085,6 +3112,9 @@ namespace pmaGUI
                             break;
                         case "ipTB": 
                             ipDefaults(textValue);
+                            break;
+                        case "staticTB":
+                            staticDefaults(textValue);
                             break;
                         default:
                             break;
