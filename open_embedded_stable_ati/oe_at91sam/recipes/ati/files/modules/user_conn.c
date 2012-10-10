@@ -1813,6 +1813,20 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J C %s\n", readEeprom(RADIO_WRITTEN_LOC, RADIO_WRITTEN_SIZE)); // reads and prints out what it read
                      }
                      break;
+                  case 'D': case 'd':      // Sets and Reads track length
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "J D %s\n", writeEeprom(TRACK_LENGTH_LOC, arg3, TRACK_LENGTH_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "J D %s\n", readEeprom(TRACK_LENGTH_LOC, TRACK_LENGTH_SIZE)); // reads and prints out what it read
+                     }
+                     break;
+				  case 'E': case 'e':      // Sets and Reads the IP address
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "J E %s\n", writeEeprom(STATIC_IP_LOC, arg3, STATIC_IP_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "J E %s\n", readEeprom(STATIC_IP_LOC, STATIC_IP_SIZE)); // reads and prints out what it read
+                     }
+                     break;
                }
                write(client, wbuf, strnlen(wbuf,1024));
                break;
@@ -1948,8 +1962,14 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'C': case 'c':
                                 snprintf(wbuf, 1024, "Get/Set Will the radio reprogram?\nFormat: J C (Y|N)\n");
                                 break;
+                            case 'D': case 'd':
+                                snprintf(wbuf, 1024, "Get/Set Track length\nFormat: J D <track length>\n");
+                                break;
+							case 'E': case 'e':
+                                snprintf(wbuf, 1024, "Get/Set Static IP address\nFormat: J E <static ip>\n");
+                                break;
                             default:
-                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ B: Partial Flash Version\nJ C: Program The Radio?\n");
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ B: Partial Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\n");
                                 break;
                         }
                         break;
