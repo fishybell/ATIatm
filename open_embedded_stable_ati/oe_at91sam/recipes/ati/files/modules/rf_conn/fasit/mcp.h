@@ -53,12 +53,13 @@ extern const char *__PROGRAM__;
  *   - all items are a multiple of 4 bytes long
  *   */
 
+/* May need to exchange the position of BLANK_ON_CONCEALED and BLANK_ALWAYS - Shelly */
 enum {
-   BLANK_ON_CONCEALED,    /* blank when fully concealed (enabled most of the time) */
+   BLANK_ALWAYS,           /* hit sensor disabled blank */
    ENABLE_ALWAYS,       /* enable full-time (even when concealed) */
    ENABLE_AT_POSITION,  /* enable when reach next position (don't change now) */
    DISABLE_AT_POSITION, /* disable when reach next position (don't change now) */
-   BLANK_ALWAYS,           /* hit sensor disabled blank */
+   BLANK_ON_CONCEALED,    /* blank when fully concealed (enabled most of the time) */
 };
 
 // the steps a lifter goes through with lifting (can start on exposed or concealed, but then moves through in order)
