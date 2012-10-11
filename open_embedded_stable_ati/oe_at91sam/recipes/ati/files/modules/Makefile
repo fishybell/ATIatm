@@ -72,6 +72,9 @@ atifirmware:
 			../../../ati2/files/HHC \
 			../../../ati2/files/TTMT \
 			../../../ati2/files/atiradiotest.sh \
+			../../../ati2/files/evaluateip.sh \
+			../../../ati2/files/networking \
+			../../../ati2/files/interfaces \
 			../../../sysvinit/sysvinit/inittab
 	cat extract.sh atifirmware.tar > atifirmware.sh
 	chmod +x atifirmware.sh

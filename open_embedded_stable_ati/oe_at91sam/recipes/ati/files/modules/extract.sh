@@ -44,7 +44,8 @@ mv /usr/bin/user_conn /usr/bin/user_conn.old
 mv user_conn /usr/bin
 mv ati2/files/fixhost /etc/init.d
 mv ati2/files/start_up /etc/init.d
-#--mv ati2/files/interfaces /etc/network -- don't uncomment unless you want to break manually changed IP settings -- TODO -- make a fix_interfaces file like the fixhost file to do it before start_up is ran so we can change the IP settings via eeprom
+mv ati2/files/networking /etc/init.d
+mv ati2/files/interfaces /etc/network
 mv ati2/files/* /usr/bin
 mv sysvinit/sysvinit/inittab /etc
 
