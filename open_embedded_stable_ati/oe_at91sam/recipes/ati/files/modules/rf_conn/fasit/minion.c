@@ -1958,7 +1958,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                //                           }
                if (minion->S.cap&PD_NES){
                   DDCMSG(D_PACKET,BLUE,"Minion %i: we also seem to have a MFS Muzzle Flash Simulator - send 2112 status",minion->mID) ; 
-                  // AND send 2112 Muzzle Flash status if supported   
+                  // AND send 2112 Muzzle Flash status if supported  
                   sendStatus2112(0,header,minion); // send of a 2112 (0 means unsolicited, 1 copys mnum and seq to resp_mnum and resp_seq)
                }
 
@@ -2474,7 +2474,8 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                 , minion->mID,htonl(header->seq),message_2110->on,message_2110->mode,message_2110->idelay,message_2110->rdelay);
 
          // check to see if we have muzzle flash capability -  or just pretend
-         if (minion->S.cap&PD_NES){
+         // Shelly - comment out the following if because it's broken
+         /*if (minion->S.cap&PD_NES){*/
 
             minion->S.mfs_on.newdata  = message_2110->on;       // set the new value for 'on'
 //            minion->S.mfs_on.flags  |= F_tell_RF;       // just note it was set
@@ -2488,6 +2489,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
             //doMFS(msg->on,msg->mode,msg->idelay,msg->rdelay);
             // when the didMFS happens fill in the 2112, force a 2112 message to be sent
             sendStatus2112(1,header,minion); // forces sending of a 2112
+
             //                      sendStatus2102(0,header,minion,&mt); // forces sending of a 2102
             //sendMFSStatus = 1; // force
 
@@ -2499,9 +2501,9 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
             lba.idelay = message_2110->idelay;
             lba.rdelay = message_2110->rdelay;
             psend_mcp(minion,&lba);
-         } else {
+         /*} else {  // Shelly - commented out
             send_2101_ACK(header,'F',minion);  // no muzzle flash capability, so send a negative ack
-         }
+         }*/
       }  break;
 
       case 2114: {
