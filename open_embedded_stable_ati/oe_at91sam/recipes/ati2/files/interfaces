@@ -57,13 +57,25 @@ iface wlan0 inet dhcp
 #iface atml0 inet dhcp
 #
 # Wired or wireless interfaces
+# See evaluateip for more
+# If we want dhcp, be_static should be 0.0.0.0
+# If we have a radio range, be_static should be 0.0.0.0
+# If we want manual, be_static should be the manually assigned
+# address. This is for MITs. 
+# Hardwired MITs require static IP addresses.
+# If no argument is provided to evaluateip.sh both
+# will fail and avahi will assign the address in the
+# 169.254.*.* family
 auto eth0
-#iface eth0 inet dhcp
-iface eth0 inet static
-	address 192.168.1.100
-	netmask 255.255.255.0
-	network 192.168.1.0
-	gateway 192.168.1.1
+iface eth0 inet dhcp
+    pre-up /home/root/evaluateip.sh dhcp
+
+auto eth0:0
+iface eth0:0 inet manual
+    pre-up /home/root/evaluateip.sh static
+    up ifconfig eth0 0.0.0.0 up
+    up ifconfig eth0 `is_static` netmask 255.255.255.0
+    
 
 #iface eth1 inet dhcp
 #
