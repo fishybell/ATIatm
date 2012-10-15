@@ -87,7 +87,7 @@ case "$1" in
         echo -n "Configuring network interfaces... "
         ifup -a
         cntr=0
-        while [ $cntr -lt 2 ]; do
+        while [ $cntr -lt 5 ]; do
           havadd=$(testEth0)
           if [ "$havadd" = "0" ]; then
               let cntr=cntr+6
