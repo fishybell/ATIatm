@@ -74,7 +74,7 @@ auto eth0:0
 iface eth0:0 inet manual
     pre-up /usr/bin/evaluateip.sh static
     up ifconfig eth0 0.0.0.0 up
-    up ifconfig eth0 `is_static` netmask 255.255.255.0
+    up ifconfig eth0 `is_static` netmask 255.255.252.0
     
 
 #iface eth1 inet dhcp
