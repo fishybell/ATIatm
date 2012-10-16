@@ -717,11 +717,13 @@ int SIT_Client::handle_2100(int start, int end) {
             DCMSG(RED,"CID_Sleep...sleeping") ; 
             didFailure(ERR_target_asleep);
             doSleep();
+            lastWakeVal = 0;
             break;
         case CID_Wake:
             DCMSG(RED,"CID_Wake...waking") ;
             didFailure(ERR_target_awake); 
             doWake();
+            lastWakeVal = 1;
             break;
         case CID_Hit_Count_Reset:
             DCMSG(RED,"CID_Wake...waking") ; 
@@ -1085,12 +1087,6 @@ void SIT_Client::didFailure(int type) {
         skippedFault = type; // send after connection
         FUNCTION_END("::didFailure(int type)")
         return;
-    }
-
-    if (type == ERR_target_asleep) {
-       lastWakeVal = 0;
-    } else if (type = ERR_target_awake) {
-       lastWakeVal = 1;
     }
 
     FASIT_header hdr;
