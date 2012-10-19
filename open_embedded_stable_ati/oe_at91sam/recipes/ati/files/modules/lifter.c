@@ -724,7 +724,7 @@ void do_kill_internal(void) {
 delay_printk("\n***hits_to_kill: %i, kill counter: %i***\n\n", atomic_read(&hits_to_kill), kill_counter);
 		// create events for outputs
 		generic_output_event(EVENT_KILL);
-        lift_faults(ERR_target_killed);
+        //lift_faults(ERR_target_killed);
 
 		// send kill upstream (always, no matter what the upload value is)
 		kdata = EVENT_KILL; // cast to 8-bits
