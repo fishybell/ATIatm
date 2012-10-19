@@ -147,7 +147,7 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
     if (na) {
         // grab value from attribute
         value = nla_get_u8(na);
-        delay_printk("Lifter: received value: %i\n", value);
+        delay_printk("Lifter: received value: %i, nl_expose_handler\n", value);
 
         switch (value) {
             case TOGGLE:
@@ -270,7 +270,7 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
     if (na) {
         // grab value from attribute
         value = nla_get_u8(na);
-        delay_printk("Lifter: received value: %i\n", value);
+        delay_printk("Lifter: received value: %i, nl_hits_handler\n", value);
 
         // get initial data from log
         rc = 0;
@@ -319,6 +319,7 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
 
         // re-get data from log
         if (value != 0) {
+delay_printk("\n***Shelly1-value: %i\n", value);
             rc = 0;
             spin_lock(hit_lock);
             this = hit_chain;
@@ -397,6 +398,7 @@ int nl_hit_log_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
         this = hit_chain;
         while (this != NULL) {
             rc++; // count hit (doesn't matter which line)
+delay_printk("\n***Shelly2-increase rc: %i\n", rc);
             this = this->next; // next link in chain
         }
         spin_unlock(hit_lock);
@@ -450,7 +452,7 @@ int nl_stop_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
     if (na) {
         // grab value from attribute
         value = nla_get_u8(na); // value is ignored
-        delay_printk("Lifter: received value: %i\n", value);
+        delay_printk("Lifter: received value: %i, nl_stop_handler\n", value);
 
         // stop motor wherever it is
         lifter_position_set(LIFTER_POSITION_ERROR_NEITHER);
@@ -719,7 +721,7 @@ void do_kill_internal(void) {
 	}
 	if (!stay_up) {
 		atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
-
+delay_printk("\n***hits_to_kill: %i, kill counter: %i***\n\n", atomic_read(&hits_to_kill), kill_counter);
 		// create events for outputs
 		generic_output_event(EVENT_KILL);
         lift_faults(ERR_target_killed);
@@ -1192,7 +1194,7 @@ int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void 
     if (na) {
         // grab value from attribute
         value = nla_get_u8(na); // value is ignored
-        delay_printk("Lifter: received value: %i\n", value);
+        delay_printk("Lifter: received value: %i, nl_event_handler\n", value);
 
         // handle event
         switch (value) {
