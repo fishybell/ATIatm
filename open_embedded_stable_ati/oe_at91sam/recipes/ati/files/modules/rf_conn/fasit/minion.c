@@ -2148,24 +2148,24 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
 #if 0
                //                               lastHitCal.seperation = 250;   //250;
                minion->S.burst.newdata = htons(250);
-               minion->S.burst.flags |= F_tell_RF;      // just note it was set
+               //minion->S.burst.flags |= F_tell_RF;      // just note it was set
 
                minion->S.sens.newdata = cal_table[13]; // fairly sensitive, but not max
-               minion->S.sens.flags |= F_tell_RF;       // just note it was set
+               //minion->S.sens.flags |= F_tell_RF;       // just note it was set
 
                //lastHitCal.blank_time = 50; // half a second blanking
 
                //lastHitCal.enable_on = BLANK_ALWAYS; // hit sensor off
                minion->S.on.newdata  = 0;       // set the new value for 'on'
-               minion->S.on.flags  |= F_tell_RF;        // just note it was set
+               //minion->S.on.flags  |= F_tell_RF;        // just note it was set
 
                //lastHitCal.hits_to_kill = 1; // kill on first hit
                minion->S.tokill.newdata = htons(1);
-               minion->S.tokill.flags |= F_tell_RF;     // just note it was set
+               //minion->S.tokill.flags |= F_tell_RF;     // just note it was set
 
                //lastHitCal.after_kill = 0; // 0 for stay down
                minion->S.react.newdata = 0; // 0 for stay down
-               minion->S.react.flags |= F_tell_RF;      // just note it was set
+               //minion->S.react.flags |= F_tell_RF;      // just note it was set
 
                //lastHitCal.type = 1; // mechanical sensor
                //lastHitCal.invert = 0; // don't invert sensor input line
@@ -2474,7 +2474,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                 , minion->mID,htonl(header->seq),message_2110->on,message_2110->mode,message_2110->idelay,message_2110->rdelay);
 
          // check to see if we have muzzle flash capability -  or just pretend
-         // Shelly - comment out the following if because it's broken
+         // Shelly - comment out the following if because it's broken for mit/sits
          /*if (minion->S.cap&PD_NES){*/
 
             minion->S.mfs_on.newdata  = message_2110->on;       // set the new value for 'on'
