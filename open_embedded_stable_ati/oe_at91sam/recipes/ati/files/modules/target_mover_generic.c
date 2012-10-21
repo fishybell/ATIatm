@@ -1780,9 +1780,15 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
         }
 
     // if no dock, don't stop on an errant dock interrupt
-    if (dock_loc == 2 || dock_loc == 3) {
+    // 10/21/12 Randy - lets not ignore dock interrupts for now
+    // this is not working correctly at Fort Polk. Maybe the defaults
+    // is not working correctly, or maybe the boards were flashed so
+    // long ago they have the wrong default in the eeprom. I like the idea
+    // but hopefully we really do not need this as it is 
+    // up the the EEs to make sure their hardware works.
+/*    if (dock_loc == 2 || dock_loc == 3) {
        return IRQ_HANDLED;
-    }
+    }    */
     
     //DELAY_PRINTK("At Dock Sensor %s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&find_dock_atomic));
 
@@ -1790,7 +1796,7 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
        do_event(EVENT_DOCK_LIMIT); // triggered on dock limit
        do_fault(ERR_stop_dock_limit); // triggered on dock limit
    SENDUSERCONNMSG( "randy before mover_speed_stop 9");
-       mover_speed_stop(1);
+         mover_speed_stop(1);
 //    if (dock_loc == 0 || dock_loc == 1) {
 //       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
 //    }
