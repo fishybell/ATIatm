@@ -1226,7 +1226,7 @@ static void dock_timeout_fire(unsigned long data)
             atomic_set(&find_dock_atomic, 0); // ...don't continue looking for the dock
          }
       }
-      dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
+      dock_timeout_start(10000); // needs to wait at least 2 seconds for velocity to settle to zero
       return;
    }
 
@@ -1239,7 +1239,7 @@ static void dock_timeout_fire(unsigned long data)
                ){
             mover_find_dock();
          } else {
-            dock_timeout_start(5000);
+            dock_timeout_start(60000);
          }
        }
     } else if (dock_loc == 1){ // Dock at right
@@ -1251,7 +1251,7 @@ static void dock_timeout_fire(unsigned long data)
                ){
             mover_find_dock();
          } else {
-            dock_timeout_start(5000);
+            dock_timeout_start(6000);
          }
        }
     } else {
@@ -1505,7 +1505,7 @@ static void timeout_fire(unsigned long data) {
        mover_speed_stop(0); // after event_stopped
        // start docking now
        atomic_set(&dockTryCount, 0);
-       dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
+       dock_timeout_start(10000); // needs to wait at least 2 seconds for velocity to settle to zero
     } else if (atomic_read(&find_dock_atomic) == 1) { // stopped due to docking problems
        //do_event(EVENT_ERROR); // timeout wasn't part of coasting
        //do_fault(ERR_did_not_dock);
@@ -1519,7 +1519,7 @@ SENDUSERCONNMSG( "randy before mover_speed_stop 4");
 SENDUSERCONNMSG( "randy before mover_speed_stop 5");
        mover_speed_stop(0); // after event_error
        atomic_set(&dockTryCount, 0);
-       dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
+       dock_timeout_start(10000); // needs to wait at least 2 seconds for velocity to settle to zero
     }
 }
 
@@ -1714,7 +1714,7 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
     mover_speed_stop(1);
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
-    dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
+    dock_timeout_start(10000); // needs to wait at least 2 seconds for velocity to settle to zero
 
     return IRQ_HANDLED;
     }
@@ -1764,7 +1764,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     mover_speed_stop(1);
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
-    dock_timeout_start(2100); // needs to wait at least 2 seconds for velocity to settle to zero
+    dock_timeout_start(10000); // needs to wait at least 2 seconds for velocity to settle to zero
 
     return IRQ_HANDLED;
     }
@@ -2744,10 +2744,10 @@ void mover_find_dock(void) {
       atomic_inc(&dockTryCount);
       if (dock_loc == 1) { // Dock at end away from home
          mover_speed_set(1); // Go Slow
-         dock_timeout_start(5000);
+         dock_timeout_start(60000);
       } else if (dock_loc == 0) { // Dock at home end
          mover_speed_set(-1); // Go Slow
-         dock_timeout_start(5000);
+         dock_timeout_start(60000);
       } else {
          atomic_set(&find_dock_atomic, 0); // No dock, stop looking
       }
