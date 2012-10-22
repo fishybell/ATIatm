@@ -17,8 +17,8 @@ start () {
       mitr=0
    fi
    if [ "$mitd" == "" ] ; then
-# Assume no dock
-      mitd=2
+# Assume dock on left
+      mitd=0
    fi
    if [ "$track" == "" ] ; then
       track=10
