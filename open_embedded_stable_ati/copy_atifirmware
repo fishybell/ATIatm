@@ -1,0 +1,63 @@
+#!/usr/bin/tclsh
+
+# remember expect string for doing the ssh/scp session
+set dossh {
+    while 1 {
+        expect {
+            -re {.*word:.*} {
+                send "shoot\r"
+            }
+            -re {.*yes/no.*} {
+                send "yes\r"
+            }
+            eof {
+                break
+            }
+        }
+    }
+}
+
+package require Expect
+package require Tclx
+fconfigure stdin -blocking 1            ;#expect bug?
+
+set hosts {}
+set firmware {}
+if {$argc < 3} {
+  puts "Arguments: copy_atifirmware firmwarefile ipaddresses"
+  exit 1
+}
+set firmware [lindex $argv 0]
+if  {$argc != 0} {
+    foreach host [lrange $argv 1 end] {
+        lappend hosts $host
+    }
+}
+
+puts "firmware: $firmware"
+# copy to each host individually
+foreach host $hosts {
+    puts "####################################################################"
+    puts "# Copying to $host"
+    puts "####################################################################"
+
+    # clear out of remembered key
+    system sed -i -e "s/^$host.*//" ~/.ssh/known_hosts
+
+    # ssh over, stop, exit ssh
+#    spawn ssh root@$host /usr/bin/stop
+#    eval $dossh
+
+    # copy firmware
+#    eval spawn scp $firmware root@$host:/usr/bin
+#    eval $dossh
+#    spawn ssh root@$host "./$firmware"
+#    eval $dossh
+    puts "host: $host"
+
+    # ssh over, start, exit ssh
+    #spawn ssh root@$host /usr/bin/start
+    #eval $dossh
+
+}
+
