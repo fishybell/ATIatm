@@ -281,6 +281,9 @@
             this.label38 = new System.Windows.Forms.Label();
             this.resetCB = new System.Windows.Forms.ComboBox();
             this.resetDfltBTN = new System.Windows.Forms.Button();
+            this.label40 = new System.Windows.Forms.Label();
+            this.firmMultButton = new System.Windows.Forms.Button();
+            this.multipleLB = new System.Windows.Forms.ListBox();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -2828,6 +2831,9 @@
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.multipleLB);
+            this.tabPage1.Controls.Add(this.firmMultButton);
+            this.tabPage1.Controls.Add(this.label40);
             this.tabPage1.Controls.Add(this.speedTB);
             this.tabPage1.Controls.Add(this.label14);
             this.tabPage1.Controls.Add(this.moveRightButton);
@@ -2928,11 +2934,11 @@
             // 
             // firmButton
             // 
-            this.firmButton.Location = new System.Drawing.Point(8, 238);
+            this.firmButton.Location = new System.Drawing.Point(8, 266);
             this.firmButton.Name = "firmButton";
-            this.firmButton.Size = new System.Drawing.Size(155, 27);
+            this.firmButton.Size = new System.Drawing.Size(100, 28);
             this.firmButton.TabIndex = 96;
-            this.firmButton.Text = "Download Firmware";
+            this.firmButton.Text = "Single";
             this.firmButton.UseVisualStyleBackColor = true;
             this.firmButton.Click += new System.EventHandler(this.firmButton_Click);
             // 
@@ -3350,6 +3356,39 @@
             this.resetDfltBTN.UseVisualStyleBackColor = true;
             this.resetDfltBTN.Click += new System.EventHandler(this.resetDfltBTN_Click);
             // 
+            // label40
+            // 
+            this.label40.AutoSize = true;
+            this.label40.Location = new System.Drawing.Point(11, 246);
+            this.label40.Name = "label40";
+            this.label40.Size = new System.Drawing.Size(131, 17);
+            this.label40.TabIndex = 102;
+            this.label40.Text = "Download Firmware";
+            // 
+            // firmMultButton
+            // 
+            this.firmMultButton.Enabled = false;
+            this.firmMultButton.Location = new System.Drawing.Point(244, 266);
+            this.firmMultButton.Name = "firmMultButton";
+            this.firmMultButton.Size = new System.Drawing.Size(100, 28);
+            this.firmMultButton.TabIndex = 103;
+            this.firmMultButton.Text = "Multiple";
+            this.toolTip1.SetToolTip(this.firmMultButton, "Please select at least one target.");
+            this.firmMultButton.UseVisualStyleBackColor = true;
+            this.firmMultButton.Click += new System.EventHandler(this.firmMultButton_Click);
+            // 
+            // multipleLB
+            // 
+            this.multipleLB.FormattingEnabled = true;
+            this.multipleLB.ItemHeight = 16;
+            this.multipleLB.Location = new System.Drawing.Point(118, 266);
+            this.multipleLB.Name = "multipleLB";
+            this.multipleLB.SelectionMode = System.Windows.Forms.SelectionMode.MultiExtended;
+            this.multipleLB.Size = new System.Drawing.Size(120, 68);
+            this.multipleLB.Sorted = true;
+            this.multipleLB.TabIndex = 105;
+            this.multipleLB.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -3675,6 +3714,9 @@
         private System.Windows.Forms.Button resetDfltBTN;
         private System.Windows.Forms.ComboBox resetCB;
         private System.Windows.Forms.Label label38;
+        private System.Windows.Forms.Button firmMultButton;
+        private System.Windows.Forms.Label label40;
+        private System.Windows.Forms.ListBox multipleLB;
     }
 }
 

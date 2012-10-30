@@ -57,6 +57,7 @@ namespace pmaGUI
                                {
                                    errorLBL.Text = "Available Targets";
                                    targetCB.Items.Add(possibleIP);
+                                   multipleLB.Items.Add(possibleIP);
                                    targetCB.Sorted = true;
                                }
                            }
@@ -158,6 +159,7 @@ namespace pmaGUI
                 disconnect();               
                 targetCB.Text = "";
                 targetCB.Items.Clear();
+                multipleLB.Items.Clear();
             }
         }
 
@@ -188,6 +190,7 @@ namespace pmaGUI
                 //timer1.Start();                
                 targetCB.Items.Clear();
                 targetCB.Text = "";
+                multipleLB.Items.Clear();
             }
         }
 
@@ -1073,6 +1076,7 @@ namespace pmaGUI
                     errorLBL.Text = "Available Targets";
                     targetCB.Items.Add(message);
                     targetCB.Sorted = true;
+                    multipleLB.Items.Add(message);
                 }
             }
         }
@@ -2670,6 +2674,7 @@ namespace pmaGUI
         private void clear_button_Click(object sender, EventArgs e)
         {
            targetCB.Items.Clear();
+           multipleLB.Items.Clear();
         }
 
         private void VersionViewButton_Click(object sender, EventArgs e)
@@ -2725,6 +2730,7 @@ namespace pmaGUI
                     disconnect();
                     targetCB.Text = "";
                     targetCB.Items.Clear();
+                    multipleLB.Items.Clear();
                 }
             }
             
@@ -3220,6 +3226,70 @@ namespace pmaGUI
                     break;
                 default:
                     break;
+            }
+        }
+
+        private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // Enables the Multiple button when at least one target is selected
+            firmMultButton.Enabled = true;
+        }
+
+        private void firmMultButton_Click(object sender, EventArgs e)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo();
+            OpenFileDialog fileDialog = new OpenFileDialog();
+            OpenFileDialog openDialog = new OpenFileDialog();
+
+            // Grab the file info
+            if (openDialog.ShowDialog() == DialogResult.OK)
+            {
+                String batFile = ".\\atifirmwarecopyall.bat";
+
+                // Get Selected IPs
+                psi.FileName = batFile;
+                String shellFile = openDialog.SafeFileName;
+                psi.Arguments = machine + " " + openDialog.FileName + " " + shellFile + " root shoot";
+                string arguments = openDialog.FileName + " " + shellFile + " root shoot ";
+                for (int i = 0; i < multipleLB.SelectedItems.Count; i++)
+			    {
+			        arguments += multipleLB.SelectedItems[i] + " ";
+			    }
+                psi.Arguments = arguments;
+
+                // Hides the console window that would pop up
+                //psi.WindowStyle = ProcessWindowStyle.Hidden;
+
+                // Create new process and set the starting information
+                Process p = new Process();
+                p.StartInfo = psi;
+
+                // Lets you know when the process has been completed
+                p.EnableRaisingEvents = true;
+                p.Start();
+
+                // Wait until the process has completed
+                while (!p.HasExited)
+                {
+                    System.Threading.Thread.Sleep(1000);
+                }
+                // Check to see what the exit code was
+                if (p.ExitCode != 0)
+                {
+                    Console.WriteLine("There was an error with the file.");
+                }
+                else
+                {
+                    targetCB.Text = "";
+                    targetCB.Items.Clear();
+                    multipleLB.Items.Clear();
+                    setVersion();
+                    // Only disconnect if you were connected to a target in the first place
+                    if (machine != "")
+                    {
+                        disconnect();
+                    }
+                }
             }
         }
         
