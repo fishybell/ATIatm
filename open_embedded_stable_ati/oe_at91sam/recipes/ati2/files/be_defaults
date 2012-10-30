@@ -1,0 +1,12 @@
+#!/bin/sh
+#This script will reset all the defaults
+
+#Set Dock Default
+dck=0
+size=$(echo $dck | wc -c)
+echo -n $dck | /usr/bin/eeprom_rw write -addr 0x55C -size $size -blank 0x03
+
+#Set Static IP Address Default
+ip_address=0.0.0.0
+size=$(echo $ip_address | wc -c)
+echo -n $ip_address | /usr/bin/eeprom_rw write -addr 0x578 -size $size -blank 0x1F
