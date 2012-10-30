@@ -1,0 +1,16 @@
+Radio Frequency=405.00
+Radio Power Low=1
+Radio Power High=25
+Dock=0
+Home=0
+Reverse=0
+Track Length=5
+Communication=network
+Listen Port=4000
+Connect Port=4000
+SmartRange IP=192.168.1.1
+Static IP=0.0.0.0
+Fall Parameters=1 0
+Bob Type=1
+Hit Sensor=0 0
+Hit Calibration=100 4 7 4

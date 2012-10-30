@@ -15,6 +15,12 @@
     {
         "Entry"
         {
+        "MsmKey" = "8:_129751EE9183451B86A530903130CB02"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_23C6BFF8CCD349C2B9F89AFD1A1BCFF8"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -216,6 +222,26 @@
         }
         "File"
         {
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_129751EE9183451B86A530903130CB02"
+            {
+            "SourcePath" = "8:defaults.txt"
+            "TargetName" = "8:defaults.txt"
+            "Tag" = "8:"
+            "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_669D9AF7CE1D441982289A1A2DEF5DF1"
             {
             "SourcePath" = "8:radiotest.bat"
@@ -373,7 +399,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:PMA"
         "ProductCode" = "8:{65FAD869-F0BC-4DF8-98C9-1B9E3A6AA168}"
-        "PackageCode" = "8:{0AF95473-8CC3-4731-AB62-FBA725D9FFF9}"
+        "PackageCode" = "8:{9993B06E-6800-4C34-9440-EF031F51734E}"
         "UpgradeCode" = "8:{F2195914-ABD7-48EC-9F47-962C60BD4A08}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
@@ -908,7 +934,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_23C6BFF8CCD349C2B9F89AFD1A1BCFF8"
             {
-            "SourcePath" = "8:..\\pmaGUI\\obj\\x86\\Release\\pmaGUI.exe"
+            "SourcePath" = "8:..\\pmaGUI\\obj\\x86\\Debug\\pmaGUI.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
