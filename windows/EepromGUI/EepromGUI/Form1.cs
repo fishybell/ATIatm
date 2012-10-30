@@ -2216,339 +2216,9 @@ namespace pmaGUI
                     String type = c.Name;
                     String textValue = c.Text;
                     c.ForeColor = SystemColors.WindowText;
-                    switch (type)
-                    {
-                        case "sitBTB":
-                            batDefaults(1, textValue);
-                            break;
-                        case "satBTB": 
-                            batDefaults(2, textValue);
-                            break;
-                        case "sesBTB":
-                            batDefaults(3, textValue);
-                            break;
-                        case "mitBTB":
-                            batDefaults(4, textValue);
-                            break;
-                        case "matBTB":
-                            batDefaults(5, textValue);
-                            break;
-                        case "revCB":
-                            batDefaults(6, Convert.ToString(revCB.SelectedIndex));
-                            break;
-                        case "DockDCB":
-                            dockDefault(DockDCB.SelectedIndex);
-                            break;
-                        case "HomeDCB":
-                            homeDefault(HomeDCB.SelectedIndex);
-                            break;
-                        case "serialDTB":
-                            serialDefault(textValue);
-                            break;
-                        case "addressDTB":
-                            addressDefault(textValue);
-                            break;
-                        case "lengthDTB":
-                            lengthDefault(textValue);
-                            break;
-                        case "freqTB":
-                            freqDefault(textValue);
-                            break;
-                        case "lpTB":
-                            lpDefault(textValue);
-                            break;
-                        case "hpTB":
-                            hpDefault(textValue);
-                            break;
-                        case "radioCheck":
-                            programDefault(radioCheck.Checked);
-                            break;
-                        case "fallDTB":
-                            fallDefault(textValue, fallDCB.SelectedIndex);
-                            break;
-                        case "fallDCB":
-                            fallDefault(fallDTB.Text, fallDCB.SelectedIndex);
-                            break;
-                        case "bobDCB":
-                            bobDefault(bobDCB.SelectedIndex);
-                            break;
-                        case "sensorDCB":
-                            sensorDefault(sensorDCB.SelectedIndex, sensorD2CB.SelectedIndex);
-                            break;
-                        case "sensorD2CB":
-                            sensorDefault(sensorDCB.SelectedIndex, sensorD2CB.SelectedIndex);
-                            break;
-                        case "hitcDTB1":
-                            calDefault(textValue, hitcDTB2.Text, hitcDTB3.Text, hitcCB4.SelectedIndex);
-                            break;
-                        case "hitcDTB2":
-                            calDefault(hitcDTB1.Text, textValue, hitcDTB3.Text, hitcCB4.SelectedIndex);
-                            break;
-                        case "hitcDTB3":
-                            calDefault(hitcDTB1.Text, hitcDTB2.Text, textValue, hitcCB4.SelectedIndex);
-                            break;
-                        case "hitcCB4":
-                            calDefault(hitcDTB1.Text, hitcDTB2.Text, hitcDTB3.Text, hitcCB4.SelectedIndex);
-                            break;
-                        case "mfsCheck":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mfsCB1":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mfsCB2":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mfsCB3":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mfsCB4":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mfsTB1":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mfsTB2":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mfsTB3":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mfsTB4":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mfsTB5":
-                            mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
-                                mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mglCheck":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mfsTB6.Text);
-                            break;
-                        case "mglCB1":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
-                            break;
-                        case "mglCB2":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
-                            break;
-                        case "mglCB3":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
-                            break;
-                        case "mglCB4":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
-                            break;
-                        case "mglTB1":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
-                            break;
-                        case "mglTB2":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
-                            break;
-                        case "mglTB3":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
-                            break;
-                        case "mglTB4":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
-                            break;
-                        case "mglTB5":
-                            mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
-                                mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
-                            break;
-                        case "phiCheck":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "phiCB1":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "phiCB2":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "phiCB3":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "phiCB4":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "phiTB1":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "phiTB2":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "phiTB3":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "phiTB4":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "phiTB5":
-                            phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
-                                phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
-                            break;
-                        case "smkCheck":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "smkCB1":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "smkCB2":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "smkCB3":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "smkCB4":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "smkTB1":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "smkTB2":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "smkTB3":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "smkTB4":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "smkTB5":
-                            smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
-                                smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
-                            break;
-                        case "thmCheck":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmCB1":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmCB2":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmCB3":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmCB4":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmTB1":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmTB2":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmTB3":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmTB4":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmTB5":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "thmTB6":
-                            thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
-                                thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
-                            break;
-                        case "msdCheck":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdCB1":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdCB2":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdCB3":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdCB4":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdTB1":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdTB2":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdTB3":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdTB4":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdTB5":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdTB6":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdTB7":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        case "msdTB8":
-                            msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
-                                msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
-                            break;
-                        default:
-                            break;
-                    }
+                    // Find what default to call
+                    callDefault(type, textValue);
+                    
                 }
                 changedList.Clear();
             }
@@ -2790,6 +2460,10 @@ namespace pmaGUI
             {
                 conn.sendMessage("I U " + frequency);
                 logSent("I U " + frequency);
+
+                // Set the radio checked button
+                radioCheck.Checked = true;
+                programDefault(radioCheck.Checked);
             }
         }
 
@@ -2802,6 +2476,10 @@ namespace pmaGUI
             {
                 conn.sendMessage("I V " + low_power);
                 logSent("I V " + low_power);
+
+                // Set the radio checked button
+                radioCheck.Checked = true;
+                programDefault(radioCheck.Checked);
             }
         }
 
@@ -2814,6 +2492,10 @@ namespace pmaGUI
             {
                 conn.sendMessage("I W " + high_power);
                 logSent("I W " + high_power);
+
+                // Set the radio checked button
+                radioCheck.Checked = true;
+                programDefault(radioCheck.Checked);
             }
         }
 
@@ -3121,6 +2803,423 @@ namespace pmaGUI
                     }
                 }
                 settingsList.Clear();
+            }
+        }
+
+        private void resetDfltBTN_Click(object sender, EventArgs e)
+        {
+            // Find the value in the selected dropdown and use that to parse the file
+            string selected = (String)resetCB.SelectedItem;
+            TextReader tr = new StreamReader(".\\defaults.txt");
+
+            if (selected == "All")
+            {
+                string line = tr.ReadLine();
+                while (line != null)
+                {
+                    int firstIndex = line.IndexOf('=') + 1;
+                    int secondIndex = line.Length;
+                    string thisDefault = line.Substring(firstIndex, secondIndex - firstIndex);
+
+                    // Find what default to call
+                    string control = line.Substring(0, firstIndex - 1);
+                    callDefault(control, thisDefault);
+                    line = tr.ReadLine();
+                }
+                tr.Close();
+            }
+            else
+            {
+                // Parse file for selected default
+                string defaultInfo = tr.ReadToEnd();
+                int firstIndex = defaultInfo.IndexOf(selected + "=") + selected.Length + 1;
+                int secondIndex = defaultInfo.IndexOf('\r', firstIndex);
+                if (secondIndex < 0)
+                {
+                    secondIndex = defaultInfo.Length;
+                }
+                string thisDefault = defaultInfo.Substring(firstIndex, secondIndex - firstIndex);
+                tr.Close();
+
+                // Find what default to call
+                callDefault(selected, thisDefault);
+            }
+
+            // Change the reboot appearance because it needs to be clicked for
+            // the changes to take effect.
+            rebootButton.ForeColor = SystemColors.HotTrack;
+            rebootButton.Font = new Font(rebootButton.Font, FontStyle.Bold);
+        }
+
+        private void callDefault(string control, string textValue)
+        {
+            switch (control)
+            {
+                case "sitBTB":
+                    batDefaults(1, textValue);
+                    break;
+                case "satBTB":
+                    batDefaults(2, textValue);
+                    break;
+                case "sesBTB":
+                    batDefaults(3, textValue);
+                    break;
+                case "mitBTB":
+                    batDefaults(4, textValue);
+                    break;
+                case "matBTB":
+                    batDefaults(5, textValue);
+                    break;
+                case "Reverse":
+                case "revCB":
+                    batDefaults(6, Convert.ToString(revCB.SelectedIndex));
+                    break;
+                case "Dock":
+                case "DockDCB":
+                    dockDefault(DockDCB.SelectedIndex);
+                    break;
+                case "Home":
+                case "HomeDCB":
+                    homeDefault(HomeDCB.SelectedIndex);
+                    break;
+                case "serialDTB":
+                    serialDefault(textValue);
+                    break;
+                case "addressDTB":
+                    addressDefault(textValue);
+                    break;
+                case "Track Length":
+                case "lengthDTB":
+                    lengthDefault(textValue);
+                    break;
+                case "Radio Frequency":
+                case "freqTB":
+                    freqDefault(textValue);
+                    break;
+                case "Radio Power Low":
+                case "lpTB":
+                    lpDefault(textValue);
+                    break;
+                case "Radio Power High":
+                case "hpTB":
+                    hpDefault(textValue);
+                    break;
+                case "radioCheck":
+                    programDefault(radioCheck.Checked);
+                    break;
+                case "Fall Parameters":
+                    fallDefault(textValue.Substring(0, 1), Convert.ToInt32(textValue.Substring(2, 1)));
+                    break;
+                case "fallDTB":
+                    fallDefault(textValue, fallDCB.SelectedIndex);
+                    break;
+                case "fallDCB":
+                    fallDefault(fallDTB.Text, fallDCB.SelectedIndex);
+                    break;
+                case "Bob Type":
+                    bobDefault(Convert.ToInt32(textValue));
+                    break;
+                case "bobDCB":
+                    bobDefault(bobDCB.SelectedIndex);
+                    break;
+                case "Hit Sensor":
+                    sensorDefault(Convert.ToInt32(textValue.Substring(0, 1)), Convert.ToInt32(textValue.Substring(2, 1)));
+                    break;
+                case "sensorDCB":
+                    sensorDefault(sensorDCB.SelectedIndex, sensorD2CB.SelectedIndex);
+                    break;
+                case "sensorD2CB":
+                    sensorDefault(sensorDCB.SelectedIndex, sensorD2CB.SelectedIndex);
+                    break;
+                case "Hit Calibration":
+                    string[] cal = textValue.Split(' ');
+                    calDefault(cal[0], cal[1], cal[2], Convert.ToInt32(cal[3]));
+                    break;
+                case "hitcDTB1":
+                    calDefault(textValue, hitcDTB2.Text, hitcDTB3.Text, hitcCB4.SelectedIndex);
+                    break;
+                case "hitcDTB2":
+                    calDefault(hitcDTB1.Text, textValue, hitcDTB3.Text, hitcCB4.SelectedIndex);
+                    break;
+                case "hitcDTB3":
+                    calDefault(hitcDTB1.Text, hitcDTB2.Text, textValue, hitcCB4.SelectedIndex);
+                    break;
+                case "hitcCB4":
+                    calDefault(hitcDTB1.Text, hitcDTB2.Text, hitcDTB3.Text, hitcCB4.SelectedIndex);
+                    break;
+                case "mfsCheck":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mfsCB1":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mfsCB2":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mfsCB3":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mfsCB4":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mfsTB1":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mfsTB2":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mfsTB3":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mfsTB4":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mfsTB5":
+                    mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
+                        mfsCB4.SelectedIndex, mfsTB1.Text, mfsTB2.Text, mfsTB3.Text, mfsTB4.Text, mfsTB5.Text, mfsTB6.Text);
+                    break;
+                case "mglCheck":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mfsTB6.Text);
+                    break;
+                case "mglCB1":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
+                    break;
+                case "mglCB2":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
+                    break;
+                case "mglCB3":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
+                    break;
+                case "mglCB4":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
+                    break;
+                case "mglTB1":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
+                    break;
+                case "mglTB2":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
+                    break;
+                case "mglTB3":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
+                    break;
+                case "mglTB4":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
+                    break;
+                case "mglTB5":
+                    mglDefault(mglCheck.Checked, mglCB1.SelectedIndex, mglCB2.SelectedIndex, mglCB3.SelectedIndex,
+                        mglCB4.SelectedIndex, mglTB1.Text, mglTB2.Text, mglTB3.Text, mglTB4.Text, mglTB5.Text, mglTB6.Text);
+                    break;
+                case "phiCheck":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "phiCB1":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "phiCB2":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "phiCB3":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "phiCB4":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "phiTB1":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "phiTB2":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "phiTB3":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "phiTB4":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "phiTB5":
+                    phiDefault(phiCheck.Checked, phiCB1.SelectedIndex, phiCB2.SelectedIndex, phiCB3.SelectedIndex,
+                        phiCB4.SelectedIndex, phiTB1.Text, phiTB2.Text, phiTB3.Text, phiTB4.Text, phiTB5.Text, phiTB6.Text);
+                    break;
+                case "smkCheck":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "smkCB1":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "smkCB2":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "smkCB3":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "smkCB4":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "smkTB1":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "smkTB2":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "smkTB3":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "smkTB4":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "smkTB5":
+                    smkDefault(smkCheck.Checked, smkCB1.SelectedIndex, smkCB2.SelectedIndex, smkCB3.SelectedIndex,
+                        smkCB4.SelectedIndex, smkTB1.Text, smkTB2.Text, smkTB3.Text, smkTB4.Text, smkTB5.Text, smkTB6.Text);
+                    break;
+                case "thmCheck":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmCB1":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmCB2":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmCB3":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmCB4":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmTB1":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmTB2":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmTB3":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmTB4":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmTB5":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "thmTB6":
+                    thmDefault(thmCheck.Checked, thmCB1.SelectedIndex, thmCB2.SelectedIndex, thmCB3.SelectedIndex,
+                        thmCB4.SelectedIndex, thmTB1.Text, thmTB2.Text, thmTB3.Text, thmTB4.Text, thmTB5.Text, thmTB6.Text);
+                    break;
+                case "msdCheck":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdCB1":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdCB2":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdCB3":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdCB4":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdTB1":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdTB2":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdTB3":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdTB4":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdTB5":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdTB6":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdTB7":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "msdTB8":
+                    msdDefault(msdCheck.Checked, msdCB1.SelectedIndex, msdCB2.SelectedIndex, msdCB3.SelectedIndex,
+                        msdCB4.SelectedIndex, msdTB1.Text, msdTB2.Text, msdTB3.Text, msdTB4.Text, msdTB5.Text, msdTB6.Text, msdTB7.Text, msdTB8.Text);
+                    break;
+                case "Communication":
+                    commDefaults(textValue);
+                    break;
+                case "Listen Port":
+                    listenDefaults(textValue);
+                    break;
+                case "Connect Port":
+                    connDefaults(textValue);
+                    break;
+                case "SmartRange IP":
+                    ipDefaults(textValue);
+                    break;
+                case "Static IP":
+                    staticDefaults(textValue);
+                    break;
+                default:
+                    break;
             }
         }
         

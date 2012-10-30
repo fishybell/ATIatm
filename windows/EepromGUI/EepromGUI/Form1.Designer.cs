@@ -214,6 +214,8 @@
             this.accCB0 = new System.Windows.Forms.ComboBox();
             this.label20 = new System.Windows.Forms.Label();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.staticTB = new System.Windows.Forms.TextBox();
+            this.label36 = new System.Windows.Forms.Label();
             this.setSettingsBTN = new System.Windows.Forms.Button();
             this.showSettingsBTN = new System.Windows.Forms.Button();
             this.passwordPanel = new System.Windows.Forms.Panel();
@@ -276,8 +278,9 @@
             this.stopButton = new System.Windows.Forms.Button();
             this.rebootButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
-            this.staticTB = new System.Windows.Forms.TextBox();
-            this.label36 = new System.Windows.Forms.Label();
+            this.label38 = new System.Windows.Forms.Label();
+            this.resetCB = new System.Windows.Forms.ComboBox();
+            this.resetDfltBTN = new System.Windows.Forms.Button();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -448,7 +451,7 @@
             this.hitcCB4.Location = new System.Drawing.Point(317, 96);
             this.hitcCB4.Margin = new System.Windows.Forms.Padding(4);
             this.hitcCB4.Name = "hitcCB4";
-            this.hitcCB4.Size = new System.Drawing.Size(132, 24);
+            this.hitcCB4.Size = new System.Drawing.Size(154, 24);
             this.hitcCB4.TabIndex = 104;
             this.toolTip1.SetToolTip(this.hitcCB4, "Enable on value");
             this.hitcCB4.Click += new System.EventHandler(this.hitcCB4_Click);
@@ -1622,7 +1625,7 @@
             // versionLBL
             // 
             this.versionLBL.AutoSize = true;
-            this.versionLBL.Location = new System.Drawing.Point(86, 436);
+            this.versionLBL.Location = new System.Drawing.Point(86, 470);
             this.versionLBL.Name = "versionLBL";
             this.versionLBL.Size = new System.Drawing.Size(0, 17);
             this.versionLBL.TabIndex = 5;
@@ -1630,7 +1633,7 @@
             // version2LBL
             // 
             this.version2LBL.AutoSize = true;
-            this.version2LBL.Location = new System.Drawing.Point(176, 437);
+            this.version2LBL.Location = new System.Drawing.Point(176, 471);
             this.version2LBL.Name = "version2LBL";
             this.version2LBL.Size = new System.Drawing.Size(0, 17);
             this.version2LBL.TabIndex = 6;
@@ -1638,7 +1641,7 @@
             // label41
             // 
             this.label41.AutoSize = true;
-            this.label41.Location = new System.Drawing.Point(24, 436);
+            this.label41.Location = new System.Drawing.Point(24, 470);
             this.label41.Name = "label41";
             this.label41.Size = new System.Drawing.Size(60, 17);
             this.label41.TabIndex = 104;
@@ -1668,6 +1671,9 @@
             // 
             // tabPage3
             // 
+            this.tabPage3.Controls.Add(this.resetDfltBTN);
+            this.tabPage3.Controls.Add(this.resetCB);
+            this.tabPage3.Controls.Add(this.label38);
             this.tabPage3.Controls.Add(this.bobDCB);
             this.tabPage3.Controls.Add(this.groupBox2);
             this.tabPage3.Controls.Add(this.batDSetButton);
@@ -1693,7 +1699,7 @@
             this.tabPage3.Margin = new System.Windows.Forms.Padding(4);
             this.tabPage3.Name = "tabPage3";
             this.tabPage3.Padding = new System.Windows.Forms.Padding(4);
-            this.tabPage3.Size = new System.Drawing.Size(841, 319);
+            this.tabPage3.Size = new System.Drawing.Size(841, 353);
             this.tabPage3.TabIndex = 4;
             this.tabPage3.Text = "Defaults";
             this.tabPage3.UseVisualStyleBackColor = true;
@@ -2247,7 +2253,7 @@
             // label28
             // 
             this.label28.AutoSize = true;
-            this.label28.Location = new System.Drawing.Point(15, 106);
+            this.label28.Location = new System.Drawing.Point(13, 101);
             this.label28.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label28.Name = "label28";
             this.label28.Size = new System.Drawing.Size(96, 17);
@@ -2267,7 +2273,7 @@
             // label27
             // 
             this.label27.AutoSize = true;
-            this.label27.Location = new System.Drawing.Point(13, 74);
+            this.label27.Location = new System.Drawing.Point(13, 70);
             this.label27.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label27.Name = "label27";
             this.label27.Size = new System.Drawing.Size(74, 17);
@@ -2334,7 +2340,7 @@
             this.paramTab.Margin = new System.Windows.Forms.Padding(4);
             this.paramTab.Name = "paramTab";
             this.paramTab.Padding = new System.Windows.Forms.Padding(4);
-            this.paramTab.Size = new System.Drawing.Size(841, 319);
+            this.paramTab.Size = new System.Drawing.Size(841, 353);
             this.paramTab.TabIndex = 2;
             this.paramTab.Text = "Parameters";
             this.paramTab.UseVisualStyleBackColor = true;
@@ -2576,10 +2582,29 @@
             this.tabPage2.Margin = new System.Windows.Forms.Padding(4);
             this.tabPage2.Name = "tabPage2";
             this.tabPage2.Padding = new System.Windows.Forms.Padding(4);
-            this.tabPage2.Size = new System.Drawing.Size(841, 319);
+            this.tabPage2.Size = new System.Drawing.Size(841, 353);
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Settings";
             this.tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // staticTB
+            // 
+            this.staticTB.Location = new System.Drawing.Point(123, 244);
+            this.staticTB.Margin = new System.Windows.Forms.Padding(4);
+            this.staticTB.Name = "staticTB";
+            this.staticTB.Size = new System.Drawing.Size(132, 22);
+            this.staticTB.TabIndex = 50;
+            this.staticTB.Click += new System.EventHandler(this.staticTB_Click);
+            // 
+            // label36
+            // 
+            this.label36.AutoSize = true;
+            this.label36.Location = new System.Drawing.Point(21, 252);
+            this.label36.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label36.Name = "label36";
+            this.label36.Size = new System.Drawing.Size(59, 17);
+            this.label36.TabIndex = 49;
+            this.label36.Text = "Static IP";
             // 
             // setSettingsBTN
             // 
@@ -2847,7 +2872,7 @@
             this.tabPage1.Margin = new System.Windows.Forms.Padding(4);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(4);
-            this.tabPage1.Size = new System.Drawing.Size(841, 319);
+            this.tabPage1.Size = new System.Drawing.Size(841, 353);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Manipulate";
             this.tabPage1.UseVisualStyleBackColor = true;
@@ -3276,33 +3301,60 @@
             this.tabControl1.Margin = new System.Windows.Forms.Padding(4);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(849, 348);
+            this.tabControl1.Size = new System.Drawing.Size(849, 382);
             this.tabControl1.TabIndex = 93;
             // 
-            // staticTB
+            // label38
             // 
-            this.staticTB.Location = new System.Drawing.Point(123, 244);
-            this.staticTB.Margin = new System.Windows.Forms.Padding(4);
-            this.staticTB.Name = "staticTB";
-            this.staticTB.Size = new System.Drawing.Size(132, 22);
-            this.staticTB.TabIndex = 50;
-            this.staticTB.Click += new System.EventHandler(this.staticTB_Click);
+            this.label38.AutoSize = true;
+            this.label38.Location = new System.Drawing.Point(16, 324);
+            this.label38.Name = "label38";
+            this.label38.Size = new System.Drawing.Size(101, 17);
+            this.label38.TabIndex = 118;
+            this.label38.Text = "Reset Defaults";
             // 
-            // label36
+            // resetCB
             // 
-            this.label36.AutoSize = true;
-            this.label36.Location = new System.Drawing.Point(21, 252);
-            this.label36.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.label36.Name = "label36";
-            this.label36.Size = new System.Drawing.Size(59, 17);
-            this.label36.TabIndex = 49;
-            this.label36.Text = "Static IP";
+            this.resetCB.FormattingEnabled = true;
+            this.resetCB.Items.AddRange(new object[] {
+            "All",
+            "Radio Frequency",
+            "Radio Power Low",
+            "Radio Power High",
+            "Dock",
+            "Home",
+            "Reverse",
+            "Track Length",
+            "Communication",
+            "Listen Port",
+            "Connect Port",
+            "SmartRange IP",
+            "Static IP",
+            "Fall Parameters",
+            "Bob Type",
+            "Hit Sensor",
+            "Hit Calibration"});
+            this.resetCB.Location = new System.Drawing.Point(120, 319);
+            this.resetCB.Name = "resetCB";
+            this.resetCB.Size = new System.Drawing.Size(121, 24);
+            this.resetCB.TabIndex = 119;
+            this.resetCB.Text = "All";
+            // 
+            // resetDfltBTN
+            // 
+            this.resetDfltBTN.Location = new System.Drawing.Point(254, 316);
+            this.resetDfltBTN.Name = "resetDfltBTN";
+            this.resetDfltBTN.Size = new System.Drawing.Size(100, 28);
+            this.resetDfltBTN.TabIndex = 120;
+            this.resetDfltBTN.Text = "Reset";
+            this.resetDfltBTN.UseVisualStyleBackColor = true;
+            this.resetDfltBTN.Click += new System.EventHandler(this.resetDfltBTN_Click);
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(881, 457);
+            this.ClientSize = new System.Drawing.Size(881, 497);
             this.Controls.Add(this.version2LBL);
             this.Controls.Add(this.label41);
             this.Controls.Add(this.versionLBL);
@@ -3620,6 +3672,9 @@
         private System.Windows.Forms.Button setSettingsBTN;
         private System.Windows.Forms.TextBox staticTB;
         private System.Windows.Forms.Label label36;
+        private System.Windows.Forms.Button resetDfltBTN;
+        private System.Windows.Forms.ComboBox resetCB;
+        private System.Windows.Forms.Label label38;
     }
 }
 
