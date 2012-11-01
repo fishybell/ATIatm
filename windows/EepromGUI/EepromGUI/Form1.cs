@@ -59,6 +59,7 @@ namespace pmaGUI
                                    targetCB.Items.Add(possibleIP);
                                    multipleLB.Items.Add(possibleIP);
                                    targetCB.Sorted = true;
+                                   rebootAllBTN.Enabled = true;
                                }
                            }
                        }
@@ -191,6 +192,11 @@ namespace pmaGUI
                 targetCB.Items.Clear();
                 targetCB.Text = "";
                 multipleLB.Items.Clear();
+
+                // Change the 'Refresh Button' appearance because it needs to be clicked for
+                // the changes to take effect.
+                clear_button.ForeColor = SystemColors.HotTrack;
+                clear_button.Font = new Font(rebootButton.Font, FontStyle.Bold);
             }
         }
 
@@ -2673,6 +2679,9 @@ namespace pmaGUI
 
         private void clear_button_Click(object sender, EventArgs e)
         {
+           // Change reboot font back to normal
+           clear_button.ForeColor = SystemColors.ControlText;
+           clear_button.Font = new Font(rebootButton.Font, FontStyle.Regular);
            targetCB.Items.Clear();
            multipleLB.Items.Clear();
         }
@@ -3290,6 +3299,54 @@ namespace pmaGUI
                         disconnect();
                     }
                 }
+            }
+        }
+
+        private void rebootAllBTN_Click(object sender, EventArgs e)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "rebootall.bat";
+            string arguments = " root shoot ";
+            for (int i = 0; i < multipleLB.Items.Count; i++)
+            {
+                arguments += multipleLB.Items[i] + " ";
+            }
+            psi.Arguments = arguments;
+
+            // Create new process and set the starting information
+            Process p = new Process();
+            p.StartInfo = psi;
+
+            // Lets you know when the process has been completed
+            p.EnableRaisingEvents = true;
+            p.Start();
+
+            // Wait until the process has completed
+            while (!p.HasExited)
+            {
+                System.Threading.Thread.Sleep(1000);
+            }
+            // Check to see what the exit code was
+            if (p.ExitCode != 0)
+            {
+                Console.WriteLine("There was an error with the file.");
+            }
+            else
+            {
+                // Change the 'Refresh Button' appearance because it needs to be clicked for
+                // the changes to take effect.
+                clear_button.ForeColor = SystemColors.HotTrack;
+                clear_button.Font = new Font(rebootButton.Font, FontStyle.Bold);
+
+                // Only disconnect if you were connected to a target in the first place
+                if (machine != "")
+                {
+                    rebootingMachine = machine;
+                    disconnect();
+                }
+                targetCB.Text = "";
+                targetCB.Items.Clear();
+                multipleLB.Items.Clear();
             }
         }
         

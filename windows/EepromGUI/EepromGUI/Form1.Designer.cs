@@ -129,6 +129,7 @@
             this.accTB8 = new System.Windows.Forms.TextBox();
             this.moveTB = new System.Windows.Forms.TextBox();
             this.lengthDTB = new System.Windows.Forms.TextBox();
+            this.firmMultButton = new System.Windows.Forms.Button();
             this.showAllButton = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
             this.deviceTB = new System.Windows.Forms.TextBox();
@@ -146,6 +147,9 @@
             this.tabPage4 = new System.Windows.Forms.TabPage();
             this.logTB = new System.Windows.Forms.TextBox();
             this.tabPage3 = new System.Windows.Forms.TabPage();
+            this.resetDfltBTN = new System.Windows.Forms.Button();
+            this.resetCB = new System.Windows.Forms.ComboBox();
+            this.label38 = new System.Windows.Forms.Label();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
             this.label19 = new System.Windows.Forms.Label();
             this.revCB = new System.Windows.Forms.ComboBox();
@@ -237,6 +241,9 @@
             this.label11 = new System.Windows.Forms.Label();
             this.label12 = new System.Windows.Forms.Label();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.rebootAllBTN = new System.Windows.Forms.Button();
+            this.multipleLB = new System.Windows.Forms.ListBox();
+            this.label40 = new System.Windows.Forms.Label();
             this.speedTB = new System.Windows.Forms.TextBox();
             this.label14 = new System.Windows.Forms.Label();
             this.moveRightButton = new System.Windows.Forms.Button();
@@ -278,12 +285,6 @@
             this.stopButton = new System.Windows.Forms.Button();
             this.rebootButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
-            this.label38 = new System.Windows.Forms.Label();
-            this.resetCB = new System.Windows.Forms.ComboBox();
-            this.resetDfltBTN = new System.Windows.Forms.Button();
-            this.label40 = new System.Windows.Forms.Label();
-            this.firmMultButton = new System.Windows.Forms.Button();
-            this.multipleLB = new System.Windows.Forms.ListBox();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -1524,6 +1525,18 @@
             this.toolTip1.SetToolTip(this.lengthDTB, "Track Length");
             this.lengthDTB.Click += new System.EventHandler(this.lengthDTB_Click);
             // 
+            // firmMultButton
+            // 
+            this.firmMultButton.Enabled = false;
+            this.firmMultButton.Location = new System.Drawing.Point(244, 266);
+            this.firmMultButton.Name = "firmMultButton";
+            this.firmMultButton.Size = new System.Drawing.Size(100, 28);
+            this.firmMultButton.TabIndex = 103;
+            this.firmMultButton.Text = "Multiple";
+            this.toolTip1.SetToolTip(this.firmMultButton, "Please select at least one target.");
+            this.firmMultButton.UseVisualStyleBackColor = true;
+            this.firmMultButton.Click += new System.EventHandler(this.firmMultButton_Click);
+            // 
             // showAllButton
             // 
             this.showAllButton.Enabled = false;
@@ -1657,7 +1670,7 @@
             this.tabPage4.Margin = new System.Windows.Forms.Padding(4);
             this.tabPage4.Name = "tabPage4";
             this.tabPage4.Padding = new System.Windows.Forms.Padding(4);
-            this.tabPage4.Size = new System.Drawing.Size(841, 319);
+            this.tabPage4.Size = new System.Drawing.Size(841, 353);
             this.tabPage4.TabIndex = 3;
             this.tabPage4.Text = "Logs";
             this.tabPage4.UseVisualStyleBackColor = true;
@@ -1706,6 +1719,52 @@
             this.tabPage3.TabIndex = 4;
             this.tabPage3.Text = "Defaults";
             this.tabPage3.UseVisualStyleBackColor = true;
+            // 
+            // resetDfltBTN
+            // 
+            this.resetDfltBTN.Location = new System.Drawing.Point(254, 316);
+            this.resetDfltBTN.Name = "resetDfltBTN";
+            this.resetDfltBTN.Size = new System.Drawing.Size(100, 28);
+            this.resetDfltBTN.TabIndex = 120;
+            this.resetDfltBTN.Text = "Reset";
+            this.resetDfltBTN.UseVisualStyleBackColor = true;
+            this.resetDfltBTN.Click += new System.EventHandler(this.resetDfltBTN_Click);
+            // 
+            // resetCB
+            // 
+            this.resetCB.FormattingEnabled = true;
+            this.resetCB.Items.AddRange(new object[] {
+            "All",
+            "Radio Frequency",
+            "Radio Power Low",
+            "Radio Power High",
+            "Dock",
+            "Home",
+            "Reverse",
+            "Track Length",
+            "Communication",
+            "Listen Port",
+            "Connect Port",
+            "SmartRange IP",
+            "Static IP",
+            "Fall Parameters",
+            "Bob Type",
+            "Hit Sensor",
+            "Hit Calibration"});
+            this.resetCB.Location = new System.Drawing.Point(120, 319);
+            this.resetCB.Name = "resetCB";
+            this.resetCB.Size = new System.Drawing.Size(121, 24);
+            this.resetCB.TabIndex = 119;
+            this.resetCB.Text = "All";
+            // 
+            // label38
+            // 
+            this.label38.AutoSize = true;
+            this.label38.Location = new System.Drawing.Point(16, 324);
+            this.label38.Name = "label38";
+            this.label38.Size = new System.Drawing.Size(101, 17);
+            this.label38.TabIndex = 118;
+            this.label38.Text = "Reset Defaults";
             // 
             // groupBox2
             // 
@@ -2831,6 +2890,7 @@
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.rebootAllBTN);
             this.tabPage1.Controls.Add(this.multipleLB);
             this.tabPage1.Controls.Add(this.firmMultButton);
             this.tabPage1.Controls.Add(this.label40);
@@ -2882,6 +2942,38 @@
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Manipulate";
             this.tabPage1.UseVisualStyleBackColor = true;
+            // 
+            // rebootAllBTN
+            // 
+            this.rebootAllBTN.Enabled = false;
+            this.rebootAllBTN.Location = new System.Drawing.Point(224, 203);
+            this.rebootAllBTN.Name = "rebootAllBTN";
+            this.rebootAllBTN.Size = new System.Drawing.Size(100, 28);
+            this.rebootAllBTN.TabIndex = 106;
+            this.rebootAllBTN.Text = "Reboot All";
+            this.rebootAllBTN.UseVisualStyleBackColor = true;
+            this.rebootAllBTN.Click += new System.EventHandler(this.rebootAllBTN_Click);
+            // 
+            // multipleLB
+            // 
+            this.multipleLB.FormattingEnabled = true;
+            this.multipleLB.ItemHeight = 16;
+            this.multipleLB.Location = new System.Drawing.Point(118, 266);
+            this.multipleLB.Name = "multipleLB";
+            this.multipleLB.SelectionMode = System.Windows.Forms.SelectionMode.MultiExtended;
+            this.multipleLB.Size = new System.Drawing.Size(120, 68);
+            this.multipleLB.Sorted = true;
+            this.multipleLB.TabIndex = 105;
+            this.multipleLB.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged);
+            // 
+            // label40
+            // 
+            this.label40.AutoSize = true;
+            this.label40.Location = new System.Drawing.Point(11, 246);
+            this.label40.Name = "label40";
+            this.label40.Size = new System.Drawing.Size(131, 17);
+            this.label40.TabIndex = 102;
+            this.label40.Text = "Download Firmware";
             // 
             // speedTB
             // 
@@ -3310,85 +3402,6 @@
             this.tabControl1.Size = new System.Drawing.Size(849, 382);
             this.tabControl1.TabIndex = 93;
             // 
-            // label38
-            // 
-            this.label38.AutoSize = true;
-            this.label38.Location = new System.Drawing.Point(16, 324);
-            this.label38.Name = "label38";
-            this.label38.Size = new System.Drawing.Size(101, 17);
-            this.label38.TabIndex = 118;
-            this.label38.Text = "Reset Defaults";
-            // 
-            // resetCB
-            // 
-            this.resetCB.FormattingEnabled = true;
-            this.resetCB.Items.AddRange(new object[] {
-            "All",
-            "Radio Frequency",
-            "Radio Power Low",
-            "Radio Power High",
-            "Dock",
-            "Home",
-            "Reverse",
-            "Track Length",
-            "Communication",
-            "Listen Port",
-            "Connect Port",
-            "SmartRange IP",
-            "Static IP",
-            "Fall Parameters",
-            "Bob Type",
-            "Hit Sensor",
-            "Hit Calibration"});
-            this.resetCB.Location = new System.Drawing.Point(120, 319);
-            this.resetCB.Name = "resetCB";
-            this.resetCB.Size = new System.Drawing.Size(121, 24);
-            this.resetCB.TabIndex = 119;
-            this.resetCB.Text = "All";
-            // 
-            // resetDfltBTN
-            // 
-            this.resetDfltBTN.Location = new System.Drawing.Point(254, 316);
-            this.resetDfltBTN.Name = "resetDfltBTN";
-            this.resetDfltBTN.Size = new System.Drawing.Size(100, 28);
-            this.resetDfltBTN.TabIndex = 120;
-            this.resetDfltBTN.Text = "Reset";
-            this.resetDfltBTN.UseVisualStyleBackColor = true;
-            this.resetDfltBTN.Click += new System.EventHandler(this.resetDfltBTN_Click);
-            // 
-            // label40
-            // 
-            this.label40.AutoSize = true;
-            this.label40.Location = new System.Drawing.Point(11, 246);
-            this.label40.Name = "label40";
-            this.label40.Size = new System.Drawing.Size(131, 17);
-            this.label40.TabIndex = 102;
-            this.label40.Text = "Download Firmware";
-            // 
-            // firmMultButton
-            // 
-            this.firmMultButton.Enabled = false;
-            this.firmMultButton.Location = new System.Drawing.Point(244, 266);
-            this.firmMultButton.Name = "firmMultButton";
-            this.firmMultButton.Size = new System.Drawing.Size(100, 28);
-            this.firmMultButton.TabIndex = 103;
-            this.firmMultButton.Text = "Multiple";
-            this.toolTip1.SetToolTip(this.firmMultButton, "Please select at least one target.");
-            this.firmMultButton.UseVisualStyleBackColor = true;
-            this.firmMultButton.Click += new System.EventHandler(this.firmMultButton_Click);
-            // 
-            // multipleLB
-            // 
-            this.multipleLB.FormattingEnabled = true;
-            this.multipleLB.ItemHeight = 16;
-            this.multipleLB.Location = new System.Drawing.Point(118, 266);
-            this.multipleLB.Name = "multipleLB";
-            this.multipleLB.SelectionMode = System.Windows.Forms.SelectionMode.MultiExtended;
-            this.multipleLB.Size = new System.Drawing.Size(120, 68);
-            this.multipleLB.Sorted = true;
-            this.multipleLB.TabIndex = 105;
-            this.multipleLB.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged);
-            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -3717,6 +3730,7 @@
         private System.Windows.Forms.Button firmMultButton;
         private System.Windows.Forms.Label label40;
         private System.Windows.Forms.ListBox multipleLB;
+        private System.Windows.Forms.Button rebootAllBTN;
     }
 }
 
