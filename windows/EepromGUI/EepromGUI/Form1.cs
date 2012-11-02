@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Drawing.Printing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
@@ -20,9 +21,14 @@ namespace pmaGUI
         Eeprom conn;
         Eeprom bconn;
         String boardType = "";
+        String currentMacItem = "";
+        bool macReceived = false;
+        int macIndex = 0;
         List<Control> changedList = new List<Control>();
         List<Control> settingsList = new List<Control>();
         List<String> ipList = new List<String>();
+        List<String> macLines = new List<String>();
+
         //Eeprom listener;
         public delegate void serviceGUIDelegate();
         public Form1()
@@ -60,6 +66,7 @@ namespace pmaGUI
                                    multipleLB.Items.Add(possibleIP);
                                    targetCB.Sorted = true;
                                    rebootAllBTN.Enabled = true;
+                                   generateBTN.Enabled = true;
                                }
                            }
                        }
@@ -68,11 +75,19 @@ namespace pmaGUI
             bconn.StartBroadCastListen();
         }
 
+        /********************************************
+         * A new target was selected
+         * ******************************************/
+        private void targetCB_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            useNewTarget((string)targetCB.SelectedItem);
+        }
+
         /********************************************************
          * The user selected a new device so close the connection and
          * start a new one
          * ******************************************************/
-        private void targetCB_SelectedIndexChanged(object sender, EventArgs e)
+        private bool useNewTarget(string targetIP)
         {
             if (conn != null)
             {
@@ -86,7 +101,7 @@ namespace pmaGUI
             changedList.Clear();
             settingsList.Clear();
             // Make main tcp connection
-            machine = (string)targetCB.SelectedItem;
+            machine = targetIP;
             conn = new Eeprom(
                this,
                delegate(string message, int status)
@@ -104,7 +119,7 @@ namespace pmaGUI
                        }
                    }
                });
-           
+
             if (conn.StartConnection(machine))
             {
                 errorLBL.Text = "";
@@ -113,13 +128,14 @@ namespace pmaGUI
                 setMAC();
                 setVersion();
                 conn.StartProcess(machine);
+                return true;
             }
             else
             {
                 errorLBL.Text = "Can't connect to this target at this time.";
                 conn = null;
+                return false;
             }
-            
         }
 
         private void batGetButton_Click(object sender, EventArgs e)
@@ -157,7 +173,7 @@ namespace pmaGUI
             {
                 conn.sendMessage("K");
                 logSent("K");
-                disconnect();               
+                disconnect();
                 targetCB.Text = "";
                 targetCB.Items.Clear();
                 multipleLB.Items.Clear();
@@ -758,7 +774,8 @@ namespace pmaGUI
          * ***********************************/
         private void disableEnable(String type)
         {
-            switch (type) {
+            switch (type)
+            {
                 case "SES":
                     enableAll();
                     moveShowButton.Enabled = false;
@@ -1106,10 +1123,10 @@ namespace pmaGUI
                     posTB.Text = getMessageValue(message, 2);
                     logSent("A " + getMessageValue(message, 2));
                     break;
-                case 'B':  
+                case 'B':
                     switch (second)
                     {
-                        case 'T':   
+                        case 'T':
                             String knob = getMessageValue(message, 0);
                             String[] knobSplit = knob.Split(' ');
                             if (knobSplit[1] == "KNOB")         // knob information
@@ -1126,7 +1143,7 @@ namespace pmaGUI
                             }
                             else if (knobSplit[1] == "MODE")    // mode information
                             {
-                                String mode = getMessageValue(message, 0); 
+                                String mode = getMessageValue(message, 0);
                                 String[] modeSplit = mode.Split(' ');
                                 modeTB.Text = modeSplit[2];
                             }
@@ -1241,7 +1258,7 @@ namespace pmaGUI
                     }
                     else
                     {
-                        eventCB.SelectedIndex = eventCB.Items.Count-1;
+                        eventCB.SelectedIndex = eventCB.Items.Count - 1;
                     }
                     eventCB.Update();
                     logSent("V " + getMessageValue(message, 2));
@@ -1282,38 +1299,38 @@ namespace pmaGUI
                         case 'E':   // battery/moving defaults
                             String batMov = getMessageValue(message, 4);
                             String[] batMovList = batMov.Split(' ');
-                                switch (batMovList[0])
-	                            {
-                                    case "SIT":
-                                        sitBTB.Text = batMovList[1];
-                                        sitBTB.ForeColor = SystemColors.WindowText;
-                                        break;
-                                    case "SAT":
-                                        satBTB.Text = batMovList[1];
-                                        satBTB.ForeColor = SystemColors.WindowText;
-                                        break;
-                                    case "SES":
-                                        sesBTB.Text = batMovList[1];
-                                        sesBTB.ForeColor = SystemColors.WindowText;
-                                        break;
-                                    case "MIT":
-                                        mitBTB.Text = batMovList[1];
-                                        mitBTB.ForeColor = SystemColors.WindowText;
-                                        break;
-                                    case "MAT":
-                                        matBTB.Text = batMovList[1];
-                                        matBTB.ForeColor = SystemColors.WindowText;
-                                        break;
-                                    case "REVERSE":
-                                        if (batMovList[1].Length == 1)
-                                        {
-                                            revCB.SelectedIndex = Convert.ToInt32(batMovList[1]);
-                                            revCB.ForeColor = SystemColors.WindowText;
-                                        }
-                                        break;
-                                    default:
-                                        break;
-	                            }
+                            switch (batMovList[0])
+                            {
+                                case "SIT":
+                                    sitBTB.Text = batMovList[1];
+                                    sitBTB.ForeColor = SystemColors.WindowText;
+                                    break;
+                                case "SAT":
+                                    satBTB.Text = batMovList[1];
+                                    satBTB.ForeColor = SystemColors.WindowText;
+                                    break;
+                                case "SES":
+                                    sesBTB.Text = batMovList[1];
+                                    sesBTB.ForeColor = SystemColors.WindowText;
+                                    break;
+                                case "MIT":
+                                    mitBTB.Text = batMovList[1];
+                                    mitBTB.ForeColor = SystemColors.WindowText;
+                                    break;
+                                case "MAT":
+                                    matBTB.Text = batMovList[1];
+                                    matBTB.ForeColor = SystemColors.WindowText;
+                                    break;
+                                case "REVERSE":
+                                    if (batMovList[1].Length == 1)
+                                    {
+                                        revCB.SelectedIndex = Convert.ToInt32(batMovList[1]);
+                                        revCB.ForeColor = SystemColors.WindowText;
+                                    }
+                                    break;
+                                default:
+                                    break;
+                            }
                             logSent("I E " + getMessageValue(message, 4));
                             break;
                         case 'F':   // Fall parameter defaults
@@ -1411,6 +1428,7 @@ namespace pmaGUI
                                 macOTB.Text = valid.Substring(12, 5);
                             }
                             logSent("I M " + getMessageValue(message, 4));
+                            macReceived = true;
                             break;
                         case 'N':   // MFS defaults
                             String[] mfsSplit = getMessageValue(message, 4).Split(' ');
@@ -1630,6 +1648,7 @@ namespace pmaGUI
             logTB.ScrollToCaret();
         }
 
+
         /***************************************************
          * Check to see when a reboot is finished by checking
          * the connection.
@@ -1754,7 +1773,7 @@ namespace pmaGUI
         {
             changedList.Add(lengthDTB);
             lengthDTB.ForeColor = SystemColors.HotTrack;
-        } 
+        }
 
         private void DockDCB_Click(object sender, EventArgs e)
         {
@@ -2228,7 +2247,7 @@ namespace pmaGUI
                     c.ForeColor = SystemColors.WindowText;
                     // Find what default to call
                     callDefault(type, textValue);
-                    
+
                 }
                 changedList.Clear();
             }
@@ -2412,10 +2431,12 @@ namespace pmaGUI
         public void programDefault(Boolean state)
         {
             string value = "";
-            if (state == true) 
-            { 
-                value = "Y"; 
-            } else {
+            if (state == true)
+            {
+                value = "Y";
+            }
+            else
+            {
                 value = "N";
             }
             if (conn != null)
@@ -2576,7 +2597,7 @@ namespace pmaGUI
         {
             if (conn != null)
             {
-                conn.sendMessage("I H " + cal1 + " " +  cal2 + " " + cal3 + " " + Convert.ToString(cal4));
+                conn.sendMessage("I H " + cal1 + " " + cal2 + " " + cal3 + " " + Convert.ToString(cal4));
                 logSent("I H " + cal1 + " " + cal2 + " " + cal3 + " " + Convert.ToString(cal4));
             }
         }
@@ -2679,11 +2700,11 @@ namespace pmaGUI
 
         private void clear_button_Click(object sender, EventArgs e)
         {
-           // Change reboot font back to normal
-           clear_button.ForeColor = SystemColors.ControlText;
-           clear_button.Font = new Font(rebootButton.Font, FontStyle.Regular);
-           targetCB.Items.Clear();
-           multipleLB.Items.Clear();
+            // Change reboot font back to normal
+            clear_button.ForeColor = SystemColors.ControlText;
+            clear_button.Font = new Font(rebootButton.Font, FontStyle.Regular);
+            targetCB.Items.Clear();
+            multipleLB.Items.Clear();
         }
 
         private void VersionViewButton_Click(object sender, EventArgs e)
@@ -2702,7 +2723,7 @@ namespace pmaGUI
             ProcessStartInfo psi = new ProcessStartInfo();
             OpenFileDialog fileDialog = new OpenFileDialog();
             OpenFileDialog openDialog = new OpenFileDialog();
-            
+
             // Grab the file info
             if (openDialog.ShowDialog() == DialogResult.OK)
             {
@@ -2742,7 +2763,7 @@ namespace pmaGUI
                     multipleLB.Items.Clear();
                 }
             }
-            
+
 
         }
 
@@ -2807,7 +2828,7 @@ namespace pmaGUI
                         case "connectTB":
                             connDefaults(textValue);
                             break;
-                        case "ipTB": 
+                        case "ipTB":
                             ipDefaults(textValue);
                             break;
                         case "staticTB":
@@ -3261,9 +3282,9 @@ namespace pmaGUI
                 psi.Arguments = machine + " " + openDialog.FileName + " " + shellFile + " root shoot";
                 string arguments = openDialog.FileName + " " + shellFile + " root shoot ";
                 for (int i = 0; i < multipleLB.SelectedItems.Count; i++)
-			    {
-			        arguments += multipleLB.SelectedItems[i] + " ";
-			    }
+                {
+                    arguments += multipleLB.SelectedItems[i] + " ";
+                }
                 psi.Arguments = arguments;
 
                 // Hides the console window that would pop up
@@ -3349,6 +3370,81 @@ namespace pmaGUI
                 multipleLB.Items.Clear();
             }
         }
-        
+
+        /******************************************************
+         * Goes through the targets one by one and gets their
+         * MAC address and adds it to the MAC List tab
+         * ****************************************************/
+        private void generateBTN_Click(object sender, EventArgs e)
+        {
+            string item = "";
+            macLabel.Text = "Generating...";
+            errorLBL.Update();
+            macReceived = false;
+
+            // Start with ip address 0 and then move on everytime a new mac is received
+            if (macIndex < multipleLB.Items.Count)
+            {
+                item = (string)multipleLB.Items[macIndex];
+            }
+            else
+            {
+                macLabel.Text = "";
+                return;
+            }
+            if (useNewTarget(item) && !macListTB.Text.Contains(item))
+            {
+                currentMacItem = item;
+                setMAC();
+
+                // Wait until the new mac has come through
+                macTimer.Start();
+            }
+            else
+            {
+                macIndex++;
+                generateBTN_Click(sender, e);
+            }
+
+        }
+
+        private void macTimer_Tick(object sender, EventArgs e)
+        {
+            if (macReceived)
+            {
+                String thisMac = macOTB.Text;
+                // Send Target's IP and Mac to Mac List box
+                macListTB.AppendText(currentMacItem + " - " + thisMac + "\n");
+                macLines.Add(currentMacItem + " - " + thisMac);
+                macReceived = false;
+                macTimer.Stop();
+                macIndex++;
+                generateBTN_Click(sender, e);
+            }
+        }
+
+        private void clearMACBTN_Click(object sender, EventArgs e)
+        {
+            macListTB.Clear();
+            macLines.Clear();
+        }
+
+        private void SaveBTN_Click(object sender, EventArgs e)
+        {
+            saveFileDialog1.ShowDialog();
+        }
+
+        private void saveFileDialog1_FileOk(object sender, CancelEventArgs e)
+        {
+            // Get filename
+            string name = saveFileDialog1.FileName + ".txt";
+
+            // Add date and time to macLines for the saved file
+            macLines.Insert(0, DateTime.Now + "");
+            macLines.Insert(1, "");
+
+            // Write to the file
+            File.WriteAllLines(name, macLines);           
+        }
     }
 }

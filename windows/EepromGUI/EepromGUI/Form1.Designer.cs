@@ -285,6 +285,14 @@
             this.stopButton = new System.Windows.Forms.Button();
             this.rebootButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
+            this.tabPage6 = new System.Windows.Forms.TabPage();
+            this.SaveBTN = new System.Windows.Forms.Button();
+            this.macLabel = new System.Windows.Forms.Label();
+            this.clearMACBTN = new System.Windows.Forms.Button();
+            this.generateBTN = new System.Windows.Forms.Button();
+            this.macListTB = new System.Windows.Forms.TextBox();
+            this.macTimer = new System.Windows.Forms.Timer(this.components);
+            this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -302,6 +310,7 @@
             this.passwordPanel.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.tabControl1.SuspendLayout();
+            this.tabPage6.SuspendLayout();
             this.SuspendLayout();
             // 
             // label9
@@ -3395,12 +3404,88 @@
             this.tabControl1.Controls.Add(this.paramTab);
             this.tabControl1.Controls.Add(this.tabPage3);
             this.tabControl1.Controls.Add(this.tabPage4);
+            this.tabControl1.Controls.Add(this.tabPage6);
             this.tabControl1.Location = new System.Drawing.Point(16, 85);
             this.tabControl1.Margin = new System.Windows.Forms.Padding(4);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
             this.tabControl1.Size = new System.Drawing.Size(849, 382);
             this.tabControl1.TabIndex = 93;
+            // 
+            // tabPage6
+            // 
+            this.tabPage6.Controls.Add(this.SaveBTN);
+            this.tabPage6.Controls.Add(this.macLabel);
+            this.tabPage6.Controls.Add(this.clearMACBTN);
+            this.tabPage6.Controls.Add(this.generateBTN);
+            this.tabPage6.Controls.Add(this.macListTB);
+            this.tabPage6.Location = new System.Drawing.Point(4, 25);
+            this.tabPage6.Name = "tabPage6";
+            this.tabPage6.Size = new System.Drawing.Size(841, 353);
+            this.tabPage6.TabIndex = 5;
+            this.tabPage6.Text = "MAC List";
+            this.tabPage6.UseVisualStyleBackColor = true;
+            // 
+            // SaveBTN
+            // 
+            this.SaveBTN.Location = new System.Drawing.Point(640, 17);
+            this.SaveBTN.Name = "SaveBTN";
+            this.SaveBTN.Size = new System.Drawing.Size(75, 28);
+            this.SaveBTN.TabIndex = 5;
+            this.SaveBTN.Text = "Save";
+            this.SaveBTN.UseVisualStyleBackColor = true;
+            this.SaveBTN.Click += new System.EventHandler(this.SaveBTN_Click);
+            // 
+            // macLabel
+            // 
+            this.macLabel.AutoSize = true;
+            this.macLabel.Location = new System.Drawing.Point(201, 28);
+            this.macLabel.Name = "macLabel";
+            this.macLabel.Size = new System.Drawing.Size(0, 17);
+            this.macLabel.TabIndex = 4;
+            // 
+            // clearMACBTN
+            // 
+            this.clearMACBTN.Location = new System.Drawing.Point(721, 17);
+            this.clearMACBTN.Name = "clearMACBTN";
+            this.clearMACBTN.Size = new System.Drawing.Size(75, 28);
+            this.clearMACBTN.TabIndex = 3;
+            this.clearMACBTN.Text = "Clear";
+            this.clearMACBTN.UseVisualStyleBackColor = true;
+            this.clearMACBTN.Click += new System.EventHandler(this.clearMACBTN_Click);
+            // 
+            // generateBTN
+            // 
+            this.generateBTN.Enabled = false;
+            this.generateBTN.Location = new System.Drawing.Point(44, 17);
+            this.generateBTN.Name = "generateBTN";
+            this.generateBTN.Size = new System.Drawing.Size(151, 28);
+            this.generateBTN.TabIndex = 2;
+            this.generateBTN.Text = "Generate MAC List";
+            this.generateBTN.UseVisualStyleBackColor = true;
+            this.generateBTN.Click += new System.EventHandler(this.generateBTN_Click);
+            // 
+            // macListTB
+            // 
+            this.macListTB.Location = new System.Drawing.Point(44, 52);
+            this.macListTB.Margin = new System.Windows.Forms.Padding(4);
+            this.macListTB.Multiline = true;
+            this.macListTB.Name = "macListTB";
+            this.macListTB.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
+            this.macListTB.Size = new System.Drawing.Size(752, 249);
+            this.macListTB.TabIndex = 1;
+            // 
+            // macTimer
+            // 
+            this.macTimer.Interval = 1000;
+            this.macTimer.Tick += new System.EventHandler(this.macTimer_Tick);
+            // 
+            // saveFileDialog1
+            // 
+            this.saveFileDialog1.CheckFileExists = true;
+            this.saveFileDialog1.Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*";
+            this.saveFileDialog1.SupportMultiDottedExtensions = true;
+            this.saveFileDialog1.FileOk += new System.ComponentModel.CancelEventHandler(this.saveFileDialog1_FileOk);
             // 
             // Form1
             // 
@@ -3463,6 +3548,8 @@
             this.tabPage1.ResumeLayout(false);
             this.tabPage1.PerformLayout();
             this.tabControl1.ResumeLayout(false);
+            this.tabPage6.ResumeLayout(false);
+            this.tabPage6.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -3731,6 +3818,14 @@
         private System.Windows.Forms.Label label40;
         private System.Windows.Forms.ListBox multipleLB;
         private System.Windows.Forms.Button rebootAllBTN;
+        private System.Windows.Forms.TabPage tabPage6;
+        private System.Windows.Forms.Button generateBTN;
+        private System.Windows.Forms.TextBox macListTB;
+        private System.Windows.Forms.Timer macTimer;
+        private System.Windows.Forms.Button clearMACBTN;
+        private System.Windows.Forms.Label macLabel;
+        private System.Windows.Forms.Button SaveBTN;
+        private System.Windows.Forms.SaveFileDialog saveFileDialog1;
     }
 }
 
