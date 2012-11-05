@@ -241,6 +241,7 @@
             this.label11 = new System.Windows.Forms.Label();
             this.label12 = new System.Windows.Forms.Label();
             this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.progressBarFlash = new System.Windows.Forms.ProgressBar();
             this.rebootAllBTN = new System.Windows.Forms.Button();
             this.multipleLB = new System.Windows.Forms.ListBox();
             this.label40 = new System.Windows.Forms.Label();
@@ -249,7 +250,6 @@
             this.moveRightButton = new System.Windows.Forms.Button();
             this.moveLeftButton = new System.Windows.Forms.Button();
             this.radioButton = new System.Windows.Forms.Button();
-            this.firmButton = new System.Windows.Forms.Button();
             this.expSTB = new System.Windows.Forms.TextBox();
             this.knobTB = new System.Windows.Forms.TextBox();
             this.knobTB2 = new System.Windows.Forms.TextBox();
@@ -286,6 +286,7 @@
             this.rebootButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage6 = new System.Windows.Forms.TabPage();
+            this.progressBarMac = new System.Windows.Forms.ProgressBar();
             this.SaveBTN = new System.Windows.Forms.Button();
             this.macLabel = new System.Windows.Forms.Label();
             this.clearMACBTN = new System.Windows.Forms.Button();
@@ -1537,11 +1538,11 @@
             // firmMultButton
             // 
             this.firmMultButton.Enabled = false;
-            this.firmMultButton.Location = new System.Drawing.Point(244, 266);
+            this.firmMultButton.Location = new System.Drawing.Point(140, 273);
             this.firmMultButton.Name = "firmMultButton";
             this.firmMultButton.Size = new System.Drawing.Size(100, 28);
             this.firmMultButton.TabIndex = 103;
-            this.firmMultButton.Text = "Multiple";
+            this.firmMultButton.Text = "Download";
             this.toolTip1.SetToolTip(this.firmMultButton, "Please select at least one target.");
             this.firmMultButton.UseVisualStyleBackColor = true;
             this.firmMultButton.Click += new System.EventHandler(this.firmMultButton_Click);
@@ -2899,6 +2900,7 @@
             // 
             // tabPage1
             // 
+            this.tabPage1.Controls.Add(this.progressBarFlash);
             this.tabPage1.Controls.Add(this.rebootAllBTN);
             this.tabPage1.Controls.Add(this.multipleLB);
             this.tabPage1.Controls.Add(this.firmMultButton);
@@ -2908,7 +2910,6 @@
             this.tabPage1.Controls.Add(this.moveRightButton);
             this.tabPage1.Controls.Add(this.moveLeftButton);
             this.tabPage1.Controls.Add(this.radioButton);
-            this.tabPage1.Controls.Add(this.firmButton);
             this.tabPage1.Controls.Add(this.expSTB);
             this.tabPage1.Controls.Add(this.knobTB);
             this.tabPage1.Controls.Add(this.knobTB2);
@@ -2952,6 +2953,14 @@
             this.tabPage1.Text = "Manipulate";
             this.tabPage1.UseVisualStyleBackColor = true;
             // 
+            // progressBarFlash
+            // 
+            this.progressBarFlash.Location = new System.Drawing.Point(149, 246);
+            this.progressBarFlash.Name = "progressBarFlash";
+            this.progressBarFlash.Size = new System.Drawing.Size(310, 20);
+            this.progressBarFlash.TabIndex = 107;
+            this.progressBarFlash.Visible = false;
+            // 
             // rebootAllBTN
             // 
             this.rebootAllBTN.Enabled = false;
@@ -2967,7 +2976,7 @@
             // 
             this.multipleLB.FormattingEnabled = true;
             this.multipleLB.ItemHeight = 16;
-            this.multipleLB.Location = new System.Drawing.Point(118, 266);
+            this.multipleLB.Location = new System.Drawing.Point(14, 273);
             this.multipleLB.Name = "multipleLB";
             this.multipleLB.SelectionMode = System.Windows.Forms.SelectionMode.MultiExtended;
             this.multipleLB.Size = new System.Drawing.Size(120, 68);
@@ -3032,16 +3041,6 @@
             this.radioButton.Text = "Test Radio";
             this.radioButton.UseVisualStyleBackColor = true;
             this.radioButton.Click += new System.EventHandler(this.radioButton_Click);
-            // 
-            // firmButton
-            // 
-            this.firmButton.Location = new System.Drawing.Point(8, 266);
-            this.firmButton.Name = "firmButton";
-            this.firmButton.Size = new System.Drawing.Size(100, 28);
-            this.firmButton.TabIndex = 96;
-            this.firmButton.Text = "Single";
-            this.firmButton.UseVisualStyleBackColor = true;
-            this.firmButton.Click += new System.EventHandler(this.firmButton_Click);
             // 
             // expSTB
             // 
@@ -3411,9 +3410,11 @@
             this.tabControl1.SelectedIndex = 0;
             this.tabControl1.Size = new System.Drawing.Size(849, 382);
             this.tabControl1.TabIndex = 93;
+            this.tabControl1.Selected += new System.Windows.Forms.TabControlEventHandler(this.tabControl1_Selected);
             // 
             // tabPage6
             // 
+            this.tabPage6.Controls.Add(this.progressBarMac);
             this.tabPage6.Controls.Add(this.SaveBTN);
             this.tabPage6.Controls.Add(this.macLabel);
             this.tabPage6.Controls.Add(this.clearMACBTN);
@@ -3425,6 +3426,14 @@
             this.tabPage6.TabIndex = 5;
             this.tabPage6.Text = "MAC List";
             this.tabPage6.UseVisualStyleBackColor = true;
+            // 
+            // progressBarMac
+            // 
+            this.progressBarMac.Location = new System.Drawing.Point(299, 22);
+            this.progressBarMac.Name = "progressBarMac";
+            this.progressBarMac.Size = new System.Drawing.Size(319, 23);
+            this.progressBarMac.TabIndex = 6;
+            this.progressBarMac.Visible = false;
             // 
             // SaveBTN
             // 
@@ -3797,7 +3806,6 @@
         private System.Windows.Forms.Button shutdownButton;
         private System.Windows.Forms.Button stopButton;
         private System.Windows.Forms.TabControl tabControl1;
-        private System.Windows.Forms.Button firmButton;
         private System.Windows.Forms.ComboBox revCB;
         private System.Windows.Forms.Button radioButton;
         private System.Windows.Forms.CheckBox radioCheck;
@@ -3826,6 +3834,8 @@
         private System.Windows.Forms.Label macLabel;
         private System.Windows.Forms.Button SaveBTN;
         private System.Windows.Forms.SaveFileDialog saveFileDialog1;
+        private System.Windows.Forms.ProgressBar progressBarFlash;
+        private System.Windows.Forms.ProgressBar progressBarMac;
     }
 }
 

@@ -28,6 +28,8 @@ namespace pmaGUI
         List<Control> settingsList = new List<Control>();
         List<String> ipList = new List<String>();
         List<String> macLines = new List<String>();
+        OpenFileDialog openDialog2 = new OpenFileDialog();
+        ProcessStartInfo psi2 = new ProcessStartInfo();
 
         //Eeprom listener;
         public delegate void serviceGUIDelegate();
@@ -2718,11 +2720,17 @@ namespace pmaGUI
             }
         }
 
-        private void firmButton_Click(object sender, EventArgs e)
+        /*private void firmButton_Click(object sender, EventArgs e)
         {
             ProcessStartInfo psi = new ProcessStartInfo();
             OpenFileDialog fileDialog = new OpenFileDialog();
             OpenFileDialog openDialog = new OpenFileDialog();
+            // progress bar setup
+            progressBarFlash.Visible = true;
+            progressBarFlash.Minimum = 1;
+            progressBarFlash.Maximum = 20; // 20 seconds to flash a target
+            progressBarFlash.Value = 1;
+            progressBarFlash.Step = 1;
 
             // Grab the file info
             if (openDialog.ShowDialog() == DialogResult.OK)
@@ -2748,6 +2756,7 @@ namespace pmaGUI
                 while (!p.HasExited)
                 {
                     System.Threading.Thread.Sleep(1000);
+                    progressBarFlash.PerformStep();
                 }
                 // Check to see what the exit code was
                 if (p.ExitCode != 0)
@@ -2761,11 +2770,12 @@ namespace pmaGUI
                     targetCB.Text = "";
                     targetCB.Items.Clear();
                     multipleLB.Items.Clear();
+                    progressBarFlash.Visible = false;
                 }
             }
 
 
-        }
+        }*/
 
         private void radioButton_Click(object sender, EventArgs e)
         {
@@ -3267,32 +3277,34 @@ namespace pmaGUI
 
         private void firmMultButton_Click(object sender, EventArgs e)
         {
-            ProcessStartInfo psi = new ProcessStartInfo();
             OpenFileDialog fileDialog = new OpenFileDialog();
-            OpenFileDialog openDialog = new OpenFileDialog();
+            // progress bar setup
+            progressBarFlash.Visible = true;
+            progressBarFlash.Minimum = 1;
+            // it takes about 20 seconds to flash a target
+            progressBarFlash.Maximum = 20 * multipleLB.SelectedItems.Count; 
+            progressBarFlash.Value = 1;
+            progressBarFlash.Step = 1;
 
             // Grab the file info
-            if (openDialog.ShowDialog() == DialogResult.OK)
+            if (openDialog2.ShowDialog() == DialogResult.OK)
             {
                 String batFile = ".\\atifirmwarecopyall.bat";
 
                 // Get Selected IPs
-                psi.FileName = batFile;
-                String shellFile = openDialog.SafeFileName;
-                psi.Arguments = machine + " " + openDialog.FileName + " " + shellFile + " root shoot";
-                string arguments = openDialog.FileName + " " + shellFile + " root shoot ";
+                psi2.FileName = batFile;
+                String shellFile = openDialog2.SafeFileName;
+                psi2.Arguments = machine + " " + openDialog2.FileName + " " + shellFile + " root shoot";
+                string arguments = openDialog2.FileName + " " + shellFile + " root shoot ";
                 for (int i = 0; i < multipleLB.SelectedItems.Count; i++)
                 {
                     arguments += multipleLB.SelectedItems[i] + " ";
                 }
-                psi.Arguments = arguments;
-
-                // Hides the console window that would pop up
-                //psi.WindowStyle = ProcessWindowStyle.Hidden;
+                psi2.Arguments = arguments;
 
                 // Create new process and set the starting information
                 Process p = new Process();
-                p.StartInfo = psi;
+                p.StartInfo = psi2;
 
                 // Lets you know when the process has been completed
                 p.EnableRaisingEvents = true;
@@ -3302,6 +3314,7 @@ namespace pmaGUI
                 while (!p.HasExited)
                 {
                     System.Threading.Thread.Sleep(1000);
+                    progressBarFlash.PerformStep();
                 }
                 // Check to see what the exit code was
                 if (p.ExitCode != 0)
@@ -3310,22 +3323,37 @@ namespace pmaGUI
                 }
                 else
                 {
+                    // Change the 'Refresh Button' appearance because it needs to be clicked for
+                    // the changes to take effect.
+                    clear_button.ForeColor = SystemColors.HotTrack;
+                    clear_button.Font = new Font(rebootButton.Font, FontStyle.Bold);
+
                     targetCB.Text = "";
                     targetCB.Items.Clear();
                     multipleLB.Items.Clear();
                     setVersion();
+                    progressBarFlash.Visible = false;
                     // Only disconnect if you were connected to a target in the first place
                     if (machine != "")
                     {
                         disconnect();
                     }
                 }
+
             }
         }
+
 
         private void rebootAllBTN_Click(object sender, EventArgs e)
         {
             ProcessStartInfo psi = new ProcessStartInfo();
+            // progress bar setup
+            progressBarFlash.Visible = true;
+            progressBarFlash.Minimum = 0;
+            progressBarFlash.Maximum = multipleLB.Items.Count;
+            progressBarFlash.Value = 0;
+            progressBarFlash.Step = 1;
+
             psi.FileName = "rebootall.bat";
             string arguments = " root shoot ";
             for (int i = 0; i < multipleLB.Items.Count; i++)
@@ -3346,6 +3374,7 @@ namespace pmaGUI
             while (!p.HasExited)
             {
                 System.Threading.Thread.Sleep(1000);
+                progressBarFlash.PerformStep();
             }
             // Check to see what the exit code was
             if (p.ExitCode != 0)
@@ -3368,6 +3397,7 @@ namespace pmaGUI
                 targetCB.Text = "";
                 targetCB.Items.Clear();
                 multipleLB.Items.Clear();
+                progressBarFlash.Visible = false;
             }
         }
 
@@ -3381,6 +3411,7 @@ namespace pmaGUI
             macLabel.Text = "Generating...";
             errorLBL.Update();
             macReceived = false;
+            progressBarMac.Visible = true;
 
             // Start with ip address 0 and then move on everytime a new mac is received
             if (macIndex < multipleLB.Items.Count)
@@ -3390,6 +3421,7 @@ namespace pmaGUI
             else
             {
                 macLabel.Text = "";
+                progressBarMac.Visible = false;
                 return;
             }
             if (useNewTarget(item) && !macListTB.Text.Contains(item))
@@ -3419,6 +3451,7 @@ namespace pmaGUI
                 macReceived = false;
                 macTimer.Stop();
                 macIndex++;
+                progressBarMac.PerformStep();
                 generateBTN_Click(sender, e);
             }
         }
@@ -3446,5 +3479,14 @@ namespace pmaGUI
             // Write to the file
             File.WriteAllLines(name, macLines);           
         }
+
+        private void tabControl1_Selected(object sender, TabControlEventArgs e)
+        {
+            progressBarMac.Minimum = 0;
+            progressBarMac.Maximum = multipleLB.Items.Count;
+            progressBarMac.Value = 0;
+            progressBarMac.Step = 1;
+        }
+
     }
 }
