@@ -2854,6 +2854,8 @@ namespace pmaGUI
 
         private void resetDfltBTN_Click(object sender, EventArgs e)
         {
+            confirmDfltPanel.Visible = false;
+
             // Find the value in the selected dropdown and use that to parse the file
             string selected = (String)resetCB.SelectedItem;
             TextReader tr = new StreamReader(".\\defaults.txt");
@@ -3486,6 +3488,18 @@ namespace pmaGUI
             progressBarMac.Maximum = multipleLB.Items.Count;
             progressBarMac.Value = 0;
             progressBarMac.Step = 1;
+        }
+
+        private void confirmDefaultsBTN_Click(object sender, EventArgs e)
+        {
+            confirmDfltPanel.Visible = true;
+            string selected = (String)resetCB.SelectedItem;
+            settingLBL.Text = "Current " + selected + " settings will be lost.";
+        }
+
+        private void cancelDfltBTN_Click(object sender, EventArgs e)
+        {
+            confirmDfltPanel.Visible = false;
         }
 
     }

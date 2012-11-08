@@ -294,6 +294,11 @@
             this.macListTB = new System.Windows.Forms.TextBox();
             this.macTimer = new System.Windows.Forms.Timer(this.components);
             this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
+            this.confirmDfltPanel = new System.Windows.Forms.Panel();
+            this.label48 = new System.Windows.Forms.Label();
+            this.settingLBL = new System.Windows.Forms.Label();
+            this.cancelDfltBTN = new System.Windows.Forms.Button();
+            this.confirmDefaultsBTN = new System.Windows.Forms.Button();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.groupBox2.SuspendLayout();
@@ -312,6 +317,7 @@
             this.tabPage1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabPage6.SuspendLayout();
+            this.confirmDfltPanel.SuspendLayout();
             this.SuspendLayout();
             // 
             // label9
@@ -1697,7 +1703,8 @@
             // 
             // tabPage3
             // 
-            this.tabPage3.Controls.Add(this.resetDfltBTN);
+            this.tabPage3.Controls.Add(this.confirmDefaultsBTN);
+            this.tabPage3.Controls.Add(this.confirmDfltPanel);
             this.tabPage3.Controls.Add(this.resetCB);
             this.tabPage3.Controls.Add(this.label38);
             this.tabPage3.Controls.Add(this.bobDCB);
@@ -1732,11 +1739,11 @@
             // 
             // resetDfltBTN
             // 
-            this.resetDfltBTN.Location = new System.Drawing.Point(254, 316);
+            this.resetDfltBTN.Location = new System.Drawing.Point(31, 61);
             this.resetDfltBTN.Name = "resetDfltBTN";
             this.resetDfltBTN.Size = new System.Drawing.Size(100, 28);
             this.resetDfltBTN.TabIndex = 120;
-            this.resetDfltBTN.Text = "Reset";
+            this.resetDfltBTN.Text = "OK";
             this.resetDfltBTN.UseVisualStyleBackColor = true;
             this.resetDfltBTN.Click += new System.EventHandler(this.resetDfltBTN_Click);
             // 
@@ -3496,6 +3503,57 @@
             this.saveFileDialog1.SupportMultiDottedExtensions = true;
             this.saveFileDialog1.FileOk += new System.ComponentModel.CancelEventHandler(this.saveFileDialog1_FileOk);
             // 
+            // confirmDfltPanel
+            // 
+            this.confirmDfltPanel.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.confirmDfltPanel.Controls.Add(this.cancelDfltBTN);
+            this.confirmDfltPanel.Controls.Add(this.settingLBL);
+            this.confirmDfltPanel.Controls.Add(this.resetDfltBTN);
+            this.confirmDfltPanel.Controls.Add(this.label48);
+            this.confirmDfltPanel.Location = new System.Drawing.Point(270, 112);
+            this.confirmDfltPanel.Name = "confirmDfltPanel";
+            this.confirmDfltPanel.Size = new System.Drawing.Size(306, 100);
+            this.confirmDfltPanel.TabIndex = 121;
+            this.confirmDfltPanel.Visible = false;
+            // 
+            // label48
+            // 
+            this.label48.AutoSize = true;
+            this.label48.Location = new System.Drawing.Point(106, 11);
+            this.label48.Name = "label48";
+            this.label48.Size = new System.Drawing.Size(101, 17);
+            this.label48.TabIndex = 0;
+            this.label48.Text = "Are you sure? ";
+            // 
+            // settingLBL
+            // 
+            this.settingLBL.AutoSize = true;
+            this.settingLBL.Location = new System.Drawing.Point(7, 30);
+            this.settingLBL.Name = "settingLBL";
+            this.settingLBL.Size = new System.Drawing.Size(194, 17);
+            this.settingLBL.TabIndex = 1;
+            this.settingLBL.Text = "Current \"\" settings will be lost.";
+            // 
+            // cancelDfltBTN
+            // 
+            this.cancelDfltBTN.Location = new System.Drawing.Point(168, 60);
+            this.cancelDfltBTN.Name = "cancelDfltBTN";
+            this.cancelDfltBTN.Size = new System.Drawing.Size(100, 28);
+            this.cancelDfltBTN.TabIndex = 121;
+            this.cancelDfltBTN.Text = "Cancel";
+            this.cancelDfltBTN.UseVisualStyleBackColor = true;
+            this.cancelDfltBTN.Click += new System.EventHandler(this.cancelDfltBTN_Click);
+            // 
+            // confirmDefaultsBTN
+            // 
+            this.confirmDefaultsBTN.Location = new System.Drawing.Point(251, 319);
+            this.confirmDefaultsBTN.Name = "confirmDefaultsBTN";
+            this.confirmDefaultsBTN.Size = new System.Drawing.Size(100, 28);
+            this.confirmDefaultsBTN.TabIndex = 122;
+            this.confirmDefaultsBTN.Text = "Reset";
+            this.confirmDefaultsBTN.UseVisualStyleBackColor = true;
+            this.confirmDefaultsBTN.Click += new System.EventHandler(this.confirmDefaultsBTN_Click);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -3559,6 +3617,8 @@
             this.tabControl1.ResumeLayout(false);
             this.tabPage6.ResumeLayout(false);
             this.tabPage6.PerformLayout();
+            this.confirmDfltPanel.ResumeLayout(false);
+            this.confirmDfltPanel.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -3836,6 +3896,11 @@
         private System.Windows.Forms.SaveFileDialog saveFileDialog1;
         private System.Windows.Forms.ProgressBar progressBarFlash;
         private System.Windows.Forms.ProgressBar progressBarMac;
+        private System.Windows.Forms.Button confirmDefaultsBTN;
+        private System.Windows.Forms.Panel confirmDfltPanel;
+        private System.Windows.Forms.Button cancelDfltBTN;
+        private System.Windows.Forms.Label settingLBL;
+        private System.Windows.Forms.Label label48;
     }
 }
 
