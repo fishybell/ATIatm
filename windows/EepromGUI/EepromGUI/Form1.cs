@@ -1129,6 +1129,10 @@ namespace pmaGUI
                     switch (second)
                     {
                         case 'T':
+                            if (message.Contains("BIT"))
+                            {
+                                logSent(message);
+                            }
                             String knob = getMessageValue(message, 0);
                             String[] knobSplit = knob.Split(' ');
                             if (knobSplit[1] == "KNOB")         // knob information
@@ -3291,7 +3295,8 @@ namespace pmaGUI
             // Grab the file info
             if (openDialog2.ShowDialog() == DialogResult.OK)
             {
-                String batFile = ".\\atifirmwarecopyall.bat";
+                //String batFile = ".\\atifirmwarecopyall.bat";
+                String batFile = "atifirmwarecopyall.bat";
 
                 // Get Selected IPs
                 psi2.FileName = batFile;
@@ -3424,11 +3429,13 @@ namespace pmaGUI
             {
                 macLabel.Text = "";
                 progressBarMac.Visible = false;
+                macIndex = 0;
                 return;
             }
             if (useNewTarget(item) && !macListTB.Text.Contains(item))
             {
                 currentMacItem = item;
+                setVersion();
                 setMAC();
 
                 // Wait until the new mac has come through
@@ -3448,8 +3455,15 @@ namespace pmaGUI
             {
                 String thisMac = macOTB.Text;
                 // Send Target's IP and Mac to Mac List box
-                macListTB.AppendText(currentMacItem + " - " + thisMac + "\n");
-                macLines.Add(currentMacItem + " - " + thisMac);
+                const string format = "{0,-20} {1,-20} {2,-20} {3,-20}";
+                string ipInfo = "IP: " + currentMacItem;
+                string boardInfo = "Type: " + boardType;
+                string versionInfo = "Version: " + version2LBL.Text;
+                string macInfo = "MAC: " + thisMac;
+                
+                string infoLine = string.Format(format, ipInfo, boardInfo, versionInfo, macInfo);
+                macListTB.AppendText(infoLine + "\n");
+                macLines.Add(infoLine);
                 macReceived = false;
                 macTimer.Stop();
                 macIndex++;
@@ -3462,6 +3476,8 @@ namespace pmaGUI
         {
             macListTB.Clear();
             macLines.Clear();
+            macIndex = 0;
+            progressBarMac.Value = 0;
         }
 
         private void SaveBTN_Click(object sender, EventArgs e)
