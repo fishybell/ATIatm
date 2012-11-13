@@ -78,7 +78,6 @@ echo ""
 
 echo "Restarting Device"
 echo ""
-sleep 5
 init 6
 exit 0
 
