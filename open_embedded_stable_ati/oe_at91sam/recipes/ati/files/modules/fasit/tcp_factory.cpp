@@ -136,6 +136,7 @@ FUNCTION_INT("::newClientSock()", -1)
          case ENOTSOCK : IERROR("errno: ENOTSOCK\n") break;
          case ETIMEDOUT : IERROR("errno: ETIMEDOUT\n") break;
       }
+      close(sock);
 FUNCTION_INT("::newClientSock()", -1)
       return -1;
    }
