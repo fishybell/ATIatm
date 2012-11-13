@@ -83,7 +83,7 @@ static int CONTINUE_ON[] = {3,1,2,2,2,0}; // leg = 1, quad = 2, both = 3, neithe
 static int TIMEOUT_IN_MSECONDS[] = {12000,12000,2000,2000,2000,0};
 static int MOVER_DELAY_MULT[] = {2,2,2,2,2,0};
 
-static int DOCK_RETRY_COUNT[] = {2, 2, 1, 1, 1, 0}; // the more we retry, the more likely we are to trip a breaker
+static int DOCK_RETRY_COUNT[] = {2, 2, 3, 1, 1, 0}; // the more we retry, the more likely we are to trip a breaker
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
