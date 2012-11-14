@@ -653,6 +653,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     int yparam9, yparam10, yparam11, yparam12, yexists;
     int eparam1, eparam2, jparam1, jparam2;
     char eparam3[5];
+    char board[20], mversion[20], communication[20], connect[20], macaddress[20];
 	int farg1;
     // read as many commands out of the buffer as possible
     while (1) {
@@ -1827,6 +1828,16 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J E %s\n", readEeprom(STATIC_IP_LOC, STATIC_IP_SIZE)); // reads and prints out what it read
                      }
                      break;
+				  case 'R': case 'r':      // Gets a report
+                        snprintf(board, 20, "%s", readEeprom(BOARD_LOC, BOARD_SIZE));
+                        snprintf(mversion, 20, "%s", readEeprom(MINOR_VERSION_LOC, MINOR_VERSION_SIZE));
+						snprintf(communication, 20, "%s", readEeprom(COMMUNICATION_LOC, COMMUNICATION_SIZE));
+                        snprintf(connect, 20, "%s", readEeprom(IP_ADDRESS_LOC, IP_ADDRESS_SIZE));
+                        snprintf(macaddress, 20, "%s", readEeprom(MAC_ADDRESS_LOC, MAC_ADDRESS_SIZE));
+                        snprintf(wbuf, 1024, "J R %s %s %s %s %s\n", board, mversion, communication, connect, macaddress );
+//char board[20], mversion[20], communication[20], connect[20], macaddress[20];
+//readEeprom(BOARD_LOC, BOARD_SIZE), readEeprom(MINOR_VERSION_LOC, MINOR_VERSION_SIZE), readEeprom(COMMUNICATION_LOC, COMMUNICATION_SIZE), readEeprom(CONNECT_PORT_LOC, CONNECT_PORT_SIZE), readEeprom(MAC_ADDRESS_LOC, MAC_ADDRESS_SIZE)
+                     break;
                }
                write(client, wbuf, strnlen(wbuf,1024));
                break;
@@ -1968,8 +1979,11 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 							case 'E': case 'e':
                                 snprintf(wbuf, 1024, "Get/Set Static IP address\nFormat: J E <static ip>\n");
                                 break;
+                            case 'R': case 'r':
+                                snprintf(wbuf, 1024, "Get a Report of relevant target information.\nFormat: J R (Board Type| Version | Communication | Connect IP | MAC)\n");
+                                break;
                             default:
-                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ B: Partial Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\n");
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ B: Partial Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ R: Target Report\n");
                                 break;
                         }
                         break;
