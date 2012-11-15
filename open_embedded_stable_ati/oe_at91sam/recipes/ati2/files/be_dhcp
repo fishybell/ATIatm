@@ -1,0 +1,3 @@
+ip_address=0.0.0.0
+size=$(echo $ip_address | wc -c)
+echo -n $ip_address | /usr/bin/eeprom_rw write -addr 0x578 -size $size -blank 0x1F
