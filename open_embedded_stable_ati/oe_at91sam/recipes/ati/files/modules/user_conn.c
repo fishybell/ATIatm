@@ -1795,16 +1795,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                switch (cmd[arg1]) { /* second letter */
                   case 'A': case 'a':	  // Reads and sets the full flash version
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "J A %s\n", writeEeprom(MAJOR_VERSION_LOC, arg3, MAJOR_VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "J A %s\n", writeEeprom(VERSION_LOC, arg3, VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "J A %s\n", readEeprom(MAJOR_VERSION_LOC, MAJOR_VERSION_SIZE)); // reads and prints out what it read
-                     }
-                     break;
-                  case 'B': case 'b':	  // Reads and sets the partial flash version
-                     if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "J B %s\n", writeEeprom(MINOR_VERSION_LOC, arg3, MINOR_VERSION_SIZE, cmd+arg2)); // writes and prints out what it wrote
-                     } else { // they are reading information
-                        snprintf(wbuf, 1024, "J B %s\n", readEeprom(MINOR_VERSION_LOC, MINOR_VERSION_SIZE)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "J A %s\n", readEeprom(VERSION_LOC, VERSION_SIZE)); // reads and prints out what it read
                      }
                      break;
                   case 'C': case 'c':	  // Will the radio reprogram?
@@ -1830,13 +1823,11 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      break;
 				  case 'R': case 'r':      // Gets a report
                         snprintf(board, 20, "%s", readEeprom(BOARD_LOC, BOARD_SIZE));
-                        snprintf(mversion, 20, "%s", readEeprom(MINOR_VERSION_LOC, MINOR_VERSION_SIZE));
+                        snprintf(mversion, 20, "%s", readEeprom(VERSION_LOC, VERSION_SIZE));
 						snprintf(communication, 20, "%s", readEeprom(COMMUNICATION_LOC, COMMUNICATION_SIZE));
                         snprintf(connect, 20, "%s", readEeprom(IP_ADDRESS_LOC, IP_ADDRESS_SIZE));
                         snprintf(macaddress, 20, "%s", readEeprom(MAC_ADDRESS_LOC, MAC_ADDRESS_SIZE));
                         snprintf(wbuf, 1024, "J R %s %s %s %s %s\n", board, mversion, communication, connect, macaddress );
-//char board[20], mversion[20], communication[20], connect[20], macaddress[20];
-//readEeprom(BOARD_LOC, BOARD_SIZE), readEeprom(MINOR_VERSION_LOC, MINOR_VERSION_SIZE), readEeprom(COMMUNICATION_LOC, COMMUNICATION_SIZE), readEeprom(CONNECT_PORT_LOC, CONNECT_PORT_SIZE), readEeprom(MAC_ADDRESS_LOC, MAC_ADDRESS_SIZE)
                      break;
                }
                write(client, wbuf, strnlen(wbuf,1024));
@@ -1967,9 +1958,6 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'A': case 'a':
                                 snprintf(wbuf, 1024, "Get/Set Full Flash Version\nFormat: J A <flash version>\n");
                                 break;
-                            case 'B': case 'b':
-                                snprintf(wbuf, 1024, "Get/Set Partial Flash Version\nFormat: J B <flash version>\n");
-                                break;
                             case 'C': case 'c':
                                 snprintf(wbuf, 1024, "Get/Set Will the radio reprogram?\nFormat: J C (Y|N)\n");
                                 break;
@@ -1983,7 +1971,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Get a Report of relevant target information.\nFormat: J R (Board Type| Version | Communication | Connect IP | MAC)\n");
                                 break;
                             default:
-                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ B: Partial Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ R: Target Report\n");
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ R: Target Report\n");
                                 break;
                         }
                         break;
