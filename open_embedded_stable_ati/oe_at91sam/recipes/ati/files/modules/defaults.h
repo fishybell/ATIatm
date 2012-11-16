@@ -491,14 +491,10 @@
 #define HOME_END_SIZE 0x4
 
 // Flash Version
-#define MAJOR_VERSION "00000000" /* format: YYYYMMDD */
-#define MAJOR_VERSION_LOC 0x564
-#define MAJOR_VERSION_SIZE 0x8
+#define VERSION "00000000" /* format: YYYYMMDD */
+#define VERSION_LOC 0x564
+#define VERSION_SIZE 0x10
 
-// Partial Flash Version
-#define MINOR_VERSION "00000000" /* format: YYYYMMDD */
-#define MINOR_VERSION_LOC 0x56C
-#define MINOR_VERSION_SIZE 0x8
 
 // Mover track length
 #define TRACK_LENGTH 5
