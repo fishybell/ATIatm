@@ -370,8 +370,6 @@ namespace pmaGUI
             {
                 conn.sendMessage("J A");
                 logSent("J A");
-                conn.sendMessage("J B");
-                logSent("J B");
             }
         }
 
@@ -1096,7 +1094,6 @@ namespace pmaGUI
             hpTB.Text = "";
             radioCheck.Checked = false;
             versionLBL.Text = "";
-            version2LBL.Text = "";
         }
 
         /****************************************************
@@ -1631,10 +1628,6 @@ namespace pmaGUI
                         case 'A':   // Major Flash Version
                             versionLBL.Text = getMessageValue(message, 4);
                             logSent("J A " + getMessageValue(message, 4));
-                            break;
-                        case 'B':   // Minor Flash Version
-                            version2LBL.Text = getMessageValue(message, 4);
-                            logSent("J B " + getMessageValue(message, 4));
                             break;
                         case 'C':   // Program radio?
                             if (getMessageValue(message, 4) == "Y")
@@ -2751,9 +2744,7 @@ namespace pmaGUI
             if (conn != null)
             {
                 conn.sendMessage("J A");
-                conn.sendMessage("J B");
                 logSent("J A");
-                logSent("J B");
             }
         }
 

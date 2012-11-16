@@ -142,7 +142,6 @@
             this.macOTB = new System.Windows.Forms.TextBox();
             this.label43 = new System.Windows.Forms.Label();
             this.versionLBL = new System.Windows.Forms.Label();
-            this.version2LBL = new System.Windows.Forms.Label();
             this.label41 = new System.Windows.Forms.Label();
             this.tabPage4 = new System.Windows.Forms.TabPage();
             this.logTB = new System.Windows.Forms.TextBox();
@@ -1661,14 +1660,6 @@
             this.versionLBL.Name = "versionLBL";
             this.versionLBL.Size = new System.Drawing.Size(0, 17);
             this.versionLBL.TabIndex = 5;
-            // 
-            // version2LBL
-            // 
-            this.version2LBL.AutoSize = true;
-            this.version2LBL.Location = new System.Drawing.Point(176, 471);
-            this.version2LBL.Name = "version2LBL";
-            this.version2LBL.Size = new System.Drawing.Size(0, 17);
-            this.version2LBL.TabIndex = 6;
             // 
             // label41
             // 
@@ -3559,7 +3550,6 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(881, 497);
-            this.Controls.Add(this.version2LBL);
             this.Controls.Add(this.label41);
             this.Controls.Add(this.versionLBL);
             this.Controls.Add(this.macOTB);
@@ -3649,7 +3639,6 @@
         private System.Windows.Forms.TextBox macOTB;
         private System.Windows.Forms.Label label43;
         private System.Windows.Forms.Label versionLBL;
-        private System.Windows.Forms.Label version2LBL;
         private System.Windows.Forms.Label label41;
         private System.Windows.Forms.TabPage tabPage4;
         private System.Windows.Forms.TextBox logTB;
