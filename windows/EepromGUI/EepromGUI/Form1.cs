@@ -22,14 +22,14 @@ namespace pmaGUI
         Eeprom bconn;
         String boardType = "";
         String currentMacItem = "";
+        String report = "";
         bool macReceived = false;
+        bool generating = false;
         int macIndex = 0;
         List<Control> changedList = new List<Control>();
         List<Control> settingsList = new List<Control>();
         List<String> ipList = new List<String>();
         List<String> macLines = new List<String>();
-        OpenFileDialog openDialog2 = new OpenFileDialog();
-        ProcessStartInfo psi2 = new ProcessStartInfo();
 
         //Eeprom listener;
         public delegate void serviceGUIDelegate();
@@ -126,9 +126,12 @@ namespace pmaGUI
             {
                 errorLBL.Text = "";
                 showAllButton.Enabled = true;
-                setBoardType();
-                setMAC();
-                setVersion();
+                if (!generating)
+                {
+                    setBoardType();
+                    setMAC();
+                    setVersion();
+                }
                 conn.StartProcess(machine);
                 return true;
             }
@@ -369,6 +372,30 @@ namespace pmaGUI
                 logSent("J A");
                 conn.sendMessage("J B");
                 logSent("J B");
+            }
+        }
+
+        /***********************************************
+        * Set communication type
+        * ********************************************/
+        private void getReport()
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("J R");
+                logSent("J R");
+            }
+        }
+
+        /***********************************************
+        * Set connection IP
+        * ********************************************/
+        private void setConnectIP()
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("I I");
+                logSent("I I");
             }
         }
 
@@ -1434,7 +1461,6 @@ namespace pmaGUI
                                 macOTB.Text = valid.Substring(12, 5);
                             }
                             logSent("I M " + getMessageValue(message, 4));
-                            macReceived = true;
                             break;
                         case 'N':   // MFS defaults
                             String[] mfsSplit = getMessageValue(message, 4).Split(' ');
@@ -1627,6 +1653,10 @@ namespace pmaGUI
                             staticTB.Text = getMessageValue(message, 4);
                             logSent("J E " + getMessageValue(message, 4));
                             break;
+                        case 'R':   // Report of several fields
+                            macReceived = true;
+                            report = getMessageValue(message, 4);
+                            break;
                     }
                     break;
                 default:
@@ -1665,9 +1695,12 @@ namespace pmaGUI
             {
                 errorLBL.Text = "";
                 showAllButton.Enabled = true;
-                setBoardType();
-                setMAC();
-                setVersion();
+                if (!generating)
+                {
+                    setBoardType();
+                    setMAC();
+                    setVersion();
+                }
                 conn.StartProcess(machine);
                 Console.WriteLine("Connected");
                 timer1.Stop();
@@ -3283,6 +3316,8 @@ namespace pmaGUI
 
         private void firmMultButton_Click(object sender, EventArgs e)
         {
+            OpenFileDialog openDialog2 = new OpenFileDialog();
+            ProcessStartInfo psi2 = new ProcessStartInfo();
             OpenFileDialog fileDialog = new OpenFileDialog();
             // progress bar setup
             progressBarFlash.Visible = true;
@@ -3295,13 +3330,14 @@ namespace pmaGUI
             // Grab the file info
             if (openDialog2.ShowDialog() == DialogResult.OK)
             {
-                //String batFile = ".\\atifirmwarecopyall.bat";
-                String batFile = "atifirmwarecopyall.bat";
+                String batFile = ".\\atifirmwarecopyall.bat";
+                //String batFile = "atifirmwarecopyall.bat";
 
+                //bool exists = File.Exists(batFile);
                 // Get Selected IPs
                 psi2.FileName = batFile;
                 String shellFile = openDialog2.SafeFileName;
-                psi2.Arguments = machine + " " + openDialog2.FileName + " " + shellFile + " root shoot";
+                //psi2.Arguments = machine + " " + openDialog2.FileName + " " + shellFile + " root shoot";
                 string arguments = openDialog2.FileName + " " + shellFile + " root shoot ";
                 for (int i = 0; i < multipleLB.SelectedItems.Count; i++)
                 {
@@ -3416,6 +3452,7 @@ namespace pmaGUI
         {
             string item = "";
             macLabel.Text = "Generating...";
+            generating = true;
             errorLBL.Update();
             macReceived = false;
             progressBarMac.Visible = true;
@@ -3430,13 +3467,13 @@ namespace pmaGUI
                 macLabel.Text = "";
                 progressBarMac.Visible = false;
                 macIndex = 0;
+                generating = false;
                 return;
             }
             if (useNewTarget(item) && !macListTB.Text.Contains(item))
             {
                 currentMacItem = item;
-                setVersion();
-                setMAC();
+                getReport();
 
                 // Wait until the new mac has come through
                 macTimer.Start();
@@ -3455,13 +3492,16 @@ namespace pmaGUI
             {
                 String thisMac = macOTB.Text;
                 // Send Target's IP and Mac to Mac List box
-                const string format = "{0,-20} {1,-20} {2,-20} {3,-20}";
+                const string format = "{0,-20} {1,-15} {2,-15} {3,-25} {4,-20} {5,-15}";
+                string[] splitReport = report.Split(' ');
                 string ipInfo = "IP: " + currentMacItem;
-                string boardInfo = "Type: " + boardType;
-                string versionInfo = "Version: " + version2LBL.Text;
-                string macInfo = "MAC: " + thisMac;
+                string boardInfo = "Type: " + splitReport[0];
+                string versionInfo = "Version: " + splitReport[1];
+                string comm = "Comm: " + splitReport[2];
+                string connectIP = "Connect IP: " + splitReport[3];
+                string macInfo = "MAC: " + splitReport[4].Substring(12, 5);
                 
-                string infoLine = string.Format(format, ipInfo, boardInfo, versionInfo, macInfo);
+                string infoLine = string.Format(format, ipInfo, macInfo, boardInfo, versionInfo, comm, connectIP);
                 macListTB.AppendText(infoLine + "\n");
                 macLines.Add(infoLine);
                 macReceived = false;

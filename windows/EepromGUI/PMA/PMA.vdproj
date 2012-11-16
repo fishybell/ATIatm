@@ -95,7 +95,7 @@
             {
             "Enabled" = "11:TRUE"
             "PromptEnabled" = "11:TRUE"
-            "PrerequisitesLocation" = "2:1"
+            "PrerequisitesLocation" = "2:2"
             "Url" = "8:"
             "ComponentsUrl" = "8:"
                 "Items"
@@ -451,7 +451,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:PMA"
         "ProductCode" = "8:{65FAD869-F0BC-4DF8-98C9-1B9E3A6AA168}"
-        "PackageCode" = "8:{8E6CE44F-CF27-4D75-88B6-D84CE5D84AE9}"
+        "PackageCode" = "8:{4B2C8E2F-9206-4481-95B4-500DACF804AC}"
         "UpgradeCode" = "8:{F2195914-ABD7-48EC-9F47-962C60BD4A08}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"

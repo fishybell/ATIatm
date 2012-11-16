@@ -10,7 +10,6 @@ shift
 set passwd=%1
 shift
 
-echo "passwd is %passwd%"
 
 :Start
 if "%1"=="" GOTO Done
