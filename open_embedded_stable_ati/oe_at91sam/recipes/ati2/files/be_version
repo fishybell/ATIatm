@@ -1,0 +1,5 @@
+mver="20121116"
+if [ "$mver" != "`has_version`" ] ; then
+   size=$(echo $mver | wc -c)
+   echo -n $mver | /usr/bin/eeprom_rw write -addr 0x564 -size $size -blank 0x010
+fi
