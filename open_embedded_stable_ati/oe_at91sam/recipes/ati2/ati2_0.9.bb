@@ -16,6 +16,7 @@ SRC_URI += "file://*.fw"
 SRC_URI += "file://*.bin"
 SRC_URI += "file://fixhost"
 SRC_URI += "file://start_up"
+SRC_URI += "file://networking"
 SRC_URI += "file://avahi-daemon.conf"
 SRC_URI += "file://start"
 SRC_URI += "file://stop"
@@ -36,6 +37,7 @@ SRC_URI += "file://TTMT"
 SRC_URI += "file://SES"
 SRC_URI += "file://BASE"
 SRC_URI += "file://HHC"
+SRC_URI += "file://evaluateip.sh"
 SRC_URI += "file://none"
 SRC_URI += "file://clients"
 #SRC_URI += "file://fasit/*.py"
@@ -77,6 +79,7 @@ do_install () {
     install -m 644 ${WORKDIR}/avahi-daemon.conf ${D}/etc/avahi
     install -m 755 ${WORKDIR}/fixhost ${D}/etc/init.d
     install -m 755 ${WORKDIR}/start_up ${D}/etc/init.d
+    install -m 755 ${WORKDIR}/networking ${D}/etc/init.d
     install -m 755 ${WORKDIR}/start ${D}/usr/bin
     install -m 755 ${WORKDIR}/stop ${D}/usr/bin
     install -m 755 ${WORKDIR}/restart ${D}/usr/bin
@@ -93,6 +96,7 @@ do_install () {
     install -m 644 ${WORKDIR}/SES ${D}/usr/bin
     install -m 644 ${WORKDIR}/BASE ${D}/usr/bin
     install -m 644 ${WORKDIR}/HHC ${D}/usr/bin
+    install -m 755 ${WORKDIR}/evaluateip.sh ${D}/usr/bin
     install -m 644 ${WORKDIR}/none ${D}/usr/bin
     install -m 755 ${WORKDIR}/clients ${D}/usr/bin
 #    install -m 755 ${WORKDIR}/*.tcl ${D}/usr/bin
