@@ -6,10 +6,6 @@ def_progs() {
    # clean up old firmware files
    rm -f /home/root/atifirmware*
 
-   # check that our version numbers are up-to-date
-   /usr/bin/be_major_version
-   /usr/bin/be_minor_version
-
    # start the "early" programs
 # user_conn is now started by inittab: 03/26/12 randy
 #   user_conn &
