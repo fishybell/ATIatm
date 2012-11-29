@@ -22,7 +22,8 @@
 #define MAT 1
 #define MIT 2
 #define MITP 3
-#define IS_MIT ( mover_type == MIT || mover_type == MITP )
+#define MITPAMC 4
+#define IS_MIT ( mover_type == MIT || mover_type == MITP || mover_type == MITPAMC )
 #define IS_MAT ( mover_type == MATOLD || mover_type == MAT )
 
 //#define TESTING_ON_EVAL
@@ -73,17 +74,17 @@ module_param(min_effort, int, S_IRUGO);
 module_param(max_accel, int, S_IRUGO);
 module_param(max_deccel, int, S_IRUGO);
 
-static char* TARGET_NAME[] = {"armor mover 2 ticks","armor mover 360 ticks","48v infantry mover","48v infantry mover portable","48v soft-reverse infantry mover","error"};
-static char* MOVER_TYPE[] = {"armor","armor","infantry","infantry","infantry","error"};
+static char* TARGET_NAME[] = {"armor mover 2 ticks","armor mover 360 ticks","48v infantry mover","48v infantry mover portable","48v infantry mover horizontal advance motion control","48v soft-reverse infantry mover","error"};
+static char* MOVER_TYPE[] = {"armor","armor","infantry","infantry","infantry","infantry","error"};
 
 // continue moving on leg or quad interrupt or neither
-static int CONTINUE_ON[] = {3,1,2,2,2,0}; // leg = 1, quad = 2, both = 3, neither = 0
+static int CONTINUE_ON[] = {3,1,2,2,2,2,0}; // leg = 1, quad = 2, both = 3, neither = 0
 
 // TODO - replace with a table based on distance and speed?
-static int TIMEOUT_IN_MSECONDS[] = {12000,12000,2000,2000,2000,0};
-static int MOVER_DELAY_MULT[] = {2,2,2,2,2,0};
+static int TIMEOUT_IN_MSECONDS[] = {12000,12000,2000,2000,2000,2000,0};
+static int MOVER_DELAY_MULT[] = {2,2,2,2,2,2,0};
 
-static int DOCK_RETRY_COUNT[] = {2, 2, 3, 1, 1, 0}; // the more we retry, the more likely we are to trip a breaker
+static int DOCK_RETRY_COUNT[] = {2, 2, 3, 1, 1, 1, 0}; // the more we retry, the more likely we are to trip a breaker
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -103,12 +104,12 @@ static int DOCK_RETRY_COUNT[] = {2, 2, 3, 1, 1, 0}; // the more we retry, the mo
 // not used? -- static int MIT_SPEEDS[] = {0,7,15,23,33,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 // the maximum allowed speed ticks
 //static int NUMBER_OF_SPEEDS[] = {10,20,10,10,0};
-static int NUMBER_OF_SPEEDS[] = {200,200,200,200,200,0};
-static int MIN_SPEED[] = {10,10,7,3,10,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
+static int NUMBER_OF_SPEEDS[] = {200,200,200,200,200,200,0};
+static int MIN_SPEED[] = {10,10,7,3,10,10,0}; // minimum acceptible input speed (15 =1 1/2 mph, 20 = 2 mph)
 
 // horn on and off times (off is time to wait after mover starts moving before going off)
-static int HORN_ON_IN_MSECONDS[] = {3500,3500,0,0,0,0};
-static int HORN_OFF_IN_MSECONDS[] = {8000,8000,0,0,0,0};
+static int HORN_ON_IN_MSECONDS[] = {3500,3500,0,0,0,0,0};
+static int HORN_OFF_IN_MSECONDS[] = {8000,8000,0,0,0,0,0};
 
 // getting going effort stuff
 //static int UNDER_WAY[] = {5, 5, 1, 5, 0}; /* how many encoder clicks before we let go of the getting going effort */
@@ -136,26 +137,26 @@ static int HORN_OFF_IN_MSECONDS[] = {8000,8000,0,0,0,0};
 // static int PID_KD_DIV[]    = {4, 5, 4, 4, 0}; // derivitive gain denominator
 // new method - used Ziegler-Nichols method to determine (found Ku of 1, Tu of 0.9 seconds:29490 ticks off track on type 0, tested on type 2 on track) -- no overshoot (36v MIT has ku of 4/3 and tu of .29)
 // new method - used Ziegler-Nichols method to determine (found Ku of 2/3, Tu of 1.5 seconds:49152 ticks off track on type 1) -- no overshoot -- due to throttle cut-off from motor controller, had to adjust by hand afterwards
-static int PID_KP_MULT[]   = {3, 3, 20, 3, 1, 0}; // proportional gain numerator
-static int PID_KP_DIV[]    = {1, 1, 1, 5, 5, 0}; // proportional gain denominator
-static int PID_KI_MULT[]   = {1, 1, 0, 0, 15, 0}; // integral gain numerator
-static int PID_KI_DIV[]    = {3, 3, 1, 1, 47515, 0}; // integral gain denominator
-static int PID_KD_MULT[]   = {0, 0, 0, 0, 190060, 0}; // derivitive gain numerator
-static int PID_KD_DIV[]    = {15, 15, 1, 1, 1, 0}; // derivitive gain denominator
+static int PID_KP_MULT[]   = {3, 3, 20, 3, 1, 1, 0}; // proportional gain numerator
+static int PID_KP_DIV[]    = {1, 1, 1, 5, 5, 5, 0}; // proportional gain denominator
+static int PID_KI_MULT[]   = {1, 1, 0, 0, 0, 15, 0}; // integral gain numerator
+static int PID_KI_DIV[]    = {3, 3, 1, 1, 1, 47515, 0}; // integral gain denominator
+static int PID_KD_MULT[]   = {0, 0, 0, 0, 0, 190060, 0}; // derivitive gain numerator
+static int PID_KD_DIV[]    = {15, 15, 1, 1, 1, 1, 0}; // derivitive gain denominator
 #ifdef TESTING_MAX
-static int MIN_EFFORT[]    = {1000, 1000, 1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {1000, 1000, 1000, 1000, 1000, 1000, 0}; // minimum effort given to ensure motor moves
 #else
-static int MIN_EFFORT[]    = {175, 175, 1, 1, 1, 0}; // minimum effort given to ensure motor moves
+static int MIN_EFFORT[]    = {175, 175, 1, 1, 1, 1, 0}; // minimum effort given to ensure motor moves
 #endif
 // not used? -- static int SPEED_AFTER[]   = {1, 3, 1, 1, 0}; // clamp effort if we hit this many correct values in a row
 // not used? -- static int SPEED_CHANGE[]  = {40, 30, 40, 1, 0}; // unclamp if the error is bigger than this
 // not used? -- static int ADJUST_PID_P[]  = {0, 0, 0, 0, 0}; // adjust MIT's proportional gain as percentage of final speed / max speed
-static int MAX_ACCEL[]     = {1000, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
-static int MAX_DECCEL[]     = {1000, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
+static int MAX_ACCEL[]     = {1000, 1000, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
+static int MAX_DECCEL[]     = {1000, 1000, 1000, 1000, 1000, 1000, 0}; // maximum effort change in one step
 
 // variables for setting the initial position if it's on the dock or not
-static int DOCK_FEET_FROM_LIMIT[] = {18, 18, 6, 6, 6, 0}; // home many feet away the dock is past the limit
-static int COAST_FEET_FROM_LIMIT[] = {18, 12, 4, 4, 4, 0}; // home many feet away it *typically* coasts past the limit
+static int DOCK_FEET_FROM_LIMIT[] = {18, 18, 6, 6, 6, 6, 0}; // home many feet away the dock is past the limit
+static int COAST_FEET_FROM_LIMIT[] = {18, 12, 4, 4, 4, 4, 0}; // home many feet away it *typically* coasts past the limit
 
 // These map directly to the FASIT faults for movers
 #define FAULT_NORMAL                                       0
@@ -173,8 +174,8 @@ static int COAST_FEET_FROM_LIMIT[] = {18, 12, 4, 4, 4, 0}; // home many feet awa
 #define FAULT_WRONG_DIRECTION_DETECTED                     12
 #define FAULT_STOPPED_DUE_TO_STOP_COMMAND                  13
 
-static int MOTOR_PWM_FWD[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_FWD_POS if PWM on H-bridge
-static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_REV_POS if PWM on H-bridge
+static int MOTOR_PWM_FWD[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_FWD_POS if PWM on H-bridge
+static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_SPEED_THROTTLE,0}; // would be OUTPUT_MOVER_MOTOR_REV_POS if PWM on H-bridge
 #define MOTOR_PWM_F (reverse ? MOTOR_PWM_REV[mover_type] : MOTOR_PWM_FWD[mover_type])
 #define MOTOR_PWM_R (reverse ? MOTOR_PWM_FWD[mover_type] : MOTOR_PWM_REV[mover_type])
 
@@ -182,25 +183,25 @@ static int MOTOR_PWM_REV[] = {OUTPUT_MOVER_PWM_SPEED_THROTTLE,OUTPUT_MOVER_PWM_S
 // END - max time (allowed by me to account for max voltage desired by motor controller : 90% of RC)
 // RA - low time setting - cannot exceed RC
 // RB - low time setting - cannot exceed RC
-static int MOTOR_PWM_RC[] = {0x3074,0x3074,0x1180,0x7000,0x1180,0};
-static int MOTOR_PWM_END[] = {0x3074,0x3074,0x1180,0x7000,0x1180,0};
+static int MOTOR_PWM_RC[] = {0x3074,0x3074,0x1180,0x7000,0x7000,0x1180,0};
+static int MOTOR_PWM_END[] = {0x3074,0x3074,0x1180,0x7000,0x7000,0x1180,0};
 //static int MOTOR_PWM_RA_DEFAULT[] = {0x04D8,0x04D8,0x0000,0x0000,0};
 //static int MOTOR_PWM_RB_DEFAULT[] = {0x04D8,0x04D8,0x0000,0x0000,0};
-static int MOTOR_PWM_RA_DEFAULT[] = {0x0001,0x0001,0x0001,0x0001,0x001,0};
-static int MOTOR_PWM_RB_DEFAULT[] = {0x0001,0x0001,0x0001,0x0001,0x001,0};
+static int MOTOR_PWM_RA_DEFAULT[] = {0x0001,0x0001,0x0001,0x0001,0x001,0x001,0};
+static int MOTOR_PWM_RB_DEFAULT[] = {0x0001,0x0001,0x0001,0x0001,0x001,0x001,0};
 
 // TODO - map pwm output pin to block/channel
 #define PWM_BLOCK				1				// block 0 : TIOA0-2, TIOB0-2 , block 1 : TIOA3-5, TIOB3-5
-static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,1,0};		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
+static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,1,1,0};		// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 #define ENCODER_PWM_CHANNEL		0				// channel 0 matches TIOA0 to TIOB0, same for 1 and 2
 
 #define MAX_TIME	0x10000
 #define MAX_OVER	0x10000
-static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
-static int ENC_PER_REV[] = {2, 360, 2, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
-static int VELO_K[] = {1344, 1344, 1680, 1680, 1680, 0}; // rpm/mph*10
-static int INCHES_PER_REV[] = {157, 157, 314, 314, 314, 0}; // 5 inch, 10 inch, etc. = inches per wheel revolution
-static int TICKS_PER_LEG[] = {1833, 1833, 2292, 2292, 2292, 0}; // 2:1 ratio 5 inch wheel 6 ft leg, 5:1 ratio 10 inch wheel 6 ft leg, etc.
+static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
+static int ENC_PER_REV[] = {2, 360, 2, 2, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
+static int VELO_K[] = {1344, 1344, 1680, 1680, 1680, 1680, 0}; // rpm/mph*10
+static int INCHES_PER_REV[] = {157, 157, 314, 314, 314, 314, 0}; // 5 inch, 10 inch, etc. = inches per wheel revolution
+static int TICKS_PER_LEG[] = {1833, 1833, 2292, 2292, 2292, 2292, 0}; // 2:1 ratio 5 inch wheel 6 ft leg, 5:1 ratio 10 inch wheel 6 ft leg, etc.
 #define TICKS_DIV 100
 
 // to keep updates to the file system in check somewhat
@@ -212,7 +213,7 @@ static int TICKS_PER_LEG[] = {1833, 1833, 2292, 2292, 2292, 0}; // 2:1 ratio 5 i
 #define CONTINUOUS_TIMEOUT_IN_MILLISECONDS 1000
 #define RAMP_TIMEOUT_IN_MILLISECONDS 10
 
-static int COAST_FACTOR[]  = {10, 10, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_IN_MILLISECONDS, tuned for how well the target coasts (smaller for coasts better? bigger for brakes better?)
+static int COAST_FACTOR[]  = {10, 10, 20, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_IN_MILLISECONDS, tuned for how well the target coasts (smaller for coasts better? bigger for brakes better?)
 
 // speed charts (TODO -- update with mover on track with load)
 // static in MOVER0_PWM_TABLE = ?
@@ -220,12 +221,12 @@ static int COAST_FACTOR[]  = {10, 10, 20, 20, 20, 1}; // divisor to PID_TIMEOUT_
 // static int MOVER2_PWM_TABLE[] = {0, 1100, 1550, 1975, 2375, 2800, 3325, 3900, 5000, 7000, 10000}; // -- first stab
 // static int MOVER2_PWM_TABLE[] = {0, 1350, 1800, 2300, 2700, 3200, 3700, 4500, 5500, 7500, 12000}; // -- second stab
 
-static int MOVER_RAMP_STEPS[] = {7, 7, 0, 3, 1, 0}; // MATs do 2 * speed, MITs do 1 * speed
+static int MOVER_RAMP_STEPS[] = {7, 7, 0, 3, 1, 1, 0}; // MATs do 2 * speed, MITs do 1 * speed
 
 
 
 // external motor controller polarity
-static int OUTPUT_MOVER_PWM_SPEED_ACTIVE[] = {ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,0};
+static int OUTPUT_MOVER_PWM_SPEED_ACTIVE[] = {ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,ACTIVE_LOW,0};
 
 // structure to access the timer counter registers
 static struct atmel_tc * tc = NULL;
@@ -245,11 +246,11 @@ module_param(reverse, bool, S_IRUGO); // variable reverse, type bool, read only 
 #define INPUT_MOVER_DOCK_ACTIVE_STATE	INPUT_CHARGING_BAT_ACTIVE_STATE
 #define LIFTER_POSITION_DOWN 0
 
-static bool PWM_H_BRIDGE[] = {false,false,false,false,false,false};
-static bool DIRECTIONAL_H_BRIDGE[] = {true,true,true,true,false,false};
-static bool USE_BRAKE[] = {false,false,false,true,true,false};
-static bool CONTACTOR_H_BRIDGE[] = {false, false, false, false, true, false};
-static bool MOTOR_CONTROL_H_BRIDGE[] = {false, false, false, false, false, false};
+static bool PWM_H_BRIDGE[] = {false,false,false,false,false,false,false};
+static bool DIRECTIONAL_H_BRIDGE[] = {true,true,true,true,true,false,false};
+static bool USE_BRAKE[] = {false,false,false,true,true,true,false};
+static bool CONTACTOR_H_BRIDGE[] = {false, false, false, false, false, true, false};
+static bool MOTOR_CONTROL_H_BRIDGE[] = {false, false, false, false, false, false, false};
 
 // Non-H-Bridge : map motor controller reverse and forward signals based on the 'reverse' parameter
 #define OUTPUT_MOVER_FORWARD	(reverse ? OUTPUT_MOVER_DIRECTION_REVERSE : OUTPUT_MOVER_DIRECTION_FORWARD)
@@ -333,6 +334,7 @@ atomic_t driver_id = ATOMIC_INIT(-1);
 static void pid_step(void); 
 //static void pid_step2(void); 
 static void pid_step3(void); 
+static void pid_step4(void); 
 #if 0 /* new method not yet used */
 static void pid_step1(void); 
 #endif
@@ -439,6 +441,7 @@ static int current_speed10(void);		// 10 * velocity/direction, measured
 static int percent_from_speed(int speed);	// 1000 * percent, calculated
 static int percent_curve_from_speed(int start, int end, int step); // 1000 * percent, calculated on a curve between start and end
 static int pwm_from_effort(int effort);		// absolute pwm, calculated
+static int pwm_from_effort_4(int effort);		// absolute pwm, calculated
 
 //---------------------------------------------------------------------------
 // Variables for PID speed control
@@ -1036,7 +1039,7 @@ static int mover_speed_set(int speed) {
    SENDUSERCONNMSG( "randy mover_speed_set %i", speed);
    if (speed != 0){
       revSpeed = speed; // we need to save the speed in case we reverse
-      if ( mover_type == MITP ){
+      if ( mover_type == MITP || mover_type == MITPAMC ){
          selectSpeed = abs(speed);
          if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
          else if (selectSpeed <= 10) tmpSpeed = 16; // mph (to meet 1-3 kph)
@@ -1358,7 +1361,9 @@ static void pid_timeout_fire(unsigned long data)
          }
       }
 #endif
-      if (mover_type == MITP){
+      if (mover_type == MITPAMC){
+         pid_step4();
+      } else if (mover_type == MITP){
          pid_step3();
       } else {
          pid_step();
@@ -2374,6 +2379,21 @@ static int pwm_from_effort(int effort) {
     return MOTOR_PWM_RB_DEFAULT[mover_type] + (
       (effort * (MOTOR_PWM_END[mover_type] - MOTOR_PWM_RB_DEFAULT[mover_type]))
       / 1000);
+}
+
+static int pwm_from_effort_4(int effort) {
+    int returnPWM = 0;
+    // use straight percentage
+    if ((atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)){
+       return MOTOR_PWM_RB_DEFAULT[mover_type] + (
+         (effort * (MOTOR_PWM_END[mover_type] - MOTOR_PWM_RB_DEFAULT[mover_type]))
+         / 1000);
+    } else if ((atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)){
+       returnPWM = (1000 * MOTOR_PWM_END[mover_type]) - (MOTOR_PWM_RB_DEFAULT[mover_type] + (
+         (effort * (MOTOR_PWM_END[mover_type] - MOTOR_PWM_RB_DEFAULT[mover_type]))
+         / 1000));
+    }
+    return returnPWM;
 }
 
 //---------------------------------------------------------------------------
@@ -3860,6 +3880,71 @@ static void pid_step3() {
 #endif
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
+
+    // These change the pwm duty cycle
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
+    __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RB));
+
+    // move effort values
+    pid_last_effort = pid_effort;
+
+    // unlock for next time
+    spin_unlock(&pid_lock);
+}
+
+// new method
+static void pid_step4() {
+   int new_speed=1, input_speed=0, input_speed_old=0, pid_effort=0, pid_p=0, pid_i=0, pid_d=0;
+   int direction, delta;
+   // not used? -- using_ticks
+   // not used? -- targetRatio;
+   // not used? -- int a, b, c;
+   struct timespec time_now = current_kernel_time();
+   struct timespec time_d = timespec_sub(time_now, time_start);
+   static int last_delta = -1; // invalid initial value for this static int
+   //static int pid_count = 0;
+
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    //using_ticks = pid_ticks;
+    //pid_ticks = 0;
+    
+    new_speed = atomic_read(&pid_set_point); // read desired pid set point
+    input_speed_old = percent_from_speed(abs(current_speed10())); // ex on MIT : 0-20mph => 0-1000, so 5mph = 250, 2.5 mph = 125, etc.
+    direction = atomic_read(&quad_direction);
+    
+    // delta is time since last pid_step, which used to be just delta_t, now it is time_d...units don't matter as we will adjust the D gain abitrarily anyway
+    //delta = atomic_read(&delta_t); // delta was in clock ticks...
+    delta = (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000l); // ...but is now in milliseconds
+    if (last_delta != -1) { // check that we're valid
+       int temp = delta;
+       delta = delta - last_delta; // ... and is now the time since the last time we ran pid_step
+       last_delta = temp; // remember
+    } else {
+       last_delta = delta; // remember
+       // first time around we won't mess with delta
+    }
+    // old delta was speed dependent, new delta should always be about the same
+
+    // read input speed (adjust speed10 value to 1000*percent)
+    input_speed = percent_from_speed(abs(current_pid_speed10())); // ex on MIT : 0-20mph => 0-1000, so 5mph = 250, 2.5 mph = 125, etc.
+    atomic_set(&pid_vel, 0);
+    if (!spin_trylock(&pid_lock)) {
+        return;
+    }
+    if (new_speed != 0) {
+      //pid_effort = (kp_m * new_speed / 2;
+      pid_effort = (((1000 * kp_m * new_speed) / kp_d) / 1000);
+      max(min(pid_effort, 1000), 0);
+    }
+         
+#ifdef SEND_PID
+       SENDUSERCONNMSG( "step3,t,%i,e,%i,u,%i,r,%i,y,%i,o,%i,P,%i,I,%i,D,%i,l,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), 0, pid_effort, new_speed, input_speed, input_speed_old, pid_p, pid_i, pid_d, atomic_read(&position));
+#endif
+    // convert effort to pwm
+    new_speed = pwm_from_effort_4(pid_effort);
 
     // These change the pwm duty cycle
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
