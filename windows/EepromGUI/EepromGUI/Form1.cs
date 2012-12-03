@@ -828,6 +828,8 @@ namespace pmaGUI
                 case "SIT":
                     enableAll();
                     moveShowButton.Enabled = false;
+                    moveRightButton.Enabled = false;
+                    moveLeftButton.Enabled = false;
                     posShowButton.Enabled = false;
                     knobShowButton.Enabled = false;
                     modeShowButton.Enabled = false;
@@ -846,6 +848,7 @@ namespace pmaGUI
                     staticTB.Enabled = false;
                     break;
                 case "MIT":
+                case "MITP":
                     enableAll();
                     modeShowButton.Enabled = false;
                     modeSetButton.Enabled = false;
@@ -866,6 +869,7 @@ namespace pmaGUI
                     expSShowButton.Enabled = false;
                     break;
                 case "MAT":
+                case "MATOLD":
                     enableAll();
                     modeShowButton.Enabled = false;
                     modeSetButton.Enabled = false;
