@@ -2388,7 +2388,7 @@ static int pwm_from_effort_4(int effort) {
        return MOTOR_PWM_RB_DEFAULT[mover_type] + (
          (effort * (MOTOR_PWM_END[mover_type] - MOTOR_PWM_RB_DEFAULT[mover_type]))
          / 1000);
-    } else if ((atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD)){
+    } else if ((atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)){
        returnPWM = (1000 * MOTOR_PWM_END[mover_type]) - (MOTOR_PWM_RB_DEFAULT[mover_type] + (
          (effort * (MOTOR_PWM_END[mover_type] - MOTOR_PWM_RB_DEFAULT[mover_type]))
          / 1000));
