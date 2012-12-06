@@ -298,6 +298,8 @@
             this.macListTB = new System.Windows.Forms.TextBox();
             this.macTimer = new System.Windows.Forms.Timer(this.components);
             this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
+            this.label49 = new System.Windows.Forms.Label();
+            this.pmavLBL = new System.Windows.Forms.Label();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.confirmDfltPanel.SuspendLayout();
@@ -1656,7 +1658,7 @@
             // versionLBL
             // 
             this.versionLBL.AutoSize = true;
-            this.versionLBL.Location = new System.Drawing.Point(86, 470);
+            this.versionLBL.Location = new System.Drawing.Point(146, 471);
             this.versionLBL.Name = "versionLBL";
             this.versionLBL.Size = new System.Drawing.Size(0, 17);
             this.versionLBL.TabIndex = 5;
@@ -1664,11 +1666,11 @@
             // label41
             // 
             this.label41.AutoSize = true;
-            this.label41.Location = new System.Drawing.Point(24, 470);
+            this.label41.Location = new System.Drawing.Point(19, 471);
             this.label41.Name = "label41";
-            this.label41.Size = new System.Drawing.Size(60, 17);
+            this.label41.Size = new System.Drawing.Size(121, 17);
             this.label41.TabIndex = 104;
-            this.label41.Text = "Version:";
+            this.label41.Text = "Firmware Version:";
             // 
             // tabPage4
             // 
@@ -3545,11 +3547,31 @@
             this.saveFileDialog1.Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*";
             this.saveFileDialog1.FileOk += new System.ComponentModel.CancelEventHandler(this.saveFileDialog1_FileOk);
             // 
+            // label49
+            // 
+            this.label49.AutoSize = true;
+            this.label49.Location = new System.Drawing.Point(664, 471);
+            this.label49.Name = "label49";
+            this.label49.Size = new System.Drawing.Size(93, 17);
+            this.label49.TabIndex = 105;
+            this.label49.Text = "PMA Version:";
+            // 
+            // pmavLBL
+            // 
+            this.pmavLBL.AutoSize = true;
+            this.pmavLBL.Location = new System.Drawing.Point(763, 471);
+            this.pmavLBL.Name = "pmavLBL";
+            this.pmavLBL.Size = new System.Drawing.Size(54, 17);
+            this.pmavLBL.TabIndex = 106;
+            this.pmavLBL.Text = "label50";
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(881, 497);
+            this.Controls.Add(this.pmavLBL);
+            this.Controls.Add(this.label49);
             this.Controls.Add(this.label41);
             this.Controls.Add(this.versionLBL);
             this.Controls.Add(this.macOTB);
@@ -3890,6 +3912,8 @@
         private System.Windows.Forms.Button cancelDfltBTN;
         private System.Windows.Forms.Label settingLBL;
         private System.Windows.Forms.Label label48;
+        private System.Windows.Forms.Label label49;
+        private System.Windows.Forms.Label pmavLBL;
     }
 }
 

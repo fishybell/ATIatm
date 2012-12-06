@@ -36,6 +36,8 @@ namespace pmaGUI
         public Form1()
         {
             InitializeComponent();
+            pmavLBL.Text = ProductVersion;
+            
             // Populate the drop down list with machines that are broadcasting
             //FindMachines();
         }
@@ -63,9 +65,9 @@ namespace pmaGUI
                            {
                                if (!targetCB.Items.Contains(possibleIP))
                                {
-                                   errorLBL.Text = "Available Targets";
                                    targetCB.Items.Add(possibleIP);
                                    multipleLB.Items.Add(possibleIP);
+                                   errorLBL.Text = targetCB.Items.Count + " Available Targets";
                                    targetCB.Sorted = true;
                                    rebootAllBTN.Enabled = true;
                                    generateBTN.Enabled = true;
@@ -1126,8 +1128,8 @@ namespace pmaGUI
             {
                 if (!targetCB.Items.Contains(message))
                 {
-                    errorLBL.Text = "Available Targets";
                     targetCB.Items.Add(message);
+                    errorLBL.Text = targetCB.Items.Count + " Available Targets";
                     targetCB.Sorted = true;
                     multipleLB.Items.Add(message);
                 }
@@ -3333,7 +3335,8 @@ namespace pmaGUI
                 psi2.FileName = batFile;
                 String shellFile = openDialog2.SafeFileName;
                 //psi2.Arguments = machine + " " + openDialog2.FileName + " " + shellFile + " root shoot";
-                string arguments = openDialog2.FileName + " " + shellFile + " root shoot ";
+                string longFileName = openDialog2.FileName;
+                string arguments = "\""+ longFileName + "\"" + " " + shellFile + " root shoot ";
                 for (int i = 0; i < multipleLB.SelectedItems.Count; i++)
                 {
                     arguments += multipleLB.SelectedItems[i] + " ";
