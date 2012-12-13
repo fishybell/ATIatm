@@ -13,6 +13,42 @@
 #define TARGET_NAME		"hit sensor"
 #define SENSOR_TYPE		"poll"
 
+//#define PRINT_DEBUG
+#define SEND_DEBUG
+
+#if defined(SEND_DEBUG)
+#define SENDUSERCONNMSG  sendUserConnMsg
+static void sendUserConnMsg( char *fmt, ...);
+#else
+#define SENDUSERCONNMSG(...)  //
+#endif
+
+#ifdef PRINT_DEBUG
+#define DELAY_PRINTK  delay_printk
+#else
+#define DELAY_PRINTK(...)  //
+#endif
+
+int error_mfh(struct sk_buff *skb, void *msg) {
+    // the msg argument is a null-terminated string
+    return nla_put_string(skb, GEN_STRING_A_MSG, msg);
+}
+
+#ifdef SEND_DEBUG
+void sendUserConnMsg( char *fmt, ...){
+    va_list ap;
+    char *msg;
+    va_start(ap, fmt);
+     msg = kmalloc(256, GFP_KERNEL);
+     if (msg){
+         vsnprintf(msg, 256, fmt, ap);
+         DELAY_PRINTK(msg);
+         send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+         kfree(msg);
+     }
+   va_end(ap);
+}
+#endif
 // for ignoring hit sensor completely
 //#define TESTING_ON_EVAL
 
@@ -131,11 +167,13 @@ void set_hit_callback(hit_event_callback handler, hit_event_callback discon) {
     // only allow setting the callback once
     if (handler != NULL && hit_callback == NULL) {
         hit_callback = handler;
-        delay_printk("HIT SENSOR: Registered callback function for hit events\n");
+SENDUSERCONNMSG( "hitsensor registered hit callback");
+        DELAY_PRINTK("HIT SENSOR: Registered callback function for hit events\n");
     }
     if (discon != NULL && disconnected_hit_sensor_callback == NULL) {
         disconnected_hit_sensor_callback = discon;
-        delay_printk("HIT SENSOR: Registered callback function for hit events\n");
+SENDUSERCONNMSG( "hitsensor registered disconnect callback");
+        DELAY_PRINTK("HIT SENSOR: Registered callback function for disconnect hit sensor events\n");
     }
     spin_unlock(&sensors[line].lock);
 }
@@ -159,14 +197,14 @@ static void hit_poll(void) {
     // on or off?
     if (at91_get_gpio_value(sensors[line].gpio) == sensors[line].active) {
         if (showpoll && sensors[line].last_val == 0) {
-            delay_printk("."); // print transition from off to on
+            DELAY_PRINTK("."); // print transition from off to on
 del_timer(&debug_timer); // cancel existing output
 mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return later
         }
         sensors[line].last_val = 1;
     } else {
         if (showpoll && sensors[line].last_val == 1) {
-            delay_printk("'"); // print transition from on to off
+            DELAY_PRINTK("'"); // print transition from on to off
 del_timer(&debug_timer); // cancel existing output
 mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return later
         }
@@ -265,6 +303,7 @@ static void hit_kyle(void) {
         }
 del_timer(&debug_timer); // cancel existing output
 mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return later
+SENDUSERCONNMSG( "hitsensor l_count=%d",sensors[line].l_count);
     }
 
     // determine established value
@@ -272,8 +311,10 @@ mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return l
         // was it a hit?
         if (sensors[line].establish_val == 0 && in_val == 1) { // was established as low, and now established as high: this means we have a hit
             if (hit_callback == NULL) {
-                delay_printk("K"); // simple print out if no callback set
+                DELAY_PRINTK("K"); // simple print out if no callback set
+SENDUSERCONNMSG( "hitsensor we have a HIT no hit_callback");
             } else {
+SENDUSERCONNMSG( "hitsensor we have a HIT hit_callback");
                 hit_callback(line); // the hit sensor polling will wait for this to finish
             }
         } 
@@ -291,7 +332,7 @@ mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return l
 //---------------------------------------------------------------------------
 void set_hit_calibration(int seperation, int sensitivity) { // set seperation and sensitivity hit calibration values
 
-   delay_printk("Lifter: set_hit_calibration(sep/burst=%d  sens=%d) \n", seperation,sensitivity);
+   DELAY_PRINTK("Lifter: set_hit_calibration(sep/burst=%d  sens=%d) \n", seperation,sensitivity);
    
     // fix input values
     if (seperation <= 0) { seperation = 1; }
@@ -319,6 +360,7 @@ EXPORT_SYMBOL(get_hit_calibration);
 void hit_blanking_on(void) {
     spin_lock(&sensors[line].lock);
     sensors[line].blanking = 1; // turn sensor off (blanking on)
+SENDUSERCONNMSG( "hitsensor we are blanking");
     spin_unlock(&sensors[line].lock);
 }
 EXPORT_SYMBOL(hit_blanking_on);
@@ -326,6 +368,7 @@ EXPORT_SYMBOL(hit_blanking_on);
 void hit_blanking_off(void) {
     spin_lock(&sensors[line].lock);
     sensors[line].blanking = 0; // turn sensor on (blanking off)
+SENDUSERCONNMSG( "hitsensor we are not blanking");
     spin_unlock(&sensors[line].lock);
 }
 EXPORT_SYMBOL(hit_blanking_off);
@@ -393,7 +436,7 @@ static void hit_change(struct work_struct * work) {
         return;
     }
     
-    delay_printk("\n");
+    DELAY_PRINTK("\n");
 }
 
 //---------------------------------------------------------------------------
@@ -405,7 +448,7 @@ static void debug_out(unsigned long data) {
         return;
     }
     
-    delay_printk("\n");
+    DELAY_PRINTK("\n");
 }
 
 #ifdef TESTING_ON_EVAL_FAKE
@@ -444,7 +487,7 @@ static int __init target_hit_poll_init(void) {
         hb_obj_init_nt(&hb_obj, hit_poll, 5000); // heartbeat object calling hit_poll() at 5 khz
     }
     d_id = install_nl_driver(&driver); // do hit sensing once
-delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
+DELAY_PRINTK("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     atomic_set(&driver_id, d_id);
 
     atomic_set(&full_init, TRUE);

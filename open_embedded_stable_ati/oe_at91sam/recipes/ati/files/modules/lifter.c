@@ -23,7 +23,7 @@
 //---------------------------------------------------------------------------
 #define TARGET_NAME     "lifter"
 
-//#define DEBUG_SEND
+#define DEBUG_SEND
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -864,6 +864,7 @@ static void blank_off(unsigned long data) {
     }
 
     // turn off hit blanking
+SENDUSERCONNMSG( "lifter blank_off blanking off ");
     hit_blanking_off();
 }
 
@@ -886,6 +887,7 @@ static void hit_enable_change(struct work_struct * work) {
     }
 
     enable_at = atomic_read(&enable_on);
+SENDUSERCONNMSG( "lifter hit_enable_change 0 enable_at=%d=", enable_at);
     switch (atomic_read(&enable_doing)) {
         case 1:
             // new action
@@ -897,10 +899,12 @@ static void hit_enable_change(struct work_struct * work) {
                     break;
                 case ENABLE_AT_POSITION:
                     // we're at position, blanking off == sensor enabled
+SENDUSERCONNMSG( "lifter hit_enable_change 1 blanking off ");
                     hit_blanking_off();
                     break;
                 case DISABLE_AT_POSITION:
                     // we're at position, blanking on == sensor disabled
+SENDUSERCONNMSG( "lifter hit_enable_change 2 blanking on ");
                     hit_blanking_on();
                     break;
             }
@@ -911,9 +915,11 @@ static void hit_enable_change(struct work_struct * work) {
                 case BLANK_ON_CONCEALED:
                     if (lifter_position_get() == LIFTER_POSITION_DOWN || lifter_position_get() == LIFTER_POSITION_MOVING) {
                         // down, so blank
+SENDUSERCONNMSG( "lifter hit_enable_change 3 blanking off ");
                         hit_blanking_on();
                     } else {
                         // not down, don't blank
+SENDUSERCONNMSG( "lifter hit_enable_change 4 blanking on ");
                         hit_blanking_off();
                     }
                     break;
@@ -923,10 +929,12 @@ static void hit_enable_change(struct work_struct * work) {
 
 
 
+SENDUSERCONNMSG( "lifter hit_enable_change 5 blanking off ");
                     hit_blanking_off();
                     break;
                 case BLANK_ALWAYS:
                     // blank always == blank now
+SENDUSERCONNMSG( "lifter hit_enable_change 6 blanking on ");
                     hit_blanking_on();
                     break;
                 case ENABLE_AT_POSITION:
@@ -1002,6 +1010,7 @@ void lift_event(int etype) {
 
 void lift_event_internal(int etype, bool upload) {
     int enable_at = atomic_read(&enable_on);
+SENDUSERCONNMSG( "lifter lift_event_internal enable_at=%d=", enable_at);
     delay_printk("lift_event(%i)\n", etype);
 
 	// send event upstream?
@@ -1044,6 +1053,7 @@ void lift_event_internal(int etype, bool upload) {
 			switch (enable_at) {
 				case ENABLE_ALWAYS:
 					// we never blank
+SENDUSERCONNMSG( "lifter lift_event_internal 1 blanking off ");
 					hit_blanking_off();
 					break;
 				case ENABLE_AT_POSITION:
@@ -1054,11 +1064,13 @@ void lift_event_internal(int etype, bool upload) {
 					break;
 				case BLANK_ALWAYS:
 					// we always blank
+SENDUSERCONNMSG( "lifter lift_event_internal 2 blanking on ");
 					hit_blanking_on();
 					break;
 				case BLANK_ON_CONCEALED:
 					if (etype == EVENT_DOWN) {
 						// we're down; blank
+SENDUSERCONNMSG( "lifter lift_event_internal 3 blanking on ");
 						hit_blanking_on();
 					}
 					break;
@@ -1067,6 +1079,7 @@ void lift_event_internal(int etype, bool upload) {
         case EVENT_LOWER:
             if (enable_at == BLANK_ON_CONCEALED) {
 			   // blank when lowering
+SENDUSERCONNMSG( "lifter lift_event_internal 4 blanking on ");
                hit_blanking_on();
             }
             break;
@@ -1074,6 +1087,7 @@ void lift_event_internal(int etype, bool upload) {
 			if (enable_at == BLANK_ON_CONCEALED) {
 				// we're not concealed, blank a little longer, or stop blanking now
 				if (atomic_read(&blank_time) == 0) { // no blanking time
+SENDUSERCONNMSG( "lifter lift_event_internal 5 blanking off ");
 					hit_blanking_off();
 				} else {
 					mod_timer(&blank_timer, jiffies+((atomic_read(&blank_time)*HZ)/1000)); // blank for X milliseconds
