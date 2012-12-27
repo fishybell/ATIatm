@@ -653,7 +653,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     int yparam9, yparam10, yparam11, yparam12, yexists;
     int eparam1, eparam2, jparam1, jparam2;
     char eparam3[5];
-    char board[20], mversion[20], communication[20], connect[20], macaddress[20];
+    char board[20], mversion[20], communication[20], connect[20], macaddress[20], serial[20], frequency[20];
 	int farg1;
     // read as many commands out of the buffer as possible
     while (1) {
@@ -1785,6 +1785,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "I Z %s\n", readEeprom(HOME_END_LOC, HOME_END_SIZE)); // reads and prints out what it read
                      }
                      break;
+                  default:
+                     snprintf(wbuf, 1024, "Invalid\n");
+                     break;
                }
                write(client, wbuf, strnlen(wbuf,1024));
                break;
@@ -1827,7 +1830,12 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 						snprintf(communication, 20, "%s", readEeprom(COMMUNICATION_LOC, COMMUNICATION_SIZE));
                         snprintf(connect, 20, "%s", readEeprom(IP_ADDRESS_LOC, IP_ADDRESS_SIZE));
                         snprintf(macaddress, 20, "%s", readEeprom(MAC_ADDRESS_LOC, MAC_ADDRESS_SIZE));
-                        snprintf(wbuf, 1024, "J R %s %s %s %s %s\n", board, mversion, communication, connect, macaddress );
+                        snprintf(serial, 20, "%s", readEeprom(SERIAL_NUMBER_LOC, SERIAL_NUMBER_SIZE));
+                        snprintf(frequency, 20, "%s", readEeprom(RADIO_FREQ_LOC, RADIO_FREQ_SIZE));
+                        snprintf(wbuf, 1024, "J R %s %s %s %s %s %s %s\n", board, mversion, serial, communication, frequency, connect, macaddress );
+                     break;
+                  default:
+                     snprintf(wbuf, 1024, "Invalid\n");
                      break;
                }
                write(client, wbuf, strnlen(wbuf,1024));
@@ -2024,7 +2032,8 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                 // empty string, just ignore
                 break;
             default:
-//printf("unrecognized command '%c'\n", cmd[0]);
+                snprintf(wbuf, 1024, "Invalid\n");
+                write(client, wbuf, strnlen(wbuf,1024));
                 break;
         }
 
