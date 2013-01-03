@@ -49,6 +49,17 @@ void sendUserConnMsg( char *fmt, ...){
    va_end(ap);
 }
 #endif
+
+// Put this here, use values 1-15 everywhere else.
+// One day we might actually get real values for these numbers
+// Retaining comment and the original table from sit_client
+// setup calibration table
+//const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,1}; -- everything was too sensitive, so I'm making up new numbers (the old ones were made up too)
+
+// three times as desensitive as previous numbers (except 15, which gives the maximum sensitivity possible)
+static int cal_table[] = {0,1,6,12,21,33,48,66,87,111,144,180,225,425,600,1000,5000,5000};
+//atic int cal_table[] = {0,1,2, 3, 4, 5, 6, 7, 8,  9, 10, 11, 12, 13, 14,  15,5000,5000};
+
 // for ignoring hit sensor completely
 //#define TESTING_ON_EVAL
 
@@ -65,6 +76,8 @@ void sendUserConnMsg( char *fmt, ...){
 //---------------------------------------------------------------------------
 static int line = 0; // 0 for regular, 1 for miles
 module_param(line, int, S_IRUGO);
+static int sens_mult = 2; // Default to 2
+module_param(sens_mult, int, S_IRUGO);
 static int showpoll = FALSE;
 module_param(showpoll, bool, S_IRUGO);
 static int usekyle = TRUE;
@@ -100,6 +113,9 @@ typedef struct hit_sensor {
     int d1_count;
     int d2_count;
     int disconnected;
+    int sensitivity;
+    int ucount;
+    int ncount;
     int invert;
     spinlock_t lock;
     int gpio;
@@ -119,6 +135,9 @@ static hit_sensor_t sensors[] = {{
     0, // start connected 
     0, // start connected 
     0, // no inverting
+    0, // sensitivity
+    0, // integrated up count
+    0, // integrated down count
     SPIN_LOCK_UNLOCKED,
     INPUT_HIT_SENSOR,
     INPUT_HIT_SENSOR_ACTIVE_STATE,
@@ -135,6 +154,9 @@ static hit_sensor_t sensors[] = {{
     0, // start connected 
     0, // start connected 
     0, // no inverting
+    0, // sensitivity
+    0, // integrated up count
+    0, // integrated down count
     SPIN_LOCK_UNLOCKED,
     INPUT_MILES_HIT,
     INPUT_MILES_ACTIVE_STATE,
@@ -167,12 +189,10 @@ void set_hit_callback(hit_event_callback handler, hit_event_callback discon) {
     // only allow setting the callback once
     if (handler != NULL && hit_callback == NULL) {
         hit_callback = handler;
-SENDUSERCONNMSG( "hitsensor registered hit callback");
         DELAY_PRINTK("HIT SENSOR: Registered callback function for hit events\n");
     }
     if (discon != NULL && disconnected_hit_sensor_callback == NULL) {
         disconnected_hit_sensor_callback = discon;
-SENDUSERCONNMSG( "hitsensor registered disconnect callback");
         DELAY_PRINTK("HIT SENSOR: Registered callback function for disconnect hit sensor events\n");
     }
     spin_unlock(&sensors[line].lock);
@@ -303,26 +323,125 @@ static void hit_kyle(void) {
         }
 del_timer(&debug_timer); // cancel existing output
 mod_timer(&debug_timer, jiffies+((100*HZ)/1000)); // write the carraige return later
-SENDUSERCONNMSG( "hitsensor l_count=%d",sensors[line].l_count);
     }
 
+    if (sensors[line].establish_val == 1) {
+    	sensors[line].ucount += in_val;
+    }
     // determine established value
     if (--sensors[line].l_count == 0) { // tests if the new value is 0 or not
         // was it a hit?
-        if (sensors[line].establish_val == 0 && in_val == 1) { // was established as low, and now established as high: this means we have a hit
+        sensors[line].establish_val = in_val; // set as established
+        if (sensors[line].establish_val == 1) { // was established as low, and now established as high: this means we have a hit
             if (hit_callback == NULL) {
                 DELAY_PRINTK("K"); // simple print out if no callback set
-SENDUSERCONNMSG( "hitsensor we have a HIT no hit_callback");
             } else {
-SENDUSERCONNMSG( "hitsensor we have a HIT hit_callback");
                 hit_callback(line); // the hit sensor polling will wait for this to finish
             }
         } 
-        sensors[line].establish_val = in_val; // set as established
+    	sensors[line].ucount = 0;
     }
 
     // remember this value as the new last value
     sensors[line].last_val = in_val;
+
+    spin_unlock(&sensors[line].lock);
+}
+
+static void hit_randy(void) {
+    int in_val, tmp_val;
+
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+    
+    // We have 2 microseconds to complete operations, so die if we can't lock
+    if (!spin_trylock(&sensors[line].lock)) {
+        return;
+    }
+
+    tmp_val = at91_get_gpio_value(sensors[line].gpio);
+// don't look for disconnected hit sensor if we are on an eval board
+#ifndef TESTING_ON_EVAL
+   // Line is high see look for disconnected hit sensor
+   if (tmp_val) {
+      sensors[line].d_count ++;
+      if ( sensors[line].d_count > 10000) {
+         sensors[line].d_count = 10000;
+         if (!sensors[line].disconnected) {
+            sensors[line].disconnected = 1;
+            if (disconnected_hit_sensor_callback != NULL) {
+               disconnected_hit_sensor_callback(sensors[line].disconnected);
+            }
+         } else {
+            sensors[line].d1_count ++;
+            if ( sensors[line].d1_count > 10000) {
+               sensors[line].d1_count = 0;
+               sensors[line].d2_count ++;
+               if ( sensors[line].d2_count > 30) {
+                  sensors[line].d2_count = 0;
+                  if (disconnected_hit_sensor_callback != NULL) {
+                     disconnected_hit_sensor_callback(sensors[line].disconnected);
+                  }
+               }
+            }
+         }
+      }
+   } else {
+      sensors[line].d_count --;
+      if ( sensors[line].d_count < 0) {
+         sensors[line].d_count = 0;
+         if (sensors[line].disconnected) {
+            sensors[line].disconnected = 0;
+            if (disconnected_hit_sensor_callback != NULL) {
+               disconnected_hit_sensor_callback(sensors[line].disconnected);
+            }
+         }
+      }
+   }
+#endif
+
+    // if we're blanking the input or disconnected, ignore everything
+    if (sensors[line].blanking || sensors[line].disconnected) {
+        spin_unlock(&sensors[line].lock);
+        return;
+    }
+
+    // NDB - don't check the value twice in the same loop - in_val = at91_get_gpio_value(sensors[line].gpio) == sensors[line].active; // do a test so the value of in_val can be 0 for non-hit and 1 for hit
+    in_val = tmp_val == sensors[line].active; // do a test so the value of in_val can be 0 for non-hit and 1 for hit
+#ifdef TESTING_ON_EVAL
+    in_val = 0; // ignore hit sensor on eval board
+#endif
+
+    // invert if needed
+    if (sensors[line].invert) {
+        in_val = !in_val;
+    }
+
+// ncount is the time between hits
+    if (in_val == 1) {
+    	++sensors[line].ucount;
+    	sensors[line].ncount = 0;
+        if (!sensors[line].l_count && (sensors[line].ucount == sensors[line].sens_cal)){
+    	    ++sensors[line].l_count;
+            if (hit_callback == NULL) {
+                DELAY_PRINTK("K"); // simple print out if no callback set
+            } else {
+SENDUSERCONNMSG( "HIT counted %d", sensors[line].ucount);
+                hit_callback(line); // the hit sensor polling will wait for this to finish
+            }
+        }
+    } else {
+        if (sensors[line].ncount < sensors[line].sep_cal){
+    	    ++sensors[line].ncount;
+        } else if (sensors[line].ncount == sensors[line].sep_cal){
+    	    ++sensors[line].ncount;
+SENDUSERCONNMSG( "HIT reset at %d", sensors[line].ucount);
+    	    sensors[line].ucount = 0;
+    	    sensors[line].l_count = 0;
+        }
+    }
 
     spin_unlock(&sensors[line].lock);
 }
@@ -337,19 +456,22 @@ void set_hit_calibration(int seperation, int sensitivity) { // set seperation an
     // fix input values
     if (seperation <= 0) { seperation = 1; }
     if (sensitivity <= 0) { sensitivity = 1; }
+//    if (sensitivity > 15) { sensitivity = 15; }
 
     // calibrate
     spin_lock(&sensors[line].lock);
-    sensors[line].sep_cal = seperation*5; // convert milliseconds to ticks
-    sensors[line].sens_cal = sensitivity;
+    sensors[line].sep_cal = seperation; // convert milliseconds to ticks
+    sensors[line].sensitivity = sensitivity;
+/*    sensors[line].sens_cal = cal_table[sensitivity];	*/
+    sensors[line].sens_cal = sensitivity * sens_mult;
     spin_unlock(&sensors[line].lock);
 }
 EXPORT_SYMBOL(set_hit_calibration);
 
 void get_hit_calibration(int *seperation, int *sensitivity) { // get seperation and sensitivity hit calibration values
     spin_lock(&sensors[line].lock);
-    *seperation = sensors[line].sep_cal/5; // convert ticks to milliseconds
-    *sensitivity = sensors[line].sens_cal;
+    *seperation = sensors[line].sep_cal; // convert ticks to milliseconds
+    *sensitivity = sensors[line].sensitivity;
     spin_unlock(&sensors[line].lock);
 }
 EXPORT_SYMBOL(get_hit_calibration);
@@ -360,7 +482,6 @@ EXPORT_SYMBOL(get_hit_calibration);
 void hit_blanking_on(void) {
     spin_lock(&sensors[line].lock);
     sensors[line].blanking = 1; // turn sensor off (blanking on)
-SENDUSERCONNMSG( "hitsensor we are blanking");
     spin_unlock(&sensors[line].lock);
 }
 EXPORT_SYMBOL(hit_blanking_on);
@@ -368,7 +489,6 @@ EXPORT_SYMBOL(hit_blanking_on);
 void hit_blanking_off(void) {
     spin_lock(&sensors[line].lock);
     sensors[line].blanking = 0; // turn sensor on (blanking off)
-SENDUSERCONNMSG( "hitsensor we are not blanking");
     spin_unlock(&sensors[line].lock);
 }
 EXPORT_SYMBOL(hit_blanking_off);
@@ -482,7 +602,8 @@ static int __init target_hit_poll_init(void) {
 
     // setup heartbeat for polling
     if (usekyle) {
-        hb_obj_init_nt(&hb_obj, hit_kyle, 5000); // heartbeat object calling hit_poll() at 5 khz
+//        hb_obj_init_nt(&hb_obj, hit_kyle, 1000); // heartbeat object calling hit_poll() at 5 khz
+        hb_obj_init_nt(&hb_obj, hit_randy, 1000); // heartbeat object calling hit_poll() at 5 khz
     } else {
         hb_obj_init_nt(&hb_obj, hit_poll, 5000); // heartbeat object calling hit_poll() at 5 khz
     }

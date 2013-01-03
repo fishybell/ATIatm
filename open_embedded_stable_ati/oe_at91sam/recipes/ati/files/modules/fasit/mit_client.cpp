@@ -342,11 +342,14 @@ FUNCTION_START("::handle_2100(int start, int end)")
          }
          if (htons(msg->burst)) lastHitCal.seperation = htons(msg->burst);      // spec says we only set if non-Zero
          if (htons(msg->sens)) {
+             lastHitCal.sensitivity = htons(msg->sens);
+/* We do not use the cal_table anymore, see target_hit_poll
              if (htons(msg->sens) > 15) {
                  lastHitCal.sensitivity = cal_table[15];
              } else {
                  lastHitCal.sensitivity = cal_table[htons(msg->sens)];
              }
+*/
          }
 
          if (htons(msg->tokill))  lastHitCal.hits_to_kill = htons(msg->tokill); 

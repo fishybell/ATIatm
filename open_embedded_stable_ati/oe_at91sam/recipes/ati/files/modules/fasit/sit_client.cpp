@@ -18,6 +18,7 @@ using namespace std;
 // setup calibration table
 //const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,1}; -- everything was too sensitive, so I'm making up new numbers (the old ones were made up too)
 
+    // We do not use the cal_table here anymore, see target_hit_poll
 const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,1000,600,425,225,180,144,111,87,66,48,33,21,12,6,1}; // three times as desensitive as previous numbers (except 15, which gives the maximum sensitivity possible)
 
 
@@ -169,6 +170,9 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
     msg->body.hit_conf.react = lastHitCal.after_kill;
     msg->body.hit_conf.tokill = htons(lastHitCal.hits_to_kill);
 
+    // We do not use the cal_table here anymore, see target_hit_poll
+    msg->body.hit_conf.sens = htons(lastHitCal.sensitivity);
+/*
     // use lookup table, as our sensitivity values don't match up to FASIT's
     for (int i=15; i>=0; i--) { // count backwards from most sensitive to least
         if (lastHitCal.sensitivity <= cal_table[i]) { // map our cal value to theirs
@@ -180,6 +184,7 @@ void SIT_Client::fillStatus2102(FASIT_2102 *msg) {
     if (msg->body.hit_conf.sens == htons(15)) {
         msg->body.hit_conf.sens = htons(fake_sens);
     }
+*/
 
     msg->body.hit_conf.burst = htons(lastHitCal.seperation); // burst seperation
     msg->body.hit_conf.mode = lastHitCal.type; // single, etc.
@@ -669,11 +674,14 @@ int SIT_Client::handle_2100(int start, int end) {
             }
             if (htons(msg->burst)) lastHitCal.seperation = htons(msg->burst);      // spec says we only set if non-Zero
             if (htons(msg->sens)) {
+                lastHitCal.sensitivity = htons(msg->sens);
+/* we do not use the cal_table anymore here, see target_hit_poll
                 if (htons(msg->sens) > 15) {
                     lastHitCal.sensitivity = cal_table[15];
                 } else {
                     lastHitCal.sensitivity = cal_table[htons(msg->sens)];
                 }
+*/
                 // remember told value for later
                 fake_sens = htons(msg->sens);
             }
