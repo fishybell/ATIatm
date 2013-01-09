@@ -437,7 +437,7 @@ SENDUSERCONNMSG( "HIT counted %d", sensors[line].ucount);
     	    ++sensors[line].ncount;
         } else if (sensors[line].ncount == sensors[line].sep_cal){
     	    ++sensors[line].ncount;
-SENDUSERCONNMSG( "HIT reset at %d", sensors[line].ucount);
+SENDUSERCONNMSG( "HIT magnitude %d", sensors[line].ucount);
     	    sensors[line].ucount = 0;
     	    sensors[line].l_count = 0;
         }
