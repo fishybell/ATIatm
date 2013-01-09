@@ -14,6 +14,15 @@ echo "Extracting Files"
 echo ""
 
 tail -n +$SKIP $THIS | tar -xj
+TARVAL=$?
+if [ $TARVAL -ne 0 ]
+then
+   echo "Bad TAR file ... Contact Software Team"
+   echo "Install FAILED"
+   exit 1
+else
+   echo "Extract Successful ..."
+fi
 
 echo "Changing Owner and Group"
 echo ""
@@ -26,22 +35,43 @@ chmod +x ati2/files/*
 
 echo "Copying files"
 echo ""
-ls *.arm | while read i ; do
-   mv /usr/bin/$i /usr/bin/$i.old
-   mv $i /usr/bin
-done
-mv /usr/bin/bcast_client /usr/bin/bcast_client.old
-mv bcast_client /usr/bin
-mv /usr/bin/bcast_server /usr/bin/bcast_server.old
-mv bcast_server /usr/bin
-mv /usr/bin/bit_button /usr/bin/bit_button.old
-mv bit_button /usr/bin
-mv /usr/bin/event_conn /usr/bin/event_conn.old
-mv event_conn /usr/bin
-mv /usr/bin/fasit_conn /usr/bin/fasit_conn.old
-mv fasit_conn /usr/bin
-mv /usr/bin/user_conn /usr/bin/user_conn.old
-mv user_conn /usr/bin
+if [ -e dtxm_edit.arm ]
+then
+    ls *.arm | while read i ; do
+       mv /usr/bin/$i /usr/bin/$i.old
+       mv $i /usr/bin
+    done
+fi
+if [ -e ./bcast_client ]
+then
+   mv /usr/bin/bcast_client /usr/bin/bcast_client.old
+   mv bcast_client /usr/bin
+fi
+if [ -e ./bcast_server ]
+then
+   mv /usr/bin/bcast_server /usr/bin/bcast_server.old
+   mv bcast_server /usr/bin
+fi
+if [ -e ./bit_button ]
+then
+   mv /usr/bin/bit_button /usr/bin/bit_button.old
+   mv bit_button /usr/bin
+fi
+if [ -e ./bit_button ]
+then
+   mv /usr/bin/event_conn /usr/bin/event_conn.old
+   mv event_conn /usr/bin
+fi
+if [ -e ./bit_button ]
+then
+   mv /usr/bin/fasit_conn /usr/bin/fasit_conn.old
+   mv fasit_conn /usr/bin
+fi
+if [ -e ./bit_button ]
+then
+   mv /usr/bin/user_conn /usr/bin/user_conn.old
+   mv user_conn /usr/bin
+fi
 mv ati2/files/fixhost /etc/init.d
 mv ati2/files/start_up /etc/init.d
 mv ati2/files/networking /etc/init.d
