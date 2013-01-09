@@ -18,7 +18,8 @@ TARVAL=$?
 if [ $TARVAL -ne 0 ]
 then
    echo "Bad TAR file ... Contact Software Team"
-   echo "Install FAILED"
+   echo -n "Install FAILED ... Press any key"
+   read -sn 1
    exit 1
 else
    echo "Extract Successful ..."
