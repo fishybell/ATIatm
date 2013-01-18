@@ -290,16 +290,25 @@
             this.rebootButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage6 = new System.Windows.Forms.TabPage();
+            this.macCancelBTN = new System.Windows.Forms.Button();
             this.progressBarMac = new System.Windows.Forms.ProgressBar();
             this.SaveBTN = new System.Windows.Forms.Button();
             this.macLabel = new System.Windows.Forms.Label();
             this.clearMACBTN = new System.Windows.Forms.Button();
             this.generateBTN = new System.Windows.Forms.Button();
             this.macListTB = new System.Windows.Forms.TextBox();
+            this.tabPage7 = new System.Windows.Forms.TabPage();
+            this.sensitivityNoteLBL = new System.Windows.Forms.Label();
+            this.currReceivedLBL = new System.Windows.Forms.Label();
+            this.label52 = new System.Windows.Forms.Label();
+            this.currHitLBL = new System.Windows.Forms.Label();
+            this.label51 = new System.Windows.Forms.Label();
+            this.label50 = new System.Windows.Forms.Label();
             this.macTimer = new System.Windows.Forms.Timer(this.components);
             this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
             this.label49 = new System.Windows.Forms.Label();
             this.pmavLBL = new System.Windows.Forms.Label();
+            this.settingErrLBL = new System.Windows.Forms.Label();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.confirmDfltPanel.SuspendLayout();
@@ -319,6 +328,7 @@
             this.tabPage1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabPage6.SuspendLayout();
+            this.tabPage7.SuspendLayout();
             this.SuspendLayout();
             // 
             // label9
@@ -344,7 +354,7 @@
             // label16
             // 
             this.label16.AutoSize = true;
-            this.label16.Location = new System.Drawing.Point(464, 47);
+            this.label16.Location = new System.Drawing.Point(494, 47);
             this.label16.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label16.Name = "label16";
             this.label16.Size = new System.Drawing.Size(73, 17);
@@ -383,7 +393,7 @@
             "25: Disable Battery Check",
             "26: Error",
             "Unknown"});
-            this.eventCB.Location = new System.Drawing.Point(545, 44);
+            this.eventCB.Location = new System.Drawing.Point(575, 44);
             this.eventCB.Margin = new System.Windows.Forms.Padding(4);
             this.eventCB.Name = "eventCB";
             this.eventCB.Size = new System.Drawing.Size(173, 24);
@@ -1545,7 +1555,7 @@
             // firmMultButton
             // 
             this.firmMultButton.Enabled = false;
-            this.firmMultButton.Location = new System.Drawing.Point(140, 273);
+            this.firmMultButton.Location = new System.Drawing.Point(168, 273);
             this.firmMultButton.Name = "firmMultButton";
             this.firmMultButton.Size = new System.Drawing.Size(100, 28);
             this.firmMultButton.TabIndex = 103;
@@ -1622,7 +1632,7 @@
             // label42
             // 
             this.label42.AutoSize = true;
-            this.label42.Location = new System.Drawing.Point(491, 78);
+            this.label42.Location = new System.Drawing.Point(521, 78);
             this.label42.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label42.Name = "label42";
             this.label42.Size = new System.Drawing.Size(47, 17);
@@ -1631,7 +1641,7 @@
             // 
             // errorTB
             // 
-            this.errorTB.Location = new System.Drawing.Point(545, 76);
+            this.errorTB.Location = new System.Drawing.Point(575, 76);
             this.errorTB.Name = "errorTB";
             this.errorTB.Size = new System.Drawing.Size(173, 22);
             this.errorTB.TabIndex = 101;
@@ -2684,6 +2694,7 @@
             // 
             // tabPage2
             // 
+            this.tabPage2.Controls.Add(this.settingErrLBL);
             this.tabPage2.Controls.Add(this.staticTB);
             this.tabPage2.Controls.Add(this.label36);
             this.tabPage2.Controls.Add(this.setSettingsBTN);
@@ -2718,6 +2729,7 @@
             this.staticTB.Size = new System.Drawing.Size(132, 22);
             this.staticTB.TabIndex = 50;
             this.staticTB.Click += new System.EventHandler(this.staticTB_Click);
+            this.staticTB.Leave += new System.EventHandler(this.staticTB_Leave);
             // 
             // label36
             // 
@@ -2852,6 +2864,7 @@
             this.ipTB.Size = new System.Drawing.Size(132, 22);
             this.ipTB.TabIndex = 43;
             this.ipTB.Click += new System.EventHandler(this.ipTB_Click);
+            this.ipTB.Leave += new System.EventHandler(this.ipTB_Leave);
             // 
             // label6
             // 
@@ -3030,7 +3043,7 @@
             this.multipleLB.Location = new System.Drawing.Point(14, 273);
             this.multipleLB.Name = "multipleLB";
             this.multipleLB.SelectionMode = System.Windows.Forms.SelectionMode.MultiExtended;
-            this.multipleLB.Size = new System.Drawing.Size(120, 68);
+            this.multipleLB.Size = new System.Drawing.Size(148, 68);
             this.multipleLB.Sorted = true;
             this.multipleLB.TabIndex = 105;
             this.multipleLB.SelectedIndexChanged += new System.EventHandler(this.listBox1_SelectedIndexChanged);
@@ -3455,6 +3468,7 @@
             this.tabControl1.Controls.Add(this.tabPage3);
             this.tabControl1.Controls.Add(this.tabPage4);
             this.tabControl1.Controls.Add(this.tabPage6);
+            this.tabControl1.Controls.Add(this.tabPage7);
             this.tabControl1.Location = new System.Drawing.Point(16, 85);
             this.tabControl1.Margin = new System.Windows.Forms.Padding(4);
             this.tabControl1.Name = "tabControl1";
@@ -3465,6 +3479,7 @@
             // 
             // tabPage6
             // 
+            this.tabPage6.Controls.Add(this.macCancelBTN);
             this.tabPage6.Controls.Add(this.progressBarMac);
             this.tabPage6.Controls.Add(this.SaveBTN);
             this.tabPage6.Controls.Add(this.macLabel);
@@ -3478,9 +3493,19 @@
             this.tabPage6.Text = "MAC List";
             this.tabPage6.UseVisualStyleBackColor = true;
             // 
+            // macCancelBTN
+            // 
+            this.macCancelBTN.Location = new System.Drawing.Point(721, 308);
+            this.macCancelBTN.Name = "macCancelBTN";
+            this.macCancelBTN.Size = new System.Drawing.Size(75, 28);
+            this.macCancelBTN.TabIndex = 7;
+            this.macCancelBTN.Text = "Cancel";
+            this.macCancelBTN.UseVisualStyleBackColor = true;
+            this.macCancelBTN.Click += new System.EventHandler(this.macCancelBTN_Click);
+            // 
             // progressBarMac
             // 
-            this.progressBarMac.Location = new System.Drawing.Point(299, 22);
+            this.progressBarMac.Location = new System.Drawing.Point(304, 22);
             this.progressBarMac.Name = "progressBarMac";
             this.progressBarMac.Size = new System.Drawing.Size(319, 23);
             this.progressBarMac.TabIndex = 6;
@@ -3535,6 +3560,78 @@
             this.macListTB.Size = new System.Drawing.Size(752, 249);
             this.macListTB.TabIndex = 1;
             // 
+            // tabPage7
+            // 
+            this.tabPage7.Controls.Add(this.sensitivityNoteLBL);
+            this.tabPage7.Controls.Add(this.currReceivedLBL);
+            this.tabPage7.Controls.Add(this.label52);
+            this.tabPage7.Controls.Add(this.currHitLBL);
+            this.tabPage7.Controls.Add(this.label51);
+            this.tabPage7.Controls.Add(this.label50);
+            this.tabPage7.Location = new System.Drawing.Point(4, 25);
+            this.tabPage7.Name = "tabPage7";
+            this.tabPage7.Size = new System.Drawing.Size(841, 353);
+            this.tabPage7.TabIndex = 6;
+            this.tabPage7.Text = "Troubleshooting";
+            this.tabPage7.UseVisualStyleBackColor = true;
+            // 
+            // sensitivityNoteLBL
+            // 
+            this.sensitivityNoteLBL.AutoSize = true;
+            this.sensitivityNoteLBL.Location = new System.Drawing.Point(263, 36);
+            this.sensitivityNoteLBL.Name = "sensitivityNoteLBL";
+            this.sensitivityNoteLBL.Size = new System.Drawing.Size(147, 17);
+            this.sensitivityNoteLBL.TabIndex = 5;
+            this.sensitivityNoteLBL.Text = "Current Hit Sensitivity.";
+            // 
+            // currReceivedLBL
+            // 
+            this.currReceivedLBL.AutoSize = true;
+            this.currReceivedLBL.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.currReceivedLBL.ForeColor = System.Drawing.SystemColors.Highlight;
+            this.currReceivedLBL.Location = new System.Drawing.Point(233, 82);
+            this.currReceivedLBL.Name = "currReceivedLBL";
+            this.currReceivedLBL.Size = new System.Drawing.Size(53, 17);
+            this.currReceivedLBL.TabIndex = 4;
+            this.currReceivedLBL.Text = "         ";
+            // 
+            // label52
+            // 
+            this.label52.AutoSize = true;
+            this.label52.Location = new System.Drawing.Point(27, 82);
+            this.label52.Name = "label52";
+            this.label52.Size = new System.Drawing.Size(180, 17);
+            this.label52.TabIndex = 3;
+            this.label52.Text = "Last Magnitude Received =";
+            // 
+            // currHitLBL
+            // 
+            this.currHitLBL.AutoSize = true;
+            this.currHitLBL.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.currHitLBL.Location = new System.Drawing.Point(195, 36);
+            this.currHitLBL.Name = "currHitLBL";
+            this.currHitLBL.Size = new System.Drawing.Size(0, 17);
+            this.currHitLBL.TabIndex = 2;
+            // 
+            // label51
+            // 
+            this.label51.AutoSize = true;
+            this.label51.Location = new System.Drawing.Point(27, 36);
+            this.label51.Name = "label51";
+            this.label51.Size = new System.Drawing.Size(142, 17);
+            this.label51.TabIndex = 1;
+            this.label51.Text = "Last Hit Recorded >=";
+            // 
+            // label50
+            // 
+            this.label50.AutoSize = true;
+            this.label50.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Underline, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label50.Location = new System.Drawing.Point(24, 15);
+            this.label50.Name = "label50";
+            this.label50.Size = new System.Drawing.Size(92, 17);
+            this.label50.TabIndex = 0;
+            this.label50.Text = "Hit Sensitivity";
+            // 
             // macTimer
             // 
             this.macTimer.Interval = 1000;
@@ -3561,9 +3658,17 @@
             this.pmavLBL.AutoSize = true;
             this.pmavLBL.Location = new System.Drawing.Point(763, 471);
             this.pmavLBL.Name = "pmavLBL";
-            this.pmavLBL.Size = new System.Drawing.Size(54, 17);
+            this.pmavLBL.Size = new System.Drawing.Size(0, 17);
             this.pmavLBL.TabIndex = 106;
-            this.pmavLBL.Text = "label50";
+            // 
+            // settingErrLBL
+            // 
+            this.settingErrLBL.AutoSize = true;
+            this.settingErrLBL.Location = new System.Drawing.Point(24, 329);
+            this.settingErrLBL.Name = "settingErrLBL";
+            this.settingErrLBL.Size = new System.Drawing.Size(32, 17);
+            this.settingErrLBL.TabIndex = 51;
+            this.settingErrLBL.Text = "      ";
             // 
             // Form1
             // 
@@ -3631,6 +3736,8 @@
             this.tabControl1.ResumeLayout(false);
             this.tabPage6.ResumeLayout(false);
             this.tabPage6.PerformLayout();
+            this.tabPage7.ResumeLayout(false);
+            this.tabPage7.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -3914,6 +4021,15 @@
         private System.Windows.Forms.Label label48;
         private System.Windows.Forms.Label label49;
         private System.Windows.Forms.Label pmavLBL;
+        private System.Windows.Forms.Button macCancelBTN;
+        private System.Windows.Forms.TabPage tabPage7;
+        private System.Windows.Forms.Label currHitLBL;
+        private System.Windows.Forms.Label label51;
+        private System.Windows.Forms.Label label50;
+        private System.Windows.Forms.Label currReceivedLBL;
+        private System.Windows.Forms.Label label52;
+        private System.Windows.Forms.Label sensitivityNoteLBL;
+        private System.Windows.Forms.Label settingErrLBL;
     }
 }
 

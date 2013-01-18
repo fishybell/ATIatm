@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
@@ -24,12 +25,15 @@ namespace pmaGUI
         String currentMacItem = "";
         String report = "";
         bool macReceived = false;
+        bool typeReceived = false;
+        bool versionReceived = false;
         bool generating = false;
         int macIndex = 0;
         List<Control> changedList = new List<Control>();
         List<Control> settingsList = new List<Control>();
         List<String> ipList = new List<String>();
         List<String> macLines = new List<String>();
+        ArrayList fixedList = new ArrayList();
 
         //Eeprom listener;
         public delegate void serviceGUIDelegate();
@@ -37,7 +41,7 @@ namespace pmaGUI
         {
             InitializeComponent();
             pmavLBL.Text = ProductVersion;
-            
+
             // Populate the drop down list with machines that are broadcasting
             //FindMachines();
         }
@@ -131,8 +135,9 @@ namespace pmaGUI
                 if (!generating)
                 {
                     setBoardType();
-                    setMAC();
                     setVersion();
+                    setCalibration();
+                    setMAC();
                 }
                 conn.StartProcess(machine);
                 return true;
@@ -360,6 +365,19 @@ namespace pmaGUI
             {
                 conn.sendMessage("I M");
                 logSent("I M");
+            }
+        }
+
+
+        /***********************************************
+        * Set the board type as soon as a connection happens
+        * ********************************************/
+        private void setCalibration()
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("L");
+                logSent("L");
             }
         }
 
@@ -824,7 +842,7 @@ namespace pmaGUI
                     calShowButton.Enabled = false;
                     accSetButton.Enabled = false;
                     accShowButton.Enabled = false;
-                    staticTB.Enabled = false;
+                    //staticTB.Enabled = false;
                     expSShowButton.Enabled = false;
                     break;
                 case "SIT":
@@ -836,7 +854,7 @@ namespace pmaGUI
                     knobShowButton.Enabled = false;
                     modeShowButton.Enabled = false;
                     modeSetButton.Enabled = false;
-                    staticTB.Enabled = false;
+                    //staticTB.Enabled = false;
                     break;
                 case "SAT":
                     enableAll();
@@ -847,7 +865,7 @@ namespace pmaGUI
                     knobShowButton.Enabled = false;
                     modeShowButton.Enabled = false;
                     modeSetButton.Enabled = false;
-                    staticTB.Enabled = false;
+                    //staticTB.Enabled = false;
                     break;
                 case "MIT":
                 case "MITP":
@@ -915,7 +933,7 @@ namespace pmaGUI
                     calShowButton.Enabled = false;
                     accSetButton.Enabled = false;
                     accShowButton.Enabled = false;
-                    staticTB.Enabled = false;
+                    //staticTB.Enabled = false;
                     break;
             }
         }
@@ -1148,6 +1166,20 @@ namespace pmaGUI
             {
                 second = message.ElementAt(2);
             }
+            if (message.Contains("INFO")){
+                string[] hitReceived = message.Split(' ');
+                string received = hitReceived[hitReceived.Length - 1];
+                if (message.Contains("HIT counted"))
+                {
+                    currHitLBL.Text = received;
+                    currReceivedLBL.Text = "";
+                }
+                else if (message.Contains("HIT magnitude"))
+                {
+                    currReceivedLBL.Text = received;
+                }
+                return;
+            }
             switch (first)
             {
                 case 'A':   // position
@@ -1221,6 +1253,7 @@ namespace pmaGUI
                     calTB3.Text = calSplit[2];
                     calCB4.SelectedIndex = Convert.ToInt32(calSplit[3]);
                     logSent("L " + getMessageValue(message, 2));
+                    sensitivityNoteLBL.Text = "Current Hit Sensitivity (" + calTB2.Text + ")"; 
                     break;
                 case 'M':   // move speed
                     speedTB.ForeColor = SystemColors.MenuHighlight;
@@ -1323,6 +1356,7 @@ namespace pmaGUI
                             disableEnable(boardType);
                             targetCB.Text = machine;
                             logSent("I B " + getMessageValue(message, 4));
+                            typeReceived = true;
                             break;
                         case 'C':   // connection port
                             connectTB.Text = getMessageValue(message, 4);
@@ -1462,6 +1496,7 @@ namespace pmaGUI
                                 passwordPanel.Visible = false;
                                 // Get last 4 characters of MAC to display
                                 macOTB.Text = valid.Substring(12, 5);
+                                macReceived = true;
                             }
                             logSent("I M " + getMessageValue(message, 4));
                             break;
@@ -1634,6 +1669,7 @@ namespace pmaGUI
                         case 'A':   // Major Flash Version
                             versionLBL.Text = getMessageValue(message, 4);
                             logSent("J A " + getMessageValue(message, 4));
+                            versionReceived = true;
                             break;
                         case 'C':   // Program radio?
                             if (getMessageValue(message, 4) == "Y")
@@ -1698,6 +1734,7 @@ namespace pmaGUI
                 {
                     setBoardType();
                     setMAC();
+                    setCalibration();
                     setVersion();
                 }
                 conn.StartProcess(machine);
@@ -2743,6 +2780,7 @@ namespace pmaGUI
             clear_button.Font = new Font(rebootButton.Font, FontStyle.Regular);
             targetCB.Items.Clear();
             multipleLB.Items.Clear();
+            errorLBL.Text = targetCB.Items.Count + " Available Targets";
         }
 
         private void VersionViewButton_Click(object sender, EventArgs e)
@@ -2842,6 +2880,13 @@ namespace pmaGUI
 
         private void setSettingsBTN_Click(object sender, EventArgs e)
         {
+            // Make sure there are no errors with string formats
+            if (!goodIP(ipTB.Text) || !goodIP(staticTB.Text))
+            {
+                //error message
+                settingErrLBL.Text = "Please fix the formatting errors before you continue.";
+                return;
+            }
             if (conn != null)
             {
                 // Change the reboot appearance because it needs to be clicked for
@@ -3327,20 +3372,20 @@ namespace pmaGUI
             // Grab the file info
             if (openDialog2.ShowDialog() == DialogResult.OK)
             {
-                String batFile = ".\\atifirmwarecopyall.bat";
-                //String batFile = "atifirmwarecopyall.bat";
+                //String batFile = ".\\atifirmwarecopyall.bat";
+                String batFile = "atifirmwarecopyall.bat";
 
-                //bool exists = File.Exists(batFile);
                 // Get Selected IPs
                 psi2.FileName = batFile;
                 String shellFile = openDialog2.SafeFileName;
-                //psi2.Arguments = machine + " " + openDialog2.FileName + " " + shellFile + " root shoot";
                 string longFileName = openDialog2.FileName;
                 string arguments = "\""+ longFileName + "\"" + " " + shellFile + " root shoot ";
                 for (int i = 0; i < multipleLB.SelectedItems.Count; i++)
                 {
                     arguments += multipleLB.SelectedItems[i] + " ";
                 }
+                //makeArray();
+                
                 psi2.Arguments = arguments;
 
                 // Create new process and set the starting information
@@ -3382,6 +3427,22 @@ namespace pmaGUI
                 }
 
             }
+        }
+
+        private ArrayList makeArray()
+        {
+            fixedList.Clear();
+
+            //TextReader tr = new StreamReader(".\\randy.ips");
+            TextReader tr = new StreamReader("randy.ips");
+            string line = tr.ReadLine();
+            while (line != null)
+            {
+                fixedList.Add(line);
+                line = tr.ReadLine();
+            }
+
+            return fixedList;
         }
 
 
@@ -3451,55 +3512,66 @@ namespace pmaGUI
             string item = "";
             macLabel.Text = "Generating...";
             generating = true;
-            errorLBL.Update();
             macReceived = false;
+            errorLBL.Update();
             progressBarMac.Visible = true;
 
             // Start with ip address 0 and then move on everytime a new mac is received
-            if (macIndex < multipleLB.Items.Count)
+            for (int i = 0; i < 2; i++)
             {
-                item = (string)multipleLB.Items[macIndex];
-            }
-            else
-            {
-                macLabel.Text = "";
-                progressBarMac.Visible = false;
-                macIndex = 0;
-                generating = false;
-                return;
-            }
-            if (useNewTarget(item) && !macListTB.Text.Contains(item))
-            {
-                currentMacItem = item;
-                getReport();
+                if (macIndex < multipleLB.Items.Count)
+                {
+                    item = (string)multipleLB.Items[macIndex];
+                }
+                else
+                {
+                    macLabel.Text = "";
+                    progressBarMac.Visible = false;
+                    macIndex = 0;
+                    generating = false;
+                    return;
+                }
+                if (useNewTarget(item) && !macListTB.Text.Contains(item))
+                {
+                    currentMacItem = item;
+                    getReport();
 
-                // Wait until the new mac has come through
-                macTimer.Start();
-            }
-            else
-            {
-                macIndex++;
-                generateBTN_Click(sender, e);
-            }
+                    // Wait until the new mac has come through
+                    macTimer.Start();
+                }
+                else
+                {
+                    macIndex++;
+                    generateBTN_Click(sender, e);
+                }
 
+            }
+            
         }
 
         private void macTimer_Tick(object sender, EventArgs e)
+        {
+            getNewReport(sender, e);
+        }
+
+        private void getNewReport(object sender, EventArgs e)
         {
             if (macReceived)
             {
                 String thisMac = macOTB.Text;
                 // Send Target's IP and Mac to Mac List box
-                const string format = "{0,-20} {1,-15} {2,-15} {3,-25} {4,-20} {5,-15}";
+                const string format = "{0,-20} {1,-15} {2,-25} {3,-15} {4,-25} {5,-20} {6,-15} {7,-15}";
                 string[] splitReport = report.Split(' ');
                 string ipInfo = "IP: " + currentMacItem;
                 string boardInfo = "Type: " + splitReport[0];
                 string versionInfo = "Version: " + splitReport[1];
-                string comm = "Comm: " + splitReport[2];
-                string connectIP = "Connect IP: " + splitReport[3];
-                string macInfo = "MAC: " + splitReport[4].Substring(12, 5);
-                
-                string infoLine = string.Format(format, ipInfo, macInfo, boardInfo, versionInfo, comm, connectIP);
+                string serial = "Serial: " + splitReport[2];
+                string comm = "Comm: " + splitReport[3];
+                string frequency = "Freq: " + splitReport[4];
+                string connectIP = "Connect IP: " + splitReport[5];
+                string macInfo = "MAC: " + splitReport[6].Substring(12, 5);
+
+                string infoLine = string.Format(format, ipInfo, macInfo, serial, boardInfo, versionInfo, comm, frequency, connectIP);
                 macListTB.AppendText(infoLine + "\n");
                 macLines.Add(infoLine);
                 macReceived = false;
@@ -3509,6 +3581,7 @@ namespace pmaGUI
                 generateBTN_Click(sender, e);
             }
         }
+
 
         private void clearMACBTN_Click(object sender, EventArgs e)
         {
@@ -3554,6 +3627,53 @@ namespace pmaGUI
         private void cancelDfltBTN_Click(object sender, EventArgs e)
         {
             confirmDfltPanel.Visible = false;
+        }
+
+        private void macCancelBTN_Click(object sender, EventArgs e)
+        {
+            macTimer.Stop();
+            macIndex = 0; 
+            macLabel.Text = "";
+            progressBarMac.Value = 0;
+            progressBarMac.Visible = false;
+        }
+
+        private bool goodIP(string ip)
+        {
+            string[] ips = ip.Split('.');
+            if (ips.Count() != 4) return false;
+
+            foreach (var item in ips)
+            {
+                // Check if they are numbers
+                char[] pieces = item.ToCharArray();
+                for (int i = 0; i < pieces.Length; i++)
+                {
+                    if (!Char.IsDigit(pieces[i])) return false;
+                }
+                // Check the range is between 0-255 
+                int number = Convert.ToInt32(item);
+                if (number < 0 || number > 255) return false;
+            }
+            return true;
+        }
+
+        private void staticTB_Leave(object sender, EventArgs e)
+        {
+            if (!goodIP(staticTB.Text))
+            {
+                //error message
+                settingErrLBL.Text = "The IP is in an incorrect format.";
+            }
+        }
+
+        private void ipTB_Leave(object sender, EventArgs e)
+        {
+            if (!goodIP(ipTB.Text))
+            {
+                //error message
+                settingErrLBL.Text = "The IP is in an incorrect format.";
+            }
         }
 
     }
