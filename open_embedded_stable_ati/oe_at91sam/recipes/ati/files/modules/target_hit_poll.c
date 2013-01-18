@@ -419,10 +419,19 @@ static void hit_randy(void) {
         in_val = !in_val;
     }
 
+// This algorithm uses 3 variables: ucount (to count if hit)
+//                                  ncount (to count if separation time)
+//                                  l_count (flag indicates a hit already occured)
+// Separation time is the time that needs to accrue before another hit
+//     can be counted
+// What happens is ucount is incremented unless the separation time is
+// reached at which point it is reset.
 // ncount is the time between hits
     if (in_val == 1) {
+// We are high, increment hit counter, reset separation counter
     	++sensors[line].ucount;
     	sensors[line].ncount = 0;
+// We do not have a hit and we have counted up to our sensitivity so count the hit
         if (!sensors[line].l_count && (sensors[line].ucount == sensors[line].sens_cal)){
     	    ++sensors[line].l_count;
             if (hit_callback == NULL) {
@@ -434,8 +443,14 @@ SENDUSERCONNMSG( "HIT counted %d", sensors[line].ucount);
         }
     } else {
         if (sensors[line].ncount < sensors[line].sep_cal){
+// We are less than our separation value (time between hits), just keep counting
     	    ++sensors[line].ncount;
         } else if (sensors[line].ncount == sensors[line].sep_cal){
+// We are equal to our separation value (time between hits), increment count 
+// so we do not do this multiple times. Also, I do not want ncount to roll over
+// to a negative value (will absolutely happen since the range is not always in
+// use). 
+// Reset our hit counter and flag
     	    ++sensors[line].ncount;
 SENDUSERCONNMSG( "HIT magnitude %d", sensors[line].ucount);
     	    sensors[line].ucount = 0;
