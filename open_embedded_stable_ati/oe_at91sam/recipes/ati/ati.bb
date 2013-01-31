@@ -56,6 +56,11 @@ FILES_${PN} += "/usr/bin/event_conn"
 FILES_${PN} += "/usr/bin/fasit_conn"
 FILES_${PN} += "/usr/bin/bcast_server"
 FILES_${PN} += "/usr/bin/bcast_client"
+FILES_${PN} += "/usr/bin/dtxm_edit.arm"
+FILES_${PN} += "/usr/bin/RFdump.arm"
+FILES_${PN} += "/usr/bin/RFmaster.arm"
+FILES_${PN} += "/usr/bin/RFslave.new.arm"
+FILES_${PN} += "/usr/bin/slaveboss.arm"
 
 
 
