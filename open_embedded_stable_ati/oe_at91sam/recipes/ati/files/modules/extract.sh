@@ -58,17 +58,17 @@ then
    mv /usr/bin/bit_button /usr/bin/bit_button.old
    mv bit_button /usr/bin
 fi
-if [ -e ./bit_button ]
+if [ -e ./event_conn ]
 then
    mv /usr/bin/event_conn /usr/bin/event_conn.old
    mv event_conn /usr/bin
 fi
-if [ -e ./bit_button ]
+if [ -e ./fasit_conn ]
 then
    mv /usr/bin/fasit_conn /usr/bin/fasit_conn.old
    mv fasit_conn /usr/bin
 fi
-if [ -e ./bit_button ]
+if [ -e ./user_conn ]
 then
    mv /usr/bin/user_conn /usr/bin/user_conn.old
    mv user_conn /usr/bin
