@@ -1063,7 +1063,7 @@ static int mover_speed_set(int speed) {
          speed = tmpSpeed;
       } else if (IS_MAT){
          selectSpeed = abs(speed);
-         if (selectSpeed <= 5) tmpSpeed = 10; // 1.0 mph (to dock slowly, or manual movement)
+         if (selectSpeed <= 5) tmpSpeed = 33; // 1.0 mph (to dock slowly, or manual movement)
          else if (selectSpeed <= 10) tmpSpeed = 65; // 6.5 mph (to meet 8-13 kph)
          else if (selectSpeed <= 20) tmpSpeed = 99; // 9.9 mph (to meet 14-18 kph)
          else if (selectSpeed <= 30) tmpSpeed = 134; // 13.4 mph (to meet 19-24 kph)
