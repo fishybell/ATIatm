@@ -14,7 +14,9 @@ shift
 :Start
 if "%1"=="" GOTO Done
 echo "copying %firmware% to %1"
+
 ".\pscp.exe" -pw %passwd% %firmware% %username%@%1:/home/root
+if errorlevel==1 GOTO Done
 
 ".\plink.exe" -ssh -v -pw %passwd% %username%@%1 "chmod +x ./%shortFirmware%"
 

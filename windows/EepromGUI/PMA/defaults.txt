@@ -1,6 +1,6 @@
 Radio Frequency=405.00
-Radio Power Low=1
-Radio Power High=25
+Radio Power Low=100
+Radio Power High=200
 Dock=0
 Home=0
 Reverse=0
@@ -14,3 +14,4 @@ Fall Parameters=1 0
 Bob Type=1
 Hit Sensor=0 0
 Hit Calibration=100 4 7 4
+Sensitivity Multiplier=2

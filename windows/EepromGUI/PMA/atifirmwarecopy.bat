@@ -3,4 +3,4 @@
 ".\plink.exe" -ssh -v -pw %5 %4@%1 "chmod +x ./%3"
 
 ".\plink.exe" -ssh -v -pw %5 %4@%1 "./%3"
-pause
+

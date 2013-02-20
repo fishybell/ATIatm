@@ -11,6 +11,7 @@ using System.Windows.Forms;
 using System.Text.RegularExpressions;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 
 namespace pmaGUI
 {
@@ -25,8 +26,7 @@ namespace pmaGUI
         String currentMacItem = "";
         String report = "";
         bool macReceived = false;
-        bool typeReceived = false;
-        bool versionReceived = false;
+        bool receivedDefault = false;
         bool generating = false;
         int macIndex = 0;
         List<Control> changedList = new List<Control>();
@@ -582,7 +582,15 @@ namespace pmaGUI
             int cal1 = Convert.ToInt32(calTB1.Text);
             int cal2 = Convert.ToInt32(calTB2.Text);
             int cal3 = Convert.ToInt32(calTB3.Text);
-            int cal4 = calCB4.SelectedIndex;
+            int cal4;
+            if (calCB4.SelectedIndex == 2)
+            {
+                cal4 = 4;
+            }
+            else
+            {
+                cal4 = calCB4.SelectedIndex;
+            }
             if (conn != null)
             {
                 conn.sendMessage("L " + cal1 + " " + cal2 + " " + cal3 + " " + cal4);
@@ -1030,6 +1038,7 @@ namespace pmaGUI
             bobDCB.SelectedIndex = -1;
             sensorDCB.SelectedIndex = -1;
             sensorD2CB.SelectedIndex = -1;
+            multiplierTB.Text = "";
             hitcDTB1.Text = "";
             hitcDTB2.Text = "";
             hitcDTB3.Text = "";
@@ -1251,7 +1260,14 @@ namespace pmaGUI
                     calTB1.Text = calSplit[0];
                     calTB2.Text = calSplit[1];
                     calTB3.Text = calSplit[2];
-                    calCB4.SelectedIndex = Convert.ToInt32(calSplit[3]);
+                    if (calSplit[3] == "4")
+                    {
+                        calCB4.SelectedIndex = 2;
+                    }
+                    else
+                    {
+                        calCB4.SelectedIndex = Convert.ToInt32(calSplit[3]);
+                    }
                     logSent("L " + getMessageValue(message, 2));
                     sensitivityNoteLBL.Text = "Current Hit Sensitivity (" + calTB2.Text + ")"; 
                     break;
@@ -1356,15 +1372,16 @@ namespace pmaGUI
                             disableEnable(boardType);
                             targetCB.Text = machine;
                             logSent("I B " + getMessageValue(message, 4));
-                            typeReceived = true;
                             break;
                         case 'C':   // connection port
                             connectTB.Text = getMessageValue(message, 4);
                             logSent("I C " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'D':   // communication type
                             commCB.SelectedItem = getMessageValue(message, 4);
                             logSent("I D " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'E':   // battery/moving defaults
                             String batMov = getMessageValue(message, 4);
@@ -1402,6 +1419,7 @@ namespace pmaGUI
                                     break;
                             }
                             logSent("I E " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'F':   // Fall parameter defaults
                             String[] fallSplit = getMessageValue(message, 4).Split(' ');
@@ -1410,6 +1428,7 @@ namespace pmaGUI
                             fallDTB.ForeColor = SystemColors.WindowText;
                             fallDCB.ForeColor = SystemColors.WindowText;
                             logSent("I F " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'G':   // MGL defaults
                             String[] mglSplit = getMessageValue(message, 4).Split(' ');
@@ -1442,16 +1461,25 @@ namespace pmaGUI
                             hitcDTB1.Text = calDSplit[0];
                             hitcDTB2.Text = calDSplit[1];
                             hitcDTB3.Text = calDSplit[2];
-                            hitcCB4.SelectedIndex = Convert.ToInt32(calDSplit[3]);
+                            if (Convert.ToInt32(calDSplit[3]) == 4)
+                            {
+                                hitcCB4.SelectedIndex = 2;
+                            }
+                            else
+                            {
+                                hitcCB4.SelectedIndex = Convert.ToInt32(calDSplit[3]);
+                            }
                             hitcDTB1.ForeColor = SystemColors.WindowText;
                             hitcDTB2.ForeColor = SystemColors.WindowText;
                             hitcDTB3.ForeColor = SystemColors.WindowText;
                             hitcCB4.ForeColor = SystemColors.WindowText;
                             logSent("I H " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'I':   // IP address
                             ipTB.Text = getMessageValue(message, 4);
                             logSent("I I " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'K':   // SMK defaults
                             String[] smkSplit = getMessageValue(message, 4).Split(' ');
@@ -1482,6 +1510,7 @@ namespace pmaGUI
                         case 'L':   // listen port
                             listenTB.Text = getMessageValue(message, 4);
                             logSent("I L " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'M':   // MAC address
                             String valid = getMessageValue(message, 4);
@@ -1534,6 +1563,7 @@ namespace pmaGUI
                                 bobDCB.ForeColor = SystemColors.WindowText;
                             }
                             logSent("I O " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'P':   // PHI defaults
                             String[] phiSplit = getMessageValue(message, 4).Split(' ');
@@ -1569,6 +1599,7 @@ namespace pmaGUI
                                 DockDCB.ForeColor = SystemColors.WindowText;
                             }
                             logSent("I Q " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'S':   // Hit sensor defaults
                             String[] hitSplit = getMessageValue(message, 4).Split(' ');
@@ -1577,6 +1608,7 @@ namespace pmaGUI
                             sensorDCB.ForeColor = SystemColors.WindowText;
                             sensorD2CB.ForeColor = SystemColors.WindowText;
                             logSent("I S " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'T':   // THM defaults
                             String[] thmSplit = getMessageValue(message, 4).Split(' ');
@@ -1608,16 +1640,19 @@ namespace pmaGUI
                             freqTB.Text = getMessageValue(message, 4);
                             freqTB.ForeColor = SystemColors.WindowText;
                             logSent("I U " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'V':   // Radio Low Power Default
                             lpTB.Text = getMessageValue(message, 4);
                             lpTB.ForeColor = SystemColors.WindowText;
                             logSent("I V " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'W':   // Radio Frequency Default
                             hpTB.Text = getMessageValue(message, 4);
                             hpTB.ForeColor = SystemColors.WindowText;
                             logSent("I W " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'X':   // Serial Number
                             serialDTB.Text = getMessageValue(message, 4);
@@ -1660,6 +1695,7 @@ namespace pmaGUI
                                 HomeDCB.ForeColor = SystemColors.WindowText;
                             }
                             logSent("I Z " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                     }
                     break;
@@ -1669,7 +1705,6 @@ namespace pmaGUI
                         case 'A':   // Major Flash Version
                             versionLBL.Text = getMessageValue(message, 4);
                             logSent("J A " + getMessageValue(message, 4));
-                            versionReceived = true;
                             break;
                         case 'C':   // Program radio?
                             if (getMessageValue(message, 4) == "Y")
@@ -1683,10 +1718,18 @@ namespace pmaGUI
                             lengthDTB.Text = getMessageValue(message, 4);
                             lengthDTB.ForeColor = SystemColors.WindowText;
                             logSent("J D " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'E':   // Static IP address
                             staticTB.Text = getMessageValue(message, 4);
                             logSent("J E " + getMessageValue(message, 4));
+                            receivedDefault = true;
+                            break;
+                        case 'F':   // sensitivity multiplier
+                            multiplierTB.Text = getMessageValue(message, 4);
+                            multiplierTB.ForeColor = SystemColors.WindowText;
+                            logSent("J F " + getMessageValue(message, 4));
+                            receivedDefault = true;
                             break;
                         case 'R':   // Report of several fields
                             macReceived = true;
@@ -1848,6 +1891,12 @@ namespace pmaGUI
         {
             changedList.Add(lengthDTB);
             lengthDTB.ForeColor = SystemColors.HotTrack;
+        }
+
+        private void multiplierTB_Click(object sender, EventArgs e)
+        {
+            changedList.Add(multiplierTB);
+            multiplierTB.ForeColor = SystemColors.HotTrack;
         }
 
         private void DockDCB_Click(object sender, EventArgs e)
@@ -2654,6 +2703,18 @@ namespace pmaGUI
         }
 
         /**************************************************
+        * Sends sensitivity multiplier message
+        * ***********************************************/
+        public void multiplierDefault(string multiplier)
+        {
+            if (conn != null)
+            {
+                conn.sendMessage("J F " + Convert.ToString(multiplier));
+                logSent("J F " + Convert.ToString(multiplier));
+            }
+        }
+
+        /**************************************************
          * Sends default hit sensor message
          * ***********************************************/
         public void sensorDefault(int sensor1, int sensor2)
@@ -2934,8 +2995,54 @@ namespace pmaGUI
         private void resetDfltBTN_Click(object sender, EventArgs e)
         {
             confirmDfltPanel.Visible = false;
+            confirmDfltPanel.Update();
 
-            // Find the value in the selected dropdown and use that to parse the file
+            // Figure out to change the defaults on one or all targets
+            if (settingLBL.Text.Contains("lost"))
+            {
+                // Change single target
+                changeDefault();
+
+                // Change the reboot appearance because it needs to be clicked for
+                // the changes to take effect.
+                rebootButton.ForeColor = SystemColors.HotTrack;
+                rebootButton.Font = new Font(rebootButton.Font, FontStyle.Bold);
+            }
+            else
+            {
+                // progress bar setup
+                progressBarFlash.Visible = true;
+                progressBarFlash.Minimum = 1;
+                // it takes about 20 seconds to flash a target
+                progressBarFlash.Maximum = targetCB.Items.Count;
+                progressBarFlash.Value = 1;
+                progressBarFlash.Step = 1;
+
+                // Change all connected targets
+                for (int i = 0; i < targetCB.Items.Count; i++)
+                {
+                    receivedDefault = false;
+                    string selectedIP = (string)targetCB.Items[i];
+                    if (useNewTarget(selectedIP))
+                    {
+                        Console.WriteLine("Changing default of " + selectedIP);
+                        receivedDefault = false;
+                        changeDefault();
+                        Thread.Sleep(2000);
+                        progressBarFlash.PerformStep();
+                    }
+                }
+                progressBarFlash.Visible = false;
+                // Change the reboot appearance because it needs to be clicked for
+                // the changes to take effect.
+                rebootAllBTN.ForeColor = SystemColors.HotTrack;
+                rebootAllBTN.Font = new Font(rebootButton.Font, FontStyle.Bold);
+            }
+        }
+
+        // Find the value in the selected dropdown and use that to parse the file
+        private void changeDefault()
+        {
             string selected = (String)resetCB.SelectedItem;
             TextReader tr = new StreamReader(".\\defaults.txt");
 
@@ -2971,15 +3078,11 @@ namespace pmaGUI
                 // Find what default to call
                 callDefault(selected, thisDefault);
             }
-
-            // Change the reboot appearance because it needs to be clicked for
-            // the changes to take effect.
-            rebootButton.ForeColor = SystemColors.HotTrack;
-            rebootButton.Font = new Font(rebootButton.Font, FontStyle.Bold);
         }
 
         private void callDefault(string control, string textValue)
         {
+            int hitReaction = -1;
             switch (control)
             {
                 case "sitBTB":
@@ -3008,6 +3111,9 @@ namespace pmaGUI
                 case "Home":
                 case "HomeDCB":
                     homeDefault(HomeDCB.SelectedIndex);
+                    break;
+                case "multiplierTB":
+                    multiplierDefault(multiplierTB.Text);
                     break;
                 case "serialDTB":
                     serialDefault(textValue);
@@ -3063,16 +3169,24 @@ namespace pmaGUI
                     calDefault(cal[0], cal[1], cal[2], Convert.ToInt32(cal[3]));
                     break;
                 case "hitcDTB1":
-                    calDefault(textValue, hitcDTB2.Text, hitcDTB3.Text, hitcCB4.SelectedIndex);
+                    hitReaction = hitcCB4.SelectedIndex;
+                    if (hitReaction == 2) hitReaction = 4;
+                    calDefault(textValue, hitcDTB2.Text, hitcDTB3.Text, hitReaction);
                     break;
                 case "hitcDTB2":
-                    calDefault(hitcDTB1.Text, textValue, hitcDTB3.Text, hitcCB4.SelectedIndex);
+                    hitReaction = hitcCB4.SelectedIndex;
+                    if (hitReaction == 2) hitReaction = 4;
+                    calDefault(hitcDTB1.Text, textValue, hitcDTB3.Text, hitReaction);
                     break;
                 case "hitcDTB3":
-                    calDefault(hitcDTB1.Text, hitcDTB2.Text, textValue, hitcCB4.SelectedIndex);
+                    hitReaction = hitcCB4.SelectedIndex;
+                    if (hitReaction == 2) hitReaction = 4;
+                    calDefault(hitcDTB1.Text, hitcDTB2.Text, textValue, hitReaction);
                     break;
                 case "hitcCB4":
-                    calDefault(hitcDTB1.Text, hitcDTB2.Text, hitcDTB3.Text, hitcCB4.SelectedIndex);
+                    hitReaction = hitcCB4.SelectedIndex;
+                    if (hitReaction == 2) hitReaction = 4;
+                    calDefault(hitcDTB1.Text, hitcDTB2.Text, hitcDTB3.Text, hitReaction);
                     break;
                 case "mfsCheck":
                     mfsDefault(mfsCheck.Checked, mfsCB1.SelectedIndex, mfsCB2.SelectedIndex, mfsCB3.SelectedIndex,
@@ -3345,6 +3459,9 @@ namespace pmaGUI
                 case "Static IP":
                     staticDefaults(textValue);
                     break;
+                case "Sensitivity Multiplier":
+                    multiplierDefault(textValue);
+                    break;
                 default:
                     break;
             }
@@ -3448,6 +3565,10 @@ namespace pmaGUI
 
         private void rebootAllBTN_Click(object sender, EventArgs e)
         {
+            // Change reboot font back to normal
+            rebootAllBTN.ForeColor = SystemColors.ControlText;
+            rebootAllBTN.Font = new Font(rebootButton.Font, FontStyle.Regular);
+
             ProcessStartInfo psi = new ProcessStartInfo();
             // progress bar setup
             progressBarFlash.Visible = true;
@@ -3674,6 +3795,13 @@ namespace pmaGUI
                 //error message
                 settingErrLBL.Text = "The IP is in an incorrect format.";
             }
+        }
+
+        private void resetAllBTN_Click(object sender, EventArgs e)
+        {
+            confirmDfltPanel.Visible = true;
+            string selected = (String)resetCB.SelectedItem;
+            settingLBL.Text = "All target's " + selected + " settings will be changed to the default.";
         }
 
     }

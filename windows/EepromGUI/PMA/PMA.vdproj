@@ -63,6 +63,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_E625B2CDE1894F6787372C248F45D71D"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_F45370CF818B4AAE9F08D159E4B688EC"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -380,6 +386,26 @@
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_E625B2CDE1894F6787372C248F45D71D"
+            {
+            "SourcePath" = "8:randy.ips"
+            "TargetName" = "8:randy.ips"
+            "Tag" = "8:"
+            "Folder" = "8:_18244EC0C0594A6CA26E99407B506DD2"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_F45370CF818B4AAE9F08D159E4B688EC"
             {
             "SourcePath" = "8:README.txt"
@@ -477,7 +503,7 @@
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:PMA"
         "ProductCode" = "8:{F4DFB20A-E228-410A-A683-8F311FCFD5C5}"
-        "PackageCode" = "8:{03044466-80F0-4D59-BB79-4DB5B05D4533}"
+        "PackageCode" = "8:{BD04D2DD-5E67-47A8-929A-425A3FC48EA8}"
         "UpgradeCode" = "8:{F2195914-ABD7-48EC-9F47-962C60BD4A08}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"

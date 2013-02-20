@@ -130,6 +130,7 @@
             this.moveTB = new System.Windows.Forms.TextBox();
             this.lengthDTB = new System.Windows.Forms.TextBox();
             this.firmMultButton = new System.Windows.Forms.Button();
+            this.multiplierTB = new System.Windows.Forms.TextBox();
             this.showAllButton = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
             this.deviceTB = new System.Windows.Forms.TextBox();
@@ -146,6 +147,7 @@
             this.tabPage4 = new System.Windows.Forms.TabPage();
             this.logTB = new System.Windows.Forms.TextBox();
             this.tabPage3 = new System.Windows.Forms.TabPage();
+            this.resetAllBTN = new System.Windows.Forms.Button();
             this.confirmDefaultsBTN = new System.Windows.Forms.Button();
             this.confirmDfltPanel = new System.Windows.Forms.Panel();
             this.cancelDfltBTN = new System.Windows.Forms.Button();
@@ -222,6 +224,7 @@
             this.accCB0 = new System.Windows.Forms.ComboBox();
             this.label20 = new System.Windows.Forms.Label();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.settingErrLBL = new System.Windows.Forms.Label();
             this.staticTB = new System.Windows.Forms.TextBox();
             this.label36 = new System.Windows.Forms.Label();
             this.setSettingsBTN = new System.Windows.Forms.Button();
@@ -245,8 +248,6 @@
             this.label11 = new System.Windows.Forms.Label();
             this.label12 = new System.Windows.Forms.Label();
             this.tabPage1 = new System.Windows.Forms.TabPage();
-            this.progressBarFlash = new System.Windows.Forms.ProgressBar();
-            this.rebootAllBTN = new System.Windows.Forms.Button();
             this.multipleLB = new System.Windows.Forms.ListBox();
             this.label40 = new System.Windows.Forms.Label();
             this.speedTB = new System.Windows.Forms.TextBox();
@@ -287,6 +288,8 @@
             this.sleepCB = new System.Windows.Forms.ComboBox();
             this.shutdownButton = new System.Windows.Forms.Button();
             this.stopButton = new System.Windows.Forms.Button();
+            this.progressBarFlash = new System.Windows.Forms.ProgressBar();
+            this.rebootAllBTN = new System.Windows.Forms.Button();
             this.rebootButton = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage6 = new System.Windows.Forms.TabPage();
@@ -308,7 +311,6 @@
             this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
             this.label49 = new System.Windows.Forms.Label();
             this.pmavLBL = new System.Windows.Forms.Label();
-            this.settingErrLBL = new System.Windows.Forms.Label();
             this.tabPage4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.confirmDfltPanel.SuspendLayout();
@@ -407,7 +409,7 @@
             this.hitcDTB3.Name = "hitcDTB3";
             this.hitcDTB3.Size = new System.Drawing.Size(59, 22);
             this.hitcDTB3.TabIndex = 101;
-            this.toolTip1.SetToolTip(this.hitcDTB3, "Millisecond blanking time from start expose");
+            this.toolTip1.SetToolTip(this.hitcDTB3, "Tenths of a second before hit sensor is activated.");
             this.hitcDTB3.Click += new System.EventHandler(this.hitcDTB3_Click);
             // 
             // fallDTB
@@ -473,12 +475,9 @@
             // 
             this.hitcCB4.FormattingEnabled = true;
             this.hitcCB4.Items.AddRange(new object[] {
-            "Blank Always",
-            "Enable Always",
-            "Enable at Position",
-            "Disable at Position",
-            "Blank on Concealed",
-            ""});
+            "Never Receive Hits",
+            "Receive Down Hits",
+            "Hits Only on Expose"});
             this.hitcCB4.Location = new System.Drawing.Point(317, 96);
             this.hitcCB4.Margin = new System.Windows.Forms.Padding(4);
             this.hitcCB4.Name = "hitcCB4";
@@ -1358,7 +1357,7 @@
             this.calTB3.Name = "calTB3";
             this.calTB3.Size = new System.Drawing.Size(59, 22);
             this.calTB3.TabIndex = 72;
-            this.toolTip1.SetToolTip(this.calTB3, "Millisecond blanking time from start expose");
+            this.toolTip1.SetToolTip(this.calTB3, "Tenths of a second before hit sensor is activated.");
             // 
             // accCB5
             // 
@@ -1490,17 +1489,16 @@
             // 
             // calCB4
             // 
+            this.calCB4.DropDownWidth = 180;
             this.calCB4.FormattingEnabled = true;
             this.calCB4.Items.AddRange(new object[] {
-            "Blank Always",
-            "Enable Always",
-            "Enable at Position",
-            "Disable at Position",
-            "Blank on Concealed"});
+            "Never Receive Hits",
+            "Receive Down Hits",
+            "Hits Only on Expose"});
             this.calCB4.Location = new System.Drawing.Point(323, 123);
             this.calCB4.Margin = new System.Windows.Forms.Padding(4);
             this.calCB4.Name = "calCB4";
-            this.calCB4.Size = new System.Drawing.Size(132, 24);
+            this.calCB4.Size = new System.Drawing.Size(148, 24);
             this.calCB4.TabIndex = 97;
             this.toolTip1.SetToolTip(this.calCB4, "Enable on value");
             // 
@@ -1563,6 +1561,16 @@
             this.toolTip1.SetToolTip(this.firmMultButton, "Please select at least one target.");
             this.firmMultButton.UseVisualStyleBackColor = true;
             this.firmMultButton.Click += new System.EventHandler(this.firmMultButton_Click);
+            // 
+            // multiplierTB
+            // 
+            this.multiplierTB.Location = new System.Drawing.Point(364, 64);
+            this.multiplierTB.Name = "multiplierTB";
+            this.multiplierTB.Size = new System.Drawing.Size(100, 22);
+            this.multiplierTB.TabIndex = 123;
+            this.toolTip1.SetToolTip(this.multiplierTB, "Sensitivity Multiplier");
+            this.multiplierTB.Visible = false;
+            this.multiplierTB.Click += new System.EventHandler(this.multiplierTB_Click);
             // 
             // showAllButton
             // 
@@ -1706,6 +1714,8 @@
             // 
             // tabPage3
             // 
+            this.tabPage3.Controls.Add(this.resetAllBTN);
+            this.tabPage3.Controls.Add(this.multiplierTB);
             this.tabPage3.Controls.Add(this.confirmDefaultsBTN);
             this.tabPage3.Controls.Add(this.confirmDfltPanel);
             this.tabPage3.Controls.Add(this.resetCB);
@@ -1740,6 +1750,17 @@
             this.tabPage3.Text = "Defaults";
             this.tabPage3.UseVisualStyleBackColor = true;
             // 
+            // resetAllBTN
+            // 
+            this.resetAllBTN.Location = new System.Drawing.Point(362, 319);
+            this.resetAllBTN.Name = "resetAllBTN";
+            this.resetAllBTN.Size = new System.Drawing.Size(231, 28);
+            this.resetAllBTN.TabIndex = 124;
+            this.resetAllBTN.Text = "Reset Default on All Targets";
+            this.resetAllBTN.UseVisualStyleBackColor = true;
+            this.resetAllBTN.Visible = false;
+            this.resetAllBTN.Click += new System.EventHandler(this.resetAllBTN_Click);
+            // 
             // confirmDefaultsBTN
             // 
             this.confirmDefaultsBTN.Location = new System.Drawing.Point(251, 319);
@@ -1757,15 +1778,15 @@
             this.confirmDfltPanel.Controls.Add(this.settingLBL);
             this.confirmDfltPanel.Controls.Add(this.resetDfltBTN);
             this.confirmDfltPanel.Controls.Add(this.label48);
-            this.confirmDfltPanel.Location = new System.Drawing.Point(270, 112);
+            this.confirmDfltPanel.Location = new System.Drawing.Point(204, 70);
             this.confirmDfltPanel.Name = "confirmDfltPanel";
-            this.confirmDfltPanel.Size = new System.Drawing.Size(306, 100);
+            this.confirmDfltPanel.Size = new System.Drawing.Size(445, 100);
             this.confirmDfltPanel.TabIndex = 121;
             this.confirmDfltPanel.Visible = false;
             // 
             // cancelDfltBTN
             // 
-            this.cancelDfltBTN.Location = new System.Drawing.Point(168, 60);
+            this.cancelDfltBTN.Location = new System.Drawing.Point(222, 61);
             this.cancelDfltBTN.Name = "cancelDfltBTN";
             this.cancelDfltBTN.Size = new System.Drawing.Size(100, 28);
             this.cancelDfltBTN.TabIndex = 121;
@@ -1784,7 +1805,7 @@
             // 
             // resetDfltBTN
             // 
-            this.resetDfltBTN.Location = new System.Drawing.Point(31, 61);
+            this.resetDfltBTN.Location = new System.Drawing.Point(101, 61);
             this.resetDfltBTN.Name = "resetDfltBTN";
             this.resetDfltBTN.Size = new System.Drawing.Size(100, 28);
             this.resetDfltBTN.TabIndex = 120;
@@ -1795,7 +1816,7 @@
             // label48
             // 
             this.label48.AutoSize = true;
-            this.label48.Location = new System.Drawing.Point(106, 11);
+            this.label48.Location = new System.Drawing.Point(165, 11);
             this.label48.Name = "label48";
             this.label48.Size = new System.Drawing.Size(101, 17);
             this.label48.TabIndex = 0;
@@ -1821,7 +1842,8 @@
             "Fall Parameters",
             "Bob Type",
             "Hit Sensor",
-            "Hit Calibration"});
+            "Hit Calibration",
+            "Sensitivity Multiplier"});
             this.resetCB.Location = new System.Drawing.Point(120, 319);
             this.resetCB.Name = "resetCB";
             this.resetCB.Size = new System.Drawing.Size(121, 24);
@@ -2346,7 +2368,7 @@
             // 
             // addressDTB
             // 
-            this.addressDTB.Location = new System.Drawing.Point(583, 96);
+            this.addressDTB.Location = new System.Drawing.Point(668, 96);
             this.addressDTB.Margin = new System.Windows.Forms.Padding(4);
             this.addressDTB.Name = "addressDTB";
             this.addressDTB.Size = new System.Drawing.Size(132, 22);
@@ -2355,7 +2377,7 @@
             // 
             // serialDTB
             // 
-            this.serialDTB.Location = new System.Drawing.Point(583, 64);
+            this.serialDTB.Location = new System.Drawing.Point(668, 64);
             this.serialDTB.Margin = new System.Windows.Forms.Padding(4);
             this.serialDTB.Name = "serialDTB";
             this.serialDTB.Size = new System.Drawing.Size(132, 22);
@@ -2366,7 +2388,7 @@
             // label30
             // 
             this.label30.AutoSize = true;
-            this.label30.Location = new System.Drawing.Point(479, 104);
+            this.label30.Location = new System.Drawing.Point(599, 103);
             this.label30.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label30.Name = "label30";
             this.label30.Size = new System.Drawing.Size(60, 17);
@@ -2376,7 +2398,7 @@
             // label29
             // 
             this.label29.AutoSize = true;
-            this.label29.Location = new System.Drawing.Point(479, 69);
+            this.label29.Location = new System.Drawing.Point(564, 69);
             this.label29.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label29.Name = "label29";
             this.label29.Size = new System.Drawing.Size(98, 17);
@@ -2631,7 +2653,7 @@
             // 
             // calShowButton
             // 
-            this.calShowButton.Location = new System.Drawing.Point(479, 121);
+            this.calShowButton.Location = new System.Drawing.Point(484, 124);
             this.calShowButton.Margin = new System.Windows.Forms.Padding(4);
             this.calShowButton.Name = "calShowButton";
             this.calShowButton.Size = new System.Drawing.Size(100, 28);
@@ -2655,7 +2677,7 @@
             // 
             // calSetButton
             // 
-            this.calSetButton.Location = new System.Drawing.Point(587, 121);
+            this.calSetButton.Location = new System.Drawing.Point(594, 124);
             this.calSetButton.Margin = new System.Windows.Forms.Padding(4);
             this.calSetButton.Name = "calSetButton";
             this.calSetButton.Size = new System.Drawing.Size(100, 28);
@@ -2720,6 +2742,15 @@
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "Settings";
             this.tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // settingErrLBL
+            // 
+            this.settingErrLBL.AutoSize = true;
+            this.settingErrLBL.Location = new System.Drawing.Point(24, 329);
+            this.settingErrLBL.Name = "settingErrLBL";
+            this.settingErrLBL.Size = new System.Drawing.Size(32, 17);
+            this.settingErrLBL.TabIndex = 51;
+            this.settingErrLBL.Text = "      ";
             // 
             // staticTB
             // 
@@ -2964,8 +2995,6 @@
             // 
             // tabPage1
             // 
-            this.tabPage1.Controls.Add(this.progressBarFlash);
-            this.tabPage1.Controls.Add(this.rebootAllBTN);
             this.tabPage1.Controls.Add(this.multipleLB);
             this.tabPage1.Controls.Add(this.firmMultButton);
             this.tabPage1.Controls.Add(this.label40);
@@ -3016,25 +3045,6 @@
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Manipulate";
             this.tabPage1.UseVisualStyleBackColor = true;
-            // 
-            // progressBarFlash
-            // 
-            this.progressBarFlash.Location = new System.Drawing.Point(149, 246);
-            this.progressBarFlash.Name = "progressBarFlash";
-            this.progressBarFlash.Size = new System.Drawing.Size(310, 20);
-            this.progressBarFlash.TabIndex = 107;
-            this.progressBarFlash.Visible = false;
-            // 
-            // rebootAllBTN
-            // 
-            this.rebootAllBTN.Enabled = false;
-            this.rebootAllBTN.Location = new System.Drawing.Point(224, 203);
-            this.rebootAllBTN.Name = "rebootAllBTN";
-            this.rebootAllBTN.Size = new System.Drawing.Size(100, 28);
-            this.rebootAllBTN.TabIndex = 106;
-            this.rebootAllBTN.Text = "Reboot All";
-            this.rebootAllBTN.UseVisualStyleBackColor = true;
-            this.rebootAllBTN.Click += new System.EventHandler(this.rebootAllBTN_Click);
             // 
             // multipleLB
             // 
@@ -3447,11 +3457,30 @@
             this.stopButton.UseVisualStyleBackColor = false;
             this.stopButton.Click += new System.EventHandler(this.stopButton_Click);
             // 
+            // progressBarFlash
+            // 
+            this.progressBarFlash.Location = new System.Drawing.Point(250, 474);
+            this.progressBarFlash.Name = "progressBarFlash";
+            this.progressBarFlash.Size = new System.Drawing.Size(310, 20);
+            this.progressBarFlash.TabIndex = 107;
+            this.progressBarFlash.Visible = false;
+            // 
+            // rebootAllBTN
+            // 
+            this.rebootAllBTN.Enabled = false;
+            this.rebootAllBTN.Location = new System.Drawing.Point(756, 75);
+            this.rebootAllBTN.Name = "rebootAllBTN";
+            this.rebootAllBTN.Size = new System.Drawing.Size(100, 28);
+            this.rebootAllBTN.TabIndex = 106;
+            this.rebootAllBTN.Text = "Reboot All";
+            this.rebootAllBTN.UseVisualStyleBackColor = true;
+            this.rebootAllBTN.Click += new System.EventHandler(this.rebootAllBTN_Click);
+            // 
             // rebootButton
             // 
             this.rebootButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 7.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.rebootButton.ForeColor = System.Drawing.SystemColors.ControlText;
-            this.rebootButton.Location = new System.Drawing.Point(757, 55);
+            this.rebootButton.Location = new System.Drawing.Point(756, 41);
             this.rebootButton.Margin = new System.Windows.Forms.Padding(4);
             this.rebootButton.Name = "rebootButton";
             this.rebootButton.Size = new System.Drawing.Size(100, 28);
@@ -3661,21 +3690,14 @@
             this.pmavLBL.Size = new System.Drawing.Size(0, 17);
             this.pmavLBL.TabIndex = 106;
             // 
-            // settingErrLBL
-            // 
-            this.settingErrLBL.AutoSize = true;
-            this.settingErrLBL.Location = new System.Drawing.Point(24, 329);
-            this.settingErrLBL.Name = "settingErrLBL";
-            this.settingErrLBL.Size = new System.Drawing.Size(32, 17);
-            this.settingErrLBL.TabIndex = 51;
-            this.settingErrLBL.Text = "      ";
-            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(881, 497);
+            this.Controls.Add(this.progressBarFlash);
             this.Controls.Add(this.pmavLBL);
+            this.Controls.Add(this.rebootAllBTN);
             this.Controls.Add(this.label49);
             this.Controls.Add(this.label41);
             this.Controls.Add(this.versionLBL);
@@ -4030,6 +4052,8 @@
         private System.Windows.Forms.Label label52;
         private System.Windows.Forms.Label sensitivityNoteLBL;
         private System.Windows.Forms.Label settingErrLBL;
+        private System.Windows.Forms.TextBox multiplierTB;
+        private System.Windows.Forms.Button resetAllBTN;
     }
 }
 
