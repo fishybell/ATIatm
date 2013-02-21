@@ -134,6 +134,17 @@ static void blank_off(unsigned long data); // forward declaration
 static struct timer_list blank_timer = TIMER_INITIALIZER(blank_off, 0, 0);
 atomic_t at_conceal = ATOMIC_INIT(0); // do nothing when conceald
 
+void lift_faults(int liftfault) {
+	u8 fault = 0;
+
+   if (liftfault) {
+      fault = liftfault; 
+	   // send fault upstream always
+	   queue_nl_multi(NL_C_FAULT, &fault, sizeof(fault));
+   }
+
+}
+
 //---------------------------------------------------------------------------
 // netlink command handler for expose commands
 //---------------------------------------------------------------------------
@@ -455,11 +466,14 @@ int nl_stop_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
         delay_printk("Lifter: received value: %i, nl_stop_handler\n", value);
 
         // stop motor wherever it is
-        lifter_position_set(LIFTER_POSITION_ERROR_NEITHER);
+// Stop in down position        lifter_position_set(LIFTER_POSITION_ERROR_NEITHER);
+//      NO NO NO, lower the lifters NOW, this is emergency stop
+        lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
         enable_battery_check(1); // enable battery checking while motor is off
 
         // TODO -- disable hit sensor (but don't clear hit log)
 
+        lift_faults(ERR_emergency_stop);
         // Stop accessories (will disable them as well)
         generic_output_event(EVENT_ERROR);
 
@@ -693,17 +707,6 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
 
     // return status
     return rc;
-}
-
-void lift_faults(int liftfault) {
-	u8 fault = 0;
-
-   if (liftfault) {
-      fault = liftfault; 
-	   // send fault upstream always
-	   queue_nl_multi(NL_C_FAULT, &fault, sizeof(fault));
-   }
-
 }
 
 /* Kill if we need to */
