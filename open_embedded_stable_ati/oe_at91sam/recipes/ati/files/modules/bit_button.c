@@ -733,11 +733,11 @@ void handle_bit_move(struct nl_handle *handle, int type) {
     switch (type) {
         case BIT_MOVE_FWD:
 //printf("BIT: sending FWD\n");
-            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 1); // fwd at slowest speed
+            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 + 3); // fwd at slowest speed
             break;
         case BIT_MOVE_REV:
 //printf("BIT: sending REV\n");
-            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 - 1); // rev at slowest speed
+            nla_put_u16(msg, GEN_INT16_A_MSG, 32768 - 3); // rev at slowest speed
             break;
         case BIT_MOVE_STOP:
 //printf("BIT: sending STOP\n");
