@@ -1,0 +1,52 @@
+#!/usr/bin/tclsh
+package require Expect
+package require Tclx
+fconfigure stdin -blocking 1            ;#expect bug?
+
+if  {$argc == 1} {
+    set num [lindex $argv 0]
+} else {
+    puts -nonewline "which one (1-9, a-f)? "
+    flush stdout
+    gets stdin num
+}
+
+# increase delays for wireless devices
+set delay 5
+if {[string match -nocase *w* $num]} {
+    set delay 10
+}
+
+# change the host to be correct
+set pass "shoot"
+set host sam$num
+set arch ".arm"
+set dir "/home/root"
+set dir "/usr/bin"
+if {[string match -nocase dx* $num]} {
+   puts -nonewline stdout "\nDX Password: "
+   system "stty -echo"
+   flush stdout
+   gets stdin pass
+   system "stty echo"
+   set host $num
+   set arch ""
+   set dir "/root"
+}
+
+system sed -i -e "s/^$host.*//" ~/.ssh/known_hosts
+eval spawn scp dtxm_edit$arch root@$host:$dir
+set timeout $delay
+while 1 {
+    expect {
+        -re {.*word:.*} {
+            send "$pass\r"
+        }
+        -re {.*yes/no.*} {
+            send "yes\r"
+        }
+        eof {
+            break
+        }
+    }
+}

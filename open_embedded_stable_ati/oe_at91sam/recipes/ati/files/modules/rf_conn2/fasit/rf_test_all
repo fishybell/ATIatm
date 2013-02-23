@@ -1,0 +1,88 @@
+# send LBC_REQUEST_NEW
+30 2047
+# receive LBC_DEVICE_REG
+
+# send LBC_DEVICE_ADDR
+31 2047 1
+# send LBC_STATUS_REQ
+0 1
+# receive LBC_STATUS_*RESP*
+
+# LBC_EXPOSE (expose, single hit mode, infinite htk, fall on kill, burst mfs, thermals off)
+1 1 1 0 0 1 2 0
+
+# send LBC_STATUS_REQ
+0 1
+# receive LBC_STATUS_*RESP*
+
+# LBC_EXPOSE (conceal, single hit mode, 10 htk, fall on kill, burst mfs, thermals off)
+1 1 0 0 10 1 2 0
+
+# send LBC_STATUS_REQ
+0 1
+# receive LBC_STATUS_*RESP*
+
+# LBC_GROUP_CONTROL (join, group 1000)
+4 1 2 1000
+
+# LBC_QEXPOSE (no parameters/payload -- should expose)
+16 1000
+
+# send LBC_STATUS_REQ
+0 1
+# receive LBC_STATUS_*RESP*
+
+# LBC_GROUP_CONTROL (disable, group 1000)
+4 1 0 1000
+
+# LBC_QCONCEAL (no parameters/payload -- should be ignored)
+17 1000
+
+# send LBC_STATUS_REQ
+0 1
+# receive LBC_STATUS_*RESP*
+
+# LBC_GROUP_CONTROL (enable, group 1000)
+4 1 1 1000
+
+# LBC_QCONCEAL (no parameters/payload -- should conceal)
+17 1000
+
+# LBC_GROUP_CONTROL (seperate, group 1000)
+4 1 3 1000
+
+# LBC_QEXPOSE (no parameters/payload -- should be ignored)
+16 1000
+
+# LBC_QEXPOSE (no parameters/payload -- should expose)
+16 1
+
+# LBC_CONFIGURE_HIT (single hit mode, 4 htk, bob kill, max sensitivity, 5 ms between hits, set hits to htk)
+3 1 0 4 4 15 1 3
+
+# exit
+X
+
+
+# LBC_MOVE (forward, 10 mph)
+2 2047 1 1000
+# LBC_MOVE (reverse, 5 mph)
+2 2047 1 500
+
+# LBC_CONFIGURE_HIT (single hit mode, 5 htk, phi then fall, medium sensitivity, 20 ms between hits, don't set hits)
+3 2047 0 5 6 7 4 0
+# LBC_CONFIGURE_HIT (single hit mode, 15 htk, bob hold, min sensitivity, 155 ms between hits, reset hits to 0)
+3 2047 0 15 5 0 31 1
+
+# LBC_AUDIO_CONTROL -- later
+
+# LBC_POWER_CONTROL (sleep)
+6 2047 1
+# LBC_POWER_CONTROL (ignore)
+6 2047 0
+# LBC_POWER_CONTROL (wake)
+6 2047 2
+
+# LBC_PYRO_FIRE -- later
+
+

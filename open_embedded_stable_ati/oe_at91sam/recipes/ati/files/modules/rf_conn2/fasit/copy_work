@@ -1,0 +1,107 @@
+#!/usr/bin/tclsh
+
+# remember expect string for doing the ssh/scp session
+set dossh {
+    while 1 {
+        expect {
+            -re {.*word:.*} {
+                send "shoot\r"
+            }
+            -re {.*yes/no.*} {
+                send "yes\r"
+            }
+            eof {
+                break
+            }
+        }
+    }
+}
+
+package require Expect
+package require Tclx
+fconfigure stdin -blocking 1            ;#expect bug?
+
+set hosts {}
+if  {$argc != 0} {
+    foreach host $argv {
+        if {[string is integer $host]} {
+            set host "sam$host"
+        }
+        lappend hosts $host
+    }
+} else {
+    puts -nonewline "which one(s)? "
+    flush stdout
+    gets stdin num1
+    if {[llength $num1] > 1} {
+        foreach host $num1 {
+            if {[string is integer $host]} {
+                set host "sam$host"
+            }
+            lappend hosts $host
+        }
+    } else {
+        set num1 "sam$num1"
+        set num2 $num1
+
+        # find list of targets
+        if {![string match sam* $num1] || ![string match sam* $num2]} {
+            puts "invalid sam numbers: $num1 $num2"
+            exit
+        }
+        scan [string trimleft $num1 samw] %x n1 ;# cut out sam or samw from start, convert from hex
+        scan [string trimleft $num2 samw] %x n2 ;# cut out sam or samw from start, convert from hex
+        if {$n1 > $n2} {
+            # we're reversed, flip order
+            set n3 $n2
+            set n2 $n1
+            set n1 $n3
+            set num3 $num2
+            set num2 $num1
+            set num1 $num3
+        }
+        set w1 [string match samw* $num1] ;# remember if I was a samw
+        set w2 [string match samw* $num2] ;# remember if I was a samw
+        if {[expr $w1 + $w2] == 1} {
+            puts "can't count from $num1 to $num2"
+            exit
+        }
+        set sam "sam"
+        if {$w1} {set sam "samw"}
+
+        # debug, put out list of targets
+        #for {set i $n1} {$i <= $n2} {incr i} {
+        #    puts "$sam[format %x $i]" 
+        #}
+        #exit
+
+        # copy to each target in order
+        for {set i $n1} {$i <= $n2} {incr i} {
+            lappend hosts "$sam[format %x $i]"
+        }
+    }
+}
+
+# copy to each host individually
+foreach host $hosts {
+    puts "####################################################################"
+    puts "# Copying to $host"
+    puts "####################################################################"
+
+    # clear out of remembered key
+    system sed -i -e "s/^$host.*//" ~/.ssh/known_hosts
+
+    # ssh over, stop, exit ssh
+    spawn ssh root@$host /usr/bin/stop
+    eval $dossh
+
+    # copy ati
+    eval spawn scp [glob *.arm] root@$host:/usr/bin
+    eval $dossh
+
+    # ssh over, start, exit ssh
+    #spawn ssh root@$host /usr/bin/start
+    #eval $dossh
+
+}
+
