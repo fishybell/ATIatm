@@ -453,7 +453,7 @@
             this.hitcDTB1.Name = "hitcDTB1";
             this.hitcDTB1.Size = new System.Drawing.Size(59, 22);
             this.hitcDTB1.TabIndex = 99;
-            this.toolTip1.SetToolTip(this.hitcDTB1, "Milliseconds Between Hits");
+            this.toolTip1.SetToolTip(this.hitcDTB1, "Rounds Per Second");
             this.hitcDTB1.Click += new System.EventHandler(this.hitcDTB1_Click);
             // 
             // sensorDCB
@@ -476,7 +476,7 @@
             this.hitcCB4.FormattingEnabled = true;
             this.hitcCB4.Items.AddRange(new object[] {
             "Never Receive Hits",
-            "Receive Down Hits",
+            "Always Receive Hits",
             "Hits Only on Expose"});
             this.hitcCB4.Location = new System.Drawing.Point(317, 96);
             this.hitcCB4.Margin = new System.Windows.Forms.Padding(4);
@@ -1399,7 +1399,7 @@
             this.calTB1.Name = "calTB1";
             this.calTB1.Size = new System.Drawing.Size(59, 22);
             this.calTB1.TabIndex = 70;
-            this.toolTip1.SetToolTip(this.calTB1, "Milliseconds Between Hits");
+            this.toolTip1.SetToolTip(this.calTB1, "Rounds Per Second");
             // 
             // accTB2
             // 
@@ -1493,7 +1493,7 @@
             this.calCB4.FormattingEnabled = true;
             this.calCB4.Items.AddRange(new object[] {
             "Never Receive Hits",
-            "Receive Down Hits",
+            "Always Receive Hits",
             "Hits Only on Expose"});
             this.calCB4.Location = new System.Drawing.Point(323, 123);
             this.calCB4.Margin = new System.Windows.Forms.Padding(4);
@@ -1778,7 +1778,7 @@
             this.confirmDfltPanel.Controls.Add(this.settingLBL);
             this.confirmDfltPanel.Controls.Add(this.resetDfltBTN);
             this.confirmDfltPanel.Controls.Add(this.label48);
-            this.confirmDfltPanel.Location = new System.Drawing.Point(204, 70);
+            this.confirmDfltPanel.Location = new System.Drawing.Point(204, 76);
             this.confirmDfltPanel.Name = "confirmDfltPanel";
             this.confirmDfltPanel.Size = new System.Drawing.Size(445, 100);
             this.confirmDfltPanel.TabIndex = 121;

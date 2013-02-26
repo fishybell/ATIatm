@@ -579,7 +579,7 @@ namespace pmaGUI
         * **********************************************/
         private void calSetButton_Click(object sender, EventArgs e)
         {
-            int cal1 = Convert.ToInt32(calTB1.Text);
+            int cal1 = 1000/Convert.ToInt32(calTB1.Text);
             int cal2 = Convert.ToInt32(calTB2.Text);
             int cal3 = Convert.ToInt32(calTB3.Text);
             int cal4;
@@ -1257,7 +1257,8 @@ namespace pmaGUI
                 case 'L':   // hit calibration
                     String cal = getMessageValue(message, 2);
                     String[] calSplit = cal.Split(' ');
-                    calTB1.Text = calSplit[0];
+                    int blankingBetween = 1000/Convert.ToInt32(calSplit[0]);
+                    calTB1.Text = Convert.ToString(blankingBetween);
                     calTB2.Text = calSplit[1];
                     calTB3.Text = calSplit[2];
                     if (calSplit[3] == "4")
@@ -1458,7 +1459,8 @@ namespace pmaGUI
                             break;
                         case 'H':   // Hit calibration defaults
                             String[] calDSplit = getMessageValue(message, 4).Split(' ');
-                            hitcDTB1.Text = calDSplit[0];
+                            int blankingB = 1000 / Convert.ToInt32(calDSplit[0]);
+                            hitcDTB1.Text = Convert.ToString(blankingB);
                             hitcDTB2.Text = calDSplit[1];
                             hitcDTB3.Text = calDSplit[2];
                             if (Convert.ToInt32(calDSplit[3]) == 4)
@@ -2733,8 +2735,9 @@ namespace pmaGUI
         {
             if (conn != null)
             {
-                conn.sendMessage("I H " + cal1 + " " + cal2 + " " + cal3 + " " + Convert.ToString(cal4));
-                logSent("I H " + cal1 + " " + cal2 + " " + cal3 + " " + Convert.ToString(cal4));
+                int milliBetween = 1000 / Convert.ToInt32(cal1);
+                conn.sendMessage("I H " + milliBetween + " " + cal2 + " " + cal3 + " " + Convert.ToString(cal4));
+                logSent("I H " + milliBetween + " " + cal2 + " " + cal3 + " " + Convert.ToString(cal4));
             }
         }
 
@@ -3171,7 +3174,7 @@ namespace pmaGUI
                 case "hitcDTB1":
                     hitReaction = hitcCB4.SelectedIndex;
                     if (hitReaction == 2) hitReaction = 4;
-                    calDefault(textValue, hitcDTB2.Text, hitcDTB3.Text, hitReaction);
+                    calDefault(hitcDTB1.Text, hitcDTB2.Text, hitcDTB3.Text, hitReaction);
                     break;
                 case "hitcDTB2":
                     hitReaction = hitcCB4.SelectedIndex;

@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<asmv1:assembly manifestVersion="1.0" xsi:schemaLocation="urn:schemas-microsoft-com:asm.v1 assembly.adaptive.xsd" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3" xmlns:dsig="http://www.w3.org/2000/09/xmldsig#" xmlns:co.v2="urn:schemas-microsoft-com:clickonce.v2" xmlns="urn:schemas-microsoft-com:asm.v2" xmlns:asmv1="urn:schemas-microsoft-com:asm.v1" xmlns:asmv2="urn:schemas-microsoft-com:asm.v2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:co.v1="urn:schemas-microsoft-com:clickonce.v1">
+  <asmv1:assemblyIdentity version="1.0.0.1" name="pmaGUI.exe" publicKeyToken="36684d3e26f71a67" language="neutral" processorArchitecture="x86" type="win32" />
+  <description asmv2:iconFile="PMA.ico" xmlns="urn:schemas-microsoft-com:asm.v1" />
+  <application />
+  <entryPoint>
+    <assemblyIdentity name="pmaGUI" version="1.0.0.0" language="neutral" processorArchitecture="x86" />
+    <commandLine file="pmaGUI.exe" parameters="" />
+  </entryPoint>
+  <trustInfo>
+    <security>
+      <applicationRequestMinimum>
+        <PermissionSet version="1" class="System.Security.NamedPermissionSet" Name="LocalIntranet" Description="Default rights given to applications on the local intranet" Unrestricted="true" ID="Custom" SameSite="site" />
+        <defaultAssemblyRequest permissionSetReference="Custom" />
+      </applicationRequestMinimum>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <!-- UAC Manifest Options
+            If you want to change the Windows User Account Control level replace the 
+            requestedExecutionLevel node with one of the following.
+
+        <requestedExecutionLevel  level="asInvoker" uiAccess="false" />
+        <requestedExecutionLevel  level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel  level="highestAvailable" uiAccess="false" />
+
+            Specifying requestedExecutionLevel node will disable file and registry virtualization.
+            If you want to utilize File and Registry Virtualization for backward 
+            compatibility then delete the requestedExecutionLevel node.
+        -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+  <dependency>
+    <dependentOS>
+      <osVersionInfo>
+        <os majorVersion="5" minorVersion="1" buildNumber="2600" servicePackMajor="0" />
+      </osVersionInfo>
+    </dependentOS>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="preRequisite" allowDelayedBinding="true">
+      <assemblyIdentity name="Microsoft.Windows.CommonLanguageRuntime" version="4.0.30319.0" />
+    </dependentAssembly>
+  </dependency>
+  <dependency>
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="pmaGUI.exe" size="415232">
+      <assemblyIdentity name="pmaGUI" version="1.0.0.0" language="neutral" processorArchitecture="x86" />
+      <hash>
+        <dsig:Transforms>
+          <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+        </dsig:Transforms>
+        <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" />
+        <dsig:DigestValue>W9GuR/WDUCrbScU8ORLKpmQp6bI=</dsig:DigestValue>
+      </hash>
+    </dependentAssembly>
+  </dependency>
+  <file name="PMA.ico" size="141650">
+    <hash>
+      <dsig:Transforms>
+        <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
+      </dsig:Transforms>
+      <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" />
+      <dsig:DigestValue>2TXhJSpvSS8mVpVS9QNwpQf6S4c=</dsig:DigestValue>
+    </hash>
+  </file>
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- A list of all Windows versions that this application is designed to work with. Windows will automatically select the most compatible environment.-->
+      <!-- If your application is designed to work with Windows 7, uncomment the following supportedOS node-->
+      <!--<supportedOS Id="{35138b9a-5d96-4fbd-8e2d-a2440225f93a}"/>-->
+    </application>
+  </compatibility>
+<publisherIdentity name="CN=ATI-PC\ATI" issuerKeyHash="70112e76915798a0ba77750228eb46919ab6d145" /><Signature Id="StrongNameSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" /><DigestValue>Gm+qktu1ZP5xXhIAG9zM/Jv8oqo=</DigestValue></Reference></SignedInfo><SignatureValue>RbMYnl74hXh4BhA65dShGBP78CYfffcpbRZrgER9cpmDvH43i5x6EhfBEFhe7pTXMq8fLxwAPLubavRyGtpWReCennD9IcBfdU/wQhl5lHCozXeuJy/86h0hWZiS3tOqiQekc+Vnaecym5F9up/KEiSd+EJih4hkAFPXc4ioON8=</SignatureValue><KeyInfo Id="StrongNameKeyInfo"><KeyValue><RSAKeyValue><Modulus>2619+Nn1Wu+lSJeqwCJO45LS9tDZZEKX8YDemuXJB3dlPpscpt3nwntv+Q+xyRU+ZH+he/hAEs5et9gy0abFdQZmtZjghH14XqTVVJAwnjVDE3zLwhzCvcAjLl5Tgaa7fjS5eiYFldczkx2zWiA4ScGw6sgd88JKR55+RpVpJI8=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><msrel:RelData xmlns:msrel="http://schemas.microsoft.com/windows/rel/2005/reldata"><r:license xmlns:r="urn:mpeg:mpeg21:2003:01-REL-R-NS" xmlns:as="http://schemas.microsoft.com/windows/pki/2005/Authenticode"><r:grant><as:ManifestInformation Hash="aaa2fc9bfcccdc1b00125e71fe64b5db92aa6f1a" Description="" Url=""><as:assemblyIdentity version="1.0.0.1" name="pmaGUI.exe" publicKeyToken="36684d3e26f71a67" language="neutral" processorArchitecture="x86" type="win32" /></as:ManifestInformation><as:SignedBy /><as:AuthenticodePublisher><as:X509SubjectName>CN=ATI-PC\ATI</as:X509SubjectName></as:AuthenticodePublisher></r:grant><r:issuer><Signature Id="AuthenticodeSignature" xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1" /><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature" /><Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#" /></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1" /><DigestValue>FIboZso5QCh02SpBG5VfyRrEv+k=</DigestValue></Reference></SignedInfo><SignatureValue>K4/25ENge7d5oB/11oE9Hqa+7sQPoONHfcaNylpmu+mHITfmxCTwu7D91ubyadKXbSZwpSkTaGX2LUZla2WnIxOppDC+UQoXSj7rebfA4pN7xIN/yhzAgwNLIvaqF5N8qHPA9Cgf56V37BSNJVdZYrsauLAlIiK05U3P0NW2wD0=</SignatureValue><KeyInfo><KeyValue><RSAKeyValue><Modulus>2619+Nn1Wu+lSJeqwCJO45LS9tDZZEKX8YDemuXJB3dlPpscpt3nwntv+Q+xyRU+ZH+he/hAEs5et9gy0abFdQZmtZjghH14XqTVVJAwnjVDE3zLwhzCvcAjLl5Tgaa7fjS5eiYFldczkx2zWiA4ScGw6sgd88JKR55+RpVpJI8=</Modulus><Exponent>AQAB</Exponent></RSAKeyValue></KeyValue><X509Data><X509Certificate>MIIBwTCCASqgAwIBAgIQE4CHXF5aHJZBq13/YUdNbTANBgkqhkiG9w0BAQUFADAfMR0wGwYDVQQDHhQAQQBUAEkALQBQAEMAXABBAFQASTAeFw0xMjEyMTcyMzM0NTVaFw0xMzEyMTgwNTM0NTVaMB8xHTAbBgNVBAMeFABBAFQASQAtAFAAQwBcAEEAVABJMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDbrX342fVa76VIl6rAIk7jktL20NlkQpfxgN6a5ckHd2U+mxym3efCe2/5D7HJFT5kf6F7+EASzl632DLRpsV1Bma1mOCEfXhepNVUkDCeNUMTfMvCHMK9wCMuXlOBprt+NLl6JgWV1zOTHbNaIDhJwbDqyB3zwkpHnn5GlWkkjwIDAQABMA0GCSqGSIb3DQEBBQUAA4GBANpNNkbVSqQtfM+Ug8e0ej2YHbm2iYTk47IAQ6Zp1Z063Y0AXxAsdvpmqxWZFPgn+70ZSAYsXvwphAtTtCsigeDB950u+27Gg+LDaDJh7urkKMogYlq7I9o4FnAtTj5BrYKzVue6Rhj4+6kmHkcD+mPFXJ9xmRitmUh2tZL/X9SY</X509Certificate></X509Data></KeyInfo></Signature></r:issuer></r:license></msrel:RelData></KeyInfo></Signature></asmv1:assembly>
