@@ -7,3 +7,4 @@ Version 1.0.0.4 - Changed text in troubleshooting tab.
 Version 1.0.0.5 - The Generate MAC button goes through the connection list twice instead of once.
 Version 2013.1.22.0 - Added a default parameter for the sensitivity multiplier. - Currently invisible
 Version 2013.2.19.0 - Changed the wording of the Blanking options.
+Version 2013.2.22.0 - Changed milliseconds between blanking to be hits per round.
