@@ -1,0 +1,18 @@
+c:\documents and settings\ati\my documents\visual studio 2010\Projects\EepromGUI\EepromGUI\bin\Debug\EepromGUI.exe
+c:\documents and settings\ati\my documents\visual studio 2010\Projects\EepromGUI\EepromGUI\bin\Debug\EepromGUI.pdb
+c:\documents and settings\ati\my documents\visual studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Debug\ResolveAssemblyReference.cache
+c:\documents and settings\ati\my documents\visual studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Debug\EepromGUI.Properties.Resources.resources
+c:\documents and settings\ati\my documents\visual studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Debug\GenerateResource.read.1.tlog
+c:\documents and settings\ati\my documents\visual studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Debug\GenerateResource.write.1.tlog
+c:\documents and settings\ati\my documents\visual studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Debug\EepromGUI.exe
+c:\documents and settings\ati\my documents\visual studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Debug\EepromGUI.pdb
+C:\Documents and Settings\ATI\my documents\visual studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Debug\EepromGUI.Form1.resources
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Debug\EepromGUI.exe
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Debug\EepromGUI.pdb
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\bin\Debug\EepromGUI.exe
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\bin\Debug\EepromGUI.pdb
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Debug\ResolveAssemblyReference.cache
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Debug\EepromGUI.Form1.resources
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Debug\EepromGUI.Properties.Resources.resources
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Debug\GenerateResource.read.1.tlog
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Debug\GenerateResource.write.1.tlog

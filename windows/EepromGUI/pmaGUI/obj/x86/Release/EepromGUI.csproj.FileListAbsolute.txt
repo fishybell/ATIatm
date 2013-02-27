@@ -1,0 +1,27 @@
+C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\bin\Release\EepromGUI.exe
+C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\bin\Release\EepromGUI.pdb
+C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\ResolveAssemblyReference.cache
+C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.Form1.resources
+C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.Properties.Resources.resources
+C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\GenerateResource.read.1.tlog
+C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\GenerateResource.write.1.tlog
+C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.exe
+C:\Documents and Settings\ATI\My Documents\Visual Studio 2010\Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.pdb
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.exe
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.pdb
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\bin\Release\EepromGUI.exe
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\bin\Release\EepromGUI.pdb
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\ResolveAssemblyReference.cache
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.Form1.resources
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.Properties.Resources.resources
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\GenerateResource.read.1.tlog
+\\tao\shellyb\Shelly's VS Projects\EepromGUI\EepromGUI\obj\x86\Release\GenerateResource.write.1.tlog
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.exe
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.pdb
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\EepromGUI\bin\Release\EepromGUI.exe
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\EepromGUI\bin\Release\EepromGUI.pdb
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\EepromGUI\obj\x86\Release\ResolveAssemblyReference.cache
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.Form1.resources
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\EepromGUI\obj\x86\Release\EepromGUI.Properties.Resources.resources
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\EepromGUI\obj\x86\Release\GenerateResource.read.1.tlog
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\EepromGUI\obj\x86\Release\GenerateResource.write.1.tlog

@@ -1,0 +1,16 @@
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\bin\Debug\pmaGUI.exe
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\bin\Debug\pmaGUI.pdb
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\ResolveAssemblyReference.cache
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\pmaGUI.Form1.resources
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\pmaGUI.Properties.Resources.resources
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\GenerateResource.read.1.tlog
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\GenerateResource.write.1.tlog
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\pmaGUI.exe
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\pmaGUI.pdb
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\bin\Debug\pmaGUI.exe.manifest
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\bin\Debug\pmaGUI.application
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\pmaGUI.TrustInfo.xml
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\pmaGUI.exe.manifest
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\obj\x86\Debug\pmaGUI.application
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\bin\Debug\randy.ips
+C:\Users\ATI\Desktop\atm\windows\EepromGUI\pmaGUI\bin\Debug\defaults.txt

@@ -1,0 +1,295 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Net.Sockets;
+using System.Threading;
+using System.ComponentModel;
+using System.Collections.ObjectModel;
+using System.Net;
+using System.IO;
+
+namespace pmaGUI
+{
+    public class Eeprom
+    {
+        TcpClient client;
+        NetworkStream stream;
+        String ip = "";
+        int port = 4422;
+        //int port = 4227; // broadcast port
+
+        //instance of our delegate
+        private static ProcessStatus _status;
+
+        //our thread object
+        private static Thread _thread;
+        private static Thread broadcast_thread;
+
+        //our ISynchronizeInvoke object
+        private static ISynchronizeInvoke _synch;
+
+        //our delegate, which will be used to marshal our call to the UI thread for updating the UI
+        public delegate void ProcessStatus(string Message, int status);
+
+
+        /***********************************************
+         * Constructor that helps set up interthread communication
+         * ********************************************/
+        public Eeprom(ISynchronizeInvoke syn, ProcessStatus notify)
+        {
+            //set the _synch & _status
+            _synch = syn;
+            _status = notify;
+        }
+
+        /***********************
+         * Empty Constructor
+         * ********************/
+
+        public Eeprom()
+        {
+            _synch = null;
+            _status = null;
+        }
+
+
+        /***************************************
+         * Start a separate thread to listen for
+         * incoming messages
+         * ************************************/
+        public void StartProcess(String machine)
+        {
+            //IPHostEntry entry = Dns.GetHostEntry(machine);
+            //this.ip = entry.AddressList[0].ToString();
+            this.ip = machine;
+            _thread = new System.Threading.Thread(ListenForUpdates);
+            _thread.IsBackground = true;
+            _thread.Name = "Listen to TCP thread";
+            _thread.Start();
+        }
+
+        public void StartBroadCastListen()
+        {
+            //Start thread for listening for machines coming up
+            broadcast_thread = new System.Threading.Thread(ListenForBroadcast);
+            broadcast_thread.IsBackground = true;
+            broadcast_thread.Name = "Listen for Machines";
+            broadcast_thread.Start();
+        }
+
+        /*****************************************
+         * Start the TCP/IP connection to the given machine
+         * ***************************************/
+        public bool StartConnection(String machine)
+        {
+            // Create the pieces to make the TCP connection
+            //Server server = new Server();
+            //IPHostEntry entry = Dns.GetHostEntry(machine);
+            //this.ip = entry.AddressList[0].ToString();
+            this.ip = machine;
+
+            //Connect to a tcp socket
+            try
+            {
+                client = new TcpClient(ip, port);
+                // Get a client stream for reading and writing.
+                stream = client.GetStream();
+                return true;
+            }
+            catch (ArgumentNullException e)
+            {
+                Console.WriteLine("ArgumentNullException: {0}", e);
+                return false;
+            }
+            catch (SocketException e)
+            {
+                Console.WriteLine("SocketException: {0}", e);
+                return false;
+            }
+        }
+
+
+        /********************************
+         * This creates a listener on a seperate 
+         * thread to log incoming respones
+         * ******************************/
+        public void ListenForUpdates()
+        {
+            try
+            {
+                // Create a TcpClient.
+                //threadClient = new TcpClient(ip, port);
+
+                //threadStream = threadClient.GetStream();
+                //otherStream.ReadTimeout = 1500;
+
+                // Loop forever
+                while (true)
+                {
+                    // Buffer to store the response bytes.
+                    Byte[] data = new Byte[4096];
+                    // String to store the response ASCII representation.
+                    String responseData = String.Empty;
+
+                    // Check to see if this NetworkStream is readable.
+                    if (stream.CanRead)
+                    {
+                        byte[] myReadBuffer = new byte[1024];
+                        StringBuilder myCompleteMessage = new StringBuilder();
+                        int numberOfBytesRead = 0;
+
+                        // Incoming message may be larger than the buffer size.
+                        do
+                        {
+                            numberOfBytesRead = stream.Read(myReadBuffer, 0, myReadBuffer.Length);
+
+                            myCompleteMessage.AppendFormat("{0}", Encoding.ASCII.GetString(myReadBuffer, 0, numberOfBytesRead));
+                        }
+                        while (stream.DataAvailable);
+
+                        // Print out the received message to the console.
+                        Console.WriteLine("Received: " + myCompleteMessage);
+                        UpdateStatus(myCompleteMessage.ToString(), 0);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Sorry.  You cannot read from this NetworkStream.");
+                    }
+
+                    // sleep 5 seconds
+                    Thread.Sleep(5000);
+                }
+
+            }
+            catch (ArgumentNullException e)
+            {
+                Console.WriteLine("ArgumentNullException: {0}", e);
+            }
+            catch (SocketException e)
+            {
+                Console.WriteLine("SocketException: {0}", e);
+            }
+            catch (IOException e)
+            {
+                Console.WriteLine("IOException: {0}", e);
+            }
+        }
+
+        /********************************
+         * This creates a listener on a seperate thread to log incoming broadcast machines.
+         * It finds the IP address sending messages and sends it to the GUI
+         * ******************************/
+        public void ListenForBroadcast()
+        {
+            // port 4227 is the port where the targets are broadcasting hello
+            IPEndPoint recvEp = new IPEndPoint(IPAddress.Any, 4227);    
+            UdpClient udpResponse = new UdpClient(4227);
+            while (true)
+            {
+                Byte[] recvBytes = udpResponse.Receive(ref recvEp);
+                //recvEp.Address is the ip adress of the machine
+                UpdateStatus(recvEp.Address.ToString(), 0);
+
+                // sleep 5 seconds
+                Thread.Sleep(10);
+            }
+
+        }
+
+        /******************************************************
+         * Update the GUI
+         * ***************************************************/
+        private static void UpdateStatus(string msg, int status)
+        {
+            // create our Object Array
+            object[] items = new object[2];
+            //populate our array with the parameters passed to our method
+            items[0] = msg;
+            items[1] = status;
+
+            //call the delegate
+            try
+            {
+                _synch.Invoke(_status, items);
+            }
+            catch (ObjectDisposedException e)
+            {
+                Console.WriteLine("ObjectDisposedException: {0}", e);
+            }
+            catch (InvalidOperationException e)
+            {
+                Console.WriteLine("InvalidOperationException: {0}", e);
+            }
+        }
+
+        /******************************************
+         * Send a message to the Eeprom board of the
+         * target and read back its response
+         * ***************************************/
+        public String sendMessage(String message)
+        {
+            String answer = "";
+            message = message + "\n";
+            try
+            {
+                // Translate the passed message into ASCII and store it as a Byte array.
+                Byte[] data = System.Text.Encoding.ASCII.GetBytes(message);
+
+                // Send the message to the connected TcpServer. 
+                if (stream.CanWrite)
+                {
+                    stream.Write(data, 0, data.Length);
+                }
+                else
+                {
+                    Console.WriteLine("Can't write message");
+                }
+
+                Console.WriteLine("Sent: {0}", message);
+            }
+            catch (ArgumentNullException e)
+            {
+                Console.WriteLine("ArgumentNullException: {0}", e);
+            }
+            catch (SocketException e)
+            {
+                Console.WriteLine("SocketException: {0}", e);
+            }
+            catch (IOException e)
+            {
+                Console.WriteLine("IOException: {0}", e);
+            }
+            return answer;
+        }
+
+        /********************************
+         * Closes the TCP/IP connection
+         * *****************************/
+        public void CloseConnection()
+        {
+            stream.Flush();
+            stream.Close();
+            client.Close();
+        }
+
+        /*******************************
+         * Kills the listen thread
+         * *****************************/
+        public void killThread()
+        {
+            if (_thread.IsAlive)
+            {
+                _thread.Abort();
+            }
+        }
+
+        public void killBroadCastThread()
+        {
+            if (broadcast_thread.IsAlive)
+            {
+                broadcast_thread.Abort();
+            }
+        }
+    }
+}
+
