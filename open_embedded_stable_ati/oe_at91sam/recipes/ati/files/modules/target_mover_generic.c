@@ -221,7 +221,7 @@ static int COAST_FACTOR[]  = {10, 10, 20, 20, 20, 20, 1}; // divisor to PID_TIME
 // static int MOVER2_PWM_TABLE[] = {0, 1100, 1550, 1975, 2375, 2800, 3325, 3900, 5000, 7000, 10000}; // -- first stab
 // static int MOVER2_PWM_TABLE[] = {0, 1350, 1800, 2300, 2700, 3200, 3700, 4500, 5500, 7500, 12000}; // -- second stab
 
-static int MOVER_RAMP_STEPS[] = {7, 7, 0, 3, 1, 1, 0}; // MATs do 2 * speed, MITs do 1 * speed
+static int MOVER_RAMP_STEPS[] = {7, 7, 0, 0, 1, 1, 0}; // MATs do 2 * speed, MITs do 1 * speed
 
 
 
@@ -452,11 +452,11 @@ int pid_errors[MAX_PID_ERRORS];  // previous errors (fully calculated for use in
 int pid_total_error = 0;   // total effort since we started moving
 //int pidEffortCounter = 0;			// prior effort
 //int pid_ticks = 0;			// prior effort
-//int pid_counter = 0;			// prior effort
 int pid_last_effort = 0;			// prior effort
 int pid_last_error = 0;				// prior error
 int pid_last_last_error = 0;		// prior prior error
 int pid_error = 0;					// current error
+int pid_counter = 0;		// Used for getting off the dock with the minerak motor controller
 //int pid_correct_count = 0;       // number of correct speeds (used to clamp effort)
 atomic_t pid_set_point = ATOMIC_INIT(0); // set point for speed to maintain
 //int pid_auto_calibration_mult = 0;    // auto-calibration factor to apply to effort
@@ -1041,7 +1041,7 @@ static int mover_speed_set(int speed) {
       revSpeed = speed; // we need to save the speed in case we reverse
       if ( mover_type == MITP || mover_type == MITPAMC ){
          selectSpeed = abs(speed);
-         if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
+         if (selectSpeed <= 5) tmpSpeed = 14; // 0.6 mph (to dock slowly)
          else if (selectSpeed <= 10) tmpSpeed = 16; // mph (to meet 1-3 kph)
          else if (selectSpeed <= 20) tmpSpeed = 35; // 3.2 mph (to meet 4-6 kph)
          else if (selectSpeed <= 30) tmpSpeed = 66; // 6.2 mph (to meet 8-10 kph)
@@ -1074,7 +1074,7 @@ static int mover_speed_set(int speed) {
          if (speed < 0) tmpSpeed *= -1;
          speed = tmpSpeed;
       }
-      if (abs(speed) > 10) {
+      if (abs(speed) > 16) {
          atomic_set(&find_dock_atomic, 0); // if moving fast do not ignore sensors
       }
    } else {
@@ -1183,6 +1183,7 @@ static int mover_speed_set(int speed) {
    if (speed != 0) {
       // if we are moving the last_sensor needs to be unknown
       atomic_set(&last_sensor, MOVER_SENSOR_UNKNOWN);
+      pid_counter = 10;
    }
 
    hardware_speed_set(abs(speed));
@@ -2754,10 +2755,12 @@ void mover_find_dock(void) {
 
    SENDUSERCONNMSG( "randy mover_find_dock,%i" ,atomic_read(&dockTryCount));
    if (isMoverAtDock() != 0) {
+   SENDUSERCONNMSG( "randy mover_find_dock, at dock");
       return;
    } // At the dock already
    if (atomic_read(&dockTryCount) > DOCK_RETRY_COUNT[mover_type]) {
       // atomic_set(&find_dock_atomic, 0); -- don't reset! will cause timeout_fire to not report ERR_did_not_dock!
+   SENDUSERCONNMSG( "randy mover_find_dock, over retry count");
       return;
    } // Tried too many times
    if (IS_MAT || IS_MIT){
@@ -3873,6 +3876,10 @@ static void pid_step3() {
     if (new_speed != 0) {
       //pid_effort = (kp_m * new_speed / 2;
       pid_effort = (((1000 * kp_m * new_speed) / kp_d) / 1000);
+      if(isMoverAtDock() && pid_counter > 0){
+          pid_effort *= 100;
+          pid_counter --;
+      }
       max(min(pid_effort, 1000), 0);
     }
          
