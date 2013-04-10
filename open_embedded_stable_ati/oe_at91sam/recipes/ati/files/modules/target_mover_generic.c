@@ -1041,7 +1041,7 @@ static int mover_speed_set(int speed) {
       revSpeed = speed; // we need to save the speed in case we reverse
       if ( mover_type == MITP || mover_type == MITPAMC ){
          selectSpeed = abs(speed);
-         if (selectSpeed <= 5) tmpSpeed = 14; // 0.6 mph (to dock slowly)
+         if (selectSpeed <= 5) tmpSpeed = 11; // 0.6 mph (to dock slowly)
          else if (selectSpeed <= 10) tmpSpeed = 16; // mph (to meet 1-3 kph)
          else if (selectSpeed <= 20) tmpSpeed = 35; // 3.2 mph (to meet 4-6 kph)
          else if (selectSpeed <= 30) tmpSpeed = 66; // 6.2 mph (to meet 8-10 kph)
@@ -1183,7 +1183,7 @@ static int mover_speed_set(int speed) {
    if (speed != 0) {
       // if we are moving the last_sensor needs to be unknown
       atomic_set(&last_sensor, MOVER_SENSOR_UNKNOWN);
-      pid_counter = 10;
+      pid_counter = 15;
    }
 
    hardware_speed_set(abs(speed));
@@ -1234,7 +1234,6 @@ static void dock_timeout_fire(unsigned long data)
       dock_timeout_start(60000); // needs to wait at least 2 seconds for velocity to settle to zero
       return;
    }
-
     if (dock_loc == 0) { // Dock at left
        if (atomic_read(&last_sensor) == MOVER_SENSOR_HOME) {
          fault = atomic_read(&lifter_fault);
@@ -3876,10 +3875,6 @@ static void pid_step3() {
     if (new_speed != 0) {
       //pid_effort = (kp_m * new_speed / 2;
       pid_effort = (((1000 * kp_m * new_speed) / kp_d) / 1000);
-      if(isMoverAtDock() && pid_counter > 0){
-          pid_effort *= 100;
-          pid_counter --;
-      }
       max(min(pid_effort, 1000), 0);
     }
          
@@ -3888,6 +3883,11 @@ static void pid_step3() {
 #endif
     // convert effort to pwm
     new_speed = pwm_from_effort(pid_effort);
+    if(isMoverAtDock() && pid_counter > 0){
+        pid_effort *= 100;
+        new_speed = MOTOR_PWM_END[mover_type];
+        pid_counter --;
+    }
 
     // These change the pwm duty cycle
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
