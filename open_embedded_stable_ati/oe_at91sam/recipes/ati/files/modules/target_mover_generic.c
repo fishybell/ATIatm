@@ -1183,7 +1183,7 @@ static int mover_speed_set(int speed) {
    if (speed != 0) {
       // if we are moving the last_sensor needs to be unknown
       atomic_set(&last_sensor, MOVER_SENSOR_UNKNOWN);
-      pid_counter = 15;
+      pid_counter = 40;
    }
 
    hardware_speed_set(abs(speed));
