@@ -26,7 +26,7 @@ start () {
    load_modules "target_user_interface.ko mover=0" \
                 "target_battery.ko minvoltval=$satb shutdown_wait=10" \
                 "target_hit_poll.ko line=0" \
-                "target_generic_output.ko" \
+                "target_generic_output.ko has_thermal=$therm has_thermalX=$thermx has_msdh=$msdh" \
                 "target_lifter_armor.ko" \
                 "lifter.ko"
 
@@ -34,7 +34,7 @@ start () {
    def_progs
 
    # start fasit client
-   fasit_conn -s -l $lport -p $cport -i $ip -k &
+   fasit_conn -s -F -l $lport -p $cport -i $ip -k &
 }
 
 # leave default stop routine
