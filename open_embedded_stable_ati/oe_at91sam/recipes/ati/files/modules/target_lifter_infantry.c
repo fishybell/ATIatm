@@ -18,8 +18,8 @@
 
 #define TIMEOUT_IN_SECONDS		3
 #define BOB_TIMEOUT_IN_MILLISECONDS		1000
-#define SENSOR_TIMEOUT_LEAVE_IN_MILLISECONDS		250
-#define SENSOR_TIMEOUT_ARRIVE_IN_MILLISECONDS	5000 /* with the new current limiters, cold move times are measured in the multiples of seconds */
+#define SENSOR_TIMEOUT_LEAVE_IN_MILLISECONDS		2700 // Make this timeout longer
+#define SENSOR_TIMEOUT_ARRIVE_IN_MILLISECONDS	3000 /* with the new current limiters, cold move times are measured in the multiples of seconds */
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -422,6 +422,7 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 	// we are responding.
     if (at91_get_gpio_value(INPUT_LIFTER_POS_DOWN_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
+      sensor_timeout_leave_stop(); // we didn't timeout, we're obviously moving
 	   delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     	timeout_timer_stop();
@@ -486,6 +487,7 @@ irqreturn_t up_position_int(int irq, void *dev_id, struct pt_regs *regs)
 	// we are responding.
     if (at91_get_gpio_value(INPUT_LIFTER_POS_UP_LIMIT) == INPUT_LIFTER_POS_ACTIVE_STATE)
         {
+      sensor_timeout_leave_stop(); // we didn't timeout, we're obviously moving
 	delay_printk("%s - %s()\n",TARGET_NAME, __func__);
 
     	timeout_timer_stop();
