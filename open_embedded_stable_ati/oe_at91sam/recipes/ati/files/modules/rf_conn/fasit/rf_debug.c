@@ -39,7 +39,7 @@ void debug_POWER_CONTROL(int color, LB_packet_t *pkt) {
 
 void debug_PYRO_FIRE(int color, LB_packet_t *pkt) {
    LB_pyro_fire_t *p = (LB_pyro_fire_t*)pkt;
-   DCMSG(color, "LBC_PYRO_FIRE: cmd: %i, addr: %i, zone: %i, crc: %02X", p->cmd, p->addr, p->zone, p->crc);
+   DCMSG(color, "LBC_PYRO_FIRE: cmd: %i, addr: %i, enable: %i, zone: %i, crc: %02X", p->cmd, p->addr, p->enable, p->zone, p->crc);
 }
 
 void debug_STATUS_RESP(int color, LB_packet_t *pkt) {

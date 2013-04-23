@@ -531,8 +531,9 @@ typedef struct LB_pyro_fire {
    // 1 * 32 bits = 1 long - padding = 4 bytes
    uint32 cmd:5 __attribute__ ((packed));
    uint32 addr:11 __attribute__ ((packed)); // destination address (always from basestation)
-   uint32 zone:2 __attribute__ ((packed));
-   uint32 pad:6 __attribute__ ((packed));
+   uint32 enable:1 __attribute__ ((packed)); // 0 = fire now, 1 = enable/disable (disabled on startup and re-connect to basestation)
+   uint32 zone:3 __attribute__ ((packed));
+   uint32 pad:5 __attribute__ ((packed));
    uint32 crc:8 __attribute__ ((packed));
 } __attribute__ ((packed))  LB_pyro_fire_t;
 
