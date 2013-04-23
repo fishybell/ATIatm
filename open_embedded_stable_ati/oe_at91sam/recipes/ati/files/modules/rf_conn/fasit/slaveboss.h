@@ -53,10 +53,6 @@ typedef struct fasit_connection {
    // for power control
    int sleeping;
 
-   // for pyro commands
-   int p_zone; // last zone commanded
-   int p_fire; // sent "set" fire command (1) or not (0)
-
    // for 2100/2102 commands
    int hit_on;
    int hit_react;
@@ -116,7 +112,7 @@ int fasitWrite(fasit_connection_t *fc); // same as above, but for FASIT messages
 
 // fasit commands
 int send_100(fasit_connection_t *fc);
-int send_2000(fasit_connection_t *fc, int zone);
+int send_2000(fasit_connection_t *fc, int enable, int zone);
 int handle_2004(fasit_connection_t *fc, int start, int end);
 int handle_2005(fasit_connection_t *fc, int start, int end);
 int handle_2006(fasit_connection_t *fc, int start, int end);

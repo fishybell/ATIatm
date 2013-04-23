@@ -1240,19 +1240,21 @@ void sendStatus15112(FASIT_header *hdr,thread_data_t *minion, FASIT_15110* msg) 
 //
 //   Since we seem to ack from a bunch of places, better to have a funciton
 //
-int send_2101_ACK(FASIT_header *hdr,int response,thread_data_t *minion) {
+#define send_2101_ACK(hdr, response, minion) send_2XXX_ACK(2101, hdr, response, minion);
+#define send_2004_ACK(hdr, response, minion) send_2XXX_ACK(2004, hdr, response, minion);
+int send_2XXX_ACK(int actual_num, FASIT_header *hdr,int response,thread_data_t *minion) {
    // do handling of message
    FASIT_header rhdr;
-   FASIT_2101 rmsg;
+   FASIT_2101 rmsg; // exactly the same structure as the 2004, so we'll just use it
 
-   DDCMSG(D_PACKET,BLUE,"minion %i: sending 2101 ACK \"%c\"",minion->mID,response);
+   DDCMSG(D_PACKET,BLUE,"minion %i: sending %i ACK \"%c\"",actual_num,minion->mID,response);
 
    // build the response - some CID's just reply 2101 with 'S' for received and complied 
    // and 'F' for Received and Cannot comply
    // other Command ID's send other messages
 
    // sets the sequence number and other data    
-   defHeader(&rhdr,2101,minion->seq++, sizeof(FASIT_2101));
+   defHeader(&rhdr,actual_num,minion->seq++, sizeof(FASIT_2101));
 
    // set response
    rmsg.response.resp_num = hdr->num;   //  pulls the message number from the header  (htons was wrong here)
@@ -1789,6 +1791,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
    FASIT_header *header;
    FASIT_header rhdr;
    FASIT_2111    msg;
+   FASIT_2000    *message_2000;
    FASIT_2100    *message_2100;
    FASIT_2110    *message_2110;
    FASIT_2114    *message_2114;
@@ -1874,6 +1877,44 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
                 ,(long long int)msg.body.devid,msg.body.flags);
          write_FASIT_msg(minion,&rhdr,sizeof(FASIT_header),&msg,sizeof(FASIT_2111));
          break;
+
+      case 2000: {
+         // BES stuff
+         LB_pyro_fire_t lpf;
+         message_2000 = (FASIT_2000*)(buf + sizeof(FASIT_header));
+         DDCMSG(D_NEW,MAGENTA,"Minion %i: fasit packet 2000 Pyro_Event_Command, seq=%i  cid=%i  zone=%i"
+                , minion->mID,htonl(header->seq),message_2000->cid, htons(message_2000->zone));
+         if (message_2000->cid == 3 || message_2000->cid == 4) { // we only send on the "set-fire" and "fire" commands
+            // send low-bandwidth message
+            lpf.cmd = LBC_PYRO_FIRE;
+            lpf.addr = minion->RF_addr;
+            switch (message_2000->cid) {
+               default:
+               case 3:
+                  lpf.enable = 1;
+                  break;
+               case 4:
+                  lpf.enable = 0;
+                  break;
+            }
+            lpf.zone=0;
+            // remap zones (only 1-4 are allowed) to 2-bit value
+            if (lpf.enable == 0) {
+               if (htons(message_2000->zone) > 1 && htons(message_2000->zone) < 5) {
+                  lpf.zone = (htons(message_2000->zone) & 0x7);
+               }
+            } else {
+               if (htons(message_2000->zone) == 65535) {
+                  lpf.zone = 7; // max of 16 bits, max of 3 bits, it's all the same to me
+               }
+            }
+            DDCMSG(D_NEW,YELLOW, "Before send...");
+            set_crc8(&lpf);
+            DDpacket((char*)&lpf, RF_size(lpf.cmd));
+            psend_mcp(minion,&lpf);
+         }
+         send_2004_ACK(header,'S',minion);
+      }  break;
 
       case 2100:
          message_2100 = (FASIT_2100*)(buf + sizeof(FASIT_header));

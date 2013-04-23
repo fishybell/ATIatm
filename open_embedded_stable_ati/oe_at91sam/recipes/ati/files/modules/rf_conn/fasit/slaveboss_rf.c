@@ -1031,8 +1031,8 @@ int handle_POWER_CONTROL(fasit_connection_t *fc, int start, int end) {
 int handle_PYRO_FIRE(fasit_connection_t *fc, int start, int end) {
    LB_pyro_fire_t *pkt = (LB_pyro_fire_t *)(fc->rf_ibuf + start);
    DDCMSG(D_RF|D_VERY,RED, "handle_PYRO_FIRE(%8p, %i, %i)", fc, start, end);
-   // send pyro fire request (will handle "set" and "fire" commands to BES)
-   return send_2000(fc, pkt->zone);
+   // send pyro fire request (will send "set" and "fire" commands to BES)
+   return send_2000(fc, pkt->enable, pkt->zone);
 }
 
 int handle_ACCESSORY(fasit_connection_t *fc, int start, int end) {

@@ -288,26 +288,28 @@ int send_100(fasit_connection_t *fc) {
    return mark_fasitWrite;
 }
 
-int send_2000(fasit_connection_t *fc, int zone) {
+int send_2000(fasit_connection_t *fc, int enable, int zone) {
    FASIT_header hdr;
    DDCMSG(D_PACKET|D_VERY,CYAN, "send_2000(%08X)", fc);
    defHeader(fc, 2000, &hdr); // sets the sequence number and other data
    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_2000));
    FASIT_2000 bdy;
 
-   // first time through?
-   if (fc->p_fire == 0) {
-      // send "set" fire command
+   // enabling/disabling BES or commanding BES?
+   if (enable == 1) { // enabling/disabling
+      // send "set fire" command
       bdy.cid = 3;
-      fc->p_fire = 1; // next time send "fire" fire command
-   } else {
-      // second time through...
+      if (zone == 0) {
+         bdy.zone = htons(0);
+      } else {
+         bdy.zone = htons(65535);
+      }
+   } else { // commanding
+      // send "fire" command
       bdy.cid = 4;
-      fc->p_fire = 0; // next time send "set" fire command again
+      bdy.zone = htons(zone);
    }
 
-   // change zone from 0-7 to 1-x
-   bdy.zone = htons(zone+1);
 
    // send
    queueMsg(fc, &hdr, sizeof(FASIT_header));

@@ -159,6 +159,7 @@ char *do_PYRO_FIRE(int a, int *num) {
    pkt->cmd = num[0];
    pkt->addr = num[1];
    pkt->zone = num[2];
+   pkt->enable = 1; // don't actually fire during a test
    set_crc8(pkt);
    return (char*)pkt;
 }
