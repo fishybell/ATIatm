@@ -1,0 +1,33 @@
+MCP (on x86 virtual machine running on SmartRange computer)
+ - many clients (minions) connect to SmartRange
+ - server for basestation/HHC connection
+ - minions converts FASIT messages to RF and vice versa
+ - minions simulate FASIT target
+ - mcp.c = main loop starts minions, listens to RF messages
+ - minion.c = main minion handling
+ - minion_state.c = main simulation handling 
+
+RFmaster.arm (on basestation/HHC)
+ - connects to MCP
+ - talks to radio
+ - RFmaster.c = main loop and handling RF message transport
+
+RFslave.new.arm (on target mechanism)
+ - talks to radio
+ - connects to slaveboss
+ - RFslave_main.c = main loop for handling file descriptors
+ - RFslave_data.c = functions for handling RF message transport
+
+slaveboss.arm (on target mechanism)
+ - server for RFslave.new.arm
+ - converts RF messages to FASIT and vice versa
+ - FASIT server for target
+ - slaveboss.c = main loop for handling file descriptors
+ - slaveboss_rf.c = functions for handling RF to FASIT translation
+ - slaveboss_fasit.c = functions for handling FASIT to RF translation
+
+Message flow to target:
+SmartRange -> MCP -> RFmaster.arm ~ radio waves ~ RFlsave.new.arm -> slaveboss.arm -> fasit_conn
+
+Message flow from target:
+fasit_conn -> slaveboss.arm -> RFslave.new.arm ~ radio waves ~ -> RFmaster.arm -> MCP -> SmartRange
