@@ -1900,7 +1900,7 @@ int handle_FASIT_msg(thread_data_t *minion,char *buf, int packetlen, minion_time
             lpf.zone=0;
             // remap zones (only 1-4 are allowed) to 2-bit value
             if (lpf.enable == 0) {
-               if (htons(message_2000->zone) > 1 && htons(message_2000->zone) < 5) {
+               if (htons(message_2000->zone) > 0 && htons(message_2000->zone) < 5) {
                   lpf.zone = (htons(message_2000->zone) & 0x7);
                }
             } else {
