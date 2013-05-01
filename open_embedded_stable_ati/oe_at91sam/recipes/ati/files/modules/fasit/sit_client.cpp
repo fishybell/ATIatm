@@ -481,11 +481,30 @@ int SIT_Client::handle_100(int start, int end) {
     return 0;
 }
 
+/* This is to handle the BES. This is only to support the 
+ * BES interface if the BES is does not use ethernet.
+ * If a networked BES is on the range, use the BES "object"
+ * (RVbes and DVbes) and control the BES from the RCS not
+ * through this interface.
+ */
 int SIT_Client::handle_2000(int start, int end) {
     FUNCTION_START("::handle_2000(int start, int end)");
 
     // do handling of message
     IMSG("Handling 2000 in SIT\n");
+    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+    FASIT_2000 *msg = (FASIT_2000*)(rbuf + start + sizeof(FASIT_header));
+
+    // save response numbers
+    resp_num = hdr->num; //  pulls the message number from the header  (htons was wrong here)
+    resp_seq = hdr->seq;
+
+    // Just parse out the command for now and print a pretty message
+    switch (msg->cid) {
+        case 4: // Only support the fire command
+            doBESFire(htons(msg->zone));    // set hit count to something
+            break;
+    }
 
     FUNCTION_INT("::handle_2000(int start, int end)", 0);
     return 0;
@@ -1118,6 +1137,16 @@ void SIT_Client::didFailure(int type) {
 }
 
 // change position to conceal
+void SIT_Client::doBESFire(int zone) {
+    FUNCTION_START("::doBESFire()");
+    // pass directly to kernel for actual action
+    if (hasPair()) {
+        nl_conn->doBESFire(zone);
+    }
+    FUNCTION_END("::doBESFire()");
+}
+
+// change position to conceal
 void SIT_Client::doConceal() {
     FUNCTION_START("::doConceal()");
     // pass directly to kernel for actual action
@@ -1235,7 +1264,9 @@ void SIT_Client::didBattery(int val) {
     FUNCTION_START("::didBattery(int val)");
 
     // if we're low we'll need to tell userspace
-    if (val <= FAILURE_BATTERY_VAL) {
+    if (val <= HALT_BATTERY_VAL) {
+        didFailure(ERR_halt_battery);
+    } else if (val <= FAILURE_BATTERY_VAL) {
         didFailure(ERR_critical_battery);
     } else if (val <= MIN_BATTERY_VAL) {
         didFailure(ERR_low_battery);
@@ -1719,6 +1750,46 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
 /***********************************************************
  *                   SIT Netlink Commands                   *
  ***********************************************************/
+void SIT_Conn::doBESFire(int zone) {
+    FUNCTION_START("::doBESFire()");
+
+    // Create attribute
+    struct accessory_conf acc_c;
+    memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out
+    acc_c.ex_data1 = zone;
+    switch (zone){
+        case 1:
+            acc_c.acc_type = ACC_BES_TRIGGER_1;
+            acc_c.on_now = 1;
+            break;
+        case 2:
+            acc_c.acc_type = ACC_BES_TRIGGER_2;
+            acc_c.on_now = 1;
+            break;
+        case 3:
+            acc_c.acc_type = ACC_BES_TRIGGER_3;
+            acc_c.on_now = 1;
+            break;
+        case 4:
+            acc_c.acc_type = ACC_BES_TRIGGER_4;
+            acc_c.on_now = 1;
+            break;
+        case 65525:
+            acc_c.acc_type = ACC_BES_TRIGGER_1;
+            acc_c.on_now = 0;
+            break;
+        default:
+            acc_c.acc_type = ACC_BES_TRIGGER_1;
+            acc_c.on_now = 0;
+            break;
+    }
+
+    // Queue command
+    queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // BES triggers are accessories
+
+    FUNCTION_END("::doBESFire()");
+}
+
 // change position to conceal
 void SIT_Conn::doConceal() {
     FUNCTION_START("::doConceal()");

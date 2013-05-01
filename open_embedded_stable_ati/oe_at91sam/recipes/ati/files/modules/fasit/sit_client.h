@@ -52,6 +52,7 @@ public :
    void didPHI(int exists,int on);
    void doTherm(int on);
    void didTherm(int exists,int on);
+   void doBESFire(int zone);
    void doBlank(int blank);
    void doGPS(); // retrieve gps data
    void didGPS(struct gps_conf gpc_c); // current gps data
@@ -162,6 +163,7 @@ public:
    void didPHI(int exists,int on);
    void doTherm(int on);
    void didTherm(int exists,int on);
+   void doBESFire(int zone);
    void doGPS(); // retrieve gps dataprotected:
 
 
