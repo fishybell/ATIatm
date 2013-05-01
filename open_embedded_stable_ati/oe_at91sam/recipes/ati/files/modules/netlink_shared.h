@@ -56,6 +56,12 @@ static struct nla_policy generic_int8_policy[GEN_INT8_A_MAX + 1] = {
 };
 
 /* specific policy for hit sensor calibration */
+typedef struct hit_on_line {
+    u8 hits:4;                           /* explained below in overwrite enum */
+    u8 line:4;                           /* for ttmt mover we need which hit line we are configuring 0-SAT, 1-front, 2-back, 3-engine */
+} hit_on_line_t;
+
+/* specific policy for hit sensor calibration */
 typedef struct hit_calibration {
     u32 seperation __attribute__ ((packed));   /* seperation calibration value (in milliseconds) */
     u32 sensitivity __attribute__ ((packed));  /* sensitivity calibration value (lower value for less sensitive) */
@@ -66,7 +72,8 @@ typedef struct hit_calibration {
     u8 bob_type:2;                             /* Type of bob: 0 bob at kill, 1 bob at hit */ 
     u8 type:2;                                 /* 0 for NCHS, 1 for mechanical (single-fire), 2 for mechanical (burst-fire), 3 for MILES */
     u8 invert:2;                               /* invert hit sensor input: 0 for no, 1 for yes, 2 for auto (not implimented) */
-    u8 set:4;                                  /* explained below */
+    u8 set:4;                                  /* explained below in overwrite enum */
+    u8 line:4;                           /* for ttmt mover we need which hit line we are configuring 0-SAT, 1-front, 2-back, 3-engine */
 } hit_calibration_t;
 enum {
     BLANK_ALWAYS,           /* hit sensor disabled blank */
@@ -97,6 +104,19 @@ static struct nla_policy hit_calibration_policy[HIT_A_MAX + 1] = {
     {}, { NLA_UNSPEC, sizeof(struct hit_calibration), sizeof(struct hit_calibration) },
 #else
     [HIT_A_MSG] = { .len = sizeof(struct hit_calibration) },
+#endif
+};
+enum {
+    HIT_M_UNSPEC,
+    HIT_M_MSG, /* mover hit structure */
+    __HIT_M_MAX,
+};
+#define HIT_M_MAX (__HIT_M_MAX - 1)
+static struct nla_policy hit_on_line_policy[HIT_M_MAX + 1] = {
+#ifdef NETLINK_USER_H
+    {}, { NLA_UNSPEC, sizeof(struct hit_on_line), sizeof(struct hit_on_line) },
+#else
+    [HIT_M_MSG] = { .len = sizeof(struct hit_on_line) },
 #endif
 };
 /* specific policy for bit button events */
@@ -156,6 +176,10 @@ enum {
     ACC_SMOKE,              /* Smoke generator : ex_data1 = smoke # */
     ACC_THERMAL,            /* Thermal device : ex_data1 = thermal # */
     ACC_MILES_SDH,          /* MILES, Shootback Device Holder : ex_data1 = Player ID, ex_data2 = MILES Code, ex_data3 = Ammo Type*/
+    ACC_BES_TRIGGER_1,      // BES trigger
+    ACC_BES_TRIGGER_2,      // BES trigger
+    ACC_BES_TRIGGER_3,      // BES trigger
+    ACC_BES_TRIGGER_4,      // BES trigger
     ACC_INTERNAL,           /* Internal type for other outputs: don't use */
 };
 enum {
@@ -247,6 +271,9 @@ enum {
     NL_C_CONTINUOUS,       /* move continuous as mph (command/reply) (generic 16-bit int) */
     NL_C_MOVEAWAY,       /* move continuous as mph (command/reply) (generic 16-bit int) */
     NL_C_GOHOME,       /* go home, used for - abort, pause, restart scenarios */
+    NL_C_HIT_CAL_MOVER,    /* calibrate hit sensor (command/reply) (hit calibrate structure) */
+    NL_C_HITS_MOVER,    /* mover hits message) */
+    NL_C_COAST,    /* ttmt needs to "coast" to a stop */
     NL_C_FAULT,      /* fault event (reply) (generic 8-bit int) */
     __NL_C_MAX,
 };
@@ -280,6 +307,9 @@ static nl_attr_size_t nl_attr_sizes[] = {
    {NL_C_CONTINUOUS, sizeof(u16), generic_int16_policy},
    {NL_C_MOVEAWAY, sizeof(u16), generic_int16_policy},
    {NL_C_GOHOME, sizeof(u8), generic_int8_policy},
+   {NL_C_HIT_CAL_MOVER, sizeof(hit_calibration_t), hit_calibration_policy},
+   {NL_C_HITS_MOVER, sizeof(hit_on_line_t), hit_on_line_policy},
+   {NL_C_COAST, sizeof(u8), generic_int8_policy},
    {NL_C_FAULT, sizeof(u8), generic_int8_policy},
    {__NL_C_MAX, 0, NULL},
 };

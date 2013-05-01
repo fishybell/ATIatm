@@ -53,7 +53,7 @@
 #define INPUT_CHARGING_BAT_DEGLITCH_STATE		DEGLITCH_ON
 #define	INPUT_CHARGING_BAT						AT91_PIN_PB8  // DOCKED
 
-#define	OUTPUT_CHARGING_RELAY 			AT91_PIN_PA4
+#define	OUTPUT_CHARGING_RELAY 			AT91_PIN_PA4	// Mover board
 #define	OUTPUT_CHARGING_RELAY_ACTIVE_STATE 		ACTIVE_HIGH
 #define	OUTPUT_CHARGING_RELAY_INACTIVE_STATE 	ACTIVE_LOW
 
@@ -187,11 +187,27 @@
 
 //---------------------------------------------------------------------------
 // MUZZLE FLASH
+// If BES is active then Night Light (Moon Glow) and PHI (Positive Hit Indicator)
+// will be disabled.
 //---------------------------------------------------------------------------
 #define	OUTPUT_MUZZLE_FLASH_ACTIVE_STATE		ACTIVE_LOW
-#define	OUTPUT_MUZZLE_FLASH 					AT91_PIN_PA10
-#define	OUTPUT_NIGHT_LIGHT 						AT91_PIN_PA6
-#define	OUTPUT_HIT_INDICATOR 					AT91_PIN_PA9
+#define	OUTPUT_MUZZLE_FLASH 				AT91_PIN_PA10
+#define	OUTPUT_NIGHT_LIGHT 				AT91_PIN_PA6
+#define	OUTPUT_HIT_INDICATOR 				AT91_PIN_PA9
+
+//---------------------------------------------------------------------------
+// BES - Battlefield Effects Simulator
+// If BES is active then Night Light (Moon Glow) and PHI (Positive Hit Indicator)
+// will be disabled.
+//---------------------------------------------------------------------------
+#define	OUTPUT_TRIGGER_1_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_TRIGGER_2_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_TRIGGER_3_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_TRIGGER_4_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_BES_TRIGGER_1 			AT91_PIN_PA4 // Lifter board
+#define	OUTPUT_BES_TRIGGER_2 			AT91_PIN_PA8 // Lifter board
+#define	OUTPUT_BES_TRIGGER_3 			AT91_PIN_PA6 // Lifter board
+#define	OUTPUT_BES_TRIGGER_4 			AT91_PIN_PA9 // Lifter board
 
 //---------------------------------------------------------------------------
 // MISC.

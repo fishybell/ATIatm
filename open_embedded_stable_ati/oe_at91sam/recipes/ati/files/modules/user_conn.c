@@ -158,6 +158,18 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
             }
 
             break;
+        case NL_C_HITS_MOVER:
+            genlmsg_parse(nlh, 0, attrs, HIT_M_MAX, hit_on_line_policy);
+
+            if (attrs[HIT_M_MSG]) {
+                // calibration data
+                struct hit_on_line *hol = (struct hit_on_line*)nla_data(attrs[HIT_M_MSG]);
+                if (hol != NULL) {
+                    snprintf(wbuf, 1024, "H %i %i\n", hol->hits, hol->line);
+                }
+            }
+
+            break;
         case NL_C_HIT_LOG:
             genlmsg_parse(nlh, 0, attrs, GEN_STRING_A_MAX, generic_string_policy);
 
@@ -169,6 +181,7 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
 
             break;
         case NL_C_HIT_CAL:
+        case NL_C_HIT_CAL_MOVER:
 //printf("NL_C_HIT_CAL\n");
             genlmsg_parse(nlh, 0, attrs, HIT_A_MAX, hit_calibration_policy);
 
@@ -189,7 +202,11 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                         case HIT_GET_CAL:
                         case HIT_OVERWRITE_CAL:
                             // sensitivity and seperation
-                            snprintf(wbuf, 1024, "L %i %i %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->enable_on);
+                            if (hit_c->line != 0){
+                                snprintf(wbuf, 1024, "L %i %i %i %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->enable_on, hit_c->line);
+                            } else {
+                                snprintf(wbuf, 1024, "L %i %i %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->enable_on);
+                            }
                             break;
                         case HIT_GET_TYPE:
                         case HIT_OVERWRITE_TYPE:
@@ -262,6 +279,22 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                         case ACC_MILES_SDH:
                             // MILES Shootback Device Holder data 
                             snprintf(wbuf, 1024, "Q MSD");
+                            break;
+                        case ACC_BES_TRIGGER_1:
+                            // BES trigger 1
+                            snprintf(wbuf, 1024, "Q BT1");
+                            break;
+                        case ACC_BES_TRIGGER_2:
+                            // BES trigger 2
+                            snprintf(wbuf, 1024, "Q BT2");
+                            break;
+                        case ACC_BES_TRIGGER_3:
+                            // BES trigger 3
+                            snprintf(wbuf, 1024, "Q BT3");
+                            break;
+                        case ACC_BES_TRIGGER_4:
+                            // BES trigger 4
+                            snprintf(wbuf, 1024, "Q BT4");
                             break;
                     }
 
@@ -636,7 +669,7 @@ int isNumber(char *data) {
 int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     char wbuf[1024];
     wbuf[0] = '\0';
-    int arg1, arg2, arg3, arg4;
+    int arg1, arg2, arg3, arg4, arg5;
     // default parameters
     int param1, param2, param3, param4, fparam1, fparam2, sparam1, sparam2;
     int nparam1, nparam2, nparam3, nparam4, nparam5, nparam6, nparam7, nparam8;
@@ -710,7 +743,15 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                 nl_cmd = NL_C_GPS;
                 break;
             case 'H': case 'h':
-                nl_cmd = NL_C_HITS;
+               arg1 = cmd[1] == ' ' ? 2 : 1; // find index of second argument
+               switch (cmd[arg1]) { /* second letter */
+                  case 'M': case 'm':	  // Reads and sets an address location
+                     nl_cmd = NL_C_HITS_MOVER;
+                     break;
+                  default:
+                     nl_cmd = NL_C_HITS;
+                     break;
+                }
                 break;
             case 'K': case 'k':
                 nl_cmd = NL_C_BATTERY;
@@ -1987,7 +2028,11 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Shutdown device\nFormat: K\n");
                         break;
                     case 'L': case 'l':
-                        snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-15)hit_desensitivity (0-1024)tenthseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_always, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_on_concealed)\n");
+			if (cmd[arg1 + 1] == 'm') {
+                            snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-15)hit_desensitivity (0-1024)tenthseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_always, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_on_concealed) (1-3)Hit Sensor(1-Front, 2-Rear, 3-Engine)\n");
+                        } else {
+                            snprintf(wbuf, 1024, "Request hit calibration parameters\nFormat: L\nChange hit calibration parameters\nFormat: L (1-10000)milliseconds_between_hits (1-15)hit_desensitivity (0-1024)tenthseconds_blanking_time_from_start_expose (0-4)enable_on_value (0-blank_always, 1-enable_always, 2-enable_at_position, 3-disable_at_position, 4-blank_on_concealed)\n");
+                        }
                         break;
                     case 'M': case 'm':
                         snprintf(wbuf, 1024, "Movement speed request\nFormat: M M\nStop movement\nFormat: M\nChange speed\nFormat M (-32767 to 32766)speed_in_mph\n");
@@ -2041,6 +2086,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
             // Construct a generic netlink by allocating a new message
             struct nl_msg *msg;
             struct hit_calibration hit_c;
+            struct hit_on_line hol;
             struct accessory_conf acc_c;
             struct gps_conf gps_c;
             struct bit_event bit_c;
@@ -2092,6 +2138,26 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         i ++;
                         snprintf(wbuf, 1024, "Move AWAY Request [%s]\n", cmd+i);
                         write(client, wbuf, strnlen(wbuf,1024));
+                    } else if (cmd[1] == 'S' || cmd[1] == 's') {
+                        nl_cmd = NL_C_COAST;
+                        nlmsg_free(msg);
+                        msg = nlmsg_alloc();
+                        genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, nl_cmd, 1);
+                        i ++;
+                        nla_put_u8(msg, GEN_INT8_A_MSG, 1); // create event X
+                        snprintf(wbuf, 1024, "Move Coast Request\n");
+                        write(client, wbuf, strnlen(wbuf,1024));
+                        break;
+                    } else if (cmd[1] == 'H' || cmd[1] == 'h') {
+                        nl_cmd = NL_C_GOHOME;
+                        nlmsg_free(msg);
+                        msg = nlmsg_alloc();
+                        genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, nl_cmd, 1);
+                        i ++;
+                        nla_put_u8(msg, GEN_INT8_A_MSG, 1); // create event X
+                        snprintf(wbuf, 1024, "Move Home Request\n");
+                        write(client, wbuf, strnlen(wbuf,1024));
+                        break;
                     }
                     if (sscanf(cmd+i, "%f", &farg1) == 1) {
 						farg1 = farg1*10;	// muliplied to work with floats in target_mover_generic
@@ -2145,6 +2211,18 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         nla_put_u8(msg, GEN_INT8_A_MSG, HIT_REQ); // request hits message
                     }
                     break;
+                case NL_C_HITS_MOVER:
+                    memset(&hol, 0, sizeof(struct hit_on_line));
+                    hol.line = 1;
+                    hol.hits = HIT_REQ;
+                    if (sscanf(cmd+arg1+1, "%i %i", &arg1, &arg2) == 2) {
+                        hol.hits = arg1;
+                        hol.line = arg2;
+                    } else if (sscanf(cmd+arg1+1, "%i", &arg1) == 1) {
+                        hol.line = arg1;
+                    }
+                    nla_put(msg, HIT_M_MSG, sizeof(struct hit_on_line), &hol);
+                    break;
                 case NL_C_HIT_LOG:
                     // hit log message
                     nla_put_string(msg, GEN_STRING_A_MSG, ""); // ignored
@@ -2156,13 +2234,35 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         case 'L': case 'l':
                             if (arg2 == 1) {
                                 // set calibration message
-                                if (sscanf(cmd+1, "%i %i %i %i", &arg1, &arg2, &arg3, &arg4) == 4) {
+                                if (sscanf(cmd+1, "%i %i %i %i %i", &arg1, &arg2, &arg3, &arg4, &arg5) == 5) {
                                     hit_c.seperation = arg1;
                                     hit_c.sensitivity = arg2;
                                     hit_c.blank_time = arg3;
                                     hit_c.enable_on = arg4;
+                                    hit_c.line = arg5;
                                     hit_c.set = HIT_OVERWRITE_CAL;
-                                }
+                                    nl_cmd = NL_C_HIT_CAL_MOVER;
+                                    nlmsg_free(msg);
+                                    msg = nlmsg_alloc();
+                                    genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, nl_cmd, 1);
+                                } else {
+                                    if (sscanf(cmd+1, "%i %i %i %i", &arg1, &arg2, &arg3, &arg4) == 4) {
+                                        hit_c.seperation = arg1;
+                                        hit_c.sensitivity = arg2;
+                                        hit_c.blank_time = arg3;
+                                        hit_c.enable_on = arg4;
+                                        hit_c.line = 0;
+                                        hit_c.set = HIT_OVERWRITE_CAL;
+                                    } else {
+                                        sscanf(cmd+1, "%i", &arg1);
+                                        hit_c.line = arg1;
+                                        hit_c.set = HIT_GET_CAL;
+                                        nl_cmd = NL_C_HIT_CAL_MOVER;
+                                        nlmsg_free(msg);
+                                        msg = nlmsg_alloc();
+                                        genlmsg_put(msg, NL_AUTO_PID, NL_AUTO_SEQ, family, 0, NLM_F_ECHO, nl_cmd, 1);
+                                    }
+				}
                             } else {
                                 // get calibration bounds request
                                 hit_c.set = HIT_GET_CAL;
@@ -2264,6 +2364,26 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                    switch (cmd[arg1 + 2]) { /* third letter */
                                        case 'M' : case 'm' :
                                            acc_c.acc_type = ACC_THERMAL;
+                                           break;
+                                   }
+                                   break;
+                           }
+                           break;
+                        case 'B' : case 'b' :
+                           switch (cmd[arg1 + 1]) { /* second letter */
+                               case 'T' : case 't' :
+                                   switch (cmd[arg1 + 2]) { /* third letter */
+                                       case '1' :
+                                           acc_c.acc_type = ACC_BES_TRIGGER_1;
+                                           break;
+                                       case '2' :
+                                           acc_c.acc_type = ACC_BES_TRIGGER_2;
+                                           break;
+                                       case '3' :
+                                           acc_c.acc_type = ACC_BES_TRIGGER_3;
+                                           break;
+                                       case '4' :
+                                           acc_c.acc_type = ACC_BES_TRIGGER_4;
                                            break;
                                    }
                                    break;
