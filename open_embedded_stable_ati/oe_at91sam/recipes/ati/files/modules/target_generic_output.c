@@ -26,23 +26,27 @@
 //---------------------------------------------------------------------------
 // These variables are parameters given when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
-static int has_moon = FALSE;				// has moon glow light
+static int has_bes = FALSE;			// has BES battlefield effects simulator
+module_param(has_bes, bool, S_IRUGO);
+// NOTE: if BES is true then the moon glow and positive hit indicator will not be active.
+// The BES uses those control lines, BE CAREFUL
+static int has_moon = FALSE;			// has moon glow light
 module_param(has_moon, bool, S_IRUGO);
-static int has_muzzle = FALSE;				// has muzzle flash simulator
+static int has_muzzle = FALSE;			// has muzzle flash simulator
 module_param(has_muzzle, bool, S_IRUGO);
-static int has_phi = FALSE;					// has positive hit indicator light
+static int has_phi = FALSE;			// has positive hit indicator light
 module_param(has_phi, bool, S_IRUGO);
-static int has_ses = FALSE;					// has SES
+static int has_ses = FALSE;			// has SES
 module_param(has_ses, bool, S_IRUGO);
-static int has_msdh = FALSE;				// has MSDH
+static int has_msdh = FALSE;			// has MSDH
 module_param(has_msdh, bool, S_IRUGO);
 static int has_thermal = FALSE;			// has X thermal generators
 module_param(has_thermal, int, S_IRUGO);
-static int has_thermalX = FALSE;			// has X thermal generators
+static int has_thermalX = FALSE;		// has X thermal generators
 module_param(has_thermalX, int, S_IRUGO);
-static int has_smokeX = FALSE;				// has X smoke generators
+static int has_smokeX = FALSE;			// has X smoke generators
 module_param(has_smokeX, int, S_IRUGO);
-static int has_internal = FALSE;			// has internal output
+static int has_internal = FALSE;		// has internal output
 module_param(has_internal, bool, S_IRUGO);
 
 //---------------------------------------------------------------------------
@@ -243,8 +247,108 @@ struct generic_output output_table[] = {
         OUTPUT_MILES_SHOOTBACK_ACTIVE_STATE,	// gpio active high/low
         RW_LOCK_UNLOCKED,		// lock
     },
+    // BES trigger 1
+    {
+        ACC_BES_TRIGGER_1,			// type
+        1,						// number
+        0,						// exists
+        DISABLED,				// enabled
+        S_DISABLED,				// state
+        S_DISABLED,				// next_state
+        0,						// active_on
+        CONSTANT_ON,			// mode
+        0,						// initial delay
+        0,						// initial delay randomization
+        0,						// repeat delay
+        0,						// repeat delay randomization
+        0,						// on time
+        0,						// off time
+        0,						// repeat count
+        0,						// repeat at
+        0,						// on/off repeat count
+        0,						// on/off repeat at
+        TIMER_INITIALIZER(state_run, 0, 6), // state function, no expire, index 3
+        OUTPUT_BES_TRIGGER_1,			// gpio pin
+        OUTPUT_TRIGGER_1_ACTIVE_STATE,	// gpio active high/low
+        RW_LOCK_UNLOCKED,		// lock
+    },
+    // BES trigger 2
+    {
+        ACC_BES_TRIGGER_2,			// type
+        1,						// number
+        0,						// exists
+        DISABLED,				// enabled
+        S_DISABLED,				// state
+        S_DISABLED,				// next_state
+        0,						// active_on
+        CONSTANT_ON,			// mode
+        0,						// initial delay
+        0,						// initial delay randomization
+        0,						// repeat delay
+        0,						// repeat delay randomization
+        0,						// on time
+        0,						// off time
+        0,						// repeat count
+        0,						// repeat at
+        0,						// on/off repeat count
+        0,						// on/off repeat at
+        TIMER_INITIALIZER(state_run, 0, 7), // state function, no expire, index 3
+        OUTPUT_BES_TRIGGER_2,			// gpio pin
+        OUTPUT_TRIGGER_2_ACTIVE_STATE,	// gpio active high/low
+        RW_LOCK_UNLOCKED,		// lock
+    },
+    // BES trigger 3
+    {
+        ACC_BES_TRIGGER_3,			// type
+        1,						// number
+        0,						// exists
+        DISABLED,				// enabled
+        S_DISABLED,				// state
+        S_DISABLED,				// next_state
+        0,						// active_on
+        CONSTANT_ON,			// mode
+        0,						// initial delay
+        0,						// initial delay randomization
+        0,						// repeat delay
+        0,						// repeat delay randomization
+        0,						// on time
+        0,						// off time
+        0,						// repeat count
+        0,						// repeat at
+        0,						// on/off repeat count
+        0,						// on/off repeat at
+        TIMER_INITIALIZER(state_run, 0, 8), // state function, no expire, index 3
+        OUTPUT_BES_TRIGGER_3,			// gpio pin
+        OUTPUT_TRIGGER_3_ACTIVE_STATE,	// gpio active high/low
+        RW_LOCK_UNLOCKED,		// lock
+    },
+    // BES trigger 4
+    {
+        ACC_BES_TRIGGER_4,			// type
+        1,						// number
+        0,						// exists
+        DISABLED,				// enabled
+        S_DISABLED,				// state
+        S_DISABLED,				// next_state
+        0,						// active_on
+        CONSTANT_ON,			// mode
+        0,						// initial delay
+        0,						// initial delay randomization
+        0,						// repeat delay
+        0,						// repeat delay randomization
+        0,						// on time
+        0,						// off time
+        0,						// repeat count
+        0,						// repeat at
+        0,						// on/off repeat count
+        0,						// on/off repeat at
+        TIMER_INITIALIZER(state_run, 0, 9), // state function, no expire, index 3
+        OUTPUT_BES_TRIGGER_4,			// gpio pin
+        OUTPUT_TRIGGER_4_ACTIVE_STATE,	// gpio active high/low
+        RW_LOCK_UNLOCKED,		// lock
+    },
 };
-#define TABLE_SIZE 6 /* size of output_table */
+#define TABLE_SIZE 10 /* size of output_table */
 
 //---------------------------------------------------------------------------
 // This atomic variable is use to store the burst count.
@@ -818,7 +922,7 @@ static void state_run(unsigned long index) {
 // delay_printk("%s(): %i\n",__func__, index);
     // lock as read/write
     write_lock(&this->lock);
-// delay_printk("i %i\ns %i\nn %i\nm %i\n", index, this->state, this->next_state, this->mode);
+ delay_printk("i %i   s %i   n %i   m %i\n", index, this->state, this->next_state, this->mode);
 
     // change current state to next state
     this->state = this->next_state;
@@ -1004,7 +1108,7 @@ static int hardware_init(void) {
     int status = 0, i;
 
     // configure flash gpio for output and set initial output
-    for (i = 0; i < TABLE_SIZE; i++) {
+    for (i = 0; 0 && (i < TABLE_SIZE); i++) {
 delay_printk("Looking at %i : %i\n", i, output_table[i].type);
         // lock for read/write
         write_lock(&output_table[i].lock);
@@ -1013,14 +1117,14 @@ delay_printk("Looking at %i : %i\n", i, output_table[i].type);
         switch (output_table[i].type) {
             case ACC_NES_MGL:
                 // only one moon glow light
-                if (has_moon && output_table[i].number == 1) {
+                if (has_moon && (!has_bes) && (output_table[i].number == 1)) {
 delay_printk("Has Moon\n");
                     output_table[i].exists = 1; // it exists
                 }
                 break;
             case ACC_NES_PHI:
                 // only one positive hit indicator
-                if (has_phi && output_table[i].number == 1) {
+                if (has_phi && (!has_bes) && (output_table[i].number == 1)) {
 delay_printk("Has PHI\n");
                     output_table[i].exists = 1; // it exists
                 }
@@ -1058,6 +1162,34 @@ delay_printk("Has Thermal %i\n", output_table[i].number);
                 // potentially multiple smoke generators
                 if (output_table[i].number <= has_smokeX) {
 delay_printk("Has Smoke %i\n", output_table[i].number);
+                    output_table[i].exists = 1; // it exists
+                }
+                break;
+            case ACC_BES_TRIGGER_1:
+                // 4 bes triggers
+                if (has_bes && output_table[i].number == 1) {
+delay_printk("Has BES trigger 1\n");
+                    output_table[i].exists = 1; // it exists
+                }
+                break;
+            case ACC_BES_TRIGGER_2:
+                // 4 bes triggers
+                if (has_bes && output_table[i].number == 1) {
+delay_printk("Has BES trigger 2\n");
+                    output_table[i].exists = 1; // it exists
+                }
+                break;
+            case ACC_BES_TRIGGER_3:
+                // 4 bes triggers
+                if (has_bes && output_table[i].number == 1) {
+delay_printk("Has BES trigger 3\n");
+                    output_table[i].exists = 1; // it exists
+                }
+                break;
+            case ACC_BES_TRIGGER_4:
+                // 4 bes triggers
+                if (has_bes && output_table[i].number == 1) {
+delay_printk("Has BES trigger 4\n");
                     output_table[i].exists = 1; // it exists
                 }
                 break;
