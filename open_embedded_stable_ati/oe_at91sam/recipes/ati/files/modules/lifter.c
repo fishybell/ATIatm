@@ -23,7 +23,7 @@
 //---------------------------------------------------------------------------
 #define TARGET_NAME     "lifter"
 
-#define DEBUG_SEND
+//#define DEBUG_SEND
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -539,6 +539,10 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
                 case ACC_THERMAL :
                 case ACC_NES_PHI :
                 case ACC_NES_MGL :
+                case ACC_BES_TRIGGER_1 :
+                case ACC_BES_TRIGGER_2 :
+                case ACC_BES_TRIGGER_3 :
+                case ACC_BES_TRIGGER_4 :
                     for (i=generic_output_exists(acc_c->acc_type); i > 0; i--) { // do I have one?
                         delay_printk("Lifter: Using Single Accessory %i\n", acc_c->acc_type);
                         num = i; // use this one
@@ -582,6 +586,17 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
                         break;
                     case ACC_MILES_SDH:
                         // TODO -- what to do with MILES data?
+                        break;
+                    case ACC_BES_TRIGGER_1:
+                    case ACC_BES_TRIGGER_2:
+                    case ACC_BES_TRIGGER_3:
+                    case ACC_BES_TRIGGER_4:
+SENDUSERCONNMSG( "TRIGGER %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_data1);
+                            mode = TEMP_ON; // Triggers are always this value
+                            acc_c->repeat = 0;
+                            acc_c->start_delay = 0;
+                            acc_c->repeat_delay = 0;
+                            acc_c->on_time = 100;
                         break;
                 }
 
