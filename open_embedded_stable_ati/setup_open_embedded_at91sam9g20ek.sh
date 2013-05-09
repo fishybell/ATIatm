@@ -24,6 +24,7 @@ bitbake console-at91sam9-image
 #This gets your source directories
 # Create a directory where you want your sources
 mkdir -p ~/Angstrom/oe
+
 #copy oe.tar where you want it.
 cp oe.tar ~/Angstrom/oe
 tar -xvf oe.tar
@@ -35,6 +36,9 @@ cd ~/devel/atm/open_embedded_stable_ati
 ln -s ~/Angstrom/oe/oe_sources oe_sources
 ln -s ~/Angstrom/oe/openembedded openembedded
 ln -s ~/Angstrom/oe/tmp tmp
+
+#Change the TMPDIR to point at your home directory
+vi oe_at91sam/conf/local.conf
 
 #Build images
 source ./oe_env.sh
