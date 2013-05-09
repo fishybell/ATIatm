@@ -1,0 +1,28 @@
+#!/bin/bash
+
+cwd=`pwd`
+# make new build directory
+dirname="/home/randyn/bitbakes/$(date +%Y%m%d)A"
+mkdir -p "$dirname"
+
+# attempt build
+source oe_env.sh
+bitbake -c clean ati ati2 console-image
+date
+bitbake console-image
+date
+bitbake u-boot
+
+# copy latest greatest
+cd $cwd/tmp/deploy/glibc/images/at91sam9g20ek_2mmc
+cp uImage-at91sam9g20ek_2mmc.bin \
+  console-image-at91sam9g20ek_2mmc.jffs2 \
+  u-boot-at91sam9g20ek_2mmc-nandflash.bin \
+  at91bootstrap.bin \
+  $cwd/flash
+
+
+# copy last build to build directory
+cd $cwd/flash
+cp *.jffs2 *.bin "$dirname"
+
