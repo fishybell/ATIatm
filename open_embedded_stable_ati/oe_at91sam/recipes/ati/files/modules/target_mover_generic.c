@@ -1074,7 +1074,7 @@ static int mover_speed_set(int speed) {
          if (speed < 0) tmpSpeed *= -1;
          speed = tmpSpeed;
       }
-      if (abs(speed) > 16) {
+      if (abs(speed) > 20) {
          atomic_set(&find_dock_atomic, 0); // if moving fast do not ignore sensors
       }
    } else {
