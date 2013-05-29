@@ -47,6 +47,7 @@ enum {
    ERR_target_asleep=193,
    ERR_target_awake=194,
    ERR_did_not_dock=195,
+   ERR_halt_battery=196,
 };
 
 #endif

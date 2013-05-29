@@ -199,6 +199,7 @@ public :
 };
 
 // global defines about targets
+#define HALT_BATTERY_VAL 1 /* when lower than critical, halt-battery message */
 #define FAILURE_BATTERY_VAL 5 /* when at 5%, send critical-battery message */
 #define MIN_BATTERY_VAL 25    /* when at 25%, send low-battery message */
 #define MAX_BATTERY_VAL 255   /* a battery way value beyond "good" for resetting battery watchdogs */
