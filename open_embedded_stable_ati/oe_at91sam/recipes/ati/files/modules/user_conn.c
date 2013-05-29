@@ -685,6 +685,14 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
     int yparam1, yparam2, yparam3, yparam4, yparam5, yparam6, yparam7, yparam8;
     int yparam9, yparam10, yparam11, yparam12, yexists;
     int eparam1, eparam2, jparam1, jparam2;
+    int bt1param1, bt1param2, bt1param3, bt1param4, bt1param5, bt1param6;
+    int bt1param7, bt1param8, bt1param9, bt1param10, bt1param11, bt1param12, bt1exists;
+    int bt2param1, bt2param2, bt2param3, bt2param4, bt2param5, bt2param6;
+    int bt2param7, bt2param8, bt2param9, bt2param10, bt2param11, bt2param12, bt2exists;
+    int bt3param1, bt3param2, bt3param3, bt3param4, bt3param5, bt3param6;
+    int bt3param7, bt3param8, bt3param9, bt3param10, bt3param11, bt3param12, bt3exists;
+    int bt4param1, bt4param2, bt4param3, bt4param4, bt4param5, bt4param6;
+    int bt4param7, bt4param8, bt4param9, bt4param10, bt4param11, bt4param12, bt4exists;
     char eparam3[5];
     char board[20], mversion[20], communication[20], connect[20], macaddress[20], serial[20], frequency[20];
 	int farg1;
@@ -1865,7 +1873,472 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J E %s\n", readEeprom(STATIC_IP_LOC, STATIC_IP_SIZE)); // reads and prints out what it read
                      }
                      break;
-				  case 'R': case 'r':      // Gets a report
+	          case 'F': case 'f':	   // BES Trigger 1
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &bt1exists, &bt1param1, &bt1param2, &bt1param3, &bt1param4, &bt1param5, &bt1param6, &bt1param7, &bt1param8, &bt1param9, &bt1param10, &bt1param11, &bt1param12) == 13) {        // write
+                        char bt1Exist[5], bt1buf1[5], bt1buf2[5], bt1buf3[5], bt1buf4[5];  
+                        char bt1buf5[5], bt1buf6[5], bt1buf7[5], bt1buf8[5];    
+                        char bt1buf9[5], bt1buf10[5], bt1buf11[5], bt1buf12[5]; 
+                        // exists
+                        snprintf(bt1Exist, 5, "%i", bt1exists);                     
+                        // activate
+                        snprintf(bt1buf1, 5, "%i", bt1param1);
+                        // activate on what kind of exposure
+                        snprintf(bt1buf2, 5, "%i", bt1param2);
+                        // activate on hit
+                        snprintf(bt1buf3, 5, "%i", bt1param3);
+                        // activate on kill
+                        snprintf(bt1buf4, 5, "%i", bt1param4);
+                        // milliseconds on time
+                        snprintf(bt1buf5, 5, "%i", bt1param5);
+                        // milliseconds off time
+                        snprintf(bt1buf6, 5, "%i", bt1param6);
+                        // start delay
+                        snprintf(bt1buf7, 5, "%i", bt1param7);
+                        // repeat delay
+                        snprintf(bt1buf8, 5, "%i", bt1param8);
+                        // repeat count
+                        snprintf(bt1buf9, 5, "%i", bt1param9);
+                        // ex1
+                        snprintf(bt1buf10, 5, "%i", bt1param10);
+                        // ex2
+                        snprintf(bt1buf11, 5, "%i", bt1param11);
+                        // How many trigger events per shot
+                        snprintf(bt1buf12, 5, "%i", bt1param12);
+						// write all the thm defaults
+                        snprintf(wbuf, 1024, "J F %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+    writeEeprom(BT1_EXISTS_LOC, strnlen(bt1Exist, 5), BT1_EXISTS_SIZE, bt1Exist),
+	writeEeprom(BT1_ACTIVATE_LOC, strnlen(bt1buf1, 5), BT1_ACTIVATE_SIZE, bt1buf1),
+    writeEeprom(BT1_ACTIVATE_EXPOSE_LOC, strnlen(bt1buf2, 5), BT1_ACTIVATE_EXPOSE_SIZE, bt1buf2), 
+    writeEeprom(BT1_ACTIVATE_ON_HIT_LOC, strnlen(bt1buf3, 5), BT1_ACTIVATE_ON_HIT_SIZE, bt1buf3), 
+    writeEeprom(BT1_ACTIVATE_ON_KILL_LOC, strnlen(bt1buf4, 5), BT1_ACTIVATE_ON_KILL_SIZE, bt1buf4),
+    writeEeprom(BT1_MS_ON_TIME_LOC, strnlen(bt1buf5, 5), BT1_MS_ON_TIME_SIZE, bt1buf5),
+    writeEeprom(BT1_MS_OFF_TIME_LOC, strnlen(bt1buf6, 5), BT1_MS_OFF_TIME_SIZE, bt1buf6),
+    writeEeprom(BT1_START_DELAY_LOC, strnlen(bt1buf7, 5), BT1_START_DELAY_SIZE, bt1buf7),
+    writeEeprom(BT1_REPEAT_DELAY_LOC, strnlen(bt1buf8, 5), BT1_REPEAT_DELAY_SIZE, bt1buf8),
+    writeEeprom(BT1_REPEAT_COUNT_LOC, strnlen(bt1buf9, 5), BT1_REPEAT_COUNT_SIZE, bt1buf9),
+    writeEeprom(BT1_EX1_LOC, strnlen(bt1buf10, 5), BT1_EX1_SIZE, bt1buf10),
+    writeEeprom(BT1_EX2_LOC, strnlen(bt1buf11, 5), BT1_EX2_SIZE, bt1buf11),
+    writeEeprom(BT1_EX3_LOC, strnlen(bt1buf12, 5), BT1_EX3_SIZE, bt1buf12));
+                     } else {	// read
+						char bt1Exists[BT1_SIZE+1], bt11[BT1_SIZE+1], bt12[BT1_SIZE+1], bt13[BT1_SIZE+1], bt14[BT1_SIZE+1], bt15[BT1_SIZE+1], bt16[BT1_SIZE+1], bt17[BT1_SIZE+1], bt18[BT1_SIZE+1], bt19[BT1_SIZE+1], bt110[BT1_SIZE+1], bt111[BT1_SIZE+1], bt112[BT1_SIZE+1];
+                        memset(bt1Exists, 0, BT1_SIZE+1);
+						memcpy(bt1Exists,readEeprom(BT1_EXISTS_LOC, BT1_EXISTS_SIZE), BT1_SIZE);
+                        if (!isNumber(bt1Exists)) {  //revert to default value
+                           snprintf(bt1Exists, BT1_SIZE, "%i", BT1_EXISTS);
+                        }
+						memset(bt11, 0, BT1_SIZE+1);
+						memcpy(bt11,readEeprom(BT1_ACTIVATE_LOC, BT1_ACTIVATE_SIZE), BT1_SIZE);
+                        if (!isNumber(bt11)) {  //revert to default value
+                           snprintf(bt11, BT1_SIZE, "%i", BT1_ACTIVATE);
+                        }
+                        memset(bt12, 0, BT1_SIZE+1);
+                        memcpy(bt12,readEeprom(BT1_ACTIVATE_EXPOSE_LOC, BT1_ACTIVATE_EXPOSE_SIZE), BT1_SIZE);
+                        if (!isNumber(bt12)) {  //revert to default value
+                           snprintf(bt12, BT1_SIZE, "%i", BT1_ACTIVATE_EXPOSE);
+                        }
+                        memset(bt13, 0, BT1_SIZE+1);
+                        memcpy(bt13,readEeprom(BT1_ACTIVATE_ON_HIT_LOC, BT1_ACTIVATE_ON_HIT_SIZE), BT1_SIZE);
+                        if (!isNumber(bt13)) {  //revert to default value
+                           snprintf(bt13, BT1_SIZE, "%i", BT1_ACTIVATE_ON_HIT);
+                        }
+                        memset(bt14, 0, BT1_SIZE+1);
+                        memcpy(bt14,readEeprom(BT1_ACTIVATE_ON_KILL_LOC, BT1_ACTIVATE_ON_KILL_SIZE), BT1_SIZE);
+                        if (!isNumber(bt14)) {  //revert to default value
+                           snprintf(bt14, BT1_SIZE, "%i", BT1_ACTIVATE_ON_KILL);
+                        }
+                        memset(bt15, 0, BT1_SIZE+1);
+                        memcpy(bt15,readEeprom(BT1_MS_ON_TIME_LOC, BT1_MS_ON_TIME_SIZE), BT1_SIZE);
+                        if (!isNumber(bt15)) {  //revert to default value
+                           snprintf(bt15, BT1_SIZE, "%i", BT1_MS_ON_TIME);
+                        }
+                        memset(bt16, 0, BT1_SIZE+1);
+                        memcpy(bt16,readEeprom(BT1_MS_OFF_TIME_LOC, BT1_MS_OFF_TIME_SIZE), BT1_SIZE);
+                        if (!isNumber(bt16)) {  //revert to default value
+                           snprintf(bt16, BT1_SIZE, "%i", BT1_MS_OFF_TIME);
+                        }
+                        memset(bt17, 0, BT1_SIZE+1);
+                        memcpy(bt17,readEeprom(BT1_START_DELAY_LOC, BT1_START_DELAY_SIZE), BT1_SIZE);
+                        if (!isNumber(bt17)) {  //revert to default value
+                           snprintf(bt17, BT1_SIZE, "%i", BT1_START_DELAY);
+                        }
+                        memset(bt18, 0, BT1_SIZE+1);
+                        memcpy(bt18,readEeprom(BT1_REPEAT_DELAY_LOC, BT1_REPEAT_DELAY_SIZE), BT1_SIZE);
+                        if (!isNumber(bt18)) {  //revert to default value
+                           snprintf(bt18, BT1_SIZE, "%i", BT1_REPEAT_DELAY);
+                        }
+                        memset(bt19, 0, BT1_SIZE+1);
+                        memcpy(bt19,readEeprom(BT1_REPEAT_COUNT_LOC, BT1_REPEAT_COUNT_SIZE), BT1_SIZE);
+                        if (!isNumber(bt19)) {  //revert to default value
+                           snprintf(bt19, BT1_SIZE, "%i", BT1_REPEAT_COUNT);
+                        }
+                        memset(bt110, 0, BT1_SIZE+1);
+                        memcpy(bt110,readEeprom(BT1_EX1_LOC, BT1_EX1_SIZE), BT1_SIZE);
+                        if (!isNumber(bt110)) {  //revert to default value
+                           snprintf(bt110, BT1_SIZE, "%i", BT1_EX1);
+                        }
+                        memset(bt111, 0, BT1_SIZE+1);
+                        memcpy(bt111,readEeprom(BT1_EX2_LOC, BT1_EX2_SIZE), BT1_SIZE);
+                        if (!isNumber(bt111)) {  //revert to default value
+                           snprintf(bt111, BT1_SIZE, "%i", BT1_EX2);
+                        }
+                        memset(bt112, 0, BT1_SIZE+1);
+                        memcpy(bt112,readEeprom(BT1_EX3_LOC, BT1_EX3_SIZE), BT1_SIZE);
+                        if (!isNumber(bt112)) {  //revert to default value
+                           snprintf(bt112, BT1_SIZE, "%i", BT1_EX3);
+                        }
+                        snprintf(wbuf, 1024, "J F %s %s %s %s %s %s %s %s %s %s %s %s %s\n", bt1Exists, bt11, bt12, bt13, bt14, bt15, bt16, bt17, bt18, bt19, bt110, bt111, bt112);
+                     }
+                     break; 
+	          case 'G': case 'g':	   // BES Trigger 2
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &bt2exists, &bt2param1, &bt2param2, &bt2param3, &bt2param4, &bt2param5, &bt2param6, &bt2param7, &bt2param8, &bt2param9, &bt2param10, &bt2param11, &bt2param12) == 13) {        // write
+                        char bt2Exist[5], bt2buf1[5], bt2buf2[5], bt2buf3[5], bt2buf4[5];  
+                        char bt2buf5[5], bt2buf6[5], bt2buf7[5], bt2buf8[5];    
+                        char bt2buf9[5], bt2buf10[5], bt2buf11[5], bt2buf12[5]; 
+                        // exists
+                        snprintf(bt2Exist, 5, "%i", bt2exists);                     
+                        // activate
+                        snprintf(bt2buf1, 5, "%i", bt2param1);
+                        // activate on what kind of exposure
+                        snprintf(bt2buf2, 5, "%i", bt2param2);
+                        // activate on hit
+                        snprintf(bt2buf3, 5, "%i", bt2param3);
+                        // activate on kill
+                        snprintf(bt2buf4, 5, "%i", bt2param4);
+                        // milliseconds on time
+                        snprintf(bt2buf5, 5, "%i", bt2param5);
+                        // milliseconds off time
+                        snprintf(bt2buf6, 5, "%i", bt2param6);
+                        // start delay
+                        snprintf(bt2buf7, 5, "%i", bt2param7);
+                        // repeat delay
+                        snprintf(bt2buf8, 5, "%i", bt2param8);
+                        // repeat count
+                        snprintf(bt2buf9, 5, "%i", bt2param9);
+                        // ex1
+                        snprintf(bt2buf10, 5, "%i", bt2param10);
+                        // ex2
+                        snprintf(bt2buf11, 5, "%i", bt2param11);
+                        // How many trigger events per shot
+                        snprintf(bt2buf12, 5, "%i", bt2param12);
+						// write all the thm defaults
+                        snprintf(wbuf, 1024, "J G %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+    writeEeprom(BT2_EXISTS_LOC, strnlen(bt2Exist, 5), BT2_EXISTS_SIZE, bt2Exist),
+	writeEeprom(BT2_ACTIVATE_LOC, strnlen(bt2buf1, 5), BT2_ACTIVATE_SIZE, bt2buf1),
+    writeEeprom(BT2_ACTIVATE_EXPOSE_LOC, strnlen(bt2buf2, 5), BT2_ACTIVATE_EXPOSE_SIZE, bt2buf2), 
+    writeEeprom(BT2_ACTIVATE_ON_HIT_LOC, strnlen(bt2buf3, 5), BT2_ACTIVATE_ON_HIT_SIZE, bt2buf3), 
+    writeEeprom(BT2_ACTIVATE_ON_KILL_LOC, strnlen(bt2buf4, 5), BT2_ACTIVATE_ON_KILL_SIZE, bt2buf4),
+    writeEeprom(BT2_MS_ON_TIME_LOC, strnlen(bt2buf5, 5), BT2_MS_ON_TIME_SIZE, bt2buf5),
+    writeEeprom(BT2_MS_OFF_TIME_LOC, strnlen(bt2buf6, 5), BT2_MS_OFF_TIME_SIZE, bt2buf6),
+    writeEeprom(BT2_START_DELAY_LOC, strnlen(bt2buf7, 5), BT2_START_DELAY_SIZE, bt2buf7),
+    writeEeprom(BT2_REPEAT_DELAY_LOC, strnlen(bt2buf8, 5), BT2_REPEAT_DELAY_SIZE, bt2buf8),
+    writeEeprom(BT2_REPEAT_COUNT_LOC, strnlen(bt2buf9, 5), BT2_REPEAT_COUNT_SIZE, bt2buf9),
+    writeEeprom(BT2_EX1_LOC, strnlen(bt2buf10, 5), BT2_EX1_SIZE, bt2buf10),
+    writeEeprom(BT2_EX2_LOC, strnlen(bt2buf11, 5), BT2_EX2_SIZE, bt2buf11),
+    writeEeprom(BT2_EX3_LOC, strnlen(bt2buf12, 5), BT2_EX3_SIZE, bt2buf12));
+                     } else {	// read
+			char bt2Exists[BT2_SIZE+1], bt21[BT2_SIZE+1], bt22[BT2_SIZE+1], bt23[BT2_SIZE+1], bt24[BT2_SIZE+1], bt25[BT2_SIZE+1], bt26[BT2_SIZE+1], bt27[BT2_SIZE+1], bt28[BT2_SIZE+1], bt29[BT2_SIZE+1], bt210[BT2_SIZE+1], bt211[BT2_SIZE+1], bt212[BT2_SIZE+1];
+                        memset(bt2Exists, 0, BT2_SIZE+1);
+			memcpy(bt2Exists,readEeprom(BT2_EXISTS_LOC, BT2_EXISTS_SIZE), BT2_SIZE);
+                        if (!isNumber(bt2Exists)) {  //revert to default value
+                           snprintf(bt2Exists, BT2_SIZE, "%i", BT2_EXISTS);
+                        }
+			memset(bt21, 0, BT2_SIZE+1);
+			memcpy(bt21,readEeprom(BT2_ACTIVATE_LOC, BT2_ACTIVATE_SIZE), BT2_SIZE);
+                        if (!isNumber(bt21)) {  //revert to default value
+                           snprintf(bt21, BT2_SIZE, "%i", BT2_ACTIVATE);
+                        }
+                        memset(bt22, 0, BT2_SIZE+1);
+                        memcpy(bt22,readEeprom(BT2_ACTIVATE_EXPOSE_LOC, BT2_ACTIVATE_EXPOSE_SIZE), BT2_SIZE);
+                        if (!isNumber(bt22)) {  //revert to default value
+                           snprintf(bt22, BT2_SIZE, "%i", BT2_ACTIVATE_EXPOSE);
+                        }
+                        memset(bt23, 0, BT2_SIZE+1);
+                        memcpy(bt23,readEeprom(BT2_ACTIVATE_ON_HIT_LOC, BT2_ACTIVATE_ON_HIT_SIZE), BT2_SIZE);
+                        if (!isNumber(bt23)) {  //revert to default value
+                           snprintf(bt23, BT2_SIZE, "%i", BT2_ACTIVATE_ON_HIT);
+                        }
+                        memset(bt24, 0, BT2_SIZE+1);
+                        memcpy(bt24,readEeprom(BT2_ACTIVATE_ON_KILL_LOC, BT2_ACTIVATE_ON_KILL_SIZE), BT2_SIZE);
+                        if (!isNumber(bt24)) {  //revert to default value
+                           snprintf(bt24, BT2_SIZE, "%i", BT2_ACTIVATE_ON_KILL);
+                        }
+                        memset(bt25, 0, BT2_SIZE+1);
+                        memcpy(bt25,readEeprom(BT2_MS_ON_TIME_LOC, BT2_MS_ON_TIME_SIZE), BT2_SIZE);
+                        if (!isNumber(bt25)) {  //revert to default value
+                           snprintf(bt25, BT2_SIZE, "%i", BT2_MS_ON_TIME);
+                        }
+                        memset(bt26, 0, BT2_SIZE+1);
+                        memcpy(bt26,readEeprom(BT2_MS_OFF_TIME_LOC, BT2_MS_OFF_TIME_SIZE), BT2_SIZE);
+                        if (!isNumber(bt26)) {  //revert to default value
+                           snprintf(bt26, BT2_SIZE, "%i", BT2_MS_OFF_TIME);
+                        }
+                        memset(bt27, 0, BT2_SIZE+1);
+                        memcpy(bt27,readEeprom(BT2_START_DELAY_LOC, BT2_START_DELAY_SIZE), BT2_SIZE);
+                        if (!isNumber(bt27)) {  //revert to default value
+                           snprintf(bt27, BT2_SIZE, "%i", BT2_START_DELAY);
+                        }
+                        memset(bt28, 0, BT2_SIZE+1);
+                        memcpy(bt28,readEeprom(BT2_REPEAT_DELAY_LOC, BT2_REPEAT_DELAY_SIZE), BT2_SIZE);
+                        if (!isNumber(bt28)) {  //revert to default value
+                           snprintf(bt28, BT2_SIZE, "%i", BT2_REPEAT_DELAY);
+                        }
+                        memset(bt29, 0, BT2_SIZE+1);
+                        memcpy(bt29,readEeprom(BT2_REPEAT_COUNT_LOC, BT2_REPEAT_COUNT_SIZE), BT2_SIZE);
+                        if (!isNumber(bt29)) {  //revert to default value
+                           snprintf(bt29, BT2_SIZE, "%i", BT2_REPEAT_COUNT);
+                        }
+                        memset(bt210, 0, BT2_SIZE+1);
+                        memcpy(bt210,readEeprom(BT2_EX1_LOC, BT2_EX1_SIZE), BT2_SIZE);
+                        if (!isNumber(bt210)) {  //revert to default value
+                           snprintf(bt210, BT2_SIZE, "%i", BT2_EX1);
+                        }
+                        memset(bt211, 0, BT2_SIZE+1);
+                        memcpy(bt211,readEeprom(BT2_EX2_LOC, BT2_EX2_SIZE), BT2_SIZE);
+                        if (!isNumber(bt211)) {  //revert to default value
+                           snprintf(bt211, BT2_SIZE, "%i", BT2_EX2);
+                        }
+                        memset(bt212, 0, BT2_SIZE+1);
+                        memcpy(bt212,readEeprom(BT2_EX3_LOC, BT2_EX3_SIZE), BT2_SIZE);
+                        if (!isNumber(bt212)) {  //revert to default value
+                           snprintf(bt212, BT2_SIZE, "%i", BT2_EX3);
+                        }
+                        snprintf(wbuf, 1024, "J G %s %s %s %s %s %s %s %s %s %s %s %s %s\n", bt2Exists, bt21, bt22, bt23, bt24, bt25, bt26, bt27, bt28, bt29, bt210, bt211, bt212);
+                     }
+                     break;
+	          case 'H': case 'h':	   // BES Trigger 3
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &bt3exists, &bt3param1, &bt3param2, &bt3param3, &bt3param4, &bt3param5, &bt3param6, &bt3param7, &bt3param8, &bt3param9, &bt3param10, &bt3param11, &bt3param12) == 13) {        // write
+                        char bt3Exist[5], bt3buf1[5], bt3buf2[5], bt3buf3[5], bt3buf4[5];  
+                        char bt3buf5[5], bt3buf6[5], bt3buf7[5], bt3buf8[5];    
+                        char bt3buf9[5], bt3buf10[5], bt3buf11[5], bt3buf12[5]; 
+                        // exists
+                        snprintf(bt3Exist, 5, "%i", bt3exists);                     
+                        // activate
+                        snprintf(bt3buf1, 5, "%i", bt3param1);
+                        // activate on what kind of exposure
+                        snprintf(bt3buf2, 5, "%i", bt3param2);
+                        // activate on hit
+                        snprintf(bt3buf3, 5, "%i", bt3param3);
+                        // activate on kill
+                        snprintf(bt3buf4, 5, "%i", bt3param4);
+                        // milliseconds on time
+                        snprintf(bt3buf5, 5, "%i", bt3param5);
+                        // milliseconds off time
+                        snprintf(bt3buf6, 5, "%i", bt3param6);
+                        // start delay
+                        snprintf(bt3buf7, 5, "%i", bt3param7);
+                        // repeat delay
+                        snprintf(bt3buf8, 5, "%i", bt3param8);
+                        // repeat count
+                        snprintf(bt3buf9, 5, "%i", bt3param9);
+                        // ex1
+                        snprintf(bt3buf10, 5, "%i", bt3param10);
+                        // ex2
+                        snprintf(bt3buf11, 5, "%i", bt3param11);
+                        // How many trigger events per shot
+                        snprintf(bt3buf12, 5, "%i", bt3param12);
+						// write all the thm defaults
+                        snprintf(wbuf, 1024, "J H %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+    writeEeprom(BT3_EXISTS_LOC, strnlen(bt3Exist, 5), BT3_EXISTS_SIZE, bt3Exist),
+	writeEeprom(BT3_ACTIVATE_LOC, strnlen(bt3buf1, 5), BT3_ACTIVATE_SIZE, bt3buf1),
+    writeEeprom(BT3_ACTIVATE_EXPOSE_LOC, strnlen(bt3buf2, 5), BT3_ACTIVATE_EXPOSE_SIZE, bt3buf2), 
+    writeEeprom(BT3_ACTIVATE_ON_HIT_LOC, strnlen(bt3buf3, 5), BT3_ACTIVATE_ON_HIT_SIZE, bt3buf3), 
+    writeEeprom(BT3_ACTIVATE_ON_KILL_LOC, strnlen(bt3buf4, 5), BT3_ACTIVATE_ON_KILL_SIZE, bt3buf4),
+    writeEeprom(BT3_MS_ON_TIME_LOC, strnlen(bt3buf5, 5), BT3_MS_ON_TIME_SIZE, bt3buf5),
+    writeEeprom(BT3_MS_OFF_TIME_LOC, strnlen(bt3buf6, 5), BT3_MS_OFF_TIME_SIZE, bt3buf6),
+    writeEeprom(BT3_START_DELAY_LOC, strnlen(bt3buf7, 5), BT3_START_DELAY_SIZE, bt3buf7),
+    writeEeprom(BT3_REPEAT_DELAY_LOC, strnlen(bt3buf8, 5), BT3_REPEAT_DELAY_SIZE, bt3buf8),
+    writeEeprom(BT3_REPEAT_COUNT_LOC, strnlen(bt3buf9, 5), BT3_REPEAT_COUNT_SIZE, bt3buf9),
+    writeEeprom(BT3_EX1_LOC, strnlen(bt3buf10, 5), BT3_EX1_SIZE, bt3buf10),
+    writeEeprom(BT3_EX2_LOC, strnlen(bt3buf11, 5), BT3_EX2_SIZE, bt3buf11),
+    writeEeprom(BT3_EX3_LOC, strnlen(bt3buf12, 5), BT3_EX3_SIZE, bt3buf12));
+                     } else {	// read
+			char bt3Exists[BT3_SIZE+1], bt31[BT3_SIZE+1], bt32[BT3_SIZE+1], bt33[BT3_SIZE+1], bt34[BT3_SIZE+1], bt35[BT3_SIZE+1], bt36[BT3_SIZE+1], bt37[BT3_SIZE+1], bt38[BT3_SIZE+1], bt39[BT3_SIZE+1], bt310[BT3_SIZE+1], bt311[BT3_SIZE+1], bt312[BT3_SIZE+1];
+                        memset(bt3Exists, 0, BT3_SIZE+1);
+			memcpy(bt3Exists,readEeprom(BT3_EXISTS_LOC, BT3_EXISTS_SIZE), BT3_SIZE);
+                        if (!isNumber(bt3Exists)) {  //revert to default value
+                           snprintf(bt3Exists, BT3_SIZE, "%i", BT3_EXISTS);
+                        }
+			memset(bt31, 0, BT3_SIZE+1);
+			memcpy(bt31,readEeprom(BT3_ACTIVATE_LOC, BT3_ACTIVATE_SIZE), BT3_SIZE);
+                        if (!isNumber(bt31)) {  //revert to default value
+                           snprintf(bt31, BT3_SIZE, "%i", BT3_ACTIVATE);
+                        }
+                        memset(bt32, 0, BT3_SIZE+1);
+                        memcpy(bt32,readEeprom(BT3_ACTIVATE_EXPOSE_LOC, BT3_ACTIVATE_EXPOSE_SIZE), BT3_SIZE);
+                        if (!isNumber(bt32)) {  //revert to default value
+                           snprintf(bt32, BT3_SIZE, "%i", BT3_ACTIVATE_EXPOSE);
+                        }
+                        memset(bt33, 0, BT3_SIZE+1);
+                        memcpy(bt33,readEeprom(BT3_ACTIVATE_ON_HIT_LOC, BT3_ACTIVATE_ON_HIT_SIZE), BT3_SIZE);
+                        if (!isNumber(bt33)) {  //revert to default value
+                           snprintf(bt33, BT3_SIZE, "%i", BT3_ACTIVATE_ON_HIT);
+                        }
+                        memset(bt34, 0, BT3_SIZE+1);
+                        memcpy(bt34,readEeprom(BT3_ACTIVATE_ON_KILL_LOC, BT3_ACTIVATE_ON_KILL_SIZE), BT3_SIZE);
+                        if (!isNumber(bt34)) {  //revert to default value
+                           snprintf(bt34, BT3_SIZE, "%i", BT3_ACTIVATE_ON_KILL);
+                        }
+                        memset(bt35, 0, BT3_SIZE+1);
+                        memcpy(bt35,readEeprom(BT3_MS_ON_TIME_LOC, BT3_MS_ON_TIME_SIZE), BT3_SIZE);
+                        if (!isNumber(bt35)) {  //revert to default value
+                           snprintf(bt35, BT3_SIZE, "%i", BT3_MS_ON_TIME);
+                        }
+                        memset(bt36, 0, BT3_SIZE+1);
+                        memcpy(bt36,readEeprom(BT3_MS_OFF_TIME_LOC, BT3_MS_OFF_TIME_SIZE), BT3_SIZE);
+                        if (!isNumber(bt36)) {  //revert to default value
+                           snprintf(bt36, BT3_SIZE, "%i", BT3_MS_OFF_TIME);
+                        }
+                        memset(bt37, 0, BT3_SIZE+1);
+                        memcpy(bt37,readEeprom(BT3_START_DELAY_LOC, BT3_START_DELAY_SIZE), BT3_SIZE);
+                        if (!isNumber(bt37)) {  //revert to default value
+                           snprintf(bt37, BT3_SIZE, "%i", BT3_START_DELAY);
+                        }
+                        memset(bt38, 0, BT3_SIZE+1);
+                        memcpy(bt38,readEeprom(BT3_REPEAT_DELAY_LOC, BT3_REPEAT_DELAY_SIZE), BT3_SIZE);
+                        if (!isNumber(bt38)) {  //revert to default value
+                           snprintf(bt38, BT3_SIZE, "%i", BT3_REPEAT_DELAY);
+                        }
+                        memset(bt39, 0, BT3_SIZE+1);
+                        memcpy(bt39,readEeprom(BT3_REPEAT_COUNT_LOC, BT3_REPEAT_COUNT_SIZE), BT3_SIZE);
+                        if (!isNumber(bt39)) {  //revert to default value
+                           snprintf(bt39, BT3_SIZE, "%i", BT3_REPEAT_COUNT);
+                        }
+                        memset(bt310, 0, BT3_SIZE+1);
+                        memcpy(bt310,readEeprom(BT3_EX1_LOC, BT3_EX1_SIZE), BT3_SIZE);
+                        if (!isNumber(bt310)) {  //revert to default value
+                           snprintf(bt310, BT3_SIZE, "%i", BT3_EX1);
+                        }
+                        memset(bt311, 0, BT3_SIZE+1);
+                        memcpy(bt311,readEeprom(BT3_EX2_LOC, BT3_EX2_SIZE), BT3_SIZE);
+                        if (!isNumber(bt311)) {  //revert to default value
+                           snprintf(bt311, BT3_SIZE, "%i", BT3_EX2);
+                        }
+                        memset(bt312, 0, BT3_SIZE+1);
+                        memcpy(bt312,readEeprom(BT3_EX3_LOC, BT3_EX3_SIZE), BT3_SIZE);
+                        if (!isNumber(bt312)) {  //revert to default value
+                           snprintf(bt312, BT3_SIZE, "%i", BT3_EX3);
+                        }
+                        snprintf(wbuf, 1024, "J H %s %s %s %s %s %s %s %s %s %s %s %s %s\n", bt3Exists, bt31, bt32, bt33, bt34, bt35, bt36, bt37, bt38, bt39, bt310, bt311, bt312);
+                     }
+
+                     break;
+	          case 'I': case 'i':	   // BES Trigger 4
+                     if (sscanf(cmd+arg2, "%i %i %i %i %i %i %i %i %i %i %i %i %i", &bt4exists, &bt4param1, &bt4param2, &bt4param3, &bt4param4, &bt4param5, &bt4param6, &bt4param7, &bt4param8, &bt4param9, &bt4param10, &bt4param11, &bt4param12) == 13) {        // write
+                        char bt4Exist[5], bt4buf1[5], bt4buf2[5], bt4buf3[5], bt4buf4[5];  
+                        char bt4buf5[5], bt4buf6[5], bt4buf7[5], bt4buf8[5];    
+                        char bt4buf9[5], bt4buf10[5], bt4buf11[5], bt4buf12[5]; 
+                        // exists
+                        snprintf(bt4Exist, 5, "%i", bt4exists);                     
+                        // activate
+                        snprintf(bt4buf1, 5, "%i", bt4param1);
+                        // activate on what kind of exposure
+                        snprintf(bt4buf2, 5, "%i", bt4param2);
+                        // activate on hit
+                        snprintf(bt4buf3, 5, "%i", bt4param3);
+                        // activate on kill
+                        snprintf(bt4buf4, 5, "%i", bt4param4);
+                        // milliseconds on time
+                        snprintf(bt4buf5, 5, "%i", bt4param5);
+                        // milliseconds off time
+                        snprintf(bt4buf6, 5, "%i", bt4param6);
+                        // start delay
+                        snprintf(bt4buf7, 5, "%i", bt4param7);
+                        // repeat delay
+                        snprintf(bt4buf8, 5, "%i", bt4param8);
+                        // repeat count
+                        snprintf(bt4buf9, 5, "%i", bt4param9);
+                        // ex1
+                        snprintf(bt4buf10, 5, "%i", bt4param10);
+                        // ex2
+                        snprintf(bt4buf11, 5, "%i", bt4param11);
+                        // How many trigger events per shot
+                        snprintf(bt4buf12, 5, "%i", bt4param12);
+						// write all the thm defaults
+                        snprintf(wbuf, 1024, "J I %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
+    writeEeprom(BT4_EXISTS_LOC, strnlen(bt4Exist, 5), BT4_EXISTS_SIZE, bt4Exist),
+	writeEeprom(BT3_ACTIVATE_LOC, strnlen(bt4buf1, 5), BT4_ACTIVATE_SIZE, bt4buf1),
+    writeEeprom(BT4_ACTIVATE_EXPOSE_LOC, strnlen(bt4buf2, 5), BT4_ACTIVATE_EXPOSE_SIZE, bt4buf2), 
+    writeEeprom(BT4_ACTIVATE_ON_HIT_LOC, strnlen(bt4buf3, 5), BT4_ACTIVATE_ON_HIT_SIZE, bt4buf3), 
+    writeEeprom(BT4_ACTIVATE_ON_KILL_LOC, strnlen(bt4buf4, 5), BT4_ACTIVATE_ON_KILL_SIZE, bt4buf4),
+    writeEeprom(BT4_MS_ON_TIME_LOC, strnlen(bt4buf5, 5), BT4_MS_ON_TIME_SIZE, bt4buf5),
+    writeEeprom(BT4_MS_OFF_TIME_LOC, strnlen(bt4buf6, 5), BT4_MS_OFF_TIME_SIZE, bt4buf6),
+    writeEeprom(BT4_START_DELAY_LOC, strnlen(bt4buf7, 5), BT4_START_DELAY_SIZE, bt4buf7),
+    writeEeprom(BT4_REPEAT_DELAY_LOC, strnlen(bt4buf8, 5), BT4_REPEAT_DELAY_SIZE, bt4buf8),
+    writeEeprom(BT4_REPEAT_COUNT_LOC, strnlen(bt4buf9, 5), BT4_REPEAT_COUNT_SIZE, bt4buf9),
+    writeEeprom(BT4_EX1_LOC, strnlen(bt4buf10, 5), BT4_EX1_SIZE, bt4buf10),
+    writeEeprom(BT4_EX2_LOC, strnlen(bt4buf11, 5), BT4_EX2_SIZE, bt4buf11),
+    writeEeprom(BT4_EX3_LOC, strnlen(bt4buf12, 5), BT4_EX3_SIZE, bt4buf12));
+                     } else {	// read
+			char bt4Exists[BT4_SIZE+1], bt41[BT4_SIZE+1], bt42[BT4_SIZE+1], bt43[BT4_SIZE+1], bt44[BT4_SIZE+1], bt45[BT4_SIZE+1], bt46[BT4_SIZE+1], bt47[BT4_SIZE+1], bt48[BT4_SIZE+1], bt49[BT4_SIZE+1], bt410[BT4_SIZE+1], bt411[BT4_SIZE+1], bt412[BT4_SIZE+1];
+                        memset(bt4Exists, 0, BT4_SIZE+1);
+			memcpy(bt4Exists,readEeprom(BT4_EXISTS_LOC, BT4_EXISTS_SIZE), BT4_SIZE);
+                        if (!isNumber(bt4Exists)) {  //revert to default value
+                           snprintf(bt4Exists, BT4_SIZE, "%i", BT4_EXISTS);
+                        }
+			memset(bt41, 0, BT4_SIZE+1);
+			memcpy(bt41,readEeprom(BT4_ACTIVATE_LOC, BT4_ACTIVATE_SIZE), BT4_SIZE);
+                        if (!isNumber(bt41)) {  //revert to default value
+                           snprintf(bt41, BT4_SIZE, "%i", BT4_ACTIVATE);
+                        }
+                        memset(bt42, 0, BT4_SIZE+1);
+                        memcpy(bt42,readEeprom(BT4_ACTIVATE_EXPOSE_LOC, BT4_ACTIVATE_EXPOSE_SIZE), BT4_SIZE);
+                        if (!isNumber(bt42)) {  //revert to default value
+                           snprintf(bt42, BT4_SIZE, "%i", BT4_ACTIVATE_EXPOSE);
+                        }
+                        memset(bt43, 0, BT4_SIZE+1);
+                        memcpy(bt43,readEeprom(BT4_ACTIVATE_ON_HIT_LOC, BT4_ACTIVATE_ON_HIT_SIZE), BT4_SIZE);
+                        if (!isNumber(bt43)) {  //revert to default value
+                           snprintf(bt43, BT4_SIZE, "%i", BT4_ACTIVATE_ON_HIT);
+                        }
+                        memset(bt44, 0, BT4_SIZE+1);
+                        memcpy(bt44,readEeprom(BT4_ACTIVATE_ON_KILL_LOC, BT4_ACTIVATE_ON_KILL_SIZE), BT4_SIZE);
+                        if (!isNumber(bt44)) {  //revert to default value
+                           snprintf(bt44, BT4_SIZE, "%i", BT4_ACTIVATE_ON_KILL);
+                        }
+                        memset(bt45, 0, BT4_SIZE+1);
+                        memcpy(bt45,readEeprom(BT4_MS_ON_TIME_LOC, BT4_MS_ON_TIME_SIZE), BT4_SIZE);
+                        if (!isNumber(bt45)) {  //revert to default value
+                           snprintf(bt45, BT4_SIZE, "%i", BT4_MS_ON_TIME);
+                        }
+                        memset(bt46, 0, BT4_SIZE+1);
+                        memcpy(bt46,readEeprom(BT4_MS_OFF_TIME_LOC, BT4_MS_OFF_TIME_SIZE), BT4_SIZE);
+                        if (!isNumber(bt46)) {  //revert to default value
+                           snprintf(bt46, BT4_SIZE, "%i", BT4_MS_OFF_TIME);
+                        }
+                        memset(bt47, 0, BT4_SIZE+1);
+                        memcpy(bt47,readEeprom(BT4_START_DELAY_LOC, BT4_START_DELAY_SIZE), BT4_SIZE);
+                        if (!isNumber(bt47)) {  //revert to default value
+                           snprintf(bt47, BT4_SIZE, "%i", BT4_START_DELAY);
+                        }
+                        memset(bt48, 0, BT4_SIZE+1);
+                        memcpy(bt48,readEeprom(BT4_REPEAT_DELAY_LOC, BT4_REPEAT_DELAY_SIZE), BT4_SIZE);
+                        if (!isNumber(bt48)) {  //revert to default value
+                           snprintf(bt48, BT4_SIZE, "%i", BT4_REPEAT_DELAY);
+                        }
+                        memset(bt49, 0, BT4_SIZE+1);
+                        memcpy(bt49,readEeprom(BT4_REPEAT_COUNT_LOC, BT4_REPEAT_COUNT_SIZE), BT4_SIZE);
+                        if (!isNumber(bt49)) {  //revert to default value
+                           snprintf(bt49, BT4_SIZE, "%i", BT4_REPEAT_COUNT);
+                        }
+                        memset(bt410, 0, BT4_SIZE+1);
+                        memcpy(bt410,readEeprom(BT4_EX1_LOC, BT4_EX1_SIZE), BT4_SIZE);
+                        if (!isNumber(bt410)) {  //revert to default value
+                           snprintf(bt410, BT4_SIZE, "%i", BT4_EX1);
+                        }
+                        memset(bt411, 0, BT4_SIZE+1);
+                        memcpy(bt411,readEeprom(BT4_EX2_LOC, BT4_EX2_SIZE), BT4_SIZE);
+                        if (!isNumber(bt411)) {  //revert to default value
+                           snprintf(bt411, BT4_SIZE, "%i", BT4_EX2);
+                        }
+                        memset(bt412, 0, BT4_SIZE+1);
+                        memcpy(bt412,readEeprom(BT4_EX3_LOC, BT4_EX3_SIZE), BT4_SIZE);
+                        if (!isNumber(bt412)) {  //revert to default value
+                           snprintf(bt412, BT4_SIZE, "%i", BT4_EX3);
+                        }
+                        snprintf(wbuf, 1024, "J I %s %s %s %s %s %s %s %s %s %s %s %s %s\n", bt4Exists, bt41, bt42, bt43, bt44, bt45, bt46, bt47, bt48, bt49, bt410, bt411, bt412);
+                     }
+                     break;
+		  case 'R': case 'r':      // Gets a report
                         snprintf(board, 20, "%s", readEeprom(BOARD_LOC, BOARD_SIZE));
                         snprintf(mversion, 20, "%s", readEeprom(VERSION_LOC, VERSION_SIZE));
 						snprintf(communication, 20, "%s", readEeprom(COMMUNICATION_LOC, COMMUNICATION_SIZE));
