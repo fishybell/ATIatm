@@ -725,6 +725,11 @@
 #define BT4_EX3_SIZE 0x04
 
 #define BT4_SIZE 4
+
+#define BES_MODE 0
+#define BES_MODE_LOC 0x700
+#define BES_MODE_SIZE 0x04
+
 // ,.. defaults
 
 
