@@ -1866,7 +1866,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J D %s\n", readEeprom(TRACK_LENGTH_LOC, TRACK_LENGTH_SIZE)); // reads and prints out what it read
                      }
                      break;
-				  case 'E': case 'e':      // Sets and Reads the IP address
+		  case 'E': case 'e':      // Sets and Reads the IP address
                      if (arg3 > 1) { // are they passing in information?
                         snprintf(wbuf, 1024, "J E %s\n", writeEeprom(STATIC_IP_LOC, arg3, STATIC_IP_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
@@ -2256,7 +2256,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
 						// write all the thm defaults
                         snprintf(wbuf, 1024, "J I %s %s %s %s %s %s %s %s %s %s %s %s %s\n", 
     writeEeprom(BT4_EXISTS_LOC, strnlen(bt4Exist, 5), BT4_EXISTS_SIZE, bt4Exist),
-	writeEeprom(BT3_ACTIVATE_LOC, strnlen(bt4buf1, 5), BT4_ACTIVATE_SIZE, bt4buf1),
+    writeEeprom(BT3_ACTIVATE_LOC, strnlen(bt4buf1, 5), BT4_ACTIVATE_SIZE, bt4buf1),
     writeEeprom(BT4_ACTIVATE_EXPOSE_LOC, strnlen(bt4buf2, 5), BT4_ACTIVATE_EXPOSE_SIZE, bt4buf2), 
     writeEeprom(BT4_ACTIVATE_ON_HIT_LOC, strnlen(bt4buf3, 5), BT4_ACTIVATE_ON_HIT_SIZE, bt4buf3), 
     writeEeprom(BT4_ACTIVATE_ON_KILL_LOC, strnlen(bt4buf4, 5), BT4_ACTIVATE_ON_KILL_SIZE, bt4buf4),
@@ -2338,6 +2338,13 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J I %s %s %s %s %s %s %s %s %s %s %s %s %s\n", bt4Exists, bt41, bt42, bt43, bt44, bt45, bt46, bt47, bt48, bt49, bt410, bt411, bt412);
                      }
                      break;
+                  case 'J': case 'j':      // Sets and Reads the BES Mode
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "J J %s\n", writeEeprom(BES_MODE_LOC, arg3, BES_MODE_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "J J %s\n", readEeprom(BES_MODE_LOC, BES_MODE_SIZE)); // reads and prints out what it read
+                     }
+                     break;
 		  case 'R': case 'r':      // Gets a report
                         snprintf(board, 20, "%s", readEeprom(BOARD_LOC, BOARD_SIZE));
                         snprintf(mversion, 20, "%s", readEeprom(VERSION_LOC, VERSION_SIZE));
@@ -2395,24 +2402,24 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'A': case 'a':
                                 snprintf(wbuf, 1024, "Get/Set address location\nFormat: I A <address location>\n");
                                 break;
-			                case 'B': case 'b':
-                          	    snprintf(wbuf, 1024, "Get/Set board type\nFormat: I B <HSAT>, <LSAT>, <MAT>, <MATOLD>, <MIT>, <MITV>, <SES>, <SIT>, <SITMT>, <BASE>, <TTMT>, <HHC>\n");
-				                break;
-			                case 'D': case 'd':
-                        	    snprintf(wbuf, 1024, "Get/Set comm type\nFormat: I D <local>, <network>, <radio>, <wifi>, <wimax>\n");
-				                break;
-			                case 'I': case 'i':
-                        	    snprintf(wbuf, 1024, "Get/Set current IP address\nFormat: I P <ip>\n");			
-				                break;
-			                case 'C': case 'c':
-                        	    snprintf(wbuf, 1024, "Get/Set connect port number\nFormat: I C <cport>\n");		
+			    case 'B': case 'b':
+                          	snprintf(wbuf, 1024, "Get/Set board type\nFormat: I B <HSAT>, <LSAT>, <MAT>, <MATOLD>, <MIT>, <MITV>, <SES>, <SIT>, <SITMT>, <BASE>, <TTMT>, <HHC>\n");
+				break;
+			    case 'D': case 'd':
+                        	snprintf(wbuf, 1024, "Get/Set comm type\nFormat: I D <local>, <network>, <radio>, <wifi>, <wimax>\n");
+				break;
+			    case 'I': case 'i':
+                        	snprintf(wbuf, 1024, "Get/Set current IP address\nFormat: I P <ip>\n");			
+				break;
+			    case 'C': case 'c':
+                        	snprintf(wbuf, 1024, "Get/Set connect port number\nFormat: I C <cport>\n");		
                                 break;
                             case 'E': case 'e':
                                 snprintf(wbuf, 1024, "Request battery/mover defaults\nFormat I E (SIT|SAT|SES|MIT|MAT|REVERSE)\nChange battery/mover defaults\nFormat I E (1-SIT|2-SAT|3-SES|4-MIT|5-MAT|6-Mover Reverse) (default)\n");
                                 break;
                             case 'F': case 'f':
                                 snprintf(wbuf, 1024, "Request fall parameters\nFormat: I F\nChange fall parameters\nFormat: I F (0-100)kill_at_x_hits (0|1|2|3|4)at_kill_do_fall_or_kill_or_stop_or_fall_and_stop_or_bob\n");
-								break;
+				break;
                             case 'G': case 'g':
                                 snprintf(wbuf, 1024, "Request MGL defaults\nFormat: I G\nChange MGL defaults\nFormat: I G (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
                                 break;
@@ -2424,34 +2431,34 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 break;
                             case 'K': case 'k':
                                 snprintf(wbuf, 1024, "Request SMK defaults\nFormat: I K\nChange SMK defaults\nFormat: I K (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
-				                break;
-			                case 'L': case 'l':
-                        	    snprintf(wbuf, 1024, "Get/Set listen port number\nFormat: I L <lport>\n");		
-				                break;
-			                case 'M': case 'm':   
-                        	    snprintf(wbuf, 1024, "Get/Set current mac address\nFormat: I M <mac>\n");	
+				break;
+			    case 'L': case 'l':
+                        	snprintf(wbuf, 1024, "Get/Set listen port number\nFormat: I L <lport>\n");		
+				break;
+			    case 'M': case 'm':   
+                        	snprintf(wbuf, 1024, "Get/Set current mac address\nFormat: I M <mac>\n");	
                                 break;	
                             case 'N': case 'n':
                                 snprintf(wbuf, 1024, "Request MFS defaults\nFormat: I N\nChange MFS defaults\nFormat: I N (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3 (0|1)mode single_or_burst\n");
-				                break;
+				break;
                             case 'O': case 'o':
                                 snprintf(wbuf, 1024, "Get/Set Bob Style\nFormat: I O (0|1)fasit_bob_at_hit_or_ats_bob_at_kill\n");	
                                 break;
                             case 'P': case 'p':
                                 snprintf(wbuf, 1024, "Request PHI defaults\nFormat: I P\nChange PHI defaults\nFormat: I P (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
-				                break;
+				break;
                             case 'Q': case 'q':
                                 snprintf(wbuf, 1024, "Docking Station Defaults\nFormat I Q (0|1|2|3) left_right_nodockleft_nodockright\n");
                                 break;
-			                case 'R': case 'r':
+			    case 'R': case 'r':
                                 snprintf(wbuf, 1024, "Reboot\nFormat: I R reboot\n");			
-				                break;
+				break;
                             case 'S': case 's':
                                 snprintf(wbuf, 1024, "Request hit sensor type\nFormat: I S\nChange hit sensor type\nFormat: I S (0|1|2)mechanical_or_nchs_or_miles (0|1)invert_input_line\n");
                                 break;
                             case 'T': case 't':
                                 snprintf(wbuf, 1024, "Request THM defaults\nFormat: I T\nChange THM defaults\nFormat: I T (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite (#)number_of_thermal_devices ex2 ex3\n");
-		                        break;
+		                break;
                             case 'U': case 'u':
                                 snprintf(wbuf, 1024, "Request Radio Frequency\nFormat: I U\nChange Radio Frequency\nFormat: I U <xxx.xxx>\n");
                                 break;
@@ -2486,14 +2493,29 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'D': case 'd':
                                 snprintf(wbuf, 1024, "Get/Set Track length\nFormat: J D <track length>\n");
                                 break;
-							case 'E': case 'e':
+			    case 'E': case 'e':
                                 snprintf(wbuf, 1024, "Get/Set Static IP address\nFormat: J E <static ip>\n");
+                                break;
+                            case 'F': case 'f':
+                                snprintf(wbuf, 1024, "Change BES Trigger 1 defaults\nFormat: J F (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 (#)number of shots to fire\n");
+                                break;
+			    case 'G': case 'g':
+                                snprintf(wbuf, 1024, "Change BES Trigger 2 defaults\nFormat: J G (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 (#)number of shots to fire\n");
+                                break;
+                            case 'H': case 'h':
+                                snprintf(wbuf, 1024, "Change BES Trigger 3 defaults\nFormat: J H (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 (#)number of shots to fire\n");
+                                break;
+                            case 'I': case 'i':
+                                snprintf(wbuf, 1024, "Change BES Trigger 4 defaults\nFormat: J I (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 (#)number of shots to fire\n");
+                                break;
+                            case 'J': case 'j':
+                                snprintf(wbuf, 1024, "Get/Set BES Mode\nFormat: J J <mode>\n");
                                 break;
                             case 'R': case 'r':
                                 snprintf(wbuf, 1024, "Get a Report of relevant target information.\nFormat: J R (Board Type| Version | Communication | Connect IP | MAC)\n");
                                 break;
                             default:
-                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ R: Target Report\n");
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ F: BES Trigger 1\nJ G: BES Trigger 2\nJ H: BES Trigger 3\nJ I: BES Trigger 4\nJ J: BES Mode\nJ R: Target Report\n");
                                 break;
                         }
                         break;
