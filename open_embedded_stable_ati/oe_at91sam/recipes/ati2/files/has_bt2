@@ -1,0 +1,16 @@
+echo -n "Trigger 2 Expose: "
+/usr/bin/eeprom_rw read -addr 0x648 -size 0x04
+echo
+
+echo -n "Trigger 2 On Hit: "
+/usr/bin/eeprom_rw read -addr 0x64C -size 0x04
+echo
+
+echo -n "Trigger 2 On Kill: "
+/usr/bin/eeprom_rw read -addr 0x650 -size 0x04
+echo
+
+echo -n "Trigger 2 Shots: "
+/usr/bin/eeprom_rw read -addr 0x670 -size 0x04
+echo
+

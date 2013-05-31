@@ -1,0 +1,20 @@
+echo -n "Enter Trigger 2 Expose setting [0-1]: "
+read besexpose
+size=$(echo $besexpose | wc -c)
+echo -n $besexpose | /usr/bin/eeprom_rw write -addr 0x648 -size $size -blank 0x03
+
+echo -n "Enter Trigger 2 On Hit setting [0-2]: "
+read beshit
+size=$(echo $beshit | wc -c)
+echo -n $beshit | /usr/bin/eeprom_rw write -addr 0x64C -size $size -blank 0x03
+
+echo -n "Enter Trigger 2 On Kill setting [0-2]: "
+read beskill
+size=$(echo $beskill | wc -c)
+echo -n $beskill | /usr/bin/eeprom_rw write -addr 0x650 -size $size -blank 0x03
+
+echo -n "Enter Trigger 2 Shots setting [0-3](0 will result in fire if on exp/hit/kill is set): "
+read besshots
+size=$(echo $besshots | wc -c)
+echo -n $besshots | /usr/bin/eeprom_rw write -addr 0x670 -size $size -blank 0x03
+

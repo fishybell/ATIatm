@@ -1,0 +1,20 @@
+echo -n "Enter Trigger 3 Expose setting [0-1]: "
+read besexpose
+size=$(echo $besexpose | wc -c)
+echo -n $besexpose | /usr/bin/eeprom_rw write -addr 0x688 -size $size -blank 0x03
+
+echo -n "Enter Trigger 3 On Hit setting [0-2]: "
+read beshit
+size=$(echo $beshit | wc -c)
+echo -n $beshit | /usr/bin/eeprom_rw write -addr 0x68C -size $size -blank 0x03
+
+echo -n "Enter Trigger 3 On Kill setting [0-2]: "
+read beskill
+size=$(echo $beskill | wc -c)
+echo -n $beskill | /usr/bin/eeprom_rw write -addr 0x690 -size $size -blank 0x03
+
+echo -n "Enter Trigger 3 Shots setting [0-3](0 will result in fire if on exp/hit/kill is set): "
+read besshots
+size=$(echo $besshots | wc -c)
+echo -n $besshots | /usr/bin/eeprom_rw write -addr 0x6B0 -size $size -blank 0x03
+

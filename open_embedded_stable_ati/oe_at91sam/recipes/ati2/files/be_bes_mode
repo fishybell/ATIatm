@@ -1,0 +1,4 @@
+echo -n "Enter BES mode 0-5: "
+read besmode
+size=$(echo $besmode | wc -c)
+echo -n $besmode | /usr/bin/eeprom_rw write -addr 0x700 -size $size -blank 0x03
