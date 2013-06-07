@@ -1,0 +1,4 @@
+echo -n "Has Thermal Pulse [0(no), 1(yes)]: "
+read thmpulse
+size=$(echo $thmpulse | wc -c)
+echo -n $thmpulse | /usr/bin/eeprom_rw write -addr 0x704 -size $size -blank 0x03
