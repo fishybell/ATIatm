@@ -730,6 +730,10 @@
 #define BES_MODE_LOC 0x700
 #define BES_MODE_SIZE 0x04
 
+#define THERMAL_PULSE 0
+#define THERMAL_PULSE_LOC 0x704
+#define THERMAL_PULSE_SIZE 0x04
+
 // ,.. defaults
 
 
