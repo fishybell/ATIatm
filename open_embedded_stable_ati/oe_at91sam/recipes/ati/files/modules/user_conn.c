@@ -280,6 +280,10 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                             // MILES Shootback Device Holder data 
                             snprintf(wbuf, 1024, "Q MSD");
                             break;
+                        case ACC_BES_ENABLE:
+                            // BES enable
+                            snprintf(wbuf, 1024, "Q BTE");
+                            break;
                         case ACC_BES_TRIGGER_1:
                             // BES trigger 1
                             snprintf(wbuf, 1024, "Q BT1");
@@ -2868,6 +2872,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                            switch (cmd[arg1 + 1]) { /* second letter */
                                case 'T' : case 't' :
                                    switch (cmd[arg1 + 2]) { /* third letter */
+                                       case 'E' : case 'e':
+                                           acc_c.acc_type = ACC_BES_ENABLE;
+                                           break;
                                        case '1' :
                                            acc_c.acc_type = ACC_BES_TRIGGER_1;
                                            break;

@@ -18,12 +18,21 @@
 #include "target_generic_output.h"
 #include "target_hit_poll.h"
 #include "target_battery.h"
+#include "eeprom_settings.h"
 #include "fasit/faults.h"
+#include "defaults.h"
 
 //---------------------------------------------------------------------------
 #define TARGET_NAME     "lifter"
 
 //#define DEBUG_SEND
+//#define PRINT_DEBUG
+
+#ifdef PRINT_DEBUG
+#define DELAY_PRINTK  delay_printk
+#else
+#define DELAY_PRINTK(...)  //
+#endif
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -56,6 +65,10 @@ static void sendUserConnMsg( char *fmt, ...){
 //---------------------------------------------------------------------------
 static int has_miles = FALSE;          // has MILES hit sensor
 module_param(has_miles, bool, S_IRUGO);
+static int has_thm_pulse = 0;           // Uses thermal pulse
+module_param(has_thm_pulse, int, S_IRUGO);
+static int has_bes = 0;           // has battlefield effects simulator
+module_param(has_bes, int, S_IRUGO);
 static int has_hitX = FALSE;           // has X mechanical hit sensors
 module_param(has_hitX, int, S_IRUGO);
 static int has_engine = FALSE;            // has engine mechanical hit sensor
@@ -151,14 +164,14 @@ void lift_faults(int liftfault) {
 int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
     int rc, value = 0;
-    delay_printk("Lifter: handling expose command\n");
+    DELAY_PRINTK("Lifter: handling expose command\n");
 
     // get attribute from message
     na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
     if (na) {
         // grab value from attribute
         value = nla_get_u8(na);
-        delay_printk("Lifter: received value: %i, nl_expose_handler\n", value);
+        DELAY_PRINTK("Lifter: received value: %i, nl_expose_handler\n", value);
 
         switch (value) {
             case TOGGLE:
@@ -254,14 +267,14 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
         } else if (rc == -1) {
             rc = HANDLE_SUCCESS_NO_REPLY;
         } else {
-            delay_printk("Lifter: could not create return message\n");
+            DELAY_PRINTK("Lifter: could not create return message\n");
             rc = HANDLE_FAILURE;
         }
     } else {
-        delay_printk("Lifter: could not get attribute\n");
+        DELAY_PRINTK("Lifter: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
-    delay_printk("Lifter: returning rc: %i\n", rc);
+    DELAY_PRINTK("Lifter: returning rc: %i\n", rc);
 
     // return to let provider send message back
     return rc;
@@ -274,14 +287,14 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
     struct nlattr *na;
     int rc, value = 0;
     struct hit_item *this;
-    delay_printk("Lifter: handling hits command\n");
+    DELAY_PRINTK("Lifter: handling hits command\n");
 
     // get attribute from message
     na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
     if (na) {
         // grab value from attribute
         value = nla_get_u8(na);
-        delay_printk("Lifter: received value: %i, nl_hits_handler\n", value);
+        DELAY_PRINTK("Lifter: received value: %i, nl_hits_handler\n", value);
 
         // get initial data from log
         rc = 0;
@@ -299,11 +312,11 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
             if (rc > atomic_read(&last_sent)) {
                 rc = atomic_read(&last_sent); // how many we sent before is how many we need to remove now
                 // if it's less or equal, just reset
-                delay_printk("RESET HITS\n");
+                DELAY_PRINTK("RESET HITS\n");
                 spin_lock(hit_lock);
                 this = hit_chain;
                 while (rc-- > 0 && this != NULL) {
-                    delay_printk("SHRANK ONE HIT\n");
+                    DELAY_PRINTK("SHRANK ONE HIT\n");
                     hit_chain = this; // remember this
                     this = this->next; // move on to next link
                     kfree(hit_chain); // free it
@@ -312,11 +325,11 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
                 spin_unlock(hit_lock);
             } else {
                 // if it's less or equal, just reset
-                delay_printk("RESET HITS\n");
+                DELAY_PRINTK("RESET HITS\n");
                 spin_lock(hit_lock);
                 this = hit_chain;
                 while (this != NULL) {
-                    delay_printk("SHRANK ONE HIT\n");
+                    DELAY_PRINTK("SHRANK ONE HIT\n");
                     hit_chain = this; // remember this
                     this = this->next; // move on to next link
                     kfree(hit_chain); // free it
@@ -330,7 +343,7 @@ int nl_hits_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
 
         // re-get data from log
         if (value != 0) {
-delay_printk("\n***Shelly1-value: %i\n", value);
+DELAY_PRINTK("\n***Shelly1-value: %i\n", value);
             rc = 0;
             spin_lock(hit_lock);
             this = hit_chain;
@@ -343,11 +356,11 @@ delay_printk("\n***Shelly1-value: %i\n", value);
 
         // fake the hit log data?
         if (value != HIT_REQ && value != 0) {
-            delay_printk("FAKE HITS\n");
+            DELAY_PRINTK("FAKE HITS\n");
             if (value > rc) {
                 // grow hit log
                 while (value > rc) {
-                    delay_printk("GREW ONE HIT\n");
+                    DELAY_PRINTK("GREW ONE HIT\n");
                     // create a full hit event ...
                     hit_event_internal(0, false); // ... except don't send data back upstream
                     rc++; // hit log grew one
@@ -357,7 +370,7 @@ delay_printk("\n***Shelly1-value: %i\n", value);
                 spin_lock(hit_lock);
                 this = hit_chain; // start removing from end of chain (TODO -- remove from other side?)
                 while (value < rc && this != NULL) {
-                    delay_printk("SHRANK ONE HIT\n");
+                    DELAY_PRINTK("SHRANK ONE HIT\n");
                     hit_chain = this; // remember this
                     this = this->next; // move on to next link
                     kfree(hit_chain); // free it
@@ -377,14 +390,14 @@ delay_printk("\n***Shelly1-value: %i\n", value);
         if (rc == 0) {
             rc = HANDLE_SUCCESS;
         } else {
-            delay_printk("Lifter: could not create return message\n");
+            DELAY_PRINTK("Lifter: could not create return message\n");
             rc = HANDLE_FAILURE;
         }
     } else {
-        delay_printk("Lifter: could not get attribute\n");
+        DELAY_PRINTK("Lifter: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
-    delay_printk("Lifter: returning rc: %i\n", rc);
+    DELAY_PRINTK("Lifter: returning rc: %i\n", rc);
 
     // return to let provider send message back
     return rc;
@@ -398,7 +411,7 @@ int nl_hit_log_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
     int rc, value = 0;
     struct hit_item *this;
     char *wbuf;
-    delay_printk("Lifter: handling hits command\n");
+    DELAY_PRINTK("Lifter: handling hits command\n");
 
     // get attribute from message
     na = info->attrs[GEN_STRING_A_MSG]; // generic string message
@@ -409,7 +422,7 @@ int nl_hit_log_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
         this = hit_chain;
         while (this != NULL) {
             rc++; // count hit (doesn't matter which line)
-delay_printk("\n***Shelly2-increase rc: %i\n", rc);
+DELAY_PRINTK("\n***Shelly2-increase rc: %i\n", rc);
             this = this->next; // next link in chain
         }
         spin_unlock(hit_lock);
@@ -437,14 +450,14 @@ delay_printk("\n***Shelly2-increase rc: %i\n", rc);
         if (rc == 0) {
             rc = HANDLE_SUCCESS;
         } else {
-            delay_printk("Lifter: could not create return message\n");
+            DELAY_PRINTK("Lifter: could not create return message\n");
             rc = HANDLE_FAILURE;
         }
     } else {
-        delay_printk("Lifter: could not get attribute\n");
+        DELAY_PRINTK("Lifter: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
-    delay_printk("Lifter: returning rc: %i\n", rc);
+    DELAY_PRINTK("Lifter: returning rc: %i\n", rc);
 
     // return to let provider send message back
     return rc;
@@ -456,14 +469,14 @@ delay_printk("\n***Shelly2-increase rc: %i\n", rc);
 int nl_stop_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
     struct nlattr *na;
     int rc, value = 0;
-    delay_printk("Lifter: handling stop command\n");
+    DELAY_PRINTK("Lifter: handling stop command\n");
 
     // get attribute from message
     na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
     if (na) {
         // grab value from attribute
         value = nla_get_u8(na); // value is ignored
-        delay_printk("Lifter: received value: %i, nl_stop_handler\n", value);
+        DELAY_PRINTK("Lifter: received value: %i, nl_stop_handler\n", value);
 
         // stop motor wherever it is
 // Stop in down position        lifter_position_set(LIFTER_POSITION_ERROR_NEITHER);
@@ -484,16 +497,264 @@ int nl_stop_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *
         if (rc == 0) {
             rc = HANDLE_SUCCESS;
         } else {
-            delay_printk("Lifter: could not create return message\n");
+            DELAY_PRINTK("Lifter: could not create return message\n");
             rc = HANDLE_FAILURE;
         }
     } else {
-        delay_printk("Lifter: could not get attribute\n");
+        DELAY_PRINTK("Lifter: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
-    delay_printk("Lifter: returning rc: %i\n", rc);
+    DELAY_PRINTK("Lifter: returning rc: %i\n", rc);
 
     // return to let provider send message back
+    return rc;
+}
+
+// Accessory Command, moved here so we can call when we want to instead of
+// needing netlink to do it. Needed to enable BES when lifting
+int do_accessory_configure(int callMethod, struct accessory_conf *acc_c, struct sk_buff *skb){
+    int rc = HANDLE_SUCCESS_NO_REPLY; // by default this is a command with no response
+    // prepare mode and active mode value for later
+    int a_mode = 0, mode = CONSTANT_ON; // may be overwritten depending on accessory type
+    int i, num, num2, num3, num4 = 0; 
+    SENDUSERCONNMSG("Q X%iX %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c->acc_type, acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
+    DELAY_PRINTK("Q X%iX %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c->acc_type, acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
+    switch (acc_c->on_exp) {
+	case 1: a_mode |= ACTIVE_UP | UNACTIVE_LOWER; break; // active when fully exposed only
+	case 2: a_mode |= ACTIVE_RAISE | UNACTIVE_LOWER; break; // active when partially and fully expose
+	case 3: a_mode |= ACTIVE_RAISE | UNACTIVE_UP | ACTIVE_LOWER | UNACTIVE_DOWN; break; // active on transition
+	case 4: a_mode |= ACTIVE_RAISE | UNACTIVE_DOWN; break; // active when partially exposed and fully concealed
+	case 5:
+            a_mode |= ACTIVE_RAISE | UNACTIVE_LOWER;
+            mode = TEMP_ON_PULSE;
+            break; // active when partially exposed and fully concealed
+    }
+    switch (acc_c->on_hit) {
+	case 1: a_mode |= ACTIVE_HIT; mode = TEMP_ON; break; // make sure we're not on forever
+	case 2: a_mode |= UNACTIVE_HIT; break;
+    }
+    switch (acc_c->on_kill) {
+	case 1: a_mode |= ACTIVE_KILL; mode = TEMP_ON; break; // make sure we're not on forever
+	case 2: a_mode |= UNACTIVE_KILL; break;
+    }
+
+    // find out which of multiple accessories to configure
+    switch (acc_c->acc_type) {
+	case ACC_MILES_SDH :
+	case ACC_SES :
+	case ACC_NES_MFS :
+	case ACC_THERMAL :
+	case ACC_THERMAL_PULSE :
+	case ACC_NES_PHI :
+	case ACC_NES_MGL :
+	    for (i=generic_output_exists(acc_c->acc_type); i > 0; i--) { // do I have one?
+		DELAY_PRINTK("Lifter: Using Single Accessory %i\n", acc_c->acc_type);
+		num = i; // use this one
+	    }
+	    break;
+	case ACC_SMOKE :
+	    if (generic_output_exists(acc_c->acc_type) >= acc_c->ex_data1) { // do I have this one? (ex_data1 is thermal #)
+		DELAY_PRINTK("Lifter: Using Multiple Accessory %i:%i\n", acc_c->acc_type, acc_c->ex_data1);
+		num = acc_c->ex_data1; // use this one
+	    }
+	    break;
+	default :
+	    DELAY_PRINTK("Lifter: bad accessory type: %s\n", acc_c->acc_type);
+	    break;
+	case ACC_BES_ENABLE :
+	case ACC_BES_TRIGGER_1 :
+	case ACC_BES_TRIGGER_2 :
+	case ACC_BES_TRIGGER_3 :
+	case ACC_BES_TRIGGER_4 :
+            if (callMethod) mode = TEMP_ON;
+	    for (i=generic_output_exists(acc_c->acc_type); i > 0; i--) { // do I have one?
+		DELAY_PRINTK("Lifter: Using Single Accessory %i\n", acc_c->acc_type);
+		num = i; // use this one
+	    }
+	    break;
+    }
+
+
+    if (!acc_c->request) {
+	DELAY_PRINTK("Doing accessory configure\n");
+SENDUSERCONNMSG( "Doing accessory configure");
+	// configure based on accessory type
+	switch (acc_c->acc_type) {
+	    case ACC_NES_MFS:
+		if (lifter_position_get() == LIFTER_POSITION_UP) {
+		    acc_c->on_now = 2;
+		}
+		// burst or single mode?
+		if (acc_c->ex_data1) {
+		    // burst mode
+		    if (acc_c->ex_data2 >= 255) { // 8-bits, so shouldn't be bigger
+			DELAY_PRINTK("MFS burst infinite repeat\n");
+SENDUSERCONNMSG( "MFS burst infinite repeat %i %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_data1, acc_c->ex_data2);
+			generic_output_set_onoff_repeat(acc_c->acc_type, num, -1); // infinite repeat
+		    } else {
+			DELAY_PRINTK("MFS burst repeat: %i\n", acc_c->ex_data2);
+SENDUSERCONNMSG( "MFS burst repeat %i %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_data1, acc_c->ex_data2);
+			generic_output_set_onoff_repeat(acc_c->acc_type, num, acc_c->ex_data2);
+		    }
+		    mode = BURST_FIRE;
+		} else {
+		    DELAY_PRINTK("MFS not bursting\n");
+SENDUSERCONNMSG( "MFS not bursting %i %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_data1, acc_c->ex_data2);
+		    mode = TEMP_ON;
+		}
+		// mfs has randomized delays
+		generic_output_set_initial_delay_random(acc_c->acc_type, num, acc_c->start_delay*250); // convert to milliseconds and halve
+		generic_output_set_repeat_delay_random(acc_c->acc_type, num, acc_c->repeat_delay*250); // convert to milliseconds and halve
+		break;
+	    case ACC_MILES_SDH:
+		// TODO -- what to do with MILES data?
+		break;
+	    case ACC_BES_ENABLE:
+SENDUSERCONNMSG( "BES ENABLE %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_data1);
+DELAY_PRINTK( "BES ENABLE %i %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->on_exp, acc_c->ex_data1);
+/*		    a_mode = ACTIVE_RAISE | UNACTIVE_LOWER; // active when partially and fully expose
+		    mode = CONSTANT_ON; // BES Enable is always this
+		    acc_c->repeat = 0;
+		    acc_c->start_delay = 0;
+		    acc_c->repeat_delay = 0;
+		    acc_c->on_time = 0;	*/
+		break;
+	    case ACC_BES_TRIGGER_1:
+SENDUSERCONNMSG( "TRIGGER 1 %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_data1);
+		    mode = TEMP_ON; // Triggers are always this value
+		break;
+	    case ACC_BES_TRIGGER_2:
+	    case ACC_BES_TRIGGER_3:
+	    case ACC_BES_TRIGGER_4:
+SENDUSERCONNMSG( "TRIGGER %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_data1);
+		    mode = TEMP_ON; // Triggers are always this value
+/*		    acc_c->repeat = 2;
+		    acc_c->start_delay = 0;
+		    acc_c->repeat_delay = 2;
+		    acc_c->on_time = 1000;	*/
+		break;
+	}
+
+	// configure generic
+	if (acc_c->on_now || acc_c->on_exp || acc_c->on_hit || acc_c->on_kill) {
+	    generic_output_set_enable(acc_c->acc_type, num, ENABLED);
+	} else {
+	    generic_output_set_enable(acc_c->acc_type, num, DISABLED);
+	}
+	generic_output_set_active_on(acc_c->acc_type, num, a_mode);
+	generic_output_set_mode(acc_c->acc_type, num, mode);
+	generic_output_set_initial_delay(acc_c->acc_type, num, acc_c->start_delay*500); // convert to milliseconds
+	generic_output_set_repeat_delay(acc_c->acc_type, num, acc_c->repeat_delay*500); // convert to milliseconds 
+	if (acc_c->repeat >= 63) { // 6 bits, so shouldn't be bigger
+	    generic_output_set_repeat_count(acc_c->acc_type, num, -1); // infinite repeat
+	} else {
+	    generic_output_set_repeat_count(acc_c->acc_type, num, acc_c->repeat);
+	}
+	generic_output_set_on_time(acc_c->acc_type, num, acc_c->on_time);
+	generic_output_set_off_time(acc_c->acc_type, num, acc_c->off_time);
+
+	// after configuration, do we activate now?
+	switch (acc_c->on_now) {
+	    case 1: generic_output_set_state(acc_c->acc_type, num, ON_SOON); break;
+	    case 2: generic_output_set_state(acc_c->acc_type, num, ON_IMMEDIATE); break;
+	}
+	acc_c->request=1;
+    }
+
+
+    // fill request or configure
+    if (acc_c->request) {
+	// replace existing accessory_conf
+	int type = acc_c->acc_type;
+	DELAY_PRINTK("Filling accessory request\n");
+	memset(acc_c, 0, sizeof(struct accessory_conf)); // clean completely
+	acc_c->acc_type = type;// but not too completely
+
+	// fill generic request
+	acc_c->exists = num > 0; // num starts as zero, and is found out above
+	switch (generic_output_get_state(acc_c->acc_type, num)) {
+	    case ON_IMMEDIATE:
+	    case ON_SOON:
+		acc_c->on_now = 1; // don't differentiate when requesting info
+		break;
+	    case OFF_IMMEDIATE:
+	    case OFF_SOON:
+	    default:
+		acc_c->on_now = 0; // don't differentiate when requesting info
+		break;
+	}
+	a_mode = generic_output_get_active_on(acc_c->acc_type, num);
+	switch (a_mode & (ACTIVE_UP | UNACTIVE_LOWER | ACTIVE_RAISE | UNACTIVE_UP | ACTIVE_LOWER | UNACTIVE_DOWN)) { // match the pieces below only
+	    case (ACTIVE_UP | UNACTIVE_LOWER):
+		acc_c->on_exp = 1; break;
+	    case (ACTIVE_RAISE | UNACTIVE_LOWER):
+		acc_c->on_exp = 2; break;
+	    case (ACTIVE_RAISE | UNACTIVE_UP | ACTIVE_LOWER | UNACTIVE_DOWN):
+		acc_c->on_exp = 3; break;
+	}
+	if (a_mode & ACTIVE_HIT) {
+	    acc_c->on_hit = 1;
+	} else if (a_mode & UNACTIVE_HIT) {
+	    acc_c->on_hit = 2;
+	}
+	if (a_mode & ACTIVE_KILL) {
+	    acc_c->on_kill = 1;
+	} else if (a_mode & UNACTIVE_KILL) {
+	    acc_c->on_kill = 2;
+	}
+	acc_c->on_time = generic_output_get_on_time(acc_c->acc_type, num);
+	acc_c->off_time = generic_output_get_off_time(acc_c->acc_type, num);
+	acc_c->start_delay = generic_output_get_initial_delay(acc_c->acc_type, num)/500; // convert to half-seconds
+	acc_c->repeat_delay = generic_output_get_repeat_delay(acc_c->acc_type, num)/500; // convert to half-seconds
+	acc_c->repeat = generic_output_get_repeat_count(acc_c->acc_type, num);
+
+	// fill request based on accessory type
+	switch (acc_c->acc_type) {
+	    case ACC_SMOKE:
+	    case ACC_THERMAL:
+	    case ACC_THERMAL_PULSE:
+		acc_c->ex_data1 = num;
+		break;
+	    case ACC_NES_MFS:
+		// burst or single mode?
+		if (mode == BURST_FIRE) {
+		    // burst mode
+		    int repeat = generic_output_get_onoff_repeat(acc_c->acc_type, num);
+		    DELAY_PRINTK("MFS burst\n");
+		    acc_c->ex_data1 = 1;
+
+		    // cram into 8-bits
+		    if (repeat == -1) {
+			acc_c->ex_data2 = 255;
+		    } else if (repeat >= 255) {
+			acc_c->ex_data2 = 254;
+		    } else if (repeat < 0) {
+			acc_c->ex_data2 = 0;
+		    } else {
+			acc_c->ex_data2 = repeat;
+		    }
+		} else {
+		    DELAY_PRINTK("MFS single\n");
+		    // single-fire mode
+		    acc_c->ex_data1 = 0;
+		}
+		break;
+	    case ACC_MILES_SDH:
+		// TODO -- what to do with MILES data?
+		DELAY_PRINTK("Lifter: Couldn't fill in s*** for MILES data %i %i %i\n", num, num2, num3);
+		acc_c->ex_data1 = num;
+		acc_c->ex_data2 = num2;
+		acc_c->ex_data3 = num3;
+		break;
+	}
+	acc_c->request=0; // not a request anymore
+
+	DELAY_PRINTK("Lifter: Returning Accessory data\n");
+        if (callMethod){
+	    nla_put(skb, ACC_A_MSG, sizeof(struct accessory_conf), acc_c);
+        }
+	rc = HANDLE_SUCCESS; // we now have a response
+    }
     return rc;
 }
 
@@ -504,7 +765,7 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
     struct nlattr *na;
     int rc = HANDLE_SUCCESS_NO_REPLY; // by default this is a command with no response
     struct accessory_conf *acc_c;
-    delay_printk("Lifter: handling accessory command\n");
+    DELAY_PRINTK("Lifter: handling accessory command\n");
 
     // get attribute from message
     na = info->attrs[ACC_A_MSG]; // accessory message
@@ -512,211 +773,7 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
         // grab value from attribute
         acc_c = (struct accessory_conf*)nla_data(na);
         if (acc_c != NULL) {
-
-            // prepare mode and active mode value for later
-            int a_mode = 0, mode = CONSTANT_ON; // may be overwritten depending on accessory type
-            int i, num, num2, num3, num4 = 0; 
-            //delay_printk("Q X%iX %i %i %i %i %i %i %i %i %i %i %i %i %i\n", acc_c->acc_type, acc_c->exists, acc_c->on_now, acc_c->on_exp, acc_c->on_hit, acc_c->on_kill, acc_c->on_time, acc_c->off_time, acc_c->start_delay, acc_c->repeat_delay, acc_c->repeat, acc_c->ex_data1, acc_c->ex_data2, acc_c->ex_data3);
-            switch (acc_c->on_exp) {
-                case 1: a_mode |= ACTIVE_UP | UNACTIVE_LOWER; break; // active when fully exposed only
-                case 2: a_mode |= ACTIVE_RAISE | UNACTIVE_LOWER; break; // active when partially and fully expose
-                case 3: a_mode |= ACTIVE_RAISE | UNACTIVE_UP | ACTIVE_LOWER | UNACTIVE_DOWN; break; // active on transition
-            }
-            switch (acc_c->on_hit) {
-                case 1: a_mode |= ACTIVE_HIT; mode = TEMP_ON; break; // make sure we're not on forever
-                case 2: a_mode |= UNACTIVE_HIT; break;
-            }
-            switch (acc_c->on_kill) {
-                case 1: a_mode |= ACTIVE_KILL; mode = TEMP_ON; break; // make sure we're not on forever
-                case 2: a_mode |= UNACTIVE_KILL; break;
-            }
-
-            // find out which of multiple accessories to configure
-            switch (acc_c->acc_type) {
-                case ACC_MILES_SDH :
-                case ACC_SES :
-                case ACC_NES_MFS :
-                case ACC_THERMAL :
-                case ACC_NES_PHI :
-                case ACC_NES_MGL :
-                case ACC_BES_TRIGGER_1 :
-                case ACC_BES_TRIGGER_2 :
-                case ACC_BES_TRIGGER_3 :
-                case ACC_BES_TRIGGER_4 :
-                    for (i=generic_output_exists(acc_c->acc_type); i > 0; i--) { // do I have one?
-                        delay_printk("Lifter: Using Single Accessory %i\n", acc_c->acc_type);
-                        num = i; // use this one
-                    }
-                    break;
-                case ACC_SMOKE :
-                    if (generic_output_exists(acc_c->acc_type) >= acc_c->ex_data1) { // do I have this one? (ex_data1 is thermal #)
-                        delay_printk("Lifter: Using Multiple Accessory %i:%i\n", acc_c->acc_type, acc_c->ex_data1);
-                        num = acc_c->ex_data1; // use this one
-                    }
-                    break;
-                default :
-                    delay_printk("Lifter: bad accessory type: %s\n", acc_c->acc_type);
-                    break;
-            }
-
-
-            if (!acc_c->request) {
-                delay_printk("Doing accessory configure\n");
-                // configure based on accessory type
-                switch (acc_c->acc_type) {
-                    case ACC_NES_MFS:
-                        // burst or single mode?
-                        if (acc_c->ex_data1) {
-                            // burst mode
-                            if (acc_c->ex_data2 >= 255) { // 8-bits, so shouldn't be bigger
-                                delay_printk("MFS burst infinite repeat\n");
-                                generic_output_set_onoff_repeat(acc_c->acc_type, num, -1); // infinite repeat
-                            } else {
-                                delay_printk("MFS burst repeat: %i\n", acc_c->ex_data2);
-                                generic_output_set_onoff_repeat(acc_c->acc_type, num, acc_c->ex_data2);
-                            }
-                            mode = BURST_FIRE;
-                        } else {
-                            delay_printk("MFS not bursting\n");
-                            mode = TEMP_ON;
-                        }
-                        // mfs has randomized delays
-                        generic_output_set_initial_delay_random(acc_c->acc_type, num, acc_c->start_delay*250); // convert to milliseconds and halve
-                        generic_output_set_repeat_delay_random(acc_c->acc_type, num, acc_c->repeat_delay*250); // convert to milliseconds and halve
-                        break;
-                    case ACC_MILES_SDH:
-                        // TODO -- what to do with MILES data?
-                        break;
-                    case ACC_BES_TRIGGER_1:
-                    case ACC_BES_TRIGGER_2:
-                    case ACC_BES_TRIGGER_3:
-                    case ACC_BES_TRIGGER_4:
-SENDUSERCONNMSG( "TRIGGER %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_data1);
-                            mode = TEMP_ON; // Triggers are always this value
-                            acc_c->repeat = 0;
-                            acc_c->start_delay = 0;
-                            acc_c->repeat_delay = 0;
-                            acc_c->on_time = 100;
-                        break;
-                }
-
-                // configure generic
-                if (acc_c->on_now || acc_c->on_exp || acc_c->on_hit || acc_c->on_kill) {
-                    generic_output_set_enable(acc_c->acc_type, num, ENABLED);
-                } else {
-                    generic_output_set_enable(acc_c->acc_type, num, DISABLED);
-                }
-                generic_output_set_active_on(acc_c->acc_type, num, a_mode);
-                generic_output_set_mode(acc_c->acc_type, num, mode);
-                generic_output_set_initial_delay(acc_c->acc_type, num, acc_c->start_delay*500); // convert to milliseconds
-                generic_output_set_repeat_delay(acc_c->acc_type, num, acc_c->repeat_delay*500); // convert to milliseconds 
-                if (acc_c->repeat >= 63) { // 6 bits, so shouldn't be bigger
-                    generic_output_set_repeat_count(acc_c->acc_type, num, -1); // infinite repeat
-                } else {
-                    generic_output_set_repeat_count(acc_c->acc_type, num, acc_c->repeat);
-                }
-                generic_output_set_on_time(acc_c->acc_type, num, acc_c->on_time);
-                generic_output_set_off_time(acc_c->acc_type, num, acc_c->off_time);
-
-                // after configuration, do we activate now?
-                switch (acc_c->on_now) {
-                    case 1: generic_output_set_state(acc_c->acc_type, num, ON_SOON); break;
-                    case 2: generic_output_set_state(acc_c->acc_type, num, ON_IMMEDIATE); break;
-                }
-                acc_c->request=1;
-            }
-
-
-            // fill request or configure
-            if (acc_c->request) {
-                // replace existing accessory_conf
-                int type = acc_c->acc_type;
-                delay_printk("Filling accessory request\n");
-                memset(acc_c, 0, sizeof(struct accessory_conf)); // clean completely
-                acc_c->acc_type = type;// but not too completely
-
-                // fill generic request
-                acc_c->exists = num > 0; // num starts as zero, and is found out above
-                switch (generic_output_get_state(acc_c->acc_type, num)) {
-                    case ON_IMMEDIATE:
-                    case ON_SOON:
-                        acc_c->on_now = 1; // don't differentiate when requesting info
-                        break;
-                    case OFF_IMMEDIATE:
-                    case OFF_SOON:
-                    default:
-                        acc_c->on_now = 0; // don't differentiate when requesting info
-                        break;
-                }
-                a_mode = generic_output_get_active_on(acc_c->acc_type, num);
-                switch (a_mode & (ACTIVE_UP | UNACTIVE_LOWER | ACTIVE_RAISE | UNACTIVE_UP | ACTIVE_LOWER | UNACTIVE_DOWN)) { // match the pieces below only
-                    case (ACTIVE_UP | UNACTIVE_LOWER):
-                        acc_c->on_exp = 1; break;
-                    case (ACTIVE_RAISE | UNACTIVE_LOWER):
-                        acc_c->on_exp = 2; break;
-                    case (ACTIVE_RAISE | UNACTIVE_UP | ACTIVE_LOWER | UNACTIVE_DOWN):
-                        acc_c->on_exp = 3; break;
-                }
-                if (a_mode & ACTIVE_HIT) {
-                    acc_c->on_hit = 1;
-                } else if (a_mode & UNACTIVE_HIT) {
-                    acc_c->on_hit = 2;
-                }
-                if (a_mode & ACTIVE_KILL) {
-                    acc_c->on_kill = 1;
-                } else if (a_mode & UNACTIVE_KILL) {
-                    acc_c->on_kill = 2;
-                }
-                acc_c->on_time = generic_output_get_on_time(acc_c->acc_type, num);
-                acc_c->off_time = generic_output_get_off_time(acc_c->acc_type, num);
-                acc_c->start_delay = generic_output_get_initial_delay(acc_c->acc_type, num)/500; // convert to half-seconds
-                acc_c->repeat_delay = generic_output_get_repeat_delay(acc_c->acc_type, num)/500; // convert to half-seconds
-                acc_c->repeat = generic_output_get_repeat_count(acc_c->acc_type, num);
-
-                // fill request based on accessory type
-                switch (acc_c->acc_type) {
-                    case ACC_SMOKE:
-                    case ACC_THERMAL:
-                        acc_c->ex_data1 = num;
-                        break;
-                    case ACC_NES_MFS:
-                        // burst or single mode?
-                        if (mode == BURST_FIRE) {
-                            // burst mode
-                            int repeat = generic_output_get_onoff_repeat(acc_c->acc_type, num);
-                            delay_printk("MFS burst\n");
-                            acc_c->ex_data1 = 1;
-
-                            // cram into 8-bits
-                            if (repeat == -1) {
-                                acc_c->ex_data2 = 255;
-                            } else if (repeat >= 255) {
-                                acc_c->ex_data2 = 254;
-                            } else if (repeat < 0) {
-                                acc_c->ex_data2 = 0;
-                            } else {
-                                acc_c->ex_data2 = repeat;
-                            }
-                        } else {
-                            delay_printk("MFS single\n");
-                            // single-fire mode
-                            acc_c->ex_data1 = 0;
-                        }
-                        break;
-                    case ACC_MILES_SDH:
-                        // TODO -- what to do with MILES data?
-                        delay_printk("Lifter: Couldn't fill in s*** for MILES data %i %i %i\n", num, num2, num3);
-                        acc_c->ex_data1 = num;
-                        acc_c->ex_data2 = num2;
-                        acc_c->ex_data3 = num3;
-                        break;
-                }
-                acc_c->request=0; // not a request anymore
-
-                delay_printk("Lifter: Returning Accessory data\n");
-                nla_put(skb, ACC_A_MSG, sizeof(struct accessory_conf), acc_c);
-                rc = HANDLE_SUCCESS; // we now have a response
-            }
+		rc = do_accessory_configure(1, acc_c, skb);
         }
     }
 
@@ -739,7 +796,7 @@ void do_kill_internal(void) {
 	}
 	if (!stay_up) {
 		atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
-delay_printk("\n***hits_to_kill: %i, kill counter: %i***\n\n", atomic_read(&hits_to_kill), kill_counter);
+DELAY_PRINTK("\n***hits_to_kill: %i, kill counter: %i***\n\n", atomic_read(&hits_to_kill), kill_counter);
 		// create events for outputs
 		generic_output_event(EVENT_KILL);
         //lift_faults(ERR_target_killed);
@@ -787,7 +844,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
     int htk = -1;
     int rc = HANDLE_SUCCESS_NO_REPLY; // by default this is a command with no response
     struct hit_calibration *hit_c;
-    delay_printk("Lifter: handling hit-calibration command\n");
+    DELAY_PRINTK("Lifter: handling hit-calibration command\n");
 
     // get attribute from message
     na = info->attrs[HIT_A_MSG]; // accessory message
@@ -1029,7 +1086,7 @@ void lift_event(int etype) {
 void lift_event_internal(int etype, bool upload) {
     int enable_at = atomic_read(&enable_on);
 SENDUSERCONNMSG( "lifter lift_event_internal enable_at=%d=", enable_at);
-    delay_printk("lift_event(%i)\n", etype);
+    DELAY_PRINTK("lift_event(%i)\n", etype);
 
 	// send event upstream?
 	if (upload) {
@@ -1158,7 +1215,7 @@ void hit_event_internal(int line, bool upload) {
 	struct hit_item *new_hit;
 	u8 hits = 0;
 	u8 data = EVENT_HIT; // cast to 8-bits
-	delay_printk("hit_event_internal(line=%i, upload=%d)\n", line,upload);
+	DELAY_PRINTK("hit_event_internal(line=%i, upload=%d)\n", line,upload);
 
 	// create event
    if (upload){
@@ -1219,14 +1276,14 @@ int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void 
     struct nlattr *na;
     int rc, value = 0;
     u8 data = BATTERY_SHUTDOWN; // in case we need to shutdown
-    delay_printk("Lifter: handling event command\n");
+    DELAY_PRINTK("Lifter: handling event command\n");
 
     // get attribute from message
     na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
     if (na) {
         // grab value from attribute
         value = nla_get_u8(na); // value is ignored
-        delay_printk("Lifter: received value: %i, nl_event_handler\n", value);
+        DELAY_PRINTK("Lifter: received value: %i, nl_event_handler\n", value);
 
         // handle event
         switch (value) {
@@ -1252,10 +1309,10 @@ int nl_event_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void 
 
         rc = HANDLE_SUCCESS_NO_REPLY;
     } else {
-        delay_printk("Lifter: could not get attribute\n");
+        DELAY_PRINTK("Lifter: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
-    delay_printk("Lifter: returning rc: %i\n", rc);
+    DELAY_PRINTK("Lifter: returning rc: %i\n", rc);
 
     // return to let provider send message back
     return rc;
@@ -1268,14 +1325,14 @@ int nl_sleep_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void 
     struct nlattr *na;
     int rc;
     u8 data = 0;
-    delay_printk("Mover: handling sleep command\n");
+    DELAY_PRINTK("Mover: handling sleep command\n");
 
     // get attribute from message
     na = info->attrs[GEN_INT8_A_MSG]; // generic 8-bit message
     if (na) {
         // grab value from attribute
         data = nla_get_u8(na); // value is ignored
-        delay_printk("Mover: received value: %i\n", data);
+        DELAY_PRINTK("Mover: received value: %i\n", data);
 
         if (data != SLEEP_REQUEST) {
             // handle sleep/wake in hw driver
@@ -1291,19 +1348,132 @@ int nl_sleep_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void 
             if (rc == 0) {
                 rc = HANDLE_SUCCESS;
             } else {
-                delay_printk("Mover: could not create return message\n");
+                DELAY_PRINTK("Mover: could not create return message\n");
                 rc = HANDLE_FAILURE;
             }
         }
     } else {
-        delay_printk("Mover: could not get attribute\n");
+        DELAY_PRINTK("Mover: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
-    delay_printk("Mover: returning rc: %i\n", rc);
+    DELAY_PRINTK("Mover: returning rc: %i\n", rc);
 
     return rc;
 }
 
+static void init_bes_triggers(int besLevel){
+    int mode;
+    int shots;
+
+                                              //    r,e,o,o,o,o,    o, o,s,r,r,e,e,e;
+                                              //    e,x,n,n,n,n,    n, f,t,e,e,x,x,x;
+                                              //    q,i, , , , ,     , f,a,p,p, , , ;
+                                              //    u,s,n,e,h,k,    t,  ,r,e,e,d,d,d;
+                                              //    e,t,o,x,i,i,    i, t,t,a,a,a,a,a;
+                                              //    s,s,w,p,t,l,    m, i, ,t,t,t,t,t;
+                                              //    t, , , , ,l,    e, m,d, , ,a,a,a;
+                                              //     , , , , , ,     , e,e,d, ,1,2,3;
+                                              //     , , , , , ,     ,  ,l,e, , , , ;
+                                              //     , , , , , ,     ,  ,a,l, , , , ;
+                                              //     , , , , , ,     ,  ,y,a, , , , ;
+                                              //     , , , , , ,     ,  , ,y, , , , ;
+    struct accessory_conf bte = {ACC_BES_ENABLE,    0,1,0,4,0,0,    0, 0,0,0,0,0,0,0};
+    struct accessory_conf bt1 = {ACC_BES_TRIGGER_1 ,0,1,0,2,0,0,   50, 0,0,0,0,0,0,0};
+    struct accessory_conf bt2 = {ACC_BES_TRIGGER_2 ,0,1,0,2,0,0,   50, 0,0,0,0,0,0,0};
+    struct accessory_conf bt3 = {ACC_BES_TRIGGER_3 ,0,1,0,2,0,0,   50, 0,0,0,0,0,0,0};
+    struct accessory_conf bt4 = {ACC_BES_TRIGGER_4 ,0,1,0,2,0,0,   50, 0,0,0,0,0,0,0};
+
+    mode = get_eeprom_int_value(BES_MODE, BES_MODE_LOC, BES_MODE_SIZE);
+    DELAY_PRINTK("BES mode: %i  Level: %i bte exp: %i\n", mode, besLevel, bte.on_exp);
+    do_accessory_configure(0, &bte, 0);
+    bt1.on_exp = get_eeprom_int_value(BT1_ACTIVATE_EXPOSE, BT1_ACTIVATE_EXPOSE_LOC, BT1_ACTIVATE_EXPOSE_SIZE);
+    if (bt1.on_exp > 1) bt1.on_exp = 1;
+    bt1.on_hit = get_eeprom_int_value(BT1_ACTIVATE_ON_HIT, BT1_ACTIVATE_ON_HIT_LOC, BT1_ACTIVATE_ON_HIT_SIZE);
+    bt1.on_kill = get_eeprom_int_value(BT1_ACTIVATE_ON_KILL, BT1_ACTIVATE_ON_KILL_LOC, BT1_ACTIVATE_ON_KILL_SIZE);
+    bt1.repeat = get_eeprom_int_value(BT1_EX3, BT1_EX3_LOC, BT1_EX3_SIZE);
+// We only repeat if number of shots greater than 1.
+// No repeat will give 1 shot, 1 repeat will be 2
+    if (bt1.repeat > 1){
+        bt1.repeat -= 1;
+        bt1.repeat_delay = 3;
+    } else {
+        bt1.repeat = 0;
+    }
+    do_accessory_configure(0, &bt1, 0);
+    if (besLevel > 1){
+            bt2.on_exp = get_eeprom_int_value(BT2_ACTIVATE_EXPOSE, BT2_ACTIVATE_EXPOSE_LOC, BT2_ACTIVATE_EXPOSE_SIZE);
+            if (bt2.on_exp > 1) bt2.on_exp = 1;
+            bt2.on_hit = get_eeprom_int_value(BT2_ACTIVATE_ON_HIT, BT2_ACTIVATE_ON_HIT_LOC, BT2_ACTIVATE_ON_HIT_SIZE);
+            bt2.on_kill = get_eeprom_int_value(BT2_ACTIVATE_ON_KILL, BT2_ACTIVATE_ON_KILL_LOC, BT2_ACTIVATE_ON_KILL_SIZE);
+            bt2.repeat = get_eeprom_int_value(BT2_EX3, BT2_EX3_LOC, BT2_EX3_SIZE);
+            if (bt2.repeat > 1){
+        	bt2.repeat -= 1;
+        	bt2.repeat_delay = 3;
+            } else {
+        	bt2.repeat = 0;
+            }
+        if (besLevel == 3){
+            if (bt2.repeat) {
+// In this BES mode we need 2 triggers per fire event so if we need
+// more than one shot we need to repeat more times.
+                bt2.repeat = (2 * (bt2.repeat + 1)) - 1;
+            } else {
+                bt2.repeat = 1;
+            }
+            bt2.repeat_delay = 3;
+        }
+	do_accessory_configure(0, &bt2, 0);
+        if (besLevel == 2 || besLevel == 5){
+            bt3.on_exp = get_eeprom_int_value(BT3_ACTIVATE_EXPOSE, BT3_ACTIVATE_EXPOSE_LOC, BT3_ACTIVATE_EXPOSE_SIZE);
+            if (bt3.on_exp > 1) bt3.on_exp = 1;
+            bt3.on_hit = get_eeprom_int_value(BT3_ACTIVATE_ON_HIT, BT3_ACTIVATE_ON_HIT_LOC, BT3_ACTIVATE_ON_HIT_SIZE);
+            bt3.on_kill = get_eeprom_int_value(BT3_ACTIVATE_ON_KILL, BT3_ACTIVATE_ON_KILL_LOC, BT3_ACTIVATE_ON_KILL_SIZE);
+            bt3.repeat = get_eeprom_int_value(BT3_EX3, BT3_EX3_LOC, BT3_EX3_SIZE);
+            if (bt3.repeat > 1){
+        	bt3.repeat -= 1;
+        	bt3.repeat_delay = 3;
+            } else {
+        	bt3.repeat = 0;
+            }
+	    do_accessory_configure(0, &bt3, 0);
+        }
+        if (besLevel == 5){
+            bt4.on_exp = get_eeprom_int_value(BT4_ACTIVATE_EXPOSE, BT4_ACTIVATE_EXPOSE_LOC, BT4_ACTIVATE_EXPOSE_SIZE);
+            if (bt4.on_exp > 1) bt4.on_exp = 1;
+            bt4.on_hit = get_eeprom_int_value(BT4_ACTIVATE_ON_HIT, BT4_ACTIVATE_ON_HIT_LOC, BT4_ACTIVATE_ON_HIT_SIZE);
+            bt4.on_kill = get_eeprom_int_value(BT4_ACTIVATE_ON_KILL, BT4_ACTIVATE_ON_KILL_LOC, BT4_ACTIVATE_ON_KILL_SIZE);
+            bt4.repeat = get_eeprom_int_value(BT4_EX3, BT4_EX3_LOC, BT4_EX3_SIZE);
+            if (bt4.repeat > 1){
+        	bt4.repeat -= 1;
+        	bt4.repeat_delay = 3;
+            } else {
+        	bt4.repeat = 0;
+            }
+	    do_accessory_configure(0, &bt4, 0);
+        }
+    }
+}
+
+static void init_thermal_pulse(){
+    int mode;
+    int shots;
+
+                                              //    r,e,o,o,o,o,    o,  o,s,r, r,e,e,e;
+                                              //    e,x,n,n,n,n,    n,  f,t,e, e,x,x,x;
+                                              //    q,i, , , , ,     ,  f,a,p, p, , , ;
+                                              //    u,s,n,e,h,k,    t,   ,r,e, e,d,d,d;
+                                              //    e,t,o,x,i,i,    i,  t,t,a, a,a,a,a;
+                                              //    s,s,w,p,t,l,    m,  i, ,t, t,t,t,t;
+                                              //    t, , , , ,l,    e,  m,d, ,  ,a,a,a;
+                                              //     , , , , , ,     ,  e,e,d,  ,1,2,3;
+                                              //     , , , , , ,     ,   ,l,e,  , , , ;
+                                              //     , , , , , ,     ,   ,a,l,  , , , ;
+                                              //     , , , , , ,     ,   ,y,a,  , , , ;
+                                              //     , , , , , ,     ,    , ,y,  , , , ;
+    struct accessory_conf thmp = {ACC_THERMAL_PULSE,0,1,0,5,0,0, 9000,100,0,0, 9,0,0,0};
+
+    do_accessory_configure(0, &thmp, 0);
+}
 
 //---------------------------------------------------------------------------
 // init handler for the module
@@ -1324,9 +1494,15 @@ static int __init Lifter_init(void) {
 
     // install driver w/ netlink provider
     d_id = install_nl_driver(&driver);
-    delay_printk("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
+    DELAY_PRINTK("%s(): %s - %s : %i\n",__func__,  __DATE__, __TIME__, d_id);
     atomic_set(&driver_id, d_id);
 
+    if (has_bes > 0 && has_bes < 6){
+        init_bes_triggers(has_bes);
+    }
+    if (has_thm_pulse){
+        init_thermal_pulse();
+    }
     // reset hit log start time
     hit_start = current_kernel_time();
 

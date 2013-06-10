@@ -187,8 +187,8 @@
 
 //---------------------------------------------------------------------------
 // MUZZLE FLASH
-// If BES is active then Night Light (Moon Glow) and PHI (Positive Hit Indicator)
-// will be disabled.
+// If BES is active then Muzzle Flash (MFS) and Night Light (Moon Glow)
+// and PHI (Positive Hit Indicator) will be disabled.
 //---------------------------------------------------------------------------
 #define	OUTPUT_MUZZLE_FLASH_ACTIVE_STATE		ACTIVE_LOW
 #define	OUTPUT_MUZZLE_FLASH 				AT91_PIN_PA10
@@ -200,14 +200,16 @@
 // If BES is active then Night Light (Moon Glow) and PHI (Positive Hit Indicator)
 // will be disabled.
 //---------------------------------------------------------------------------
-#define	OUTPUT_TRIGGER_1_ACTIVE_STATE		ACTIVE_LOW
-#define	OUTPUT_TRIGGER_2_ACTIVE_STATE		ACTIVE_LOW
-#define	OUTPUT_TRIGGER_3_ACTIVE_STATE		ACTIVE_LOW
-#define	OUTPUT_TRIGGER_4_ACTIVE_STATE		ACTIVE_LOW
-#define	OUTPUT_BES_TRIGGER_1 			AT91_PIN_PA4 // Lifter board
-#define	OUTPUT_BES_TRIGGER_2 			AT91_PIN_PA8 // Lifter board
-#define	OUTPUT_BES_TRIGGER_3 			AT91_PIN_PA6 // Lifter board
-#define	OUTPUT_BES_TRIGGER_4 			AT91_PIN_PA9 // Lifter board
+#define	OUTPUT_BES_ENABLE_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_BES_TRIGGER_1_ACTIVE_STATE	ACTIVE_HIGH
+#define	OUTPUT_BES_TRIGGER_2_ACTIVE_STATE	ACTIVE_HIGH
+#define	OUTPUT_BES_TRIGGER_3_ACTIVE_STATE	ACTIVE_HIGH
+#define	OUTPUT_BES_TRIGGER_4_ACTIVE_STATE	ACTIVE_HIGH
+#define	OUTPUT_BES_ENABLE 			AT91_PIN_PA4 // J9-2 Lifter board
+#define	OUTPUT_BES_TRIGGER_1 			AT91_PIN_PA8 // J9-4 Lifter board
+#define	OUTPUT_BES_TRIGGER_2 			AT91_PIN_PA6 // J9-6 Lifter board
+#define	OUTPUT_BES_TRIGGER_3 			AT91_PIN_PA9 // J9-7 Lifter board
+#define	OUTPUT_BES_TRIGGER_4 			AT91_PIN_PC10 // J8-5 Lifter board
 
 //---------------------------------------------------------------------------
 // MISC.
@@ -217,6 +219,9 @@
 
 #define OUTPUT_THERMAL_ACTIVE_STATE		ACTIVE_LOW
 #define	OUTPUT_THERMAL 					AT91_PIN_PA5
+// Thermal pulse is on SATs and uses the same pin as MFS on SITs
+#define OUTPUT_THERMAL_PULSE_ACTIVE_STATE		ACTIVE_HIGH
+#define	OUTPUT_THERMAL_PULSE 				AT91_PIN_PA10
 
 #define	OUTPUT_SMOKE 					AT91_PIN_PA4
 #define	OUTPUT_M21_RELAY 				AT91_PIN_PB30

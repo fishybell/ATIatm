@@ -149,6 +149,9 @@ struct clk *	adc_clk;
 //---------------------------------------------------------------------------
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
+#define HAS_BES ( has_bes > 0 && has_bes < 6 )
+static int has_bes = 0;
+module_param(has_bes, int, S_IRUGO);
 static int charge = FALSE;
 module_param(charge, bool, S_IRUGO);
 static int shutdown = TRUE;
@@ -260,6 +263,9 @@ void enable_battery_check(int enable) {
       they were.
       Shelly 3-1-2012 */
    atomic_set(&check_atomic, enable);
+   if (enable){
+   } else {
+   }
    // automatically reenable the battery check if the calling ko doesn't
 /*
    if (enable == 0) {
@@ -437,8 +443,9 @@ static void timeout_fire(unsigned long data) {
     if (atomic_read(&check_atomic)) {
         // start the adc reading
         hardware_adc_read_start();
-        atomic_set(&fast_blink, 0);
     }
+    atomic_set(&fast_blink, 0); // we are going to turn off the fast blink even
+                                // if we don't check the adc
 
     // Restart the timeout timer
     mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS*HZ));
@@ -459,9 +466,12 @@ static void check_charging_fire(unsigned long data) {
    int fault;
     // check/don't check adc line
     check_charging_stop();
-   if( !isDeviceAtDock()) {
+   if( !isDeviceAtDock() || HAS_BES ) {
    // If not at dock do not perform checks
-      at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+   // The BES on SATs use the same pin for a trigger
+      if (!HAS_BES) {
+          at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_INACTIVE_STATE);
+      }
       fault = ERR_notcharging_battery;
       send_nl_message_multi(&fault, bat_mfh, NL_C_FAULT);
       return;

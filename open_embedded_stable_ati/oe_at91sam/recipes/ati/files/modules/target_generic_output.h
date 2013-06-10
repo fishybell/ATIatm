@@ -59,6 +59,7 @@ typedef enum {
     CONSTANT_ON,	// goes on, stays on (can not repeat)
     BURST_FIRE,		// intermittent on/off multiple times (can repeat)
     TEMP_ON,		// intermittent on (can repeat)
+    TEMP_ON_PULSE,	// go on for time then, intermittent on (can repeat)
 } GO_mode_t;
 extern GO_mode_t generic_output_get_mode(int type, int num);
 extern void generic_output_set_mode(int type, int num, GO_mode_t value);

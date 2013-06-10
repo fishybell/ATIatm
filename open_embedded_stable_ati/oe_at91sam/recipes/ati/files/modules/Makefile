@@ -1,4 +1,5 @@
 obj-m := 	target.o \
+			eeprom_settings.o \
 			target_lifter_infantry.o \
 			target_muzzle_flash.o \
 			target_miles_transmitter.o \
@@ -63,6 +64,7 @@ atifirmware:
 			../../../ati2/files/MAT \
 			../../../ati2/files/MATOLD \
 			../../../ati2/files/MIT \
+			../../../ati2/files/MITV \
 			../../../ati2/files/MITP \
 			../../../ati2/files/SAT \
 			../../../ati2/files/SES \

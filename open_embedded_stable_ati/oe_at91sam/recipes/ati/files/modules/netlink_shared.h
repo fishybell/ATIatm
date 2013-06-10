@@ -156,7 +156,7 @@ typedef struct accessory_conf {
     u8 request:1;    /* request all data for this accessory (on reply, on_now will indicate current status (if available), exists will indicate existence of accessory */
     u8 exists:1;     /* 1 for exists, not used except for requests */
     u8 on_now:2;     /* 1 for activate normal, 2 for activate immediate */
-    u8 on_exp:2;     /* 1 for active when fully exposed, 2 for active when partially exposed and fully exposed, 3 for active only while exposing/concealing */
+    u8 on_exp:3;     /* 1 for active when fully exposed, 2 for active when partially exposed and fully exposed, 3 for active only while exposing/concealing */
     u8 on_hit:2;     /* 1 for activate on hit, 2 for deactivate on hit */
     u8 on_kill:2;    /* 1 for activate on kill, 2 for deactivate on kill */
     u16 on_time __attribute__ ((packed));     /* time on (in milliseconds, 0 for forever) */
@@ -176,10 +176,12 @@ enum {
     ACC_SMOKE,              /* Smoke generator : ex_data1 = smoke # */
     ACC_THERMAL,            /* Thermal device : ex_data1 = thermal # */
     ACC_MILES_SDH,          /* MILES, Shootback Device Holder : ex_data1 = Player ID, ex_data2 = MILES Code, ex_data3 = Ammo Type*/
+    ACC_BES_ENABLE,      // BES enable
     ACC_BES_TRIGGER_1,      // BES trigger
     ACC_BES_TRIGGER_2,      // BES trigger
     ACC_BES_TRIGGER_3,      // BES trigger
     ACC_BES_TRIGGER_4,      // BES trigger
+    ACC_THERMAL_PULSE,      // Thermal pulse for MATs
     ACC_INTERNAL,           /* Internal type for other outputs: don't use */
 };
 enum {

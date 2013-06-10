@@ -1754,38 +1754,46 @@ void SIT_Conn::doBESFire(int zone) {
     FUNCTION_START("::doBESFire()");
 
     // Create attribute
-    struct accessory_conf acc_c;
-    memset(&acc_c, 0, sizeof(struct accessory_conf)); // start zeroed out
-    acc_c.ex_data1 = zone;
+                                              //   r,e,o,o,o,o,   o,o,  s,r,r,e,e,e;
+                                              //   e,x,n,n,n,n,   n,f,  t,e,e,x,x,x;
+                                              //   q,i, , , , ,    ,f,  a,p,p, , , ;
+                                              //   u,s,n,e,h,k,   t, ,  r,e,e,d,d,d;
+                                              //   e,t,o,x,i,i,   i,t,  t,a,a,a,a,a;
+                                              //   s,s,w,p,t,l,   m,i,   ,t,t,t,t,t;
+                                              //   t, , , , ,l,   e,m,  d, , ,a,a,a;
+                                              //    , , , , , ,    ,e,  e,d, ,1,2,3;
+                                              //    , , , , , ,    , ,  l,e, , , , ;
+                                              //    , , , , , ,    , ,  a,l, , , , ;
+                                              //    , , , , , ,    , ,  y,a, , , , ;
+                                              //    , , , , , ,    , ,   ,y, , , , ;
+    struct accessory_conf bte = {ACC_BES_ENABLE,   0,1,1,0,0,0,1500,0,  0,0,0,0,0,0};
+    struct accessory_conf btr = {ACC_BES_TRIGGER_1,0,1,1,0,0,0,  50,0,  2,0,0,0,0,0};
     switch (zone){
         case 1:
-            acc_c.acc_type = ACC_BES_TRIGGER_1;
-            acc_c.on_now = 1;
+            btr.acc_type = ACC_BES_TRIGGER_1;
             break;
         case 2:
-            acc_c.acc_type = ACC_BES_TRIGGER_2;
-            acc_c.on_now = 1;
+            btr.acc_type = ACC_BES_TRIGGER_2;
             break;
         case 3:
-            acc_c.acc_type = ACC_BES_TRIGGER_3;
-            acc_c.on_now = 1;
+            btr.acc_type = ACC_BES_TRIGGER_3;
             break;
         case 4:
-            acc_c.acc_type = ACC_BES_TRIGGER_4;
-            acc_c.on_now = 1;
+            btr.acc_type = ACC_BES_TRIGGER_4;
             break;
         case 65525:
-            acc_c.acc_type = ACC_BES_TRIGGER_1;
-            acc_c.on_now = 0;
+            btr.acc_type = ACC_BES_TRIGGER_1;
+            btr.on_now = 0;
             break;
         default:
-            acc_c.acc_type = ACC_BES_TRIGGER_1;
-            acc_c.on_now = 0;
+            btr.acc_type = ACC_BES_TRIGGER_1;
+            btr.on_now = 0;
             break;
     }
 
     // Queue command
-    queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &acc_c); // BES triggers are accessories
+    queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &bte); // BES triggers are accessories
+    queueMsg(NL_C_ACCESSORY, ACC_A_MSG, sizeof(struct accessory_conf), &btr); // BES triggers are accessories
 
     FUNCTION_END("::doBESFire()");
 }
