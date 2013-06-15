@@ -9,6 +9,7 @@ start () {
    mitb=$(has_mit_battery)
    mitr=$(has_mover_reverse)
    mitd=$(has_dock)
+   mitds=$(has_dock_speed)
    mith=$(has_home)
    track=$(has_track_length)
    if [ "$mitb" == "" ] ; then
@@ -28,11 +29,14 @@ start () {
    if [ "$track" == "" ] ; then
       track=10
    fi
+   if [ "$mitds" == "" ] ; then
+      matd=0
+   fi
 
    # load modules
    load_modules "target_user_interface.ko mover=1" \
                 "target_battery.ko minvoltval=$mitb shutdown_wait=3" \
-                "target_mover_generic.ko mover_type=$mitm reverse=$mitr dock_loc=$mitd track_len=$track home_loc=$mith" \
+                "target_mover_generic.ko mover_type=$mitm reverse=$mitr dock_loc=$mitd dock_inc=$mitds track_len=$track home_loc=$mith" \
                 "target_generic_output.ko" \
                 "mover.ko"
 

@@ -2349,6 +2349,13 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J J %s\n", readEeprom(BES_MODE_LOC, BES_MODE_SIZE)); // reads and prints out what it read
                      }
                      break;
+                  case 'K': case 'k':      // Sets and Reads the Dock Speed
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "J K %s\n", writeEeprom(DOCK_SPEED_LOC, arg3, DOCK_SPEED_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "J K %s\n", readEeprom(DOCK_SPEED_LOC, DOCK_SPEED_SIZE)); // reads and prints out what it read
+                     }
+                     break;
 		  case 'R': case 'r':      // Gets a report
                         snprintf(board, 20, "%s", readEeprom(BOARD_LOC, BOARD_SIZE));
                         snprintf(mversion, 20, "%s", readEeprom(VERSION_LOC, VERSION_SIZE));
@@ -2515,11 +2522,14 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'J': case 'j':
                                 snprintf(wbuf, 1024, "Get/Set BES Mode\nFormat: J J <mode>\n");
                                 break;
+                            case 'K': case 'k':
+                                snprintf(wbuf, 1024, "Get/Set Dock Speed\nFormat: J K <speed>\n");
+                                break;
                             case 'R': case 'r':
                                 snprintf(wbuf, 1024, "Get a Report of relevant target information.\nFormat: J R (Board Type| Version | Communication | Connect IP | MAC)\n");
                                 break;
                             default:
-                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ F: BES Trigger 1\nJ G: BES Trigger 2\nJ H: BES Trigger 3\nJ I: BES Trigger 4\nJ J: BES Mode\nJ R: Target Report\n");
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ F: BES Trigger 1\nJ G: BES Trigger 2\nJ H: BES Trigger 3\nJ I: BES Trigger 4\nJ J: BES Mode\nJ K: Dock Speed\nJ R: Target Report\n");
                                 break;
                         }
                         break;

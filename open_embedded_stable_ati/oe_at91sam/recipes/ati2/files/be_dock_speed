@@ -1,0 +1,4 @@
+echo -n "Enter Dock Speed 1-20: "
+read dockspeed
+size=$(echo $dockspeed | wc -c)
+echo -n $dockspeed | /usr/bin/eeprom_rw write -addr 0x708 -size $size -blank 0x03

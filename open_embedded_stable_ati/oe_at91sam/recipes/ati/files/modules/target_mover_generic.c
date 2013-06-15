@@ -17,6 +17,7 @@
 
 #include "target_generic_output.h" /* for EVENT_### definitions */
 
+#define DOCK_TIMER 60000
 // Mover type defines
 #define MATOLD 0
 #define MAT 1
@@ -54,6 +55,8 @@ static void sendUserConnMsg( char *fmt, ...);
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
 static int mover_type = 1; // 0 = armor 2 ticks, 1 = armor 360 ticks, 2 = infantry/48v KDZ controller, 3 = error
+static int dock_inc = 0;
+static int dock_speed = 0;
 static int dock_loc = 2; // 0 = home end of track, 1 = end away from home, 2 = no dock
 // This is for the "Home" location, where everything starts from.
 // This may or may not be the same place as the dock
@@ -61,6 +64,7 @@ static int home_loc = 0; // 0 = home end of track, 1 = end away from home
 static int track_len = 10; // default to 10 meters
 module_param(mover_type, int, S_IRUGO);
 module_param(dock_loc, int, S_IRUGO);
+module_param(dock_inc, int, S_IRUGO);
 module_param(home_loc, int, S_IRUGO);
 module_param(track_len, int, S_IRUGO);
 static int kp_m = -1, kp_d = -1,  ki_m = -1, ki_d = -1, kd_m = -1, kd_d = -1, min_effort = -1, max_accel = -1, max_deccel = -1;
@@ -970,14 +974,14 @@ static int hardware_movement_stop(int stop_timer)
 
     // notify user-space
     schedule_work(&movement_work);
-    dock_timeout_start(60000); // needs to wait at least 2 seconds for velocity to settle to zero
+    dock_timeout_start(DOCK_TIMER); // needs to wait at least 2 seconds for velocity to settle to zero
 
     return 0;
     }
 
 static int mover_speed_stop(int started_stopping) {
    SENDUSERCONNMSG( "randy mover_speed_stop");
-    dock_timeout_start(60000); // needs to wait at least 2 seconds for velocity to settle to zero
+    dock_timeout_start(DOCK_TIMER); // needs to wait at least 2 seconds for velocity to settle to zero
     speed_timeout_stop();
     ramp_timeout_stop();
     if (started_stopping) {
@@ -994,6 +998,7 @@ static int mover_speed_reverse(int speed) {
    SENDUSERCONNMSG( "randy before mover_speed_stop 15");
    mover_speed_stop(1);
    atomic_set(&find_dock_atomic, 0);
+   SENDUSERCONNMSG( "randy l find %i", atomic_read(&find_dock_atomic));
    dock_timeout_stop();
    atomic_set(&reverse_speed, speed);
    timeout_timer_start(2); // initial timeout timer twice as long as normal
@@ -1036,13 +1041,17 @@ static int mover_speed_set(int speed) {
    // check if we're just getting going (once we're under way we'll switch this off)
    //if (o_speed == 0) { atomic_set(&getting_going, 0); /* count up from zero */ }
 
+   dock_speed = 0;
    SENDUSERCONNMSG( "randy mover_speed_set %i", speed);
    if (speed != 0){
       revSpeed = speed; // we need to save the speed in case we reverse
       if ( mover_type == MITP || mover_type == MITPAMC ){
          selectSpeed = abs(speed);
-         if (selectSpeed <= 5) tmpSpeed = 11; // 0.6 mph (to dock slowly)
-         else if (selectSpeed <= 10) tmpSpeed = 16; // mph (to meet 1-3 kph)
+         if (selectSpeed <= 5){
+             if (dock_inc > 0 && dock_inc < 21) tmpSpeed = dock_inc * 3;
+             else tmpSpeed = 11; // 0.6 mph (to dock slowly)
+             dock_speed = tmpSpeed;
+         } else if (selectSpeed <= 10) tmpSpeed = 16; // mph (to meet 1-3 kph)
          else if (selectSpeed <= 20) tmpSpeed = 35; // 3.2 mph (to meet 4-6 kph)
          else if (selectSpeed <= 30) tmpSpeed = 66; // 6.2 mph (to meet 8-10 kph)
          else tmpSpeed = 96; // 9.7 mph (to meet 12-14 kph)
@@ -1052,8 +1061,10 @@ static int mover_speed_set(int speed) {
          speed = tmpSpeed;
       } else if (IS_MIT){
          selectSpeed = abs(speed);
-         if (selectSpeed <= 5) tmpSpeed = 6; // 0.6 mph (to dock slowly)
-         else if (selectSpeed <= 10) tmpSpeed = 13; // 1.3 mph (to meet 1-3 kph)
+         if (selectSpeed <= 5){
+             tmpSpeed = 6; // 0.6 mph (to dock slowly)
+             dock_speed = tmpSpeed;
+         } else if (selectSpeed <= 10) tmpSpeed = 13; // 1.3 mph (to meet 1-3 kph)
          else if (selectSpeed <= 20) tmpSpeed = 31; // 3.2 mph (to meet 4-6 kph)
          else if (selectSpeed <= 30) tmpSpeed = 60; // 6.0 mph (to meet 8-10 kph)
          else tmpSpeed = 85; // 8.5 mph (to meet 12-14 kph)
@@ -1063,8 +1074,11 @@ static int mover_speed_set(int speed) {
          speed = tmpSpeed;
       } else if (IS_MAT){
          selectSpeed = abs(speed);
-         if (selectSpeed <= 1) tmpSpeed = 19; // 1.0 mph (to dock slowly, or manual movement)
-         else if (selectSpeed <= 5) tmpSpeed = 33; // Button
+         if (selectSpeed <= 1){
+             if (dock_inc > 0 && dock_inc < 21) tmpSpeed = dock_inc * 5;
+             else tmpSpeed = 19; // 1.0 mph (to dock slowly, or manual movement)
+             dock_speed = tmpSpeed;
+         } else if (selectSpeed <= 5) tmpSpeed = 33; // Button
          else if (selectSpeed <= 10) tmpSpeed = 65; // 6.5 mph (to meet 8-13 kph)
          else if (selectSpeed <= 20) tmpSpeed = 99; // 9.9 mph (to meet 14-18 kph)
          else if (selectSpeed <= 30) tmpSpeed = 134; // 13.4 mph (to meet 19-24 kph)
@@ -1073,10 +1087,13 @@ static int mover_speed_set(int speed) {
 //         tmpSpeed = MIT_SPEEDS[selectSpeed];
          if (speed < 0) tmpSpeed *= -1;
          speed = tmpSpeed;
+         if (dock_speed > 0) dock_speed = speed;
       }
-      if (abs(speed) > 20) {
-         atomic_set(&find_dock_atomic, 0); // if moving fast do not ignore sensors
-      }
+//      We cannot do this if our dock speed is tuneable
+//      if (abs(speed) > 20) {
+//         atomic_set(&find_dock_atomic, 0); // if moving fast do not ignore sensors
+//   SENDUSERCONNMSG( "randy n find %i", atomic_read(&find_dock_atomic));
+//      }
    } else {
       // Stop mover if speed is 0
    SENDUSERCONNMSG( "randy before mover_speed_stop 1");
@@ -1092,8 +1109,10 @@ static int mover_speed_set(int speed) {
    if (atomic_read(&find_dock_atomic) == 1) {
       if (speed > 0 && dock_loc == 0) { // going right, dock on left?
          atomic_set(&find_dock_atomic, 0); // moving away from left dock
+   SENDUSERCONNMSG( "randy m find %i", atomic_read(&find_dock_atomic));
       } else if (speed < 0 && dock_loc == 1) { // going left, dock on right?
          atomic_set(&find_dock_atomic, 0); // moving away from right dock
+   SENDUSERCONNMSG( "randy o find %i", atomic_read(&find_dock_atomic));
       }
    }
    
@@ -1104,6 +1123,7 @@ static int mover_speed_set(int speed) {
       timeout_timer_stop();
    SENDUSERCONNMSG( "randy before mover_speed_stop 2");
       atomic_set(&find_dock_atomic, 0); // we never reverse to the dock
+   SENDUSERCONNMSG( "randy p find %i", atomic_read(&find_dock_atomic));
       mover_speed_stop(1);
       mover_speed_reverse(revSpeed); // Use the speed passed in for the reverse
       return 1;
@@ -1221,14 +1241,16 @@ static void dock_timeout_fire(unsigned long data)
         {
         return;
         }
-   SENDUSERCONNMSG( "randy dock_timeout_fire");
+   SENDUSERCONNMSG( "randy dock_timeout_fire start find %i", atomic_read(&find_dock_atomic));
 
    // don't try to dock if we're moving
    speed = current_speed10();
-   if (abs(speed) > 0) {
+   if (0 && abs(speed) > 0) {
+   SENDUSERCONNMSG( "randy dock_timeout_fire %i", speed);
       if (atomic_read(&find_dock_atomic) == 1) {
          if ((dock_loc == 0 && speed > 0) || (dock_loc == 1 && speed < 0)) { // if we're moving away from the dock...
             atomic_set(&find_dock_atomic, 0); // ...don't continue looking for the dock
+   SENDUSERCONNMSG( "randy a find %i", atomic_read(&find_dock_atomic));
          }
       }
       dock_timeout_start(60000); // needs to wait at least 2 seconds for velocity to settle to zero
@@ -1243,7 +1265,7 @@ static void dock_timeout_fire(unsigned long data)
                ){
             mover_find_dock();
          } else {
-            dock_timeout_start(60000);
+            dock_timeout_start(DOCK_TIMER);
          }
        }
     } else if (dock_loc == 1){ // Dock at right
@@ -1255,7 +1277,7 @@ static void dock_timeout_fire(unsigned long data)
                ){
             mover_find_dock();
          } else {
-            dock_timeout_start(60000);
+            dock_timeout_start(DOCK_TIMER);
          }
        }
     } else {
@@ -1309,16 +1331,7 @@ static void pid_timeout_start()
    int new_speed, timeout = PID_TIMEOUT_IN_MILLISECONDS;
    new_speed = atomic_read(&pid_set_point); // read desired pid set point
    if (new_speed != 0) {
-      //timeout /= 10; // 10 times a second (starting point)
-      //timeout /= 3; // 3 times a second (gives the motor controller time to think?)
-      //timeout /= 2; // twice a second (gives the motor controller extra time to think?)
-      //timeout /= 25; // 25 times a second (cause that's next)
       timeout /= COAST_FACTOR[mover_type]; // adjusted to let it coast nice and smoothly between power pushes
-      //timeout /= 250; // 250 times a second (cause that's next)
-/*      if (new_speed < 50) {
-         timeout /=2;
-      }
-      if (isMoverAtDock() != 0) { timeout /= 5; } */
    }
    mod_timer(&pid_timeout_list, jiffies+(timeout*HZ/1000));
 }
@@ -1340,28 +1353,6 @@ static void pid_timeout_fire(unsigned long data)
       {
         return;
       }
-
-      pid_timeout_stop();
-#if 0
-      if (atomic_read(&goal_atomic) != 0){
-         // We only care about direction if we are moving
-         if (atomic_read(&quad_direction) == 1){
-            // Forward detected
-            if (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE){
-               do_fault(ERR_wrong_direction);
-               atomic_set(&continuous_speed, 0);
-               mover_speed_stop(1);
-            }
-         } else {
-            // Reverse detected
-            if (atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD){
-               do_fault(ERR_wrong_direction);
-               atomic_set(&continuous_speed, 0);
-               mover_speed_stop(1);
-            }
-         }
-      }
-#endif
       if (mover_type == MITPAMC){
          pid_step4();
       } else if (mover_type == MITP){
@@ -1511,7 +1502,7 @@ static void timeout_fire(unsigned long data) {
        mover_speed_stop(0); // after event_stopped
        // start docking now
        atomic_set(&dockTryCount, 0);
-       dock_timeout_start(60000); // needs to wait at least 2 seconds for velocity to settle to zero
+       dock_timeout_start(DOCK_TIMER); // needs to wait at least 2 seconds for velocity to settle to zero
     } else if (atomic_read(&find_dock_atomic) == 1) { // stopped due to docking problems
        //do_event(EVENT_ERROR); // timeout wasn't part of coasting
        //do_fault(ERR_did_not_dock);
@@ -1519,13 +1510,14 @@ static void timeout_fire(unsigned long data) {
 SENDUSERCONNMSG( "randy before mover_speed_stop 4");
        mover_speed_stop(0); // after event_error
        atomic_set(&find_dock_atomic, 0); // we're not finding anymore
+   SENDUSERCONNMSG( "randy b find %i", atomic_read(&find_dock_atomic));
     } else { // stopped due to problem moving
        do_event(EVENT_ERROR); // timeout wasn't part of coasting
        do_fault(ERR_no_movement);
 SENDUSERCONNMSG( "randy before mover_speed_stop 5");
        mover_speed_stop(0); // after event_error
        atomic_set(&dockTryCount, 0);
-       dock_timeout_start(60000); // needs to wait at least 2 seconds for velocity to settle to zero
+       dock_timeout_start(DOCK_TIMER); // needs to wait at least 2 seconds for velocity to settle to zero
     }
 }
 
@@ -1560,6 +1552,7 @@ irqreturn_t leg_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
             }
         // calculate position based on number of times we've passed a track leg
         atomic_set(&position, (atomic_read(&legs) * TICKS_PER_LEG[mover_type])/TICKS_DIV); // this overwrites the value received from the quad encoder
+SENDUSERCONNMSG( "randy set position 1 %i", atomic_read(&position));
         if (atomic_read(&doing_pos) == FALSE)
             {
             atomic_set(&doing_pos, TRUE);
@@ -1689,6 +1682,7 @@ send_nl_message_multi("Did home reset", error_mfh, NL_C_FAILURE);
         atomic_set(&found_home, 1); // only "home" the mover once per reset
         atomic_set(&legs, 0);
         atomic_set(&position, 0);
+SENDUSERCONNMSG( "randy set position 2 %i", atomic_read(&position));
 #ifndef DEBUG_PID
     } else {
 send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
@@ -1720,7 +1714,7 @@ send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
     mover_speed_stop(1);
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
-    dock_timeout_start(60000); // needs to wait at least 2 seconds for velocity to settle to zero
+    dock_timeout_start(DOCK_TIMER); // needs to wait at least 2 seconds for velocity to settle to zero
 
     return IRQ_HANDLED;
     }
@@ -1770,7 +1764,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     mover_speed_stop(1);
     continuous_timeout_start();
     atomic_set(&dockTryCount, 0);
-    dock_timeout_start(60000); // needs to wait at least 2 seconds for velocity to settle to zero
+    dock_timeout_start(DOCK_TIMER); // needs to wait at least 2 seconds for velocity to settle to zero
 
     return IRQ_HANDLED;
     }
@@ -1807,13 +1801,16 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
 //       at91_set_gpio_output(OUTPUT_CHARGING_RELAY, OUTPUT_CHARGING_RELAY_ACTIVE_STATE);
 //    }
        atomic_set(&find_dock_atomic, 0);
+   SENDUSERCONNMSG( "randy c find %i", atomic_read(&find_dock_atomic));
        enable_battery_check(1);
        battery_check_is_docked(1);
        if (atomic_read(&found_home) == 0) { // if we haven't found our home position, we at least know *about* where the dock is
           if (dock_loc == 0) { // Dock at left
              atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * DOCK_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we're docked behind home, calculate ticks
+SENDUSERCONNMSG( "randy set position 3 %i", atomic_read(&position));
           } else { // Dock at right
              atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + DOCK_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we're docked past end, calculate ticks
+SENDUSERCONNMSG( "randy set position 4 %i", atomic_read(&position));
           }
        } else {
           // we've found both home and the dock...
@@ -1824,6 +1821,7 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
           } else { // if this is not our first time...
              // ...reset our location to compensate for wheel spin, which causes our location to drift over time
              atomic_set(&position, atomic_read(&dock_location));
+SENDUSERCONNMSG( "randy set position 5 %i", atomic_read(&position));
           }
        }
     } else {
@@ -2011,6 +2009,7 @@ printk("bytes written: %04x\n", __raw_readl(tc->regs + ATMEL_TC_REG(ENCODER_PWM_
         case 1:
         // initialize armor clock
         case 3:
+        case 4:
         // initialize infantry/48v soft-reverse clock
         __raw_writel(ATMEL_TC_TIMER_CLOCK2			// Master clock/8 = 132MHz/8 ~ 16MHz
                     | ATMEL_TC_WAVE					// output mode
@@ -2133,8 +2132,10 @@ static int hardware_init(void)
       // we know *about* where the home is, assume that location
       if (dock_loc == 2) { // home at left
          atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * DOCK_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we're "docked" behind home, calculate ticks
+SENDUSERCONNMSG( "randy set position 6 %i", atomic_read(&position));
       } else { // assume home at right
          atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + DOCK_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we're "docked" past end, calculate ticks
+SENDUSERCONNMSG( "randy set position 7 %i", atomic_read(&position));
       }
     } else if (isMoverAtDock() != 0) { // or if we're on it
       do_event(EVENT_DOCK_LIMIT);
@@ -2144,8 +2145,10 @@ static int hardware_init(void)
       // we know *about* where the dock is, assume that location
       if (dock_loc == 0) { // Dock at left
          atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * DOCK_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we're docked behind home, calculate ticks
+SENDUSERCONNMSG( "randy set position 8 %i", atomic_read(&position));
       } else { // assume Dock at right
          atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + DOCK_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we're docked past end, calculate ticks
+SENDUSERCONNMSG( "randy set position 9 %i", atomic_read(&position));
       }
     } else {
       do_event(EVENT_UNDOCKED);
@@ -2153,8 +2156,10 @@ static int hardware_init(void)
       // assume we're on the opposite side from the dock
       if (dock_loc == 0) { // Dock at left
          atomic_set(&position, ((INCHES_PER_REV[mover_type] * (metersToFeet(track_len) + COAST_FEET_FROM_LIMIT[mover_type])) / TICKS_DIV)); // we coasted past end, calculate ticks
+SENDUSERCONNMSG( "randy set position 10 %i", atomic_read(&position));
       } else { // assume Dock at right
          atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * COAST_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we coasted behind home, calculate ticks
+SENDUSERCONNMSG( "randy set position 11 %i", atomic_read(&position));
       }
     }
 
@@ -2620,6 +2625,7 @@ int mover_set_continuous_move(int c) {
          return 0;
    }
    atomic_set(&find_dock_atomic, 0);
+   SENDUSERCONNMSG( "randy d find %i", atomic_read(&find_dock_atomic));
    dock_timeout_stop();
    if (c != 0) {
       atomic_set(&continuous_speed, abs(c));
@@ -2660,6 +2666,7 @@ int mover_set_moveaway_move(int c) {
          return 0;
    }
    atomic_set(&find_dock_atomic, 0);
+   SENDUSERCONNMSG( "randy e find %i", atomic_read(&find_dock_atomic));
    atomic_set(&continuous_speed, 0);
    speed_timeout_stop();
    if (c != 0) {
@@ -2694,6 +2701,7 @@ EXPORT_SYMBOL(mover_set_moveaway_move);
 int mover_set_move_speed(int speed) {
    atomic_set(&continuous_speed, 0);
    atomic_set(&find_dock_atomic, 0);
+   SENDUSERCONNMSG( "randy f find %i", atomic_read(&find_dock_atomic));
    // check to see if we're sleeping or not
    if (atomic_read(&sleep_atomic) == 1) {
          return 0;
@@ -2728,6 +2736,7 @@ int mover_set_speed_stop() {
    SENDUSERCONNMSG( "randy before mover_speed_stop 13");
     mover_speed_stop(1);
     atomic_set(&find_dock_atomic, 0);
+   SENDUSERCONNMSG( "randy g find %i", atomic_read(&find_dock_atomic));
     dock_timeout_stop(); // stop docking as well
     return 1;
 }
@@ -2764,15 +2773,17 @@ void mover_find_dock(void) {
    } // Tried too many times
    if (IS_MAT || IS_MIT){
       atomic_set(&find_dock_atomic, 1);
+   SENDUSERCONNMSG( "randy h find %i", atomic_read(&find_dock_atomic));
       atomic_inc(&dockTryCount);
       if (dock_loc == 1) { // Dock at end away from home
          mover_speed_set(1); // Go Slow
-         dock_timeout_start(60000);
+         dock_timeout_start(DOCK_TIMER);
       } else if (dock_loc == 0) { // Dock at home end
          mover_speed_set(-1); // Go Slow
-         dock_timeout_start(60000);
+         dock_timeout_start(DOCK_TIMER);
       } else {
          atomic_set(&find_dock_atomic, 0); // No dock, stop looking
+   SENDUSERCONNMSG( "randy i find %i", atomic_read(&find_dock_atomic));
       }
    }
 }
@@ -2780,6 +2791,7 @@ void mover_find_dock(void) {
 void mover_go_home(void) {
    atomic_set(&continuous_speed, 0);
    atomic_set(&find_dock_atomic, 0);
+   SENDUSERCONNMSG( "randy k find %i", atomic_read(&find_dock_atomic));
    dock_timeout_stop();
    if (IS_MIT){
       if (home_loc == 1) { // Dock at end away from home
@@ -3872,22 +3884,30 @@ static void pid_step3() {
     if (!spin_trylock(&pid_lock)) {
         return;
     }
+    // convert effort to pwm
     if (new_speed != 0) {
-      //pid_effort = (kp_m * new_speed / 2;
-      pid_effort = (((1000 * kp_m * new_speed) / kp_d) / 1000);
-      max(min(pid_effort, 1000), 0);
+      if(isMoverAtDock() && pid_counter > 0){
+        pid_effort *= 100;
+        new_speed = MOTOR_PWM_END[mover_type];
+        pid_counter --;
+      } else if (dock_speed != 0 && pid_counter > 0){
+        pid_effort = (((1000 * kp_m * new_speed * 3) / kp_d) / 1000);
+        max(min(pid_effort, 1000), 0);
+        new_speed = pwm_from_effort(pid_effort);
+        pid_counter --;
+        if (pid_counter < 34){
+           pid_counter = 0;
+        }
+      } else {
+        pid_effort = (((1000 * kp_m * new_speed) / kp_d) / 1000);
+        max(min(pid_effort, 1000), 0);
+        new_speed = pwm_from_effort(pid_effort);
+      }
     }
          
 #ifdef SEND_PID
        SENDUSERCONNMSG( "step3,t,%i,e,%i,u,%i,r,%i,y,%i,o,%i,P,%i,I,%i,D,%i,l,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), 0, pid_effort, new_speed, input_speed, input_speed_old, pid_p, pid_i, pid_d, atomic_read(&position));
 #endif
-    // convert effort to pwm
-    new_speed = pwm_from_effort(pid_effort);
-    if(isMoverAtDock() && pid_counter > 0){
-        pid_effort *= 100;
-        new_speed = MOTOR_PWM_END[mover_type];
-        pid_counter --;
-    }
 
     // These change the pwm duty cycle
     __raw_writel(max(new_speed,1), tc->regs + ATMEL_TC_REG(MOTOR_PWM_CHANNEL[mover_type], RA));
