@@ -5,18 +5,38 @@ start () {
    # load network
    source /usr/bin/load_network
 
+   matm=1
+   matb=$(has_mat_battery)
+   matr=$(has_mover_reverse)
+   matd=$(has_dock)
+   track=$(has_track_length)
+   if [ "$matb" == "" ] ; then
+      matb=12
+   fi
+   if [ "$matr" != "0" ] && [ "$matr" != "1" ] ; then
+      matr=0
+   fi
+   if [ "$matd" == "" ] ; then
+# Assume no dock
+      matd=2
+   fi
+   if [ "$track" == "" ] ; then
+      track=250
+   fi
+
    # load modules
    load_modules "target_user_interface.ko mover=1" \
-                "target_battery.ko minvoltval=48" \
-                "target_mover_generic.ko mover_type=1 reverse=0" \
+                "target_mover_hit_poll.ko sens_mult=2" \
+                "target_battery.ko minvoltval=$matb shutdown_wait=5" \
+                "target_mover_ttmt.ko reverse=$matr dock_loc=$matd track_len=$track" \
                 "target_generic_output.ko" \
-                "mover.ko"
+                "mover_ttmt.ko"
 
    # start default programs
    def_progs
 
    # start fasit client
-   fasit_conn -M -l $lport -p $cport -i $ip -vv -k &
+   fasit_conn -m -l $lport -p $cport -i $ip -k &
 }
 
 # leave default stop routine
