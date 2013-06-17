@@ -30,6 +30,9 @@ FUNCTION_START("::MIT_Client(int fd, int tnum) : Connection(fd)")
    // we have not yet connected to SmartRange/TRACR
    ever_conn = false;
    skippedFault = 0; // haven't skipped any faults
+   mHits[0] = 0;
+   mHits[1] = 0;
+   mHits[2] = 0;
 
 
    // connect our netlink connection
@@ -140,6 +143,34 @@ FUNCTION_START("::sendStatus2102()")
 FUNCTION_END("::sendStatus2102()")
 }
 
+// create and send a status messsage to the FASIT server
+void MIT_Client::sendStatus15122(hit_on_line_t *hol) {
+    FUNCTION_START("::sendStatus15122()");
+
+    FASIT_header hdr;
+    FASIT_15122 msg;
+    defHeader(15122, &hdr); // sets the sequence number and other data
+    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_15122));
+
+    // set response
+    // fill out as response
+    msg.body.line = hol->line;
+    msg.body.hits = hol->hits;
+
+    DCMSG(BLUE,"Prepared to send 15122 status packet:");
+    DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htonl(hdr.seq),htonl(hdr.rsrvd),htons(hdr.length));
+    DCMSG(BLUE,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htonl(msg.response.rseq));
+    DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body   line: %3d  hits: %3d\n", msg.body.line, msg.body.hits);
+
+    // send
+    queueMsg(&hdr, sizeof(FASIT_header));
+    queueMsg(&msg, sizeof(FASIT_15122));
+    finishMsg();
+
+
+    FUNCTION_END("::sendStatus15122()");
+}
+
 // returns true when a FASIT_TCP object has been successfully attached as a SIT
 bool MIT_Client::hasSIT() {
    FUNCTION_START("::hasSIT()");
@@ -208,6 +239,35 @@ FUNCTION_END("::delSIT()")
 /***********************************************************
 *                  FASIT Message Handlers                  *
 ***********************************************************/
+//
+//  Hit count routines
+//
+int MIT_Client::handle_15120(int start, int end) {
+   hit_on_line_t hol;
+    FUNCTION_START("::handle_15120(int start, int end)");
+
+    // do handling of message
+    IMSG("Handling 15120 in MIT\n");
+
+    // map header and body for both message and response
+    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+    FASIT_15120 *msg = (FASIT_15120*)(rbuf + start + sizeof(FASIT_header));
+
+    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
+    DCMSG(RED,"header len=%d start=%d end=%d rbuf=%d msg=%d\n",sizeof(FASIT_header), start, end, rbuf, msg);
+    DCMSG(RED,"\t\t\t\t\t\t\tmessage body %7d %7d\n",
+          msg->line, msg->hits);
+
+    if (msg->line > 0){
+        hol.line = msg->line;
+        hol.hits = msg->hits;
+        doHitsMover(&hol);
+    }
+
+    FUNCTION_INT("::handle_15120(int start, int end)", 0) ;
+    return 0;
+}
+
 void MIT_Client::handle_2111(FASIT_2111 *msg) {
 FUNCTION_START("::handle_2111(FASIT_2111 *msg)")
 
@@ -357,6 +417,25 @@ FUNCTION_START("::handle_2100(int start, int end)")
          lastHitCal.type = msg->mode;           // mechanical sensor
          lastHitCal.set = HIT_OVERWRITE_ALL;    // nothing will change without this
 	     doHitCal(lastHitCal);
+	 break;
+	  case CID_Config_Hit_Sensor_Mover:
+         DCMSG(RED,"CID_Config_HitSensor_Mover ") ;
+         if (htons(msg->burst)) lastHitCal.seperation = htons(msg->burst);      // spec says we only set if non-Zero
+         if (htons(msg->sens)) {
+             lastHitCal.sensitivity = htons(msg->sens);
+/* We do not use the cal_table anymore, see target_hit_poll
+             if (htons(msg->sens) > 15) {
+                 lastHitCal.sensitivity = cal_table[15];
+             } else {
+                 lastHitCal.sensitivity = cal_table[htons(msg->sens)];
+             }
+*/
+         }
+             lastHitCal.line = msg->mode;
+
+         lastHitCal.set = HIT_OVERWRITE_ALL;    // nothing will change without this
+	     doHitCalMover(lastHitCal);
+        needPass = false; // don't pass this message to the attached SIT
 		 break;
      case CID_Reset_Device:
          // send 2101 ack
@@ -371,6 +450,11 @@ FUNCTION_START("::handle_2100(int start, int end)")
       case CID_Gohome:
 		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
          doGoHome();
+         needPass = false; // don't pass this message to the attached SIT
+         break;
+      case CID_Coast:
+		 // send 2101 ack  (2102's will be generated at start and stop of actuator)
+         doCoast();
          needPass = false; // don't pass this message to the attached SIT
          break;
       case CID_Move_Request:
@@ -521,6 +605,22 @@ void MIT_Client::doHitCal(struct hit_calibration hit_c) {
     FUNCTION_END("::doHitCal(struct hit_calibration hit_c)");
 }
 
+void MIT_Client::doHitCalMover(struct hit_calibration hit_c) {
+    FUNCTION_START("::doHitCalMover(struct hit_calibration hit_c)");
+    // pass directly to kernel for actual action
+    if (hasPair()) {
+        nl_conn->doHitCalMover(hit_c);
+    }
+    FUNCTION_END("::doHitCalMover(struct hit_calibration hit_c)");
+}
+
+void MIT_Client::doHitsMover(hit_on_line_t *hol) {
+    FUNCTION_START("::doHitsMover(hit_on_line_t *hol)");
+    // pass directly to kernel for actual action
+        nl_conn->doHitsMover(hol);
+    FUNCTION_END("::doHitsMover(hit_on_line_t *hol)");
+}
+
 // retrieve battery value
 void MIT_Client::doBattery() {
 FUNCTION_START("::doBattery()")
@@ -563,6 +663,9 @@ FUNCTION_END("::didBattery(int val)")
 void MIT_Client::didFault(int val) {
     FUNCTION_START("::didFault(int val)");
 
+    if (val == ERR_halt_battery){
+        nl_conn->doShutdown();
+    }
     didFailure(val);
 
     FUNCTION_END("::didFault(int val)");
@@ -590,6 +693,22 @@ FUNCTION_START("::didPosition(int pos)")
    }
 
 FUNCTION_END("::didPosition(int pos)")
+}
+
+// current position value
+void MIT_Client::didHitsMover(hit_on_line_t *hol) {
+FUNCTION_START("::didHitsMover(int pos)")
+
+   // remember position value, send status if changed
+   if (hol != NULL) {
+      DCMSG(GREEN,"didHitsMover is forcing a 15122 status") ;      
+      if (mHits[hol->line - 1] != hol->hits){
+         mHits[hol->line - 1] = hol->hits;
+         sendStatus15122(hol);
+      }
+   }
+
+FUNCTION_END("::didHitsMover(int pos)")
 }
 
 // start movement or change movement
@@ -622,6 +741,17 @@ FUNCTION_START("::doGoHome()")
       nl_conn->doGoHome();
    }
 FUNCTION_END("::doGoHome()")
+}
+
+// start movement or change movement
+void MIT_Client::doCoast() {
+FUNCTION_START("::doCoast()")
+   DMSG("GoHome\n");
+   // pass directly to kernel for actual action
+   if (nl_conn != NULL) {
+      nl_conn->doCoast();
+   }
+FUNCTION_END("::doCoast()")
 }
 
 // start movement or change movement
@@ -809,6 +939,7 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
    struct nlmsghdr *nlh = nlmsg_hdr(msg);
    struct genlmsghdr *ghdr = static_cast<genlmsghdr*>(nlmsg_data(nlh));
 
+DCMSG(RED, "Command parseed: %i", ghdr->cmd);
    // parse message and call individual commands as needed
    switch (ghdr->cmd) {
       case NL_C_FAILURE:
@@ -850,6 +981,20 @@ FUNCTION_START("::parseData(struct nl_msg *msg)")
             // # feet from home
             int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
             mit_client->didPosition(value);
+         }
+
+         break;
+
+      case NL_C_HITS_MOVER :
+	DCMSG(RED, "NL_C_HITS_MOVER");
+         genlmsg_parse(nlh, 0, attrs, HIT_M_MAX, hit_on_line_policy);
+
+         if (attrs[HIT_M_MSG]) {
+            // # feet from home
+            struct hit_on_line *hol = (struct hit_on_line*)nla_data(attrs[HIT_M_MSG]);
+            if (hol != NULL) {
+                mit_client->didHitsMover(hol);
+            }
          }
 
          break;
@@ -957,6 +1102,16 @@ FUNCTION_START("::doGoHome()")
 FUNCTION_END("::doGoHome()")
 }
 
+// Command
+void MIT_Conn::doCoast() {
+FUNCTION_START("::doCoast()")
+   DCMSG(GREEN, "MIT_Conn doCoast ");
+   
+   queueMsgU8(NL_C_COAST, 1);
+
+FUNCTION_END("::doCoast()")
+}
+
 // start movement or change movement
 void MIT_Conn::doContinuousMove(float speed, int direction) { // speed in mph, direction 1 for forward, -1 for reverse, 0 for stop
 FUNCTION_START("::doContinuousMove(float speed, int direction)")
@@ -1053,6 +1208,26 @@ void MIT_Conn::doHitCal(struct hit_calibration hit_c) {
     queueMsg(NL_C_HIT_CAL, HIT_A_MSG, sizeof(struct hit_calibration), &hit_c); // pass structure without changing
 
     FUNCTION_END("::doHitCal(struct hit_calibration hit_c)");
+}
+
+// change hit calibration data
+void MIT_Conn::doHitCalMover(struct hit_calibration hit_c) {
+    FUNCTION_START("::doHitCalMover(struct hit_calibration hit_c)");
+
+    // Queue command
+    queueMsg(NL_C_HIT_CAL_MOVER, HIT_A_MSG, sizeof(struct hit_calibration), &hit_c); // pass structure without changing
+
+    FUNCTION_END("::doHitCalMover(struct hit_calibration hit_c)");
+}
+
+// change hit calibration data
+void MIT_Conn::doHitsMover(hit_on_line_t *hol) {
+    FUNCTION_START("::doHitsMover(hit_on_line_t *hol)");
+
+    // Queue command
+    queueMsg(NL_C_HITS_MOVER, HIT_M_MSG, sizeof(hit_on_line_t), hol); // pass structure without changing
+
+    FUNCTION_END("::doHitsMover(hit_on_line_t *hol)");
 }
 
 // retrieve battery value

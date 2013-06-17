@@ -168,6 +168,8 @@ enum {
    CID_Hit_Count_Reset = 182,/* not a standard FASIT value */
    CID_Gohome = 183,/* not a standard FASIT value */
    CID_MoveAway = 184,/* not a standard FASIT value */
+   CID_Config_Hit_Sensor_Mover = 185,/* not a standard FASIT value */
+   CID_Coast = 186,/* not a standard FASIT value for ttmt kill reaction */
 };
 
 /********************************************/
@@ -346,6 +348,24 @@ typedef struct FASIT_15112 {
 	FASIT_RESPONSE response;
 	FASIT_15112b body;
 } FASIT_15112;
+
+/********************************************/
+/* 15122 - Mover Hits    */
+/********************************************/
+typedef struct FASIT_15122b { // body
+   __uint8_t  line;
+   __uint8_t  hits;
+    //__uint8_t  num;
+} FASIT_15122b;
+typedef struct FASIT_15122 {
+	FASIT_RESPONSE response;
+	FASIT_15122b body;
+} FASIT_15122;
+
+typedef struct FASIT_15120 {
+   __uint8_t  line;
+   __uint8_t  hits;
+} FASIT_15120;
 
 /********************************************/
 /* 14200 - Configure Hit Blanking           */

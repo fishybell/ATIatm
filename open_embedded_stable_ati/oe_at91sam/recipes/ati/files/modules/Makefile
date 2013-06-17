@@ -15,8 +15,12 @@ obj-m := 	target.o \
 			delay_printk.o \
 			lifter.o \
 			mover.o \
+			mover_ttmt.o \
+			target_lifter_ttmt.o \
+			target_mover_ttmt.o \
 			target_generic_output.o \
 			target_hit_poll.o \
+			target_mover_hit_poll.o \
 			nchs.o \
 			scenario.o \
 
@@ -72,10 +76,12 @@ atifirmware:
 			../../../ati2/files/EIM \
 			../../../ati2/files/BASE \
 			../../../ati2/files/HHC \
+			../../../ati2/files/SITMT \
 			../../../ati2/files/TTMT \
 			../../../ati2/files/atiradiotest.sh \
 			../../../ati2/files/evaluateip.sh \
 			../../../ati2/files/networking \
+			../../../ati2/files/K40networking \
 			../../../ati2/files/interfaces \
 			../../../sysvinit/sysvinit/inittab
 	cat extract.sh atifirmware.tar > atifirmware.sh

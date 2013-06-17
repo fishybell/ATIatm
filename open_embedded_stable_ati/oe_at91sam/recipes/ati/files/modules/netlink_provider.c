@@ -409,6 +409,20 @@ struct genl_ops provider_gnl_ops_hits_cal = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
+struct genl_ops provider_gnl_ops_hits_cal_mover = {
+    .cmd = NL_C_HIT_CAL_MOVER,
+    .flags = 0,
+    .policy = hit_calibration_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
+struct genl_ops provider_gnl_ops_hit_on_line = {
+    .cmd = NL_C_HITS_MOVER,
+    .flags = 0,
+    .policy = hit_on_line_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
 struct genl_ops provider_gnl_ops_bit = {
     .cmd = NL_C_BIT,
     .flags = 0,
@@ -493,6 +507,13 @@ struct genl_ops provider_gnl_ops_gohome = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
+struct genl_ops provider_gnl_ops_coast = {
+    .cmd = NL_C_COAST,
+    .flags = 0,
+    .policy = generic_int8_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
 struct genl_ops provider_gnl_ops_disconnected_hit = {
     .cmd = NL_C_FAULT,
     .flags = 0,
@@ -524,6 +545,9 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_CONTINUOUS */			&provider_gnl_ops_continuous_move,
     /* NL_C_MOVEAWAY */			&provider_gnl_ops_moveaway_move,
     /* NL_C_GOHOME */			&provider_gnl_ops_gohome,
+    /* NL_C_HIT_CAL_MOVER */		&provider_gnl_ops_hits_cal_mover,
+    /* NL_C_HITS_MOVER */		&provider_gnl_ops_hit_on_line,
+    /* NL_C_COAST */			&provider_gnl_ops_coast,
     /* NL_C_FAULT */       &provider_gnl_ops_disconnected_hit,
 };
 

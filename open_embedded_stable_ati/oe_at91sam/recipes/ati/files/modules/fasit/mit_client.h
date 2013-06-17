@@ -34,7 +34,10 @@ public :
    void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
    void doGoHome(); // go home
+   void doCoast(); // "coast" to stop for ttmt kill reaction
    void doHitCal(struct hit_calibration hit_c);  // so we know the kill reaction
+   void doHitCalMover(struct hit_calibration hit_c);  // for TTMT
+   void doHitsMover(hit_on_line_t *hol);  // for TTMT
    void doContinuousMove(float speed, int direction); // start movement or change movement
    void doContinuousMove(); // retrieve movement values
    void doMoveAway(float speed, int direction); // start movement or change movement
@@ -46,6 +49,7 @@ public :
    void didExpose(int val); // current expose value
    void doStop(); // emergency stop (stops accessories as well)
    void didStop(); // received immediate stop response
+   void didHitsMover(hit_on_line_t *); // mover hits
    void Reset(); // received immediate stop response
 
    void handle_2111(FASIT_2111 *msg); // called from attached_SIT_Client object
@@ -71,6 +75,7 @@ protected:
 //   int handle_2110(int start, int end); just forwarded
 //   int handle_2112(int start, int end); just forwarded
 //   int handle_2113(int start, int end); just forwarded
+   int handle_15120(int start, int end);
 
 private:
    class MIT_Conn *nl_conn;
@@ -79,6 +84,7 @@ private:
    // helper functions for filling out a 2102 status message
    void fillStatus2102(FASIT_2102 *msg);
    void sendStatus2102();
+   void sendStatus15122(hit_on_line_t *);
 
    // remember the last command we received for responses back
    int resp_num;
@@ -87,6 +93,7 @@ private:
    // remember if we ever connected
    bool ever_conn;
    int skippedFault;
+   int mHits[3];
 
    // remember the battery value rather than send a response each time we get a change
    int lastBatteryVal;
@@ -155,7 +162,10 @@ public:
    void doMove(float speed, int direction); // start movement or change movement
    void doMove(); // retrieve movement values
    void doGoHome(); // go home
+   void doCoast(); // "coast" to stop for ttmt kill reaction
    void doHitCal(struct hit_calibration hit_c);  // so we know the kill reaction
+   void doHitCalMover(struct hit_calibration hit_c);  // for TTMT
+   void doHitsMover(hit_on_line_t *hol);  // for TTMT
    void doContinuousMove(float speed, int direction); // start movement or change movement
    void doContinuousMove(); // retrieve movement values
    void doMoveAway(float speed, int direction); // start movement or change movement
