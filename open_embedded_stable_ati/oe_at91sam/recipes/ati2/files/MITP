@@ -30,7 +30,7 @@ start () {
       track=10
    fi
    if [ "$mitds" == "" ] ; then
-      matd=0
+      mitds=0
    fi
 
    # load modules
