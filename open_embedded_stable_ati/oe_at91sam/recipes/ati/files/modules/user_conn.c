@@ -2349,11 +2349,18 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J J %s\n", readEeprom(BES_MODE_LOC, BES_MODE_SIZE)); // reads and prints out what it read
                      }
                      break;
-                  case 'K': case 'k':      // Sets and Reads the Dock Speed
+		  case 'K': case 'k':      // Sets and Reads whether we are using a 20 AMP thermal
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "J K %s\n", writeEeprom(DOCK_SPEED_LOC, arg3, DOCK_SPEED_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "J K %s\n", writeEeprom(THERMAL_PULSE_LOC, arg3, THERMAL_PULSE_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "J K %s\n", readEeprom(DOCK_SPEED_LOC, DOCK_SPEED_SIZE)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "J K %s\n", readEeprom(THERMAL_PULSE_LOC, THERMAL_PULSE_SIZE)); // reads and prints out what it read
+                     }
+                     break;
+                  case 'L': case 'l':      // Sets and Reads docking speed
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "J L %s\n", writeEeprom(DOCK_SPEED_LOC, arg3, DOCK_SPEED_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "J L %s\n", readEeprom(DOCK_SPEED_LOC, DOCK_SPEED_SIZE)); // reads and prints out what it read
                      }
                      break;
 		  case 'R': case 'r':      // Gets a report
@@ -2523,13 +2530,16 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Get/Set BES Mode\nFormat: J J <mode>\n");
                                 break;
                             case 'K': case 'k':
-                                snprintf(wbuf, 1024, "Get/Set Dock Speed\nFormat: J K <speed>\n");
+                                snprintf(wbuf, 1024, "Get/Set if we are using a 20 AMP thermal\nFormat: J K <0|1>\n");
+                                break;
+                            case 'L': case 'l':
+                                snprintf(wbuf, 1024, "Get/Set mover docking speed\nFormat: J L <0|1|2|3|4>\n");
                                 break;
                             case 'R': case 'r':
                                 snprintf(wbuf, 1024, "Get a Report of relevant target information.\nFormat: J R (Board Type| Version | Communication | Connect IP | MAC)\n");
                                 break;
                             default:
-                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ F: BES Trigger 1\nJ G: BES Trigger 2\nJ H: BES Trigger 3\nJ I: BES Trigger 4\nJ J: BES Mode\nJ K: Dock Speed\nJ R: Target Report\n");
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ F: BES Trigger 1\nJ G: BES Trigger 2\nJ H: BES Trigger 3\nJ I: BES Trigger 4\nJ J: BES Mode\nJ K: Using a 20 AMP thermal\nJ L: Mover Docking Speed\nJ R: Target Report\n");
                                 break;
                         }
                         break;
