@@ -76,6 +76,7 @@ fi
 mv ati2/files/fixhost /etc/init.d
 mv ati2/files/start_up /etc/init.d
 mv ati2/files/networking /etc/init.d
+mv ati2/files/K40networking /etc/rc6.d
 mv ati2/files/interfaces /etc/network
 mv ati2/files/* /usr/bin
 mv sysvinit/sysvinit/inittab /etc
@@ -109,7 +110,7 @@ echo ""
 
 echo "Restarting Device"
 echo ""
-init 6
+reboot
 exit 0
 
 # DO NOT PUT ANYTHING AFTER THIS LINE, IF YOU DO THE EXTRACT WILL FAIL
