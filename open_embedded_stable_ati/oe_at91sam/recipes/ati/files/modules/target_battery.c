@@ -36,6 +36,14 @@
 #define BATTERY_CHARGING_ERROR  	2
 
 //#define DEBUG_SEND
+//#define PRINT_DEBUG
+
+#ifdef PRINT_DEBUG
+#define DELAY_PRINTK  delay_printk
+#else
+#define DELAY_PRINTK(...)  //
+#endif
+
 
 #ifdef DEBUG_SEND
 #define SENDUSERCONNMSG  sendUserConnMsg
@@ -159,6 +167,7 @@ module_param(shutdown, bool, S_IRUGO);
 static int shutdown_wait = 2;
 module_param(shutdown_wait, int, S_IRUGO);
 static int minvoltval = 12;
+static int minvoltvalidx = 0;
 module_param(minvoltval, int, S_IRUGO);
 
 // these lists go 12, 24, 36, 48, error
@@ -317,7 +326,7 @@ static void shutdown_soon(bool lowbat) {
     char *scen;
 
     // tell the debug port we're shutting down
-    delay_printk("Shutting down due to %s.\n", lowbat ? "low battery" : "user command");
+    DELAY_PRINTK("Shutting down due to %s.\n", lowbat ? "low battery" : "user command");
 
     // check for initial shutdown message
     if (atomic_read(&shutdown_msg) == 0) {
@@ -353,18 +362,20 @@ static void shutdown_device(unsigned long data) {
 // battery percentage from adc value
 //---------------------------------------------------------------------------
 int bat_from_adc(int adc_val) {
+DELAY_PRINTK("target_battery bat_from_adc ADC = %i\n", adc_val);
     // turn an adc_val into a percentage
-    if (adc_val >= BATTERY_NORMAL[minvoltval]) {
+    if (adc_val >= BATTERY_NORMAL[minvoltvalidx]) {
         adc_val = BAT_NORMAL; // normal percentage
-    } else if (adc_val >= BATTERY_LOW[minvoltval]) {
+    } else if (adc_val >= BATTERY_LOW[minvoltvalidx]) {
         adc_val = BAT_LOW; // low percentage
-    } else if (adc_val >= BATTERY_CRIT[minvoltval]) {
+    } else if (adc_val >= BATTERY_CRIT[minvoltvalidx]) {
         adc_val = BAT_CRIT; // critical percentage
-    } else if (adc_val <= BATTERY_WAIT[minvoltval]) {
+    } else if (adc_val <= BATTERY_WAIT[minvoltvalidx]) {
         adc_val = BAT_INVALID; // invalid percentage
-    } else if (adc_val <= BATTERY_HALT[minvoltval]) {
+    } else {
         adc_val = BAT_HALT; // no battery left
     }
+DELAY_PRINTK("target_battery bat_from_adc return = %i\n", adc_val);
     return adc_val;
 }
 
@@ -385,6 +396,8 @@ static void adc_read_fire(unsigned long data)
 	unsigned char adc_val;
 	unsigned char old_adc_val;
 
+SENDUSERCONNMSG( "target_battery adc_read_fire check %i", atomic_read(&check_atomic));
+DELAY_PRINTK( "target_battery adc_read_fire check %i\n", atomic_read(&check_atomic));
     // check/don't check adc line
     if (!atomic_read(&check_atomic)) {
         return;
@@ -396,6 +409,7 @@ static void adc_read_fire(unsigned long data)
 	// check if the register adc register is ready
 	if(!(__raw_readl(adc_base + ADC_SR) & CH_EN))
 		{
+DELAY_PRINTK( "target_battery adc_read_fire NOT READY\n");
 		// try again later
         	mod_timer(&adc_read_timer_list, jiffies+((ADC_READ_DELAY_IN_MSECONDS*HZ)/1000));
 		}
@@ -406,28 +420,36 @@ static void adc_read_fire(unsigned long data)
 
 		// has the value changed?
 		old_adc_val = atomic_read(&adc_atomic);
-		if (adc_val != old_adc_val)
+		if (1 || adc_val != old_adc_val)
 			{
 			atomic_set(&adc_atomic, adc_val);
-            switch (bat_from_adc(adc_val)) {
-                case BAT_NORMAL:	delay_printk("ADC = %i (normal)\n", adc_val); break;
-                case BAT_LOW:		delay_printk("ADC = %i (low)\n", adc_val); break;
-                case BAT_CRIT:		delay_printk("ADC = %i (critical)\n", adc_val); break;
-                case BAT_INVALID:	delay_printk("ADC = %i (invalid)\n", adc_val); break;
-                case BAT_HALT: 
-                   // print out that we would have shutdown and/or shutdown
-                   delay_printk("ADC = %i (shutdown)\n", adc_val);
-                   if (shutdown) { // only if allowed to shutdown
-                      shutdown_soon(true);
-                   }
-                   break;
-            }
+                        switch (bat_from_adc(adc_val)) {
+                            case BAT_NORMAL:
+                                DELAY_PRINTK("ADC = %i (normal)\n", adc_val);
+                                break;
+                            case BAT_LOW:
+                                DELAY_PRINTK("ADC = %i (low)\n", adc_val);
+                                break;
+                            case BAT_CRIT:
+                                DELAY_PRINTK("ADC = %i (critical)\n", adc_val);
+                                break;
+                            case BAT_INVALID:
+                                DELAY_PRINTK("ADC = %i (invalid)\n", adc_val);
+                                break;
+                            case BAT_HALT: 
+                               // print out that we would have shutdown and/or shutdown
+                               DELAY_PRINTK("ADC = %i (shutdown)\n", adc_val);
+                               if (shutdown) { // only if allowed to shutdown
+                                  shutdown_soon(true);
+                               }
+                               break;
+                        }
 
 			// notify user-space
 			schedule_work(&level_work);
 
 			// start blinking if we're too low
-			if (adc_val < BATTERY_NORMAL[minvoltval])
+			if (adc_val < BATTERY_NORMAL[minvoltvalidx])
 				{
         			mod_timer(&led_blink_timer_list, jiffies+((LED_BLINK_ON_IN_MSECONDS*HZ)/1000));
 				}
@@ -447,6 +469,7 @@ static void timeout_fire(unsigned long data) {
     atomic_set(&fast_blink, 0); // we are going to turn off the fast blink even
                                 // if we don't check the adc
 
+SENDUSERCONNMSG( "target_battery timeout_fire------------------------");
     // Restart the timeout timer
     mod_timer(&timeout_timer_list, jiffies+(TIMEOUT_IN_SECONDS*HZ));
 }
@@ -533,14 +556,14 @@ irqreturn_t charging_bat_int(int irq, void *dev_id, struct pt_regs *regs)
     //  we are responding.
     if (at91_get_gpio_value(INPUT_CHARGING_BAT) == INPUT_CHARGING_BAT_ACTIVE_STATE)
         {
-       delay_printk("%s - %s - ACTIVE\n",TARGET_NAME, __func__);
+       DELAY_PRINTK("%s - %s - ACTIVE\n",TARGET_NAME, __func__);
         // we're connected, start the timer and turn off the led
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, !OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
         mod_timer(&charging_timer_list, jiffies+((LED_CHARGING_OFF_IN_MSECONDS*HZ)/1000));
         }
     else
         {
-       delay_printk("%s - %s - INACTIVE\n",TARGET_NAME, __func__);
+       DELAY_PRINTK("%s - %s - INACTIVE\n",TARGET_NAME, __func__);
         // we're disconnected, delete the timer and turn on the led
 	del_timer(&charging_timer_list);
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
@@ -595,7 +618,7 @@ static void led_blink_fire(unsigned long data)
 
     // are we still low?
     value = atomic_read(&adc_atomic);
-    if (atomic_read(&adc_startup) == 0 && value >= BATTERY_NORMAL[minvoltval])
+    if (atomic_read(&adc_startup) == 0 && value >= BATTERY_NORMAL[minvoltvalidx])
         {
         // we're high, turn led on and return
         at91_set_gpio_value(OUTPUT_LED_LOW_BAT, OUTPUT_LED_LOW_BAT_ACTIVE_STATE);
@@ -672,13 +695,13 @@ static int hardware_init(void)
     // correct voltage variable to minimum adc value
     switch (abs(minvoltval))
         {
-        case 12: minvoltval = 0;  break; /* 12v is first index */
-        case 24: minvoltval = 1; break;  /* 24v is second */
-        case 36: minvoltval = 2; break;  /* 36v is third */
-        case 48: minvoltval = 3; break;  /* 48v is fourth */
-        default: minvoltval = 4; break;  /* error is fifth */
+        case 12: minvoltvalidx = 0;  break; /* 12v is first index */
+        case 24: minvoltvalidx = 1; break;  /* 24v is second */
+        case 36: minvoltvalidx = 2; break;  /* 36v is third */
+        case 48: minvoltvalidx = 3; break;  /* 48v is fourth */
+        default: minvoltvalidx = 4; break;  /* error is fifth */
         }
-   delay_printk("%s charge: %i, minvoltval: %i\n",__func__,  charge, minvoltval);
+   DELAY_PRINTK("%s charge: %i, minvoltval: %i, idx: %i\n",__func__,  charge, minvoltval, minvoltvalidx);
 
     // Enable USB 5V
     at91_set_gpio_input(USB_ENABLE, USB_ENABLE_PULLUP_STATE);
@@ -711,11 +734,11 @@ static int hardware_init(void)
             {
             if (status == -EINVAL)
                 {
-                   delay_printk(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_CHARGING_BAT);
+                   DELAY_PRINTK(KERN_ERR "request_irq() failed - invalid irq number (%d) or handler\n", INPUT_CHARGING_BAT);
                 }
             else if (status == -EBUSY)
                 {
-                   delay_printk(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_CHARGING_BAT);
+                   DELAY_PRINTK(KERN_ERR "request_irq(): irq number (%d) is busy, change your config\n", INPUT_CHARGING_BAT);
                 }
 
             return status;
@@ -882,11 +905,11 @@ int nl_battery_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
         if (rc == 0) {
             rc = HANDLE_SUCCESS;
         } else {
-           delay_printk("BATTERY: could not create return message\n");
+           DELAY_PRINTK("BATTERY: could not create return message\n");
             rc = HANDLE_FAILURE;
         }
     } else {
-       delay_printk("BATTERY: could not get attribute\n");
+       DELAY_PRINTK("BATTERY: could not get attribute\n");
         rc = HANDLE_FAILURE;
     }
 //delay_printk("returning rc: %i\n", rc);
@@ -906,7 +929,7 @@ static int __init target_battery_init(void)
    };
     struct nl_driver driver = {NULL, commands, sizeof(commands)/sizeof(struct driver_command), NULL}; // no heartbeat object, X command in list, no identifying data structure
 
-delay_printk("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
+DELAY_PRINTK("%s(): %s - %s\n",__func__,  __DATE__, __TIME__);
 	hardware_init();
 	retval = target_sysfs_add(&target_device_battery);
 
