@@ -77,21 +77,6 @@ static int pos_mfh(struct sk_buff *skb, void *pos_data) {
 }
 
 //---------------------------------------------------------------------------
-// Work item to notify the user-space about a position change or error
-//---------------------------------------------------------------------------
-static void position_change(struct work_struct * work) {
-    u16 pos_data;
-    // not initialized or exiting?
-    if (atomic_read(&full_init) != TRUE) {
-        return;
-    }
-
-    // notify netlink userspace
-    pos_data = mover_position_get() + 0x8000; // message is unsigned, fix it be "signed"
-    send_nl_message_multi(&pos_data, pos_mfh, NL_C_POSITION);
-}
-
-//---------------------------------------------------------------------------
 // Message filler handler for expose functions
 //---------------------------------------------------------------------------
 int move_mfh(struct sk_buff *skb, void *move_data) {
@@ -109,6 +94,23 @@ static void sendUserConnMsg( char *fmt, ...){
       kfree(msg);
    }
    va_end(ap);
+}
+
+//---------------------------------------------------------------------------
+// Work item to notify the user-space about a position change or error
+//---------------------------------------------------------------------------
+static void position_change(struct work_struct * work) {
+    u16 pos_data;
+    // not initialized or exiting?
+    if (atomic_read(&full_init) != TRUE) {
+        return;
+    }
+
+    // notify netlink userspace
+//    pos_data = mover_position_get() + 0x8000; // message is unsigned, fix it be "signed"
+    pos_data = mover_position_get(); // message is unsigned, fix it be "signed"
+SENDUSERCONNMSG( "randy position_change %i", pos_data );
+    send_nl_message_multi(&pos_data, pos_mfh, NL_C_POSITION);
 }
 
 //---------------------------------------------------------------------------

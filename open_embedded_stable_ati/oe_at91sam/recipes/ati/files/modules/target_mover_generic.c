@@ -88,7 +88,7 @@ static int CONTINUE_ON[] = {3,1,2,2,2,2,0}; // leg = 1, quad = 2, both = 3, neit
 static int TIMEOUT_IN_MSECONDS[] = {12000,12000,2000,2000,2000,2000,0};
 static int MOVER_DELAY_MULT[] = {2,2,2,2,2,2,0};
 
-static int DOCK_RETRY_COUNT[] = {2, 2, 3, 1, 1, 1, 0}; // the more we retry, the more likely we are to trip a breaker
+static int DOCK_RETRY_COUNT[] = {2, 2, 3, 3, 1, 1, 0}; // the more we retry, the more likely we are to trip a breaker
 
 #define MOVER_POSITION_START 		0
 #define MOVER_POSITION_BETWEEN		1	// not at start or end
@@ -1457,8 +1457,8 @@ static void position_fire(unsigned long data)
         {
         return;
         }
-    atomic_set(&doing_pos, FALSE);
     schedule_work(&position_work); // notify the system
+    atomic_set(&doing_pos, FALSE);
     }
 
 //---------------------------------------------------------------------------
@@ -1526,6 +1526,7 @@ SENDUSERCONNMSG( "randy before mover_speed_stop 5");
 //---------------------------------------------------------------------------
 irqreturn_t leg_sensor_int(int irq, void *dev_id, struct pt_regs *regs)
     {
+SENDUSERCONNMSG( "randy leg_sensor_int %i", atomic_read(&position));
 //    return IRQ_HANDLED;
     if (!atomic_read(&full_init))
         {
@@ -1613,22 +1614,22 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
             // reverse flag set
             if (status & ATMEL_TC_MTIOB) {
                 // wheel going backwards, but reversed, so we're going forward
-                atomic_inc(&position);
+//                atomic_inc(&position);
                 atomic_set(&quad_direction, 1);
             } else {
                 // wheel going forwards, but reversed, so we're going backwards
-                atomic_dec(&position);
+//                atomic_dec(&position);
                 atomic_set(&quad_direction, -1);
             }
         } else {
             // reverse flag not set
             if (status & ATMEL_TC_MTIOB) {
                 // wheel going backwards, so we're going reversed
-                atomic_dec(&position);
+//                atomic_dec(&position);
                 atomic_set(&quad_direction, -1);
             } else {
                 // wheel going forward, so we're going forward
-                atomic_inc(&position);
+//                atomic_inc(&position);
                 atomic_set(&quad_direction, 1);
             }
         }
@@ -1661,6 +1662,30 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
    return IRQ_HANDLED;
 }
 
+static void set_left_position(void){
+    if (dock_loc == 0) atomic_set(&position, 2 * 10 / 3);
+    else if (dock_loc == 2) atomic_set(&position, 0);
+    else atomic_set(&position, track_len * 10 / 3);
+SENDUSERCONNMSG( "randy set_left_position %i  dock_lock %i", atomic_read(&position), dock_loc);
+        if (atomic_read(&doing_pos) == FALSE)
+            {
+            atomic_set(&doing_pos, TRUE);
+            mod_timer(&position_timer_list, jiffies+((POSITION_DELAY_IN_MSECONDS*HZ)/1000));
+            }
+}
+
+static void set_right_position(void){
+    if (dock_loc == 1) atomic_set(&position, 2 * 10 / 3);
+    else if (dock_loc == 3) atomic_set(&position, 0);
+    else atomic_set(&position, track_len * 10 / 3);
+SENDUSERCONNMSG( "randy set_right_position %i  dock_lock %i", atomic_read(&position), dock_loc);
+        if (atomic_read(&doing_pos) == FALSE)
+            {
+            atomic_set(&doing_pos, TRUE);
+            mod_timer(&position_timer_list, jiffies+((POSITION_DELAY_IN_MSECONDS*HZ)/1000));
+            }
+}
+
 //---------------------------------------------------------------------------
 // track sensor "home"
 //---------------------------------------------------------------------------
@@ -1688,6 +1713,7 @@ SENDUSERCONNMSG( "randy set position 2 %i", atomic_read(&position));
 send_nl_message_multi("Ignored home reset", error_mfh, NL_C_FAILURE);
 #endif
     }
+    set_left_position();
 
     // reset home maximum location if necessary
     if (pos > home) {
@@ -1739,6 +1765,7 @@ irqreturn_t track_sensor_end_int(int irq, void *dev_id, struct pt_regs *regs)
     
     // reset home maximum location (wheel slippage, testing, etc. can cause the old value to be wrong)
     atomic_set(&home_max, -5000);
+    set_right_position();
 
    SENDUSERCONNMSG( "randy end_int %i", atomic_read(&movement_atomic));
     // check to see if this one needs to be ignored
@@ -1804,6 +1831,15 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
    SENDUSERCONNMSG( "randy c find %i", atomic_read(&find_dock_atomic));
        enable_battery_check(1);
        battery_check_is_docked(1);
+// Dock is always position 0
+       atomic_set(&position, 0);
+SENDUSERCONNMSG( "randy set position 1a %i", atomic_read(&position));
+        if (atomic_read(&doing_pos) == FALSE)
+            {
+            atomic_set(&doing_pos, TRUE);
+            mod_timer(&position_timer_list, jiffies+((POSITION_DELAY_IN_MSECONDS*HZ)/1000));
+            }
+#if 0       
        if (atomic_read(&found_home) == 0) { // if we haven't found our home position, we at least know *about* where the dock is
           if (dock_loc == 0) { // Dock at left
              atomic_set(&position, ((-1 * INCHES_PER_REV[mover_type] * DOCK_FEET_FROM_LIMIT[mover_type]) / TICKS_DIV)); // we're docked behind home, calculate ticks
@@ -1824,6 +1860,7 @@ SENDUSERCONNMSG( "randy set position 4 %i", atomic_read(&position));
 SENDUSERCONNMSG( "randy set position 5 %i", atomic_read(&position));
           }
        }
+#endif
     } else {
        // Not on dock (if we have a dock)
        if (dock_loc == 0 || dock_loc == 1) {
@@ -2162,6 +2199,9 @@ SENDUSERCONNMSG( "randy set position 10 %i", atomic_read(&position));
 SENDUSERCONNMSG( "randy set position 11 %i", atomic_read(&position));
       }
     }
+
+// Just start at 0 for now.
+    atomic_set(&position, 0);
 
     // de-assert the pwm line
     at91_set_gpio_output(MOTOR_PWM_F, !OUTPUT_MOVER_PWM_SPEED_ACTIVE[mover_type]);
@@ -2747,7 +2787,9 @@ extern int mover_position_get() {
     if (TICKS_DIV <= 0) {
        return 0; // bad data, return 0
     }
-    return ((INCHES_PER_REV[mover_type]*pos)/(TICKS_DIV))/12; // inches to feet
+//    return ((INCHES_PER_REV[mover_type]*pos)/(TICKS_DIV))/12; // inches to feet
+   SENDUSERCONNMSG( "randy mover_position_get,%i  ***********" ,pos);
+    return pos;
 }
 EXPORT_SYMBOL(mover_position_get);
 
@@ -3347,7 +3389,7 @@ static void do_position(struct work_struct * work)
 #endif
             target_sysfs_notify(&target_device_mover_generic, "position");
 #ifdef SEND_POS
-        SENDUSERCONNMSG( "pid6,t,%i,e,0,u,0,r,0,y,0,o,0,P,0,I,0,D,0,l,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), atomic_read(&position)); // use the same output format as the SEND_PID message, so it's easier to parse
+        SENDUSERCONNMSG( "******randy******position,t,%i,p,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), atomic_read(&position)); // use the same output format as the SEND_PID message, so it's easier to parse
 #endif
         }
 

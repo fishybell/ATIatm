@@ -979,7 +979,8 @@ DCMSG(RED, "Command parseed: %i", ghdr->cmd);
 
          if (attrs[GEN_INT16_A_MSG]) {
             // # feet from home
-            int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
+//            int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
+            int value = nla_get_u16(attrs[GEN_INT16_A_MSG]); // message was unsigned, fix it
             mit_client->didPosition(value);
          }
 
