@@ -73,6 +73,15 @@ testEth0 (){
     echo $(checkAddress $add)
 }
 
+setTries (){
+    rad=`/usr/bin/is_comm`
+    if [ "$rad" = "radio" ]; then
+        echo "0"
+    else
+        echo "5"
+    fi
+}
+
 case "$1" in
     start)
 	# /etc/sysctl.conf is preferred
@@ -87,7 +96,8 @@ case "$1" in
         echo -n "Configuring network interfaces... "
         ifup -a
         cntr=0
-        while [ $cntr -lt 5 ]; do
+        dhcpTries=$(setTries)
+        while [ $cntr -lt $dhcpTries ]; do
           havadd=$(testEth0)
           if [ "$havadd" = "0" ]; then
               let cntr=cntr+6
