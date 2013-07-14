@@ -816,7 +816,7 @@ int main(int argc, char **argv) {
       char frequency[RADIO_FREQ_SIZE+1];  /* default frequency (as a string) */
       uint8 powerLow;        /* low power setting */
       uint8 powerHigh;       /* high power setting */
-      char radioWritten;     /* radio parameters have been written to radio EEPROM */
+      char radioWritten[RADIO_WRITTEN_SIZE + 1];     /* radio parameters have been written to radio EEPROM */
       float frequency_f;      /* frequency as a float */
       char frequency_bcd[3]; /* frequency as bcd */
       char frequency_pll[24]; /* frequency for pll */
@@ -830,9 +830,10 @@ int main(int argc, char **argv) {
       DDCMSG(D_EEPROM, RED, "Read radio low power: %i", powerLow);
       powerHigh = ReadEepromInt(RADIO_POWER_H_LOC, RADIO_POWER_H_SIZE, RADIO_POWER_H);
       DDCMSG(D_EEPROM, RED, "Read radio high power: %i", powerHigh);
-      radioWritten = ReadEepromInt(RADIO_WRITTEN_LOC, RADIO_WRITTEN_SIZE, (int)RADIO_WRITTEN);
+//      radioWritten = ReadEepromInt(RADIO_WRITTEN_LOC, RADIO_WRITTEN_SIZE, (int)RADIO_WRITTEN);
+      ReadEepromStr(RADIO_WRITTEN_LOC, RADIO_WRITTEN_SIZE, RADIO_WRITTEN, radioWritten);
       err1 = errno;
-      DDCMSG(D_EEPROM, RED, "Read radio written: %i|%c", radioWritten, radioWritten);
+      DDCMSG(D_EEPROM, RED, "Read radio written: -%s-", radioWritten);
 
       // verify frequency is valid
       frequency_f = strtof(frequency, &frequency_check);
@@ -844,7 +845,7 @@ int main(int argc, char **argv) {
       }
       
       // check if they need to be written
-      if (radioWritten != 'Y') {
+      if (radioWritten[0] != 'Y') {
          // set up the RF modem link
          OpenRadio(ttyport, &RFfd); 
 
@@ -895,7 +896,7 @@ int main(int argc, char **argv) {
          CloseRadio(RFfd);
 
          // save that we wrote it to the radio
-         WriteEepromInt(RADIO_WRITTEN_LOC, RADIO_WRITTEN_SIZE, 'Y');
+         WriteEepromStr(RADIO_WRITTEN_LOC, RADIO_WRITTEN_SIZE, "Y");
       }
    }
 }

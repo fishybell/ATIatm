@@ -32,6 +32,15 @@ void WriteEepromInt(int address, int size, int default_int) {
    runCMDintW(wbuf, default_int, size);
 }
 
+/***************************************************************
+ * Writes data from the specified address at the specified size.
+ *************************************************************/
+void WriteEepromStr(int address, int size, char * default_string) {
+   char wbuf[1024];
+   snprintf(wbuf, 1024, "/usr/bin/eeprom_rw write -addr 0x%04X -size 0x%02X -blank 0x%02X\n", address, size, size);
+   runCMDstrW(wbuf, default_string, size);
+}
+
 /*************************************************************
  * Opens up the memory location for reading.
  * Returns either the data at the location or the default value
@@ -133,6 +142,39 @@ void runCMDintW(char *cmd, int default_int, int size) {
 
    // format data
    snprintf(data, min(size,1024), "%i", default_int);
+
+   // write
+   while (index < 1024 && r > 0 && index < size) {
+      r = fwrite(data + index, min(size,buffer_max), sizeof(char), fp);
+      index += r;
+   }
+
+   // close pipe
+   status = pclose(fp);
+   if (status == -1) {
+      DieWithError("Error: could not close");
+   }
+}
+
+/*************************************************************
+ * Opens up the memory location for writing.
+ *************************************************************/
+void runCMDstrW(char *cmd, char *default_string, int size) {
+   char data[1024];
+   int output;
+   FILE *fp;
+   int buffer_max = 256;
+   int index = 0, r = 1;
+   int status;
+
+   // open pipe
+   fp = popen(cmd, "w");
+   if (fp == NULL) {
+      DieWithError("Error: fp is NULL");
+   }
+
+   // format data
+   snprintf(data, min(size,1024), "%s", default_string);
 
    // write
    while (index < 1024 && r > 0 && index < size) {

@@ -7,10 +7,12 @@ void ReadEepromStr(int address, int size, char *default_string, char *dest_buf);
 int ReadEepromInt(int address, int size, int default_int);
 // writes an int from the eeprom
 void WriteEepromInt(int address, int size, int default_int);
+void WriteEepromStr(int address, int size, char *default_string);
 
 // runs the actual command to get the console output
 void runCMDstr(char *cmd, char *default_string, char *dest_buf);
 int runCMDint(char *cmd, int default_int);
 void runCMDintW(char *cmd, int default_int, int size); // write data instead of reading it
+void runCMDstrW(char *cmd, char *default_string, int size); // write data instead of reading it
 
 #endif
