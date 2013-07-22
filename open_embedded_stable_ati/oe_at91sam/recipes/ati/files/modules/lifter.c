@@ -1378,10 +1378,10 @@ static void init_bes_triggers(int besLevel){
                                               //     , , , , , ,     ,  ,y,a, , , , ;
                                               //     , , , , , ,     ,  , ,y, , , , ;
     struct accessory_conf bte = {ACC_BES_ENABLE,    0,1,0,4,0,0,    0, 0,0,0,0,0,0,0};
-    struct accessory_conf bt1 = {ACC_BES_TRIGGER_1 ,0,1,0,2,0,0,   50, 0,0,0,0,0,0,0};
-    struct accessory_conf bt2 = {ACC_BES_TRIGGER_2 ,0,1,0,2,0,0,   50, 0,0,0,0,0,0,0};
-    struct accessory_conf bt3 = {ACC_BES_TRIGGER_3 ,0,1,0,2,0,0,   50, 0,0,0,0,0,0,0};
-    struct accessory_conf bt4 = {ACC_BES_TRIGGER_4 ,0,1,0,2,0,0,   50, 0,0,0,0,0,0,0};
+    struct accessory_conf bt1 = {ACC_BES_TRIGGER_1 ,0,1,0,0,1,0,  250, 0,0,0,0,0,0,0};
+    struct accessory_conf bt2 = {ACC_BES_TRIGGER_2 ,0,1,0,2,0,0,  250, 0,0,0,0,0,0,0};
+    struct accessory_conf bt3 = {ACC_BES_TRIGGER_3 ,0,1,0,2,0,0,  250, 0,0,0,0,0,0,0};
+    struct accessory_conf bt4 = {ACC_BES_TRIGGER_4 ,0,1,0,2,0,0,  250, 0,0,0,0,0,0,0};
 
     mode = get_eeprom_int_value(BES_MODE, BES_MODE_LOC, BES_MODE_SIZE);
     DELAY_PRINTK("BES mode: %i  Level: %i bte exp: %i\n", mode, besLevel, bte.on_exp);
