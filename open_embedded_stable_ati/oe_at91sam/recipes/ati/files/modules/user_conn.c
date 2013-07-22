@@ -1856,7 +1856,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J A %s\n", readEeprom(VERSION_LOC, VERSION_SIZE)); // reads and prints out what it read
                      }
                      break;
-                  case 'C': case 'c':	  // Will the radio reprogram?
+                  case 'C': case 'c':	  // Radio Programmed?
                      if (arg3 > 1) { // are they passing in information?
                         snprintf(wbuf, 1024, "J C %s\n", writeEeprom(RADIO_WRITTEN_LOC, arg3, RADIO_WRITTEN_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
@@ -2506,7 +2506,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Get/Set Full Flash Version\nFormat: J A <flash version>\n");
                                 break;
                             case 'C': case 'c':
-                                snprintf(wbuf, 1024, "Get/Set Will the radio reprogram?\nFormat: J C (Y|N)\n");
+                                snprintf(wbuf, 1024, "Is the radio programmed?\nFormat: J C (Y|N)\n");
                                 break;
                             case 'D': case 'd':
                                 snprintf(wbuf, 1024, "Get/Set Track length\nFormat: J D <track length>\n");
@@ -2539,7 +2539,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Get a Report of relevant target information.\nFormat: J R (Board Type| Version | Communication | Connect IP | MAC)\n");
                                 break;
                             default:
-                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Program The Radio?\nJ D: Track Length\nJ E: Static IP\nJ F: BES Trigger 1\nJ G: BES Trigger 2\nJ H: BES Trigger 3\nJ I: BES Trigger 4\nJ J: BES Mode\nJ K: Using a 20 AMP thermal\nJ L: Mover Docking Speed\nJ R: Target Report\n");
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Radio Programmed?\nJ D: Track Length\nJ E: Static IP\nJ F: BES Trigger 1\nJ G: BES Trigger 2\nJ H: BES Trigger 3\nJ I: BES Trigger 4\nJ J: BES Mode\nJ K: Using a 20 AMP thermal\nJ L: Mover Docking Speed\nJ R: Target Report\n");
                                 break;
                         }
                         break;
