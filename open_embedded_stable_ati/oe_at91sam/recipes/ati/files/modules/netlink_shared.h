@@ -157,8 +157,10 @@ typedef struct accessory_conf {
     u8 exists:1;     /* 1 for exists, not used except for requests */
     u8 on_now:2;     /* 1 for activate normal, 2 for activate immediate */
     u8 on_exp:3;     /* 1 for active when fully exposed, 2 for active when partially exposed and fully exposed, 3 for active only while exposing/concealing */
+    u8 pad1:3;
     u8 on_hit:2;     /* 1 for activate on hit, 2 for deactivate on hit */
     u8 on_kill:2;    /* 1 for activate on kill, 2 for deactivate on kill */
+    u8 pad2:4;
     u16 on_time __attribute__ ((packed));     /* time on (in milliseconds, 0 for forever) */
     u16 off_time __attribute__ ((packed));    /* time off (in milliseconds, 0 for forever) */
     u8 start_delay;  /* time to delay before activation (in half-seconds) */
