@@ -55,6 +55,7 @@ static void sendUserConnMsg( char *fmt, ...);
 // These variables are parameters giving when doing an insmod (insmod blah.ko variable=5)
 //---------------------------------------------------------------------------
 static int mover_type = 1; // 0 = armor 2 ticks, 1 = armor 360 ticks, 2 = infantry/48v KDZ controller, 3 = error
+static int pos_ticks = 0;
 static int dock_inc = 0;
 static int dock_speed = 0;
 static int dock_loc = 2; // 0 = home end of track, 1 = end away from home, 2 = no dock
@@ -202,9 +203,10 @@ static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,1,1,0};		// channel 0 matches TIOA0 to
 #define MAX_TIME	0x10000
 #define MAX_OVER	0x10000
 static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
-static int ENC_PER_REV[] = {2, 360, 2, 2, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
+static int ENC_PER_REV[] = {4, 360, 10, 10, 10, 10, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
 static int VELO_K[] = {1344, 1344, 1680, 1680, 1680, 1680, 0}; // rpm/mph*10
 static int INCHES_PER_REV[] = {157, 157, 314, 314, 314, 314, 0}; // 5 inch, 10 inch, etc. = inches per wheel revolution
+static int CM_PER_TICK[] = {10, 10, 8, 8, 8, 8, 0}; // 5 inch, 10 inch, etc. = inches per wheel revolution
 static int TICKS_PER_LEG[] = {1833, 1833, 2292, 2292, 2292, 2292, 0}; // 2:1 ratio 5 inch wheel 6 ft leg, 5:1 ratio 10 inch wheel 6 ft leg, etc.
 #define TICKS_DIV 100
 
@@ -1615,10 +1617,12 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
             if (status & ATMEL_TC_MTIOB) {
                 // wheel going backwards, but reversed, so we're going forward
 //                atomic_inc(&position);
+                pos_ticks ++;
                 atomic_set(&quad_direction, 1);
             } else {
                 // wheel going forwards, but reversed, so we're going backwards
 //                atomic_dec(&position);
+                pos_ticks --;
                 atomic_set(&quad_direction, -1);
             }
         } else {
@@ -1626,10 +1630,12 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
             if (status & ATMEL_TC_MTIOB) {
                 // wheel going backwards, so we're going reversed
 //                atomic_dec(&position);
+                pos_ticks --;
                 atomic_set(&quad_direction, -1);
             } else {
                 // wheel going forward, so we're going forward
 //                atomic_inc(&position);
+                pos_ticks ++;
                 atomic_set(&quad_direction, 1);
             }
         }
@@ -1663,9 +1669,9 @@ irqreturn_t quad_encoder_int(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static void set_left_position(void){
-    if (dock_loc == 0) atomic_set(&position, 2 * 10 / 3);
-    else if (dock_loc == 2) atomic_set(&position, 0);
-    else atomic_set(&position, track_len * 10 / 3);
+    if (dock_loc == 0){ atomic_set(&position, 2 * 10 / 3); pos_ticks = 2 * 100 / CM_PER_TICK[mover_type]; }
+    else if (dock_loc == 2){ atomic_set(&position, 0); pos_ticks = 0; }
+    else{ atomic_set(&position, track_len * 10 / 3); pos_ticks = track_len * 100 / CM_PER_TICK[mover_type]; }
 SENDUSERCONNMSG( "randy set_left_position %i  dock_lock %i", atomic_read(&position), dock_loc);
         if (atomic_read(&doing_pos) == FALSE)
             {
@@ -1675,9 +1681,9 @@ SENDUSERCONNMSG( "randy set_left_position %i  dock_lock %i", atomic_read(&positi
 }
 
 static void set_right_position(void){
-    if (dock_loc == 1) atomic_set(&position, 2 * 10 / 3);
-    else if (dock_loc == 3) atomic_set(&position, 0);
-    else atomic_set(&position, track_len * 10 / 3);
+    if (dock_loc == 1){ atomic_set(&position, 2 * 10 / 3); pos_ticks = 2 * 100 / CM_PER_TICK[mover_type]; }
+    else if (dock_loc == 3){ atomic_set(&position, 0); pos_ticks = 0; }
+    else{ atomic_set(&position, track_len * 10 / 3);  pos_ticks = track_len * 100 / CM_PER_TICK[mover_type]; }
 SENDUSERCONNMSG( "randy set_right_position %i  dock_lock %i", atomic_read(&position), dock_loc);
         if (atomic_read(&doing_pos) == FALSE)
             {
@@ -2787,6 +2793,7 @@ extern int mover_position_get() {
     if (TICKS_DIV <= 0) {
        return 0; // bad data, return 0
     }
+    pos = pos_ticks * CM_PER_TICK[mover_type] / 30;
 //    return ((INCHES_PER_REV[mover_type]*pos)/(TICKS_DIV))/12; // inches to feet
    SENDUSERCONNMSG( "randy mover_position_get,%i  ***********" ,pos);
     return pos;
