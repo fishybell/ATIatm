@@ -34,6 +34,9 @@ def_progs() {
          ;;
    esac
          
+   # start the non-standard broadcast server on every product at the very end to help with runtime autodetection of connected devices
+   bcast_server -p 4227 &
+
    # radio stuff here to ip is always correct later on radio devices
    if [ "$comm" == "radio" ] ; then
       # load radio defaults onto radio
@@ -123,9 +126,6 @@ def_progs() {
          fi
          ;;
    esac
-
-   # start the non-standard broadcast server on every product at the very end to help with runtime autodetection of connected devices
-   bcast_server -p 4227 &
 
    export ip=$ip
    export cport=$cport
