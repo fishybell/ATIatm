@@ -12,6 +12,8 @@ start () {
    thermx=$(has_thermalX)
    therm=$(has_thermal)
    msdh=$(has_msdh)
+   satbes=$(has_bes_mode)
+   thermp=$(has_thermal_pulse)
    if [ "$mfs" == "" ] ; then                       
       mfs=1
    fi 
@@ -33,14 +35,20 @@ start () {
    if [ "$msdh" == "" ] ; then                       
       msdh=0                                         
    fi
+   if [ "$satbes" == "" ] ; then                       
+      satbes=0                                         
+   fi
+   if [ "$thermp" == "" ] ; then                       
+      thermp=0                                         
+   fi
    # load modules
    load_modules "eeprom_settings.ko" \
                 "target_user_interface.ko mover=0" \
-                "target_battery.ko minvoltval=$sitb shutdown_wait=1" \
-                "target_hit_poll.ko line=0" \
-                "target_generic_output.ko has_muzzle=$mfs has_moon=$moon has_phi=$phi has_thermal=$therm has_thermalX=$thermx has_msdh=$msdh" \
+                "target_battery.ko minvoltval=$sitb shutdown_wait=1 has_bes=$satbes" \
+                "target_hit_poll.ko line=0 sens_mult=2" \
+                "target_generic_output.ko has_muzzle=$mfs has_moon=$moon has_phi=$phi has_thermal=$therm has_thermalX=$thermx has_msdh=$msdh has_bes=$satbes has_thm_pulse=$thermp" \
                 "target_lifter_infantry.ko" \
-                "lifter.ko"
+                "lifter.ko has_bes=$satbes has_thm_pulse=$thermp"
 
    # start default programs
    def_progs
