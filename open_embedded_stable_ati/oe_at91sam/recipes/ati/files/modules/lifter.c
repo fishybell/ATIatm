@@ -1377,15 +1377,12 @@ static void init_bes_triggers(int besLevel){
                                               //     , , , , , ,     ,  ,a,l, , , , ;
                                               //     , , , , , ,     ,  ,y,a, , , , ;
                                               //     , , , , , ,     ,  , ,y, , , , ;
-    struct accessory_conf bte = {ACC_BES_ENABLE,    0,1,0,4,0,0,    0, 0,0,0,0,0,0,0};
     struct accessory_conf bt1 = {ACC_BES_TRIGGER_1 ,0,1,0,0,1,0,  250, 0,0,0,0,0,0,0};
     struct accessory_conf bt2 = {ACC_BES_TRIGGER_2 ,0,1,0,2,0,0,  250, 0,0,0,0,0,0,0};
     struct accessory_conf bt3 = {ACC_BES_TRIGGER_3 ,0,1,0,2,0,0,  250, 0,0,0,0,0,0,0};
     struct accessory_conf bt4 = {ACC_BES_TRIGGER_4 ,0,1,0,2,0,0,  250, 0,0,0,0,0,0,0};
 
     mode = get_eeprom_int_value(BES_MODE, BES_MODE_LOC, BES_MODE_SIZE);
-    DELAY_PRINTK("BES mode: %i  Level: %i bte exp: %i\n", mode, besLevel, bte.on_exp);
-    do_accessory_configure(0, &bte, 0);
     bt1.on_exp = get_eeprom_int_value(BT1_ACTIVATE_EXPOSE, BT1_ACTIVATE_EXPOSE_LOC, BT1_ACTIVATE_EXPOSE_SIZE);
     if (bt1.on_exp > 1) bt1.on_exp = 1;
     bt1.on_hit = get_eeprom_int_value(BT1_ACTIVATE_ON_HIT, BT1_ACTIVATE_ON_HIT_LOC, BT1_ACTIVATE_ON_HIT_SIZE);

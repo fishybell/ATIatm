@@ -198,18 +198,19 @@
 //---------------------------------------------------------------------------
 // BES - Battlefield Effects Simulator
 // If BES is active then Night Light (Moon Glow) and PHI (Positive Hit Indicator)
-// will be disabled.
+// will be disabled. As of 07/25/2013 the enable line is no longer used. We
+// must provide power continuously to the BES.
 //---------------------------------------------------------------------------
 #define	OUTPUT_BES_ENABLE_ACTIVE_STATE		ACTIVE_LOW
 #define	OUTPUT_BES_TRIGGER_1_ACTIVE_STATE	ACTIVE_HIGH
 #define	OUTPUT_BES_TRIGGER_2_ACTIVE_STATE	ACTIVE_HIGH
 #define	OUTPUT_BES_TRIGGER_3_ACTIVE_STATE	ACTIVE_HIGH
-#define	OUTPUT_BES_TRIGGER_4_ACTIVE_STATE	ACTIVE_HIGH
+#define	OUTPUT_BES_TRIGGER_4_ACTIVE_STATE	ACTIVE_LOW
 #define	OUTPUT_BES_ENABLE 			AT91_PIN_PA4 // J9-2 Lifter board
 #define	OUTPUT_BES_TRIGGER_1 			AT91_PIN_PA8 // J9-4 Lifter board
 #define	OUTPUT_BES_TRIGGER_2 			AT91_PIN_PA6 // J9-6 Lifter board
 #define	OUTPUT_BES_TRIGGER_3 			AT91_PIN_PA9 // J9-7 Lifter board
-#define	OUTPUT_BES_TRIGGER_4 			AT91_PIN_PC10 // J8-5 Lifter board
+#define	OUTPUT_BES_TRIGGER_4 			AT91_PIN_PA4 // J9-2 Lifter board
 
 //---------------------------------------------------------------------------
 // MISC.
@@ -220,8 +221,8 @@
 #define OUTPUT_THERMAL_ACTIVE_STATE		ACTIVE_LOW
 #define	OUTPUT_THERMAL 					AT91_PIN_PA5
 // Thermal pulse is on SATs and uses the same pin as MFS on SITs
-#define OUTPUT_THERMAL_PULSE_ACTIVE_STATE		ACTIVE_HIGH
-#define	OUTPUT_THERMAL_PULSE 				AT91_PIN_PA10
+#define OUTPUT_THERMAL_PULSE_ACTIVE_STATE		ACTIVE_LOW
+#define	OUTPUT_THERMAL_PULSE 				AT91_PIN_PA10 // J9-8 Lifter board
 
 #define	OUTPUT_SMOKE 					AT91_PIN_PA4
 #define	OUTPUT_M21_RELAY 				AT91_PIN_PB30
