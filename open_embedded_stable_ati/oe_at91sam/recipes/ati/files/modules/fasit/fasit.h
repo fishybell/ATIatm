@@ -292,6 +292,23 @@ typedef struct FASIT_2113 {
    FASIT_2113b body;
 } FASIT_2113;
 
+/********************************************/
+/* 13000 - Configure Hits to Bob  */
+/*********************************************/
+typedef struct FASIT_13000 {
+	__uint8_t  tobob;
+} FASIT_13000;
+
+/********************************************/
+/* 13002 - Hits to Bob Status    */
+/********************************************/
+typedef struct FASIT_13002b { // body
+	__uint8_t tobob;
+} FASIT_13002b;
+typedef struct FASIT_13002 {
+	FASIT_RESPONSE response;
+	FASIT_13002b body;
+} FASIT_13002;
 
 /********************************************/
 /* 13110 - Configure Moon Glow    */

@@ -114,7 +114,7 @@ FUNCTION_END("::newClient()");
 int FASIT_TCP::parseData(int size, const char *buf) {
 FUNCTION_START("::parseData(int size, char *buf)");
    IMSG("TCP %i read %i bytes of data\n", fd, size);
-
+DCMSG(RED,"**Shelly FASIT_TCP::parseData line: 117") ;
    addToBuffer(size, buf);
 
    // check client
@@ -143,6 +143,8 @@ FUNCTION_INT("::parseData(int size, char *buf)", 0);
 	     HANDLE_FASIT (2113);
          HANDLE_FASIT (2114);
          HANDLE_FASIT (2115);
+         HANDLE_FASIT (13000);
+         HANDLE_FASIT (13002);
 	     HANDLE_FASIT (13110);
 	     HANDLE_FASIT (13112);
 	     HANDLE_FASIT (14110);
@@ -216,6 +218,8 @@ TMSG("too short: %i > (%i - %i)\n", *start, rsize, sizeof(FASIT_header));
          CHECK_LENGTH (2113);
 	     CHECK_LENGTH (2114);
 	     CHECK_LENGTH (2115);
+         CHECK_LENGTH (13000);
+         CHECK_LENGTH (13002);
 	     CHECK_LENGTH (13110);
 	     CHECK_LENGTH (13112);
 	     CHECK_LENGTH (14110);
@@ -501,6 +505,40 @@ FUNCTION_START("::handle_2113(int start, int end)");
 
 FUNCTION_INT("::handle_2113(int start, int end)", 0);
    return 0;
+}
+
+int FASIT_TCP::handle_13000(int start, int end) {
+	FUNCTION_START("::handle_13000(int start, int end)");
+   // map header and message
+	FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+	FASIT_13000 *msg = (FASIT_13000*)(rbuf + start + sizeof(FASIT_header));
+
+   // send via client
+	if (hasPair()) {
+		pair()->queueMsg(hdr, sizeof(FASIT_header));
+		pair()->queueMsg(msg, sizeof(FASIT_13000));
+		pair()->finishMsg();
+	}
+
+	FUNCTION_INT("::handle_13000(int start, int end)", 0);
+	return 0;
+}
+
+int FASIT_TCP::handle_13002(int start, int end) {
+	FUNCTION_START("::handle_13002(int start, int end)");
+   // map header and message
+	FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+	FASIT_13002 *msg = (FASIT_13002*)(rbuf + start + sizeof(FASIT_header));
+
+   // send via client
+	if (hasPair()) {
+		pair()->queueMsg(hdr, sizeof(FASIT_header));
+		pair()->queueMsg(msg, sizeof(FASIT_13002));
+		pair()->finishMsg();
+	}
+
+	FUNCTION_INT("::handle_13002(int start, int end)", 0);
+	return 0;
 }
 
 int FASIT_TCP::handle_13110(int start, int end) {
