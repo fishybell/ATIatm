@@ -446,6 +446,26 @@ int SES_Client::handle_2115(int start, int end) {
 	 return 0;
 }
 
+int SES_Client::handle_13000(int start, int end) {
+	FUNCTION_START("::handle_13000(int start, int end)")
+
+	// do handling of message
+	IMSG("Handling 13000 in SES\n");
+
+	FUNCTION_INT("::handle_13000(int start, int end)", 0)
+	return 0;
+}
+
+int SES_Client::handle_13002(int start, int end) {
+	FUNCTION_START("::handle_13002(int start, int end)")
+
+	// do handling of message
+	IMSG("Handling 13002 in SES\n");
+
+	FUNCTION_INT("::handle_13002(int start, int end)", 0)
+	return 0;
+}
+
 int SES_Client::handle_13110(int start, int end) {
 	FUNCTION_START("::handle_13110(int start, int end)")
 
