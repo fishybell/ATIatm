@@ -48,6 +48,8 @@ protected:
    virtual int handle_2110(int start, int end);
    virtual int handle_2112(int start, int end);
    virtual int handle_2113(int start, int end);
+   virtual int handle_13000(int start, int end);
+   virtual int handle_13002(int start, int end);
    virtual int handle_13110(int start, int end);
    virtual int handle_13112(int start, int end);
    virtual int handle_14110(int start, int end);
