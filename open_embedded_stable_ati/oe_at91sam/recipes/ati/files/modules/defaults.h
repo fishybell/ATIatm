@@ -37,9 +37,9 @@
 #define FALL_AT_FALL_SIZE 0x20
 
 // Bob type defaults
-#define BOB_TYPE 1
-#define BOB_TYPE_LOC 0X460
-#define BOB_TYPE_SIZE 0X10
+#define BOB_HITS 0
+#define BOB_HITS_LOC 0X460
+#define BOB_HITS_SIZE 0X10
 
 // Serial Number defaults
 #define SERIAL_NUMBER "00000-0-0"
