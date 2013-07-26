@@ -54,6 +54,7 @@ public :
    void didTherm(int exists,int on);
    void doBESFire(int zone);
    void doBlank(int blank);
+   void doBob(int bob);
    void doGPS(); // retrieve gps data
    void didGPS(struct gps_conf gpc_c); // current gps data
 
@@ -79,6 +80,8 @@ protected:
    int handle_2110(int start, int end);
    int handle_2112(int start, int end);
    int handle_2113(int start, int end);
+   int handle_13000(int start, int end);
+   int handle_13002(int start, int end);
    int handle_13110(int start, int end);
    int handle_13112(int start, int end);
    int handle_14110(int start, int end);
@@ -101,6 +104,7 @@ private:
    void sendStatus2102(int force);
    void setStatus2112(int on, int mode, int idelay, int rdelay);
    void sendStatus2112();
+   void sendStatus13002(int tobob);
    void sendStatus13112(int on);
    void sendStatus14112(int on);
    void sendStatus15112(int on);
