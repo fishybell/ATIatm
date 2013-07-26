@@ -193,11 +193,11 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                         case HIT_OVERWRITE_NONE:
                         case HIT_OVERWRITE_ALL:
                             // all calibration data
-                            snprintf(wbuf, 1024, "L %i %i %i %i\nY %i %i\nF %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->enable_on, hit_c->type, hit_c->invert, hit_c->hits_to_kill, hit_c->after_kill);
+                            snprintf(wbuf, 1024, "L %i %i %i %i\nY %i %i\nF %i %i %i\n", hit_c->seperation, hit_c->sensitivity, hit_c->blank_time, hit_c->enable_on, hit_c->type, hit_c->invert, hit_c->hits_to_kill, hit_c->after_kill, hit_c->hits_to_bob);
                             break;
                         case HIT_OVERWRITE_OTHER:
                             // type and hits_to_kill
-                            snprintf(wbuf, 1024, "Y %i %i\nF %i %i\n", hit_c->type, hit_c->invert, hit_c->hits_to_kill, hit_c->after_kill);
+                            snprintf(wbuf, 1024, "Y %i %i\nF %i %i %i\n", hit_c->type, hit_c->invert, hit_c->hits_to_kill, hit_c->after_kill, hit_c->hits_to_bob);
                             break;
                         case HIT_GET_CAL:
                         case HIT_OVERWRITE_CAL:
@@ -216,7 +216,7 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
                         case HIT_GET_KILL:
                         case HIT_OVERWRITE_KILL:
                             // hits_to_kill only
-                            snprintf(wbuf, 1024, "F %i %i\n", hit_c->hits_to_kill, hit_c->after_kill);
+                            snprintf(wbuf, 1024, "F %i %i %i\n", hit_c->hits_to_kill, hit_c->after_kill, hit_c->hits_to_bob);
                             break;
                     }
                 }
@@ -1400,9 +1400,9 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                      break;
                   case 'O': case 'o':      // Sets and Reads bob type
                      if (arg3 > 1) { // are they passing in information?
-                        snprintf(wbuf, 1024, "I O %s\n", writeEeprom(BOB_TYPE_LOC, arg3, BOB_TYPE_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                        snprintf(wbuf, 1024, "I O %s\n", writeEeprom(BOB_HITS_LOC, arg3, BOB_HITS_SIZE, cmd+arg2)); // writes and prints out what it wrote
                      } else { // they are reading information
-                        snprintf(wbuf, 1024, "I O %s\n", readEeprom(BOB_TYPE_LOC, BOB_TYPE_SIZE)); // reads and prints out what it read
+                        snprintf(wbuf, 1024, "I O %s\n", readEeprom(BOB_HITS_LOC, BOB_HITS_SIZE)); // reads and prints out what it read
                      }
                      break;
                   case 'P': case 'p':      // PHI defaults
@@ -2407,7 +2407,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "Expose\nFormat: E\n");
                         break;
                     case 'F': case 'f':
-                        snprintf(wbuf, 1024, "Request fall parameters\nFormat: F\nChange fall parameters\nFormat: F (0-100)kill_at_x_hits (0|1|2|3|4)at_kill_do_fall_or_kill_or_stop_or_fall_and_stop_or_bob\n");
+                        snprintf(wbuf, 1024, "Request fall parameters\nFormat: F\nChange fall parameters\nFormat: F (0-100)kill_at_x_hits (0|1|2|3|4)at_kill_do_fall_or_kill_or_stop_or_fall_and_stop_or_bob (1-100)bob_at_x_hits\n");
                         break;
                     case 'G': case 'g':
                         snprintf(wbuf, 1024, "Request GPS data\nFormat: G\n");
@@ -2420,23 +2420,23 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'A': case 'a':
                                 snprintf(wbuf, 1024, "Get/Set address location\nFormat: I A <address location>\n");
                                 break;
-			    case 'B': case 'b':
-                          	snprintf(wbuf, 1024, "Get/Set board type\nFormat: I B <HSAT>, <LSAT>, <MAT>, <MATOLD>, <MIT>, <MITV>, <SES>, <SIT>, <SITMT>, <BASE>, <TTMT>, <HHC>\n");
-				break;
-			    case 'D': case 'd':
-                        	snprintf(wbuf, 1024, "Get/Set comm type\nFormat: I D <local>, <network>, <radio>, <wifi>, <wimax>\n");
-				break;
-			    case 'I': case 'i':
-                        	snprintf(wbuf, 1024, "Get/Set current IP address\nFormat: I P <ip>\n");			
-				break;
-			    case 'C': case 'c':
-                        	snprintf(wbuf, 1024, "Get/Set connect port number\nFormat: I C <cport>\n");		
-                                break;
+							case 'B': case 'b':
+						              	snprintf(wbuf, 1024, "Get/Set board type\nFormat: I B <HSAT>, <LSAT>, <MAT>, <MATOLD>, <MIT>, <MITV>, <SES>, <SIT>, <SITMT>, <BASE>, <TTMT>, <HHC>\n");
+							break;
+							case 'D': case 'd':
+						            	snprintf(wbuf, 1024, "Get/Set comm type\nFormat: I D <local>, <network>, <radio>, <wifi>, <wimax>\n");
+							break;
+							case 'I': case 'i':
+						            	snprintf(wbuf, 1024, "Get/Set current IP address\nFormat: I P <ip>\n");			
+							break;
+							case 'C': case 'c':
+						            	snprintf(wbuf, 1024, "Get/Set connect port number\nFormat: I C <cport>\n");		
+						                    break;
                             case 'E': case 'e':
                                 snprintf(wbuf, 1024, "Request battery/mover defaults\nFormat I E (SIT|SAT|SES|MIT|MAT|REVERSE)\nChange battery/mover defaults\nFormat I E (1-SIT|2-SAT|3-SES|4-MIT|5-MAT|6-Mover Reverse) (default)\n");
                                 break;
                             case 'F': case 'f':
-                                snprintf(wbuf, 1024, "Request fall parameters\nFormat: I F\nChange fall parameters\nFormat: I F (0-100)kill_at_x_hits (0|1|2|3|4)at_kill_do_fall_or_kill_or_stop_or_fall_and_stop_or_bob\n");
+                                snprintf(wbuf, 1024, "Request fall parameters\nFormat: I F\nChange fall parameters\nFormat: I F (0-100)kill_at_x_hits (0|1|2|3|4)at_kill_do_fall_or_kill_or_stop_or_fall_and_stop_or_bob (0-100)bob_at_x_hits\n");
 				break;
                             case 'G': case 'g':
                                 snprintf(wbuf, 1024, "Request MGL defaults\nFormat: I G\nChange MGL defaults\nFormat: I G (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
@@ -2460,7 +2460,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Request MFS defaults\nFormat: I N\nChange MFS defaults\nFormat: I N (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3 (0|1)mode single_or_burst\n");
 				break;
                             case 'O': case 'o':
-                                snprintf(wbuf, 1024, "Get/Set Bob Style\nFormat: I O (0|1)fasit_bob_at_hit_or_ats_bob_at_kill\n");	
+                                snprintf(wbuf, 1024, "Get/Set Hits to Bob\nFormat: I O <hits to bob>\n");	
                                 break;
                             case 'P': case 'p':
                                 snprintf(wbuf, 1024, "Request PHI defaults\nFormat: I P\nChange PHI defaults\nFormat: I P (0|1|2)active_soon_or_immediate (0|1|2|3)active_on_full_expose_or_partial_expose_or_during_partial (0|1|2)active_or_deactive_on_hit (0|1|2)active_or_deactive_on_kill (0-60000)milliseconds_on_time (0-60000)milliseconds_off_time (0-250)halfseconds_start_delay (0-250)halfseconds_repeat_delay (0-62|63)repeat_count_or_infinite ex1 ex2 ex3\n");
@@ -2496,7 +2496,7 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                 snprintf(wbuf, 1024, "Home End Defaults\nFormat I Z (0|1) left_right\n");
                                 break;
                             default:
-                                snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI J: SES defaults\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI O: Bob type\nI P: PHI defaults\nI Q: Docking Station Default\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI U: Radio Frequency\nI V: Radio Power Low\nI W: Radio Power High\nI X: Serial Number\nI Y: MSD Defaults\nI Z: Mover Home End Defaults\n");
+                                snprintf(wbuf, 1024, "I A: Address\nI B: Board Type\nI C: Connect Port Number\nI D: Comm Type\nI E: Battery/Mover Defaults\nI F: Fall Parameters Defaults\nI G: MGL Defaults\nI H: Hit Calibration Defaults\nI I: IP Address\nI J: SES defaults\nI K: SMK Defaults\nI L: Listen Port Number\nI M: MAC Address\nI N: MFS Defaults\nI O: Hits to Bob\nI P: PHI defaults\nI Q: Docking Station Default\nI R: Reboot\nI S: Hit Sensor Defaults\nI T: THM Defaults\nI U: Radio Frequency\nI V: Radio Power Low\nI W: Radio Power High\nI X: Serial Number\nI Y: MSD Defaults\nI Z: Mover Home End Defaults\n");
                                 break;
 				        }
                         break; 
@@ -2802,10 +2802,11 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             break;
                         case 'F': case 'f':
                             if (arg2 == 1) {
-                                if (sscanf(cmd+1, "%i %i", &arg1, &arg2) == 2) {
+                                if (sscanf(cmd+1, "%i %i %i", &arg1, &arg2, &arg3) == 3) {
                                     // set hits_to_kill and after_kill values message
                                     hit_c.hits_to_kill = arg1;
                                     hit_c.after_kill = arg2;
+                                    hit_c.hits_to_bob = arg3;
                                     hit_c.set = HIT_OVERWRITE_KILL;
                                 }
                             } else {
