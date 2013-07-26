@@ -25,7 +25,7 @@
 //---------------------------------------------------------------------------
 #define TARGET_NAME     "lifter"
 
-//#define DEBUG_SEND
+#define DEBUG_SEND
 //#define PRINT_DEBUG
 
 #ifdef PRINT_DEBUG
@@ -77,6 +77,10 @@ static int has_wheelX = FALSE;            // has wheel X mechanical hit sensors
 module_param(has_wheelX, int, S_IRUGO);
 static int has_turret = FALSE;            // has turret hit sensor
 module_param(has_turret, bool, S_IRUGO);
+static int has_hits_to_kill = 1;           // hits to kill
+module_param(has_hits_to_kill, int, S_IRUGO);
+static int has_hits_to_bob = 1;           // hits to bob
+module_param(has_hits_to_bob, int, S_IRUGO);
 
 void lift_event_internal(int etype, bool upload); // forward declaration
 void hit_event_internal(int line, bool upload); // forward declaration
@@ -139,6 +143,8 @@ atomic_t kill_counter = ATOMIC_INIT(1); // invalid hit count for hits_to_kill
 atomic_t hit_type = ATOMIC_INIT(1); // single-fire mechanical
 atomic_t after_kill = ATOMIC_INIT(0); // stay down on kill
 atomic_t bob_type = ATOMIC_INIT(-1); // invalid hit count for bob_type
+atomic_t hits_to_bob = ATOMIC_INIT(1); // invalid hit count for bob
+atomic_t bob_counter = ATOMIC_INIT(1); // invalid hit count for bob
 static struct timer_list kill_timer; // TODO -- stay down for a little while?
 atomic_t blank_time = ATOMIC_INIT(0); // no blanking time
 atomic_t enable_on = ATOMIC_INIT(BLANK_ON_CONCEALED); // blank when fully concealed
@@ -187,7 +193,8 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
                     // was down, go up
                     lifter_position_set(LIFTER_POSITION_UP); // expose now
                     atomic_set(&toggle_last, EXPOSE); // remember toggle direction
-		              atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+		            atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+                    atomic_set(&bob_counter, atomic_read(&hits_to_bob)); // reset bob counter
                     atomic_set(&last_lift_cmd, EXPOSE);
                     atomic_set(&last_lift_event, EVENT_ERROR); // no event
                 } else { // moving or error
@@ -216,7 +223,8 @@ int nl_expose_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void
                 // do expose
                 if (lifter_position_get() != LIFTER_POSITION_UP) {
                     lifter_position_set(LIFTER_POSITION_UP); // expose now
-		              atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+		            atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+                    atomic_set(&bob_counter, atomic_read(&hits_to_bob)); // reset bob counter
                     rc = -1; // we'll be going later
                 } else {
                     rc = EXPOSE; // we're already there
@@ -784,19 +792,24 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
 /* Kill if we need to */
 void do_kill_internal(void) {
 	int stay_up = 1;
+    int bob_reached = 1;
 	u8 kdata;
 	if (atomic_read(&hits_to_kill) > 0) {
 		stay_up = !atomic_dec_and_test(&kill_counter);
-        // If fasit bob then bob after each hit until killed
-        if (atomic_read(&bob_type) == 1 && stay_up && atomic_read(&after_kill) == 4) {
+        bob_reached = !atomic_dec_and_test(&bob_counter);
+SENDUSERCONNMSG( "do_kill kill %i bob %i ", kill_counter, bob_counter);
+        // Bob after bob counter reached
+        if (!bob_reached && stay_up && atomic_read(&after_kill) == 4) {
            enable_battery_check(0); // disable battery checking while motor is on
            set_target_conceal();
            lifter_position_set(LIFTER_POSITION_DOWN); // conceal now 
+DELAY_PRINTK("\n***hits_to_bob: %i, bob counter: %i***\n\n", atomic_read(&hits_to_bob), bob_counter);
+           atomic_set(&bob_counter, atomic_read(&hits_to_bob)); // reset bob counter
         }
 	}
 	if (!stay_up) {
 		atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
-DELAY_PRINTK("\n***hits_to_kill: %i, kill counter: %i***\n\n", atomic_read(&hits_to_kill), kill_counter);
+
 		// create events for outputs
 		generic_output_event(EVENT_KILL);
         //lift_faults(ERR_target_killed);
@@ -805,7 +818,6 @@ DELAY_PRINTK("\n***hits_to_kill: %i, kill counter: %i***\n\n", atomic_read(&hits
 		kdata = EVENT_KILL; // cast to 8-bits
 		queue_nl_multi(NL_C_EVENT, &kdata, sizeof(kdata));
 
-		// bob if we need to bob
 		switch (atomic_read(&after_kill)) {
 			case 0: /* fall */
 			case 1: /* kill -- TODO -- find out difference between fall and kill */
@@ -822,16 +834,9 @@ DELAY_PRINTK("\n***hits_to_kill: %i, kill counter: %i***\n\n", atomic_read(&hits
 				// TODO -- send stop movement message to mover
 				break;
 			case 4: 
-                if (atomic_read(&bob_type) != 1) { /* ats bob */
-				   // put down
-                   enable_battery_check(0); // disable battery checking while motor is on
-                   set_target_conceal();
-				   lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-                } else if (atomic_read(&bob_type) == 1) { /* fasit bob */
-                   enable_battery_check(0); // disable battery checking while motor is on
-				   lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
-                }
-				break;
+                enable_battery_check(0); // disable battery checking while motor is on
+				lifter_position_set(LIFTER_POSITION_DOWN); // conceal now
+                break;
 		}
 	}
 }
@@ -862,6 +867,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     hit_c->blank_time = atomic_read(&blank_time)/100; // convert from milliseconds
                     hit_c->enable_on = atomic_read(&enable_on);
                     hit_c->hits_to_kill = atomic_read(&hits_to_kill);
+                    hit_c->hits_to_bob = atomic_read(&hits_to_bob);
                     hit_c->after_kill = atomic_read(&after_kill);
                     hit_c->type = atomic_read(&hit_type);
                     hit_c->invert = get_hit_invert();
@@ -869,10 +875,12 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                     rc = HANDLE_SUCCESS; // with return message
                     break;
                 case HIT_OVERWRITE_ALL:   /* overwrites every value */
+SENDUSERCONNMSG( "HIT_OVERWRITE_ALL  Bobs %i", hit_c->hits_to_bob);
                     set_hit_calibration(hit_c->seperation, hit_c->sensitivity);
                     htk = atomic_read(&hits_to_kill);
                     atomic_set(&hits_to_kill, hit_c->hits_to_kill);
                     atomic_set(&after_kill, hit_c->after_kill);
+                    atomic_set(&hits_to_bob, hit_c->hits_to_bob);
                     atomic_set(&bob_type, hit_c->bob_type);
                     atomic_set(&hit_type, hit_c->type);
                     set_hit_invert(hit_c->invert);
@@ -891,6 +899,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                 case HIT_OVERWRITE_OTHER: /* overwrites non-calibration values (type, etc.) */
                     htk = atomic_read(&hits_to_kill);
                     atomic_set(&hits_to_kill, hit_c->hits_to_kill);
+                    atomic_set(&hits_to_bob, hit_c->hits_to_bob);
                     atomic_set(&after_kill, hit_c->after_kill);
                     atomic_set(&hit_type, hit_c->type);
                     set_hit_invert(hit_c->invert);
@@ -902,6 +911,7 @@ int nl_hit_cal_handler(struct genl_info *info, struct sk_buff *skb, int cmd, voi
                 case HIT_OVERWRITE_KILL:  /* overwrites hits_to_kill value only */
                     htk = atomic_read(&hits_to_kill);
                     atomic_set(&hits_to_kill, hit_c->hits_to_kill);
+                    atomic_set(&hits_to_bob, hit_c->hits_to_bob);
                     atomic_set(&after_kill, hit_c->after_kill);
                     break;
             }
@@ -1174,8 +1184,9 @@ SENDUSERCONNMSG( "lifter lift_event_internal 5 blanking off ");
 	// reset kill counter on start of raise
 	if (etype == EVENT_RAISE) {
         //if (atomic_read(&after_kill) != 5) {  // not set to fasit bob
-        if (atomic_read(&bob_type) != 1) {
+        if (atomic_read(&after_kill) != 4) {
 		   atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+           atomic_set(&bob_counter, atomic_read(&hits_to_bob)); // reset bob counter
         }
 	}
 
@@ -1509,6 +1520,9 @@ static int __init Lifter_init(void) {
 
     INIT_WORK(&position_work, position_change);
     INIT_WORK(&hit_enable_work, hit_enable_change);
+
+    atomic_set(&hits_to_kill, has_hits_to_kill);
+    atomic_set(&hits_to_bob, has_hits_to_bob);
 
     // signal that we are fully initialized
     atomic_set(&full_init, TRUE);
