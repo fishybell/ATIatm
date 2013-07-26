@@ -98,20 +98,13 @@ FUNCTION_START("::reInit()");
      // initial hit calibration settings
      fake_sens = 1;
      lastHitCal.seperation = Eeprom::ReadEeprom(HIT_MSECS_BETWEEN_LOC, HIT_MSECS_BETWEEN_SIZE, HIT_MSECS_BETWEEN);
-
-//if 0 -- CODE FOR SHELLY
-     //char *buf = readeeprom(0x240,0x10);
-     //if (sscanf(buf, "%i", &temp) == 1) {
-     //   lastHitCal.seperation = temp;
-     //}
-//endif
      lastHitCal.sensitivity = Eeprom::ReadEeprom(HIT_DESENSITIVITY_LOC, HIT_DESENSITIVITY_SIZE, HIT_DESENSITIVITY); // fairly sensitive, but not max
      lastHitCal.blank_time = Eeprom::ReadEeprom(HIT_START_BLANKING_LOC, HIT_START_BLANKING_SIZE, HIT_START_BLANKING); // half a second blanking
      lastHitCal.enable_on = Eeprom::ReadEeprom(HIT_ENABLE_ON_LOC, HIT_ENABLE_ON_SIZE, HIT_ENABLE_ON); // hit sensor off
      lastHitCal.hits_to_kill = Eeprom::ReadEeprom(FALL_KILL_AT_X_HITS_LOC, FALL_KILL_AT_X_HITS_SIZE, FALL_KILL_AT_X_HITS); // kill on first hit
      lastHitCal.after_kill = Eeprom::ReadEeprom(FALL_AT_FALL_LOC, FALL_AT_FALL_SIZE, FALL_AT_FALL); // 0 for fall
-     lastHitCal.bob_type = Eeprom::ReadEeprom(BOB_TYPE_LOC, BOB_TYPE_SIZE, BOB_TYPE); // 1 for bob at each hit until killed
-     DCMSG(YELLOW,"Bob Type: %i", lastHitCal.bob_type) ;
+     lastHitCal.hits_to_bob = Eeprom::ReadEeprom(BOB_HITS_LOC, BOB_HITS_SIZE, BOB_HITS); // 1 for bob at each hit until killed
+     DCMSG(YELLOW,"Bob Hits: %i", lastHitCal.hits_to_bob) ;
      lastHitCal.type = Eeprom::ReadEeprom(HIT_SENSOR_TYPE_LOC, HIT_SENSOR_TYPE_SIZE, HIT_SENSOR_TYPE); // mechanical sensor
      lastHitCal.invert = Eeprom::ReadEeprom(HIT_SENSOR_INVERT_LOC, HIT_SENSOR_INVERT_SIZE, HIT_SENSOR_INVERT); // don't invert sensor input line
      lastHitCal.set = HIT_OVERWRITE_ALL;   // nothing will change without this
@@ -295,6 +288,43 @@ void SIT_Client::sendStatus2112() {
     FUNCTION_END("::sendStatus2112()");
 }
 
+// create and send a status messsage to the FASIT server
+void SIT_Client::sendStatus13002(int tobob) {
+    FUNCTION_START("::sendStatus13002()");
+DCMSG(RED,"**Shelly - sendStatus13002 line: 1414") ;
+    FASIT_header hdr;
+    FASIT_13002 msg;
+    defHeader(13002, &hdr); // sets the sequence number and other data
+    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_13002));
+
+    // set response
+    // fill out as response
+    msg.response.rnum = resp_num;
+    msg.response.rseq = resp_seq;
+    resp_num = resp_seq = 0; // the next one will be unsolicited
+
+    /*if (on){
+        msg.body.on = 1;
+    } else {
+        msg.body.on = 0;
+    }*/
+
+    DCMSG(BLUE,"Prepared to send 13002 status packet:");
+    DCMSG(BLUE,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n %6d  %d.%d  %6d  %6d  %7d",htons(hdr.num),htons(hdr.icd1),htons(hdr.icd2),htonl(hdr.seq),htonl(hdr.rsrvd),htons(hdr.length));
+    DCMSG(BLUE,"R-Num = %4d  R-seq-#=%4d ",htons(msg.response.rnum),htonl(msg.response.rseq));
+    DCMSG(BLUE,"\t\t\t\t\t\t\tmessage body\n "\
+          "  HitsToBob  \n"\
+          "  %3d   ",
+          msg.body.tobob);
+
+    // send
+    queueMsg(&hdr, sizeof(FASIT_header));
+    queueMsg(&msg, sizeof(FASIT_13002));
+    finishMsg();
+
+
+    FUNCTION_END("::sendStatus13002()");
+}
 
 // create and send a status messsage to the FASIT server
 void SIT_Client::sendStatus13112(int on) {
@@ -899,6 +929,60 @@ int SIT_Client::handle_2115(int start, int end) {
     FUNCTION_INT("::handle_2115(int start, int end)", 0);
     return 0;
 }
+
+/* SmartRange only message to know how many hits to bob */
+int SIT_Client::handle_13000(int start, int end) {
+    FUNCTION_START("::handle_13000(int start, int end)");
+
+    // do handling of message
+    IMSG("Handling 13000 in SIT\n");
+
+    // map header and body for both message and response
+    FASIT_header rhdr;
+    FASIT_13002 rmsg;
+    FASIT_header *hdr = (FASIT_header*)(rbuf + start);
+    FASIT_13000 *msg = (FASIT_13000*)(rbuf + start + sizeof(FASIT_header));
+
+    DCMSG(RED,"header\nM-Num | ICD-v | seq-# | rsrvd | length\n%6d  %d.%d  %6d  %6d  %7d",htons(hdr->num),htons(hdr->icd1),htons(hdr->icd2),htons(hdr->seq),htons(hdr->rsrvd),htons(hdr->length));
+    DCMSG(RED,"\t\t\t\t\t\t\tmessage body\nHitsToBob \n%7d",
+          msg->tobob);
+
+    // set hit sensor hits to bob
+    doBob(msg->tobob);
+
+
+    //lastHitCal.hits_to_bob = htons(msg->tobob);
+    //lastHitCal.set = HIT_OVERWRITE_ALL;
+    //doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
+
+    // then respond with a 13002 of it's status
+    defHeader(13002, &rhdr); // sets the sequence number and other data
+    rhdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_13002));
+
+    // set response
+    rmsg.response.rnum = htons(hdr->num);   //  pulls the message number from the header
+    rmsg.response.rseq = hdr->seq; 
+    /*if (htons(msg->tobob)) {       
+
+
+    } else {
+        send_2101_ACK(hdr,'F'); // no tobob, so send a negative ack
+    }*/
+
+    FUNCTION_INT("::handle_13000(int start, int end)", 0) ;
+    return 0;
+}
+
+int SIT_Client::handle_13002(int start, int end) {
+    FUNCTION_START("::handle_13002(int start, int end)")
+
+    // do handling of message
+    IMSG("Handling 13002 in SIT \n");
+
+    FUNCTION_INT("::handle_13002(int start, int end)", 0)
+    return 0;
+}
+
 //
 //  Configure Moon glow 
 //     We respond with a 13112 to indicate the updated status if we support Moon Glow,
@@ -1311,6 +1395,7 @@ void SIT_Client::didStop() {
 void SIT_Client::doHitCal(struct hit_calibration hit_c) {
     FUNCTION_START("::doHitCal(struct hit_calibration hit_c)");
     // pass directly to kernel for actual action
+DCMSG(RED,"doHitCal line: 1404") ; 
     if (hasPair()) {
         nl_conn->doHitCal(hit_c);
     }
@@ -1320,6 +1405,7 @@ void SIT_Client::doHitCal(struct hit_calibration hit_c) {
 // current hit calibration data
 void SIT_Client::didHitCal(struct hit_calibration hit_c) {
     FUNCTION_START("::didHitCal(struct hit_calibration hit_c)");
+    sendStatus13002(hit_c.hits_to_bob);
     // ignore?
     FUNCTION_END("::didHitCal(struct hit_calibration hit_c)");
 }
@@ -1534,6 +1620,14 @@ void SIT_Client::doBlank(int blank) {
     FUNCTION_END("::doBlank(int blank)");
 }
 
+void SIT_Client::doBob(int bob) {
+    FUNCTION_START("::doBob(int bob)");
+    lastHitCal.hits_to_bob = bob;
+    lastHitCal.set = HIT_OVERWRITE_ALL;    // nothing will change without this
+    doHitCal(lastHitCal); // tell kernel by calling SIT_Clients version of doHitCal
+    FUNCTION_END("::doBob(int bob)");
+}
+
 // retrieve gps data
 void SIT_Client::doGPS() {
     FUNCTION_START("::doGPS()");
@@ -1569,7 +1663,7 @@ SIT_Conn::~SIT_Conn() {
 }
 
 int SIT_Conn::parseData(struct nl_msg *msg) {
-    FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)");
+    FUNCTION_START("SIT_Conn::parseData(struct nl_msg *msg)"); 
     struct nlattr *attrs[NL_A_MAX+1];
     struct nlmsghdr *nlh = nlmsg_hdr(msg);
     struct genlmsghdr *ghdr = static_cast<genlmsghdr*>(nlmsg_data(nlh));
@@ -1668,8 +1762,9 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
                             lastHitCal.type = hit_c->type;
                             lastHitCal.invert = hit_c->invert;
                             lastHitCal.hits_to_kill = hit_c->hits_to_kill;
+                            lastHitCal.hits_to_bob = hit_c->hits_to_bob;
                             lastHitCal.after_kill = hit_c->after_kill;
-                            lastHitCal.bob_type = hit_c->bob_type;           
+                            //lastHitCal.bob_type = hit_c->bob_type;           
                             break;
                         case HIT_OVERWRITE_TYPE:
                         case HIT_GET_TYPE:
@@ -1679,8 +1774,9 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
                         case HIT_OVERWRITE_KILL:
                         case HIT_GET_KILL:
                             lastHitCal.hits_to_kill = hit_c->hits_to_kill;
+                            lastHitCal.hits_to_bob = hit_c->hits_to_bob;
                             lastHitCal.after_kill = hit_c->after_kill;
-                            lastHitCal.bob_type = hit_c->bob_type;  
+                            //lastHitCal.bob_type = hit_c->bob_type;  
                             break;
                     }
                     sit_client->didHitCal(lastHitCal); // tell client
