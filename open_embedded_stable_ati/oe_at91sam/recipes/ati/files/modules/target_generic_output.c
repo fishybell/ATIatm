@@ -10,6 +10,7 @@
 #include "target_generic_output.h"
 #include "netlink_kernel.h" /* for constant definitions */
 
+//#define DEBUG_SEND
 //#define PRINT_DEBUG
 
 #ifdef PRINT_DEBUG
@@ -17,6 +18,32 @@
 #else
 #define DELAY_PRINTK(...)  //
 #endif
+
+#ifdef DEBUG_SEND
+#define SENDUSERCONNMSG  sendUserConnMsg
+#else
+#define SENDUSERCONNMSG(...)  //
+#endif
+
+//---------------------------------------------------------------------------
+// Message filler handler for failure messages
+//---------------------------------------------------------------------------
+static int error_mfh(struct sk_buff *skb, void *msg) {
+    // the msg argument is a null-terminated string
+    return nla_put_string(skb, GEN_STRING_A_MSG, msg);
+}
+static void sendUserConnMsg( char *fmt, ...){
+    va_list ap;
+    char *msg;
+    va_start(ap, fmt);
+     msg = kmalloc(256, GFP_KERNEL);
+     if (msg){
+         vsnprintf(msg, 256, fmt, ap);
+         send_nl_message_multi(msg, error_mfh, NL_C_FAILURE);
+         kfree(msg);
+     }
+   va_end(ap);
+}
 
 //#define TESTING_ON_EVAL
 #ifdef TESTING_ON_EVAL
@@ -81,6 +108,7 @@ typedef struct generic_output {
     int randomr; // random repeat delay size
     int on_time;
     int off_time;
+    int repeat_count_save; // number of times to repeat (saved)
     int repeat_count; // number of times to repeat
     int repeat_at; // times repeated so far
     int onoff_repeat_count; // number of times to repeat
@@ -127,6 +155,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         75,						// on time (75 millisecond burst on)
         75,						// off time (75 millisecond burst off)
+        0,						// repeat count save
         10,						// repeat count (10 total fires)
         0,						// repeat at
         20,						// on/off repeat count (20 bursts per fire)
@@ -152,6 +181,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -177,6 +207,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -202,6 +233,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -227,6 +259,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -252,6 +285,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -277,6 +311,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -302,6 +337,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -327,6 +363,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -352,6 +389,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -377,6 +415,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -402,6 +441,7 @@ struct generic_output output_table[] = {
         0,						// repeat delay randomization
         0,						// on time
         0,						// off time
+        0,						// repeat count save
         0,						// repeat count
         0,						// repeat at
         0,						// on/off repeat count
@@ -994,6 +1034,13 @@ static void state_run(unsigned long index) {
 		this->off_time, this->repeat_count, this->repeat_at, this->onoff_repeat_count,
 		this->onoff_repeat_at, this->gpio, this->active);
 
+ SENDUSERCONNMSG("i %i  t %i  n %i  e %i  en %i  s %i  ns %i  ao %x\nm %i  id %i  ri %i  rd %i  rr %i  ont %i  oft %i  rc %i  ra %i  orc %i  ora %i  gp %i  a %i\n",
+		index, this->type, this->number, this->exists,
+		this->enabled, this->state, this->next_state, this->active_on, this->mode,
+		this->idelay, this->randomi, this->rdelay, this->randomr, this->on_time,
+		this->off_time, this->repeat_count, this->repeat_at, this->onoff_repeat_count,
+		this->onoff_repeat_at, this->gpio, this->active);
+
     // change current state to next state
     this->state = this->next_state;
 
@@ -1175,14 +1222,16 @@ DELAY_PRINTK("burst else index %i repeating stop_on %i\n", index, this->repeat_a
                     } else {
                         if (this->on_time >= 1000){
 DELAY_PRINTK("temp_on_pulse index %i on %i off %i change\n", index, this->on_time, this->off_time);
+                            this->repeat_count_save = this->repeat_count;
                             this->onoff_repeat_count = this->repeat_count;
-                            this->repeat_count = this->on_time / 20;
+//                            this->repeat_count = this->on_time / 1;
+                            this->repeat_count =  -1;
                             this->on_time = this->off_time;
                         } else {
                         // don't normal repeat: next state is off
                             this->next_state = S_WAITING; // is off, next off (stay off)
-                            this->on_time = this->repeat_count * 20;
-                            this->repeat_count = this->onoff_repeat_count;
+                            this->repeat_count = this->repeat_count_save;
+                            this->on_time = this->repeat_count * 1;
                         }
                     }
                     break;

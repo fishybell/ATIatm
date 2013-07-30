@@ -548,11 +548,12 @@ int do_accessory_configure(int callMethod, struct accessory_conf *acc_c, struct 
 
     // find out which of multiple accessories to configure
     switch (acc_c->acc_type) {
+	case ACC_THERMAL_PULSE :
+            mode = TEMP_ON_PULSE;
+	case ACC_THERMAL :
 	case ACC_MILES_SDH :
 	case ACC_SES :
 	case ACC_NES_MFS :
-	case ACC_THERMAL :
-	case ACC_THERMAL_PULSE :
 	case ACC_NES_PHI :
 	case ACC_NES_MGL :
 	    for (i=generic_output_exists(acc_c->acc_type); i > 0; i--) { // do I have one?
@@ -770,10 +771,12 @@ SENDUSERCONNMSG( "TRIGGER %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_d
 // netlink command handler for accessory commands
 //---------------------------------------------------------------------------
 int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
+    struct accessory_conf thmp = {ACC_THERMAL_PULSE,0,1,1,0,0,0,9000,005,0,0, 9,0,0,0};
+    int lastOnValue = 0;
     struct nlattr *na;
     int rc = HANDLE_SUCCESS_NO_REPLY; // by default this is a command with no response
     struct accessory_conf *acc_c;
-    DELAY_PRINTK("Lifter: handling accessory command\n");
+    DELAY_PRINTK("Lifter: handling accessory command thermal mode\n");
 
     // get attribute from message
     na = info->attrs[ACC_A_MSG]; // accessory message
@@ -781,7 +784,21 @@ int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, v
         // grab value from attribute
         acc_c = (struct accessory_conf*)nla_data(na);
         if (acc_c != NULL) {
+                lastOnValue = acc_c->on_now;
+SENDUSERCONNMSG("before has_thm_pulse %i, acctype %i on_now %i\n", has_thm_pulse, acc_c->acc_type, lastOnValue);
 		rc = do_accessory_configure(1, acc_c, skb);
+SENDUSERCONNMSG("after has_thm_pulse %i, acctype %i on_now %i\n", has_thm_pulse, acc_c->acc_type, lastOnValue);
+DELAY_PRINTK("has_thm_pulse %i, acctype %i on_now %i\n", has_thm_pulse, acc_c->acc_type, lastOnValue);
+		if (has_thm_pulse) {
+                    if (acc_c->acc_type == ACC_THERMAL) {
+                        if (lastOnValue == 1) {
+                            do_accessory_configure(0, &thmp, 0);
+                        } else {
+                            thmp.on_now = 0;
+                            do_accessory_configure(0, &thmp, 0);
+                        }
+                    }
+                }
         }
     }
 
@@ -1479,7 +1496,6 @@ static void init_thermal_pulse(){
                                               //     , , , , , ,     ,   ,y,a,  , , , ;
                                               //     , , , , , ,     ,    , ,y,  , , , ;
     struct accessory_conf thmp = {ACC_THERMAL_PULSE,0,1,0,5,0,0, 9000,100,0,0, 9,0,0,0};
-
     do_accessory_configure(0, &thmp, 0);
 }
 
