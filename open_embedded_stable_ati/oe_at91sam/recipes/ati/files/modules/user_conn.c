@@ -133,7 +133,8 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
 
             if (attrs[GEN_INT16_A_MSG]) {
                 // # feet from home
-                int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
+//                int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
+                int value = nla_get_u16(attrs[GEN_INT16_A_MSG]); // message was unsigned, fix it
                 snprintf(wbuf, 1024, "A %i\n", value);
             }
 
@@ -2884,6 +2885,13 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                                    switch (cmd[arg1 + 2]) { /* third letter */
                                        case 'M' : case 'm' :
                                            acc_c.acc_type = ACC_THERMAL;
+                                           break;
+                                   }
+                                   break;
+                               case 'M' : case 'm' :
+                                   switch (cmd[arg1 + 2]) { /* third letter */
+                                       case 'P' : case 'p' :
+                                           acc_c.acc_type = ACC_THERMAL_PULSE;
                                            break;
                                    }
                                    break;
