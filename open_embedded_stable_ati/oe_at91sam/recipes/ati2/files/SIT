@@ -14,6 +14,8 @@ start () {
    msdh=$(has_msdh)
    satbes=$(has_bes_mode)
    thermp=$(has_thermal_pulse)
+   htk=$(has_hits_to_kill)
+   htb=$(has_hits_to_bob)
    if [ "$mfs" == "" ] ; then                       
       mfs=1
    fi 
@@ -41,6 +43,12 @@ start () {
    if [ "$thermp" == "" ] ; then                       
       thermp=0                                         
    fi
+   if [ "$htk" == "" ] ; then                       
+      htk=1                                       
+   fi
+      if [ "$htb" == "" ] ; then                       
+      htb=1                                       
+   fi
    # load modules
    load_modules "eeprom_settings.ko" \
                 "target_user_interface.ko mover=0" \
@@ -48,7 +56,7 @@ start () {
                 "target_hit_poll.ko line=0 sens_mult=2" \
                 "target_generic_output.ko has_muzzle=$mfs has_moon=$moon has_phi=$phi has_thermal=$therm has_thermalX=$thermx has_msdh=$msdh has_bes=$satbes has_thm_pulse=$thermp" \
                 "target_lifter_infantry.ko" \
-                "lifter.ko has_bes=$satbes has_thm_pulse=$thermp"
+                "lifter.ko has_bes=$satbes has_thm_pulse=$thermp has_hits_to_kill=$htk has_hits_to_bob=$htb"
 
    # start default programs
    def_progs
