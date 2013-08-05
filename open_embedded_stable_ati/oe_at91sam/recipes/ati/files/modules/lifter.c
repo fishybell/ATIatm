@@ -25,7 +25,7 @@
 //---------------------------------------------------------------------------
 #define TARGET_NAME     "lifter"
 
-#define DEBUG_SEND
+//#define DEBUG_SEND
 //#define PRINT_DEBUG
 
 #ifdef PRINT_DEBUG
