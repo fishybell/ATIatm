@@ -1,0 +1,2 @@
+/usr/bin/eeprom_rw read -addr 0x2C0 -size 0x20
+echo
