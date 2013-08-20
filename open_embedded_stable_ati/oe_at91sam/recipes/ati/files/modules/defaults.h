@@ -739,9 +739,12 @@
 #define DOCK_SPEED_SIZE 0x04
 
 // Unix Version
-#define VERSION "A" /* format: CCCC */
-#define VERSION_LOC 0x70C
-#define VERSION_SIZE 0x4
+#define UVERSION "A" /* format: CCCC */
+#define UVERSION_LOC 0x70C
+#define UVERSION_SIZE 0x4
+
+
+
 // ,.. defaults
 
 
