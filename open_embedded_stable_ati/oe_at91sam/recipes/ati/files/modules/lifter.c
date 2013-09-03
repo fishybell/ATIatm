@@ -771,7 +771,7 @@ SENDUSERCONNMSG( "TRIGGER %i %i %i", acc_c->acc_type, acc_c->on_now, acc_c->ex_d
 // netlink command handler for accessory commands
 //---------------------------------------------------------------------------
 int nl_accessory_handler(struct genl_info *info, struct sk_buff *skb, int cmd, void *ident) {
-    struct accessory_conf thmp = {ACC_THERMAL_PULSE,0,1,1,0,0,0,9000,005,0,0, 9,0,0,0};
+    struct accessory_conf thmp = {ACC_THERMAL_PULSE,0,1,1,0,2,0,0,2,9000,005,0,0, 9,0,0,0};
     int lastOnValue = 0;
     struct nlattr *na;
     int rc = HANDLE_SUCCESS_NO_REPLY; // by default this is a command with no response
@@ -1393,22 +1393,22 @@ static void init_bes_triggers(int besLevel){
     int mode;
     int shots;
 
-                                              //    r,e,o,o,o,o,    o, o,s,r,r,e,e,e;
-                                              //    e,x,n,n,n,n,    n, f,t,e,e,x,x,x;
-                                              //    q,i, , , , ,     , f,a,p,p, , , ;
-                                              //    u,s,n,e,h,k,    t,  ,r,e,e,d,d,d;
-                                              //    e,t,o,x,i,i,    i, t,t,a,a,a,a,a;
-                                              //    s,s,w,p,t,l,    m, i, ,t,t,t,t,t;
-                                              //    t, , , , ,l,    e, m,d, , ,a,a,a;
-                                              //     , , , , , ,     , e,e,d, ,1,2,3;
-                                              //     , , , , , ,     ,  ,l,e, , , , ;
-                                              //     , , , , , ,     ,  ,a,l, , , , ;
-                                              //     , , , , , ,     ,  ,y,a, , , , ;
-                                              //     , , , , , ,     ,  , ,y, , , , ;
-    struct accessory_conf bt1 = {ACC_BES_TRIGGER_1 ,0,1,0,0,1,0,  250, 0,0,0,0,0,0,0};
-    struct accessory_conf bt2 = {ACC_BES_TRIGGER_2 ,0,1,0,2,0,0,  250, 0,0,0,0,0,0,0};
-    struct accessory_conf bt3 = {ACC_BES_TRIGGER_3 ,0,1,0,2,0,0,  250, 0,0,0,0,0,0,0};
-    struct accessory_conf bt4 = {ACC_BES_TRIGGER_4 ,0,1,0,2,0,0,  250, 0,0,0,0,0,0,0};
+                                              //    r,e,o,o,p,o,o,p,    o, o,s,r,r,e,e,e;
+                                              //    e,x,n,n,a,n,n,a,    n, f,t,e,e,x,x,x;
+                                              //    q,i, , ,d, , ,d,     , f,a,p,p, , , ;
+                                              //    u,s,n,e,1,h,k,2,    t,  ,r,e,e,d,d,d;
+                                              //    e,t,o,x, ,i,i, ,    i, t,t,a,a,a,a,a;
+                                              //    s,s,w,p, ,t,l, ,    m, i, ,t,t,t,t,t;
+                                              //    t, , , , , ,l, ,    e, m,d, , ,a,a,a;
+                                              //     , , , , , , , ,     , e,e,d, ,1,2,3;
+                                              //     , , , , , , , ,     ,  ,l,e, , , , ;
+                                              //     , , , , , , , ,     ,  ,a,l, , , , ;
+                                              //     , , , , , , , ,     ,  ,y,a, , , , ;
+                                              //     , , , , , , , ,     ,  , ,y, , , , ;
+    struct accessory_conf bt1 = {ACC_BES_TRIGGER_1 ,0,1,0,0,2,1,0,2,  250, 0,0,0,0,0,0,0};
+    struct accessory_conf bt2 = {ACC_BES_TRIGGER_2 ,0,1,0,2,2,0,0,2,  250, 0,0,0,0,0,0,0};
+    struct accessory_conf bt3 = {ACC_BES_TRIGGER_3 ,0,1,0,2,2,0,0,2,  250, 0,0,0,0,0,0,0};
+    struct accessory_conf bt4 = {ACC_BES_TRIGGER_4 ,0,1,0,2,2,0,0,2,  250, 0,0,0,0,0,0,0};
 
     mode = get_eeprom_int_value(BES_MODE, BES_MODE_LOC, BES_MODE_SIZE);
     bt1.on_exp = get_eeprom_int_value(BT1_ACTIVATE_EXPOSE, BT1_ACTIVATE_EXPOSE_LOC, BT1_ACTIVATE_EXPOSE_SIZE);
@@ -1483,19 +1483,7 @@ static void init_thermal_pulse(){
     int mode;
     int shots;
 
-                                              //    r,e,o,o,o,o,    o,  o,s,r, r,e,e,e;
-                                              //    e,x,n,n,n,n,    n,  f,t,e, e,x,x,x;
-                                              //    q,i, , , , ,     ,  f,a,p, p, , , ;
-                                              //    u,s,n,e,h,k,    t,   ,r,e, e,d,d,d;
-                                              //    e,t,o,x,i,i,    i,  t,t,a, a,a,a,a;
-                                              //    s,s,w,p,t,l,    m,  i, ,t, t,t,t,t;
-                                              //    t, , , , ,l,    e,  m,d, ,  ,a,a,a;
-                                              //     , , , , , ,     ,  e,e,d,  ,1,2,3;
-                                              //     , , , , , ,     ,   ,l,e,  , , , ;
-                                              //     , , , , , ,     ,   ,a,l,  , , , ;
-                                              //     , , , , , ,     ,   ,y,a,  , , , ;
-                                              //     , , , , , ,     ,    , ,y,  , , , ;
-    struct accessory_conf thmp = {ACC_THERMAL_PULSE,0,1,0,5,0,0, 9000,100,0,0, 9,0,0,0};
+    struct accessory_conf thmp = {ACC_THERMAL_PULSE,0,1,0,5,2.0,0,2, 9000,100,0,0, 9,0,0,0};
     do_accessory_configure(0, &thmp, 0);
 }
 
