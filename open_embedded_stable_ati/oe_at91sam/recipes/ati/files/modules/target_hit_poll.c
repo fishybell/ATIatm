@@ -367,8 +367,8 @@ static void hit_randy(void) {
    // Line is high see look for disconnected hit sensor
    if (tmp_val) {
       sensors[line].d_count ++;
-      if ( sensors[line].d_count > 10000) {
-         sensors[line].d_count = 10000;
+      if ( sensors[line].d_count > 50000) {
+         sensors[line].d_count = 50000;
          if (!sensors[line].disconnected) {
             sensors[line].disconnected = 1;
             if (disconnected_hit_sensor_callback != NULL) {
@@ -376,7 +376,7 @@ static void hit_randy(void) {
             }
          } else {
             sensors[line].d1_count ++;
-            if ( sensors[line].d1_count > 10000) {
+            if ( sensors[line].d1_count > 50000) {
                sensors[line].d1_count = 0;
                sensors[line].d2_count ++;
                if ( sensors[line].d2_count > 30) {
@@ -475,7 +475,7 @@ void set_hit_calibration(int seperation, int sensitivity) { // set seperation an
 
     // calibrate
     spin_lock(&sensors[line].lock);
-    sensors[line].sep_cal = seperation; // convert milliseconds to ticks
+    sensors[line].sep_cal = seperation * 5; // convert milliseconds to ticks
     sensors[line].sensitivity = sensitivity;
 /*    sensors[line].sens_cal = cal_table[sensitivity];	*/
     sensors[line].sens_cal = sensitivity * sens_mult;
@@ -485,7 +485,7 @@ EXPORT_SYMBOL(set_hit_calibration);
 
 void get_hit_calibration(int *seperation, int *sensitivity) { // get seperation and sensitivity hit calibration values
     spin_lock(&sensors[line].lock);
-    *seperation = sensors[line].sep_cal; // convert ticks to milliseconds
+    *seperation = sensors[line].sep_cal / 5; // convert ticks to milliseconds
     *sensitivity = sensors[line].sensitivity;
     spin_unlock(&sensors[line].lock);
 }
@@ -618,7 +618,7 @@ static int __init target_hit_poll_init(void) {
     // setup heartbeat for polling
     if (usekyle) {
 //        hb_obj_init_nt(&hb_obj, hit_kyle, 1000); // heartbeat object calling hit_poll() at 5 khz
-        hb_obj_init_nt(&hb_obj, hit_randy, 1000); // heartbeat object calling hit_poll() at 5 khz
+        hb_obj_init_nt(&hb_obj, hit_randy, 5000); // heartbeat object calling hit_poll() at 5 khz
     } else {
         hb_obj_init_nt(&hb_obj, hit_poll, 5000); // heartbeat object calling hit_poll() at 5 khz
     }
