@@ -203,7 +203,8 @@ static int MOTOR_PWM_CHANNEL[] = {1,1,1,1,1,1,0};		// channel 0 matches TIOA0 to
 #define MAX_TIME	0x10000
 #define MAX_OVER	0x10000
 static int RPM_K[] = {1966080, 1966080, 1966080, 1966080, 1966080, 1966080, 0}; // CLOCK * 60 seconds
-static int ENC_PER_REV[] = {4, 360, 10, 10, 10, 10, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
+static int ENC_PER_REV[] = {2, 360, 2, 2, 2, 2, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
+//static int ENC_PER_REV[] = {4, 360, 10, 10, 10, 10, 0}; // 2 = encoder click is half a revolution, or 360 ticks per revolution
 static int VELO_K[] = {1344, 1344, 1680, 1680, 1680, 1680, 0}; // rpm/mph*10
 static int INCHES_PER_REV[] = {157, 157, 314, 314, 314, 314, 0}; // 5 inch, 10 inch, etc. = inches per wheel revolution
 static int CM_PER_TICK[] = {10, 10, 8, 8, 8, 8, 0}; // 5 inch, 10 inch, etc. = inches per wheel revolution
@@ -1824,6 +1825,15 @@ irqreturn_t track_sensor_dock_int(int irq, void *dev_id, struct pt_regs *regs)
     }    */
     
     //DELAY_PRINTK("At Dock Sensor %s - %s() : %i\n",TARGET_NAME[mover_type], __func__, atomic_read(&find_dock_atomic));
+
+// If we are trying to move and not find the dock ignore
+    if (((atomic_read(&movement_atomic) == MOVER_DIRECTION_FORWARD) ||
+            (atomic_read(&movement_atomic) == MOVER_DIRECTION_REVERSE)) &&
+            (atomic_read(&find_dock_atomic) == 0)) 
+        {
+        // ...then ignore switch
+        return IRQ_HANDLED;
+        }
 
     if (isMoverAtDock() != 0) {
        do_event(EVENT_DOCK_LIMIT); // triggered on dock limit
@@ -3714,7 +3724,7 @@ static void pid_step() {
 #ifdef SEND_PID
     //if ((pid_count++ % 10) == 0) {
        //SENDUSERCONNMSG( "pid4,t,%i,e,%i,u,%i,r,%i,y,%i,d,%i,P,%i,I,%i,D,%i,*,%i,/,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, max(min(pid_effort, 1000), 0), new_speed, input_speed,delta, pid_p, pid_i, pid_d, pid_auto_calibration_mult, pid_auto_calibration_div);
-       SENDUSERCONNMSG( "pid5,t,%i,e,%i,u,%i,r,%i,y,%i,o,%i,P,%i,I,%i,D,%i,l,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed, input_speed_old, pid_p, pid_i, pid_d, atomic_read(&position));
+       SENDUSERCONNMSG( "pid_step,t,%i,e,%i,u,%i,r,%i,y,%i,o,%i,P,%i,I,%i,D,%i,l,%i", (int)(time_d.tv_sec * 1000) + (int)(time_d.tv_nsec / 1000000), pid_error, pid_effort, new_speed, input_speed, input_speed_old, pid_p, pid_i, pid_d, atomic_read(&position));
     //}
 #endif
 /*
