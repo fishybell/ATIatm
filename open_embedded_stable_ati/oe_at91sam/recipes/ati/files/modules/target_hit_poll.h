@@ -17,7 +17,7 @@ extern int get_hit_invert(void);
 
 // register a callback for the hit event
 typedef void (*hit_event_callback)(int); // called at each hit received by the sensor (passing which sensor line it was received on)
-extern void set_hit_callback(hit_event_callback handler, hit_event_callback discon);
+extern void set_hit_callback(hit_event_callback handler, hit_event_callback discon, hit_event_callback magni);
 
 
 #endif // __TARGET_HIT_POLL_H__

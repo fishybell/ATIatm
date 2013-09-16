@@ -139,6 +139,17 @@ static int parse_cb(struct nl_msg *msg, void *arg) {
             }
 
             break;
+        case NL_C_MAGNITUDE:
+            genlmsg_parse(nlh, 0, attrs, GEN_INT16_A_MAX, generic_int16_policy);
+
+            if (attrs[GEN_INT16_A_MSG]) {
+                // # feet from home
+//                int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
+                int value = nla_get_u16(attrs[GEN_INT16_A_MSG]); // message was unsigned, fix it
+                snprintf(wbuf, 1024, "MAGNITUDE %i\n", value);
+            }
+
+            break;
         case NL_C_STOP:
             genlmsg_parse(nlh, 0, attrs, GEN_INT8_A_MAX, generic_int8_policy);
 
@@ -2364,6 +2375,13 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                         snprintf(wbuf, 1024, "J L %s\n", readEeprom(DOCK_SPEED_LOC, DOCK_SPEED_SIZE)); // reads and prints out what it read
                      }
                      break;
+                  case 'M': case 'm':      // Sets and Reads using TRACR flag
+                     if (arg3 > 1) { // are they passing in information?
+                        snprintf(wbuf, 1024, "J M %s\n", writeEeprom(USING_TRACR_LOC, arg3, USING_TRACR_SIZE, cmd+arg2)); // writes and prints out what it wrote
+                     } else { // they are reading information
+                        snprintf(wbuf, 1024, "J M %s\n", readEeprom(USING_TRACR_LOC, USING_TRACR_SIZE)); // reads and prints out what it read
+                     }
+                     break;
 		  case 'R': case 'r':      // Gets a report
                         snprintf(board, 20, "%s", readEeprom(BOARD_LOC, BOARD_SIZE));
                         snprintf(mversion, 20, "%s", readEeprom(VERSION_LOC, VERSION_SIZE));
@@ -2536,11 +2554,14 @@ int telnet_client(struct nl_handle *handle, char *client_buf, int client) {
                             case 'L': case 'l':
                                 snprintf(wbuf, 1024, "Get/Set mover docking speed\nFormat: J L <0|1|2|3|4>\n");
                                 break;
+                            case 'M': case 'm':
+                                snprintf(wbuf, 1024, "Get/Set Using TRACR settings (0=No, 1=Yes)\nFormat: J M <0|1>\n");
+                                break;
                             case 'R': case 'r':
                                 snprintf(wbuf, 1024, "Get a Report of relevant target information.\nFormat: J R (Board Type| Version | Communication | Connect IP | MAC)\n");
                                 break;
                             default:
-                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Radio Programmed?\nJ D: Track Length\nJ E: Static IP\nJ F: BES Trigger 1\nJ G: BES Trigger 2\nJ H: BES Trigger 3\nJ I: BES Trigger 4\nJ J: BES Mode\nJ K: Using a 20 AMP thermal\nJ L: Mover Docking Speed\nJ R: Target Report\n");
+                                snprintf(wbuf, 1024, "J A: Full Flash Version\nJ C: Radio Programmed?\nJ D: Track Length\nJ E: Static IP\nJ F: BES Trigger 1\nJ G: BES Trigger 2\nJ H: BES Trigger 3\nJ I: BES Trigger 4\nJ J: BES Mode\nJ K: Using a 20 AMP thermal\nJ L: Mover Docking Speed\nJ M: Using TRACR\nJ R: Target Report\n");
                                 break;
                         }
                         break;

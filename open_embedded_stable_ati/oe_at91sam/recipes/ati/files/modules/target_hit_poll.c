@@ -56,9 +56,11 @@ void sendUserConnMsg( char *fmt, ...){
 // setup calibration table
 //const u32 SIT_Client::cal_table[16] = {0xFFFFFFFF,333,200,125,75,60,48,37,29,22,16,11,7,4,2,1}; -- everything was too sensitive, so I'm making up new numbers (the old ones were made up too)
 
+// cal_table is now (09/04/2013) only used for TRACR, see using_tracr
 // three times as desensitive as previous numbers (except 15, which gives the maximum sensitivity possible)
-static int cal_table[] = {0,1,6,12,21,33,48,66,87,111,144,180,225,425,600,1000,5000,5000};
-//atic int cal_table[] = {0,1,2, 3, 4, 5, 6, 7, 8,  9, 10, 11, 12, 13, 14,  15,5000,5000};
+//static int cal_table[] = {0,  1,  6, 12, 21, 33, 48, 66, 87,111,144,180,225,425,600,1000,5000,5000};
+static int cal_table[] = {0, 55, 50, 45, 40, 35, 30, 25, 20, 15,  9,  7,  5,  3,  2,  1,5000,5000};
+//atic int cal_table[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,5000,5000};
 
 // for ignoring hit sensor completely
 //#define TESTING_ON_EVAL
@@ -82,6 +84,8 @@ static int showpoll = FALSE;
 module_param(showpoll, bool, S_IRUGO);
 static int usekyle = TRUE;
 module_param(usekyle, bool, S_IRUGO);
+static int using_tracr = 0;
+module_param(using_tracr, int, S_IRUGO);
 
 
 //---------------------------------------------------------------------------
@@ -184,7 +188,8 @@ static struct timer_list fake_timer = TIMER_INITIALIZER(fake_run, 0, 0);
 //---------------------------------------------------------------------------
 static hit_event_callback hit_callback = NULL;
 static hit_event_callback disconnected_hit_sensor_callback = NULL;
-void set_hit_callback(hit_event_callback handler, hit_event_callback discon) {
+static hit_event_callback magnitude_hit_sensor_callback = NULL;
+void set_hit_callback(hit_event_callback handler, hit_event_callback discon, hit_event_callback magni) {
     spin_lock(&sensors[line].lock);
     // only allow setting the callback once
     if (handler != NULL && hit_callback == NULL) {
@@ -193,6 +198,10 @@ void set_hit_callback(hit_event_callback handler, hit_event_callback discon) {
     }
     if (discon != NULL && disconnected_hit_sensor_callback == NULL) {
         disconnected_hit_sensor_callback = discon;
+        DELAY_PRINTK("HIT SENSOR: Registered callback function for disconnect hit sensor events\n");
+    }
+    if (magni != NULL && magnitude_hit_sensor_callback == NULL) {
+        magnitude_hit_sensor_callback = magni;
         DELAY_PRINTK("HIT SENSOR: Registered callback function for disconnect hit sensor events\n");
     }
     spin_unlock(&sensors[line].lock);
@@ -403,7 +412,7 @@ static void hit_randy(void) {
 #endif
 
     // if we're blanking the input or disconnected, ignore everything
-    if (sensors[line].blanking || sensors[line].disconnected) {
+    if (((!sensors[line].ucount) && sensors[line].blanking) || sensors[line].disconnected) {
         spin_unlock(&sensors[line].lock);
         return;
     }
@@ -453,6 +462,9 @@ SENDUSERCONNMSG( "HIT counted %d", sensors[line].ucount);
 // Reset our hit counter and flag
     	    ++sensors[line].ncount;
 SENDUSERCONNMSG( "HIT magnitude %d", sensors[line].ucount);
+            if (magnitude_hit_sensor_callback != NULL && sensors[line].ucount > 0) {
+               magnitude_hit_sensor_callback(sensors[line].ucount);
+            }
     	    sensors[line].ucount = 0;
     	    sensors[line].l_count = 0;
         }
@@ -471,14 +483,17 @@ void set_hit_calibration(int seperation, int sensitivity) { // set seperation an
     // fix input values
     if (seperation <= 0) { seperation = 1; }
     if (sensitivity <= 0) { sensitivity = 1; }
-//    if (sensitivity > 15) { sensitivity = 15; }
 
     // calibrate
     spin_lock(&sensors[line].lock);
     sensors[line].sep_cal = seperation * 5; // convert milliseconds to ticks
     sensors[line].sensitivity = sensitivity;
-/*    sensors[line].sens_cal = cal_table[sensitivity];	*/
-    sensors[line].sens_cal = sensitivity * sens_mult;
+    if (using_tracr) {
+       if (sensitivity > 15) sensitivity = 15;
+       sensors[line].sens_cal = cal_table[sensitivity] * sens_mult;
+    } else {
+       sensors[line].sens_cal = sensitivity * sens_mult;
+    }
     spin_unlock(&sensors[line].lock);
 }
 EXPORT_SYMBOL(set_hit_calibration);
