@@ -743,6 +743,11 @@
 #define UVERSION_LOC 0x70C
 #define UVERSION_SIZE 0x4
 
+// Using TRACR
+#define USING_TRACR 0
+#define USING_TRACR_LOC 0x710
+#define USING_TRACR_SIZE 0x4
+
 
 
 // ,.. defaults
