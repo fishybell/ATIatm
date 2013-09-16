@@ -521,6 +521,13 @@ struct genl_ops provider_gnl_ops_disconnected_hit = {
     .doit = provider_command_handler,
     .dumpit = NULL,
 };
+struct genl_ops provider_gnl_ops_magnitude = {
+    .cmd = NL_C_MAGNITUDE,
+    .flags = 0,
+    .policy = generic_int16_policy,
+    .doit = provider_command_handler,
+    .dumpit = NULL,
+};
 
 static struct genl_ops *command_op_map[] = {
     /* NL_C_UNSPEC */		NULL,
@@ -548,6 +555,7 @@ static struct genl_ops *command_op_map[] = {
     /* NL_C_HIT_CAL_MOVER */		&provider_gnl_ops_hits_cal_mover,
     /* NL_C_HITS_MOVER */		&provider_gnl_ops_hit_on_line,
     /* NL_C_COAST */			&provider_gnl_ops_coast,
+    /* NL_C_MAGNITUDE */	&provider_gnl_ops_magnitude,
     /* NL_C_FAULT */       &provider_gnl_ops_disconnected_hit,
 };
 

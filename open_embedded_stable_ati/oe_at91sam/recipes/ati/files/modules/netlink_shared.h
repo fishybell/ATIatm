@@ -279,6 +279,7 @@ enum {
     NL_C_HIT_CAL_MOVER,    /* calibrate hit sensor (command/reply) (hit calibrate structure) */
     NL_C_HITS_MOVER,    /* mover hits message) */
     NL_C_COAST,    /* ttmt needs to "coast" to a stop */
+    NL_C_MAGNITUDE,   /* magnitude of hit (generic 16-bit int) */
     NL_C_FAULT,      /* fault event (reply) (generic 8-bit int) */
     __NL_C_MAX,
 };
@@ -315,6 +316,7 @@ static nl_attr_size_t nl_attr_sizes[] = {
    {NL_C_HIT_CAL_MOVER, sizeof(hit_calibration_t), hit_calibration_policy},
    {NL_C_HITS_MOVER, sizeof(hit_on_line_t), hit_on_line_policy},
    {NL_C_COAST, sizeof(u8), generic_int8_policy},
+   {NL_C_MAGNITUDE, sizeof(u16), generic_int16_policy},
    {NL_C_FAULT, sizeof(u8), generic_int8_policy},
    {__NL_C_MAX, 0, NULL},
 };

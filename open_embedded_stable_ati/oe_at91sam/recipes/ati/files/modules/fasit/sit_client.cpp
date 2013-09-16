@@ -327,6 +327,38 @@ DCMSG(RED,"**Shelly - sendStatus13002 line: 1414") ;
 }
 
 // create and send a status messsage to the FASIT server
+void SIT_Client::sendStatus15132(int mag) {
+    FUNCTION_START("::sendStatus15132()");
+    FASIT_header hdr;
+    FASIT_15132 msg;
+    defHeader(15132, &hdr); // sets the sequence number and other data
+    hdr.length = htons(sizeof(FASIT_header) + sizeof(FASIT_15132));
+
+    // set response
+    // fill out as response
+    msg.response.rnum = resp_num;
+    msg.response.rseq = resp_seq;
+    resp_num = resp_seq = 0; // the next one will be unsolicited
+    msg.body.magnitude = mag;
+
+    /*if (on){
+        msg.body.on = 1;
+    } else {
+        msg.body.on = 0;
+    }*/
+
+    DCMSG(BLUE,"Prepared to send 15132 status packet: %d", mag);
+
+    // send
+    queueMsg(&hdr, sizeof(FASIT_header));
+    queueMsg(&msg, sizeof(FASIT_15132));
+    finishMsg();
+
+
+    FUNCTION_END("::sendStatus15132()");
+}
+
+// create and send a status messsage to the FASIT server
 void SIT_Client::sendStatus13112(int on) {
     FUNCTION_START("::sendStatus13112()");
 
@@ -1391,6 +1423,16 @@ void SIT_Client::didStop() {
     FUNCTION_END("::didStop()");
 }
 
+// current position value
+void SIT_Client::didMagnitude(int mag) {
+FUNCTION_START("::didMagnitude(int mag)")
+
+      DCMSG(GREEN,"didMagnitude is forcing a 15132 status") ;      
+      sendStatus15132(mag);
+
+FUNCTION_END("::didMagnitude(int pos)")
+}
+
 // change hit calibration data
 void SIT_Client::doHitCal(struct hit_calibration hit_c) {
     FUNCTION_START("::doHitCal(struct hit_calibration hit_c)");
@@ -1735,6 +1777,18 @@ int SIT_Conn::parseData(struct nl_msg *msg) {
             // received emergency stop response
             sit_client->didStop(); // tell client
             break;
+      case NL_C_MAGNITUDE :
+         genlmsg_parse(nlh, 0, attrs, GEN_INT16_A_MAX, generic_int16_policy);
+
+         if (attrs[GEN_INT16_A_MSG]) {
+            // # feet from home
+//            int value = nla_get_u16(attrs[GEN_INT16_A_MSG]) - 0x8000; // message was unsigned, fix it
+            int value = nla_get_u16(attrs[GEN_INT16_A_MSG]); // message was unsigned, fix it
+            sit_client->didMagnitude(value);
+         }
+
+         break;
+
         case NL_C_HIT_CAL:
             genlmsg_parse(nlh, 0, attrs, HIT_A_MAX, hit_calibration_policy);
             DCMSG(CYAN,"parseData case NL_C_HIT_CAL: attrs = 0x%x",attrs[HIT_A_MSG]) ;

@@ -42,6 +42,7 @@ public :
    void getAcc_C(struct accessory_conf *acc_c); // get last remembered hit calibration data
    void doHits(int num); // change received hits to "num" (usually to 0 for reset)
    void didHits(int num); // received "num" hits
+   void didMagnitude(int mag); // received magnitude
    void doMSDH(int code, int ammo, int player, int delay); // change MSDH data
    void didMSDH(int code, int ammo, int player, int delay); // current MSDH data
    void doMFS(int on, int mode, int idelay, int rdelay); // change MFS data   
@@ -108,6 +109,7 @@ private:
    void sendStatus13112(int on);
    void sendStatus14112(int on);
    void sendStatus15112(int on);
+   void sendStatus15132(int mag);
 
    // remember the last command we received for responses back
    int resp_num;

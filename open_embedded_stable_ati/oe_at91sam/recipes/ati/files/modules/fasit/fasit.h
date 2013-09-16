@@ -385,6 +385,18 @@ typedef struct FASIT_15120 {
 } FASIT_15120;
 
 /********************************************/
+/* 15132 - Hit magnitude    */
+/********************************************/
+typedef struct FASIT_15132b { // body
+   __uint16_t magnitude PCKD;
+    //__uint8_t  num;
+} FASIT_15132b;
+typedef struct FASIT_15132 {
+	FASIT_RESPONSE response;
+	FASIT_15132b body;
+} FASIT_15132;
+
+/********************************************/
 /* 14200 - Configure Hit Blanking           */
 /********************************************/
 typedef struct FASIT_14200 {

@@ -1233,6 +1233,24 @@ SENDUSERCONNMSG( "lifter lift_event_internal 5 blanking off ");
 }
 
 //---------------------------------------------------------------------------
+// Message filler handler for magnitude
+//---------------------------------------------------------------------------
+static int mag_mfh(struct sk_buff *skb, void *mag_data) {
+    // the mag_data argument is a pre-made u16 structure
+    return nla_put_u16(skb, GEN_INT16_A_MSG, *((u16*)mag_data));
+}
+
+//---------------------------------------------------------------------------
+// handler for magnitude
+//---------------------------------------------------------------------------
+void magnitude_event(int mag) {
+    u16 magnitude;
+    magnitude = mag; // message is unsigned, fix it be "signed"
+SENDUSERCONNMSG( "randy magnitude event %i", magnitude );
+    send_nl_message_multi(&magnitude, mag_mfh, NL_C_MAGNITUDE);
+}
+
+//---------------------------------------------------------------------------
 // event handler for hits
 //---------------------------------------------------------------------------
 void hit_event(int line) {
@@ -1519,7 +1537,7 @@ static int __init Lifter_init(void) {
     hit_start = current_kernel_time();
 
     // set callback handlers
-    set_hit_callback(hit_event, disconnected_hit_sensor_event);
+    set_hit_callback(hit_event, disconnected_hit_sensor_event, magnitude_event);
     set_lift_callback(lift_event, lift_faults);
 
     INIT_WORK(&position_work, position_change);
