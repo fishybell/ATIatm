@@ -3,6 +3,7 @@
 //---------------------------------------------------------------------------
 #include <linux/device.h>
 #include <linux/interrupt.h>
+#include <linux/random.h>
 #include <mach/gpio.h>
 
 #include "target.h"
@@ -44,6 +45,12 @@
 	#undef INPUT_LIFTER_POS_UP_LIMIT
 	#define	INPUT_LIFTER_POS_UP_LIMIT 			AT91_PIN_PC3
 #endif // FIX_FOR_JPY_IO_BOARD
+
+
+static int max_rnd = 0;           // Uses thermal pulse
+module_param(max_rnd, int, S_IRUGO);
+static int min_rnd = 0;           // Uses thermal pulse
+module_param(min_rnd, int, S_IRUGO);
 
 //---------------------------------------------------------------------------
 // This lock protects against motor control from simultaneously access from
@@ -257,7 +264,16 @@ static void sensor_timeout_arrive_fire(unsigned long data)
 static int sensorTimerArriveDirection;
 static void bob_timeout_start()
 	{
-	mod_timer(&bob_timeout_list, jiffies+(BOB_TIMEOUT_IN_MILLISECONDS*HZ/1000));
+        int rand = random32();
+        if (max_rnd > min_rnd){
+        rand %= (max_rnd - min_rnd);
+        rand += min_rnd;
+        rand *= 100;
+        } else {
+           rand = BOB_TIMEOUT_IN_MILLISECONDS;
+        }
+//	mod_timer(&bob_timeout_list, jiffies+(BOB_TIMEOUT_IN_MILLISECONDS*HZ/1000));
+	mod_timer(&bob_timeout_list, jiffies+(rand*HZ/1000));
 	}
 
 //---------------------------------------------------------------------------
@@ -444,7 +460,11 @@ irqreturn_t down_position_int(int irq, void *dev_id, struct pt_regs *regs)
 
 	      if (atomic_read(&at_conceal) ==  1) {
             atomic_set(&at_conceal, 0);
+                if (max_rnd > 0){
+                   bob_timeout_start();
+                } else {
             lifter_position_set(LIFTER_POSITION_UP);
+                }
          }
 
         }

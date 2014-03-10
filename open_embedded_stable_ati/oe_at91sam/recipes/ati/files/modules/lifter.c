@@ -77,6 +77,8 @@ static int has_wheelX = FALSE;            // has wheel X mechanical hit sensors
 module_param(has_wheelX, int, S_IRUGO);
 static int has_turret = FALSE;            // has turret hit sensor
 module_param(has_turret, bool, S_IRUGO);
+static int has_kill_reaction = 3;           // hits to kill
+module_param(has_kill_reaction, int, S_IRUGO);
 static int has_hits_to_kill = 1;           // hits to kill
 module_param(has_hits_to_kill, int, S_IRUGO);
 static int has_hits_to_bob = 1;           // hits to bob
@@ -813,6 +815,9 @@ void do_kill_internal(void) {
 	u8 kdata;
 	if (atomic_read(&hits_to_kill) > 0) {
 		stay_up = !atomic_dec_and_test(&kill_counter);
+	if (atomic_read(&hits_to_kill) >= 255) { // 255 is never die
+		atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+        }
         bob_reached = !atomic_dec_and_test(&bob_counter);
 SENDUSERCONNMSG( "do_kill kill %i bob %i ", kill_counter, bob_counter);
         // Bob after bob counter reached
@@ -1545,6 +1550,9 @@ static int __init Lifter_init(void) {
 
     atomic_set(&hits_to_kill, has_hits_to_kill);
     atomic_set(&hits_to_bob, has_hits_to_bob);
+    atomic_set(&kill_counter, atomic_read(&hits_to_kill)); // reset kill counter
+    atomic_set(&bob_counter, atomic_read(&hits_to_bob)); // reset bob counter
+    atomic_set(&after_kill, has_kill_reaction);
 
     // signal that we are fully initialized
     atomic_set(&full_init, TRUE);

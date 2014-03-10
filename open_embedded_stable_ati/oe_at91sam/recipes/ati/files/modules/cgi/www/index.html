@@ -1,0 +1,60 @@
+<html>
+  <head>
+    <script src="ajax.js" type="text/javascript">
+    </script>
+    <title>Action Target Stationary Target</title>
+  </head>
+  <body bgcolor=white>
+    <h1>Action Target Stationary Target</h1>
+   <table style="width:800px">
+     <tr>
+       <td>Version:</td>
+       <td><div ID="ativersion"></div></td>
+       <td></td>
+     </tr>
+     <tr>
+       <td>IP Address:</td>
+       <td><input ID="ipadd" type="text"></td>
+       <td>Do not change this unless you know what will happen.</td>
+     </tr>
+     <tr>
+       <td>Subnet Mask:</td>
+       <td><input ID="subnet" type="text"></td>
+       <td>Do not change this unless you know what will happen.</td>
+     </tr>
+     <tr>
+       <td>Hits To Bob:</td>
+       <td><input ID="bobhits" type="text"></td>
+       <td>Bob (go down and back up) after this many hits.</td>
+     </tr>
+     <tr>
+       <td>Minimum Bob Delay:</td>
+       <td><input ID="minrnd" type="text"></td>
+       <td>This allows a delay before bobbing (tenths of seconds: 10 = 1 second).</td>
+     </tr>
+     <tr>
+       <td>Maximum Bob Delay:</td>
+       <td><input ID="maxrnd" type="text"></td>
+       <td>This allows a delay before bobbing (tenths of seconds: 30 = 3 seconds). Change to 0 (zero) for no delay.</td>
+     </tr>
+     <tr>
+       <td>Sensitivity:</td>
+       <td><input ID="sensitivity" type="text"></td>
+       <td>Some rounds and targets (steel vs plastic) can be more sensitive. Higher number is less sensitive.</td>
+     </tr>
+     <tr>
+       <td><button onclick="expose()">EXPOSE</button></td>
+       <td><button onclick="conceal()">CONCEAL</button></td>
+     </tr>
+     <tr>
+       <td></td>
+       <td><button onclick="postBobber()">SUBMIT CHANGES</button></td>
+     </tr>
+   </table>
+    <div id="message1"></div>
+    <div id="message2"></div>
+  </body>
+  <script language="javascript" type="text/javascript">
+    showBobber();
+  </script>
+</html>

@@ -748,6 +748,21 @@
 #define USING_TRACR_LOC 0x710
 #define USING_TRACR_SIZE 0x4
 
+// Subnet mask - for use with static ips
+#define SUBNET "255.255.252.0"
+#define SUBNET_LOC 0x714
+#define SUBNET_SIZE 0x20
+
+// Subnet mask - for use with static ips
+#define MINRND 0
+#define MINRND_LOC 0x734
+#define MINRND_SIZE 0x4
+
+// Subnet mask - for use with static ips
+#define MAXRND 0
+#define MAXRND_LOC 0x738
+#define MAXRND_SIZE 0x4
+
 
 
 // ,.. defaults
