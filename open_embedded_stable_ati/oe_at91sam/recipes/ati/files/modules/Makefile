@@ -29,10 +29,16 @@ ifeq (${CURD},modules)
   include files.mk
 endif
 
-BFILES :=bit_button user_conn fasit_conn event_conn bcast_server bcast_client
+BFILES :=bit_button user_conn fasit_conn event_conn bcast_server bcast_client expose conceal
 default: ${BFILES} rf
 	make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- -C ${KDIR} SUBDIRS=${PWD}  modules
 	
+conceal: conceal.c netlink_shared.h netlink_user.h
+	${CC} ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -lnl conceal.c -o conceal
+
+expose: expose.c netlink_shared.h netlink_user.h
+	${CC} ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -lnl expose.c -o expose
+
 user_conn: user_conn.c netlink_shared.h netlink_user.h
 	${CC} ${CFLAGS} ${LDFLAGS} ${CU_FLAGS} -lnl user_conn.c -o user_conn
 
@@ -86,6 +92,44 @@ atifirmware:
 			../../../sysvinit/sysvinit/inittab
 	cat extract.sh atifirmware.tar > atifirmware.sh
 	chmod +x atifirmware.sh
+
+atibobber: 
+	date +mver=\"%Y%m%d\" > ../../../ati2/files/be_minor_version
+	cat ../../../ati2/files/make_minor_version >> ../../../ati2/files/be_minor_version
+	tar -cvjf atibobber.tar --exclude=be_major_version *.ko *.arm ${BFILES} \
+			./cgi \
+			../../../ati2/files/be_* \
+			../../../ati2/files/has_* \
+			../../../ati2/files/is_* \
+			../../../ati2/files/load_* \
+			../../../ati2/files/unload \
+			../../../ati2/files/fixhost \
+			../../../ati2/files/start_up \
+			../../../ati2/files/start \
+			../../../ati2/files/stop \
+			../../../ati2/files/restart \
+			../../../ati2/files/MAT \
+			../../../ati2/files/MATOLD \
+			../../../ati2/files/MIT \
+			../../../ati2/files/MITV \
+			../../../ati2/files/MITP \
+			../../../ati2/files/SAT \
+			../../../ati2/files/SES \
+			../../../ati2/files/SIT \
+			../../../ati2/files/EIM \
+			../../../ati2/files/BASE \
+			../../../ati2/files/HHC \
+			../../../ati2/files/SITMT \
+			../../../ati2/files/TTMT \
+			../../../ati2/files/atiradiotest.sh \
+			../../../ati2/files/evaluateip.sh \
+			../../../ati2/files/networking \
+			../../../ati2/files/thttpd \
+			../../../ati2/files/K40networking \
+			../../../ati2/files/interfaces \
+			../../../sysvinit/sysvinit/inittab
+	cat extractbobber.sh atibobber.tar > atibobber.sh
+	chmod +x atibobber.sh
 
 rf:
 	${MAKE} -C rf_conn/fasit
