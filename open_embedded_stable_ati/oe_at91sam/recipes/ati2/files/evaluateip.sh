@@ -10,7 +10,7 @@ if [ $# == 0 ]; then
 fi
 
 add=`is_static`
-if [ "$add" == "0.0.0.0" -o "$add" == "" ]; then
+if [ "$add" == "0.0.0.0" -o "$add" == "" -o "$add" == "dhcp" -o "$add" == "DHCP" ]; then
 # if we want to be static, we need an address
    if [ "$1" == "static" ]; then
       exit 1

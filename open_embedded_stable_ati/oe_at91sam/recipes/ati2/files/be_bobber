@@ -1,0 +1,50 @@
+if [ "x$#" != "x9" ]; then
+  echo "Usage: $0 IP Subnet KillReaction HitsToKill HitsToBob Sensitivity Delay MinRandomBob MaxRandomBob"
+  exit 1
+fi
+
+ip_address=$1
+size=$(echo $ip_address | wc -c)
+echo -n $ip_address | /usr/bin/eeprom_rw write -addr 0x578 -size $size -blank 0x1F
+
+shift
+subnet=$1
+size=$(echo $subnet | wc -c)
+echo -n $subnet | /usr/bin/eeprom_rw write -addr 0x714 -size $size -blank 0x1F
+
+shift
+killreaction=$1
+size=$(echo $killreaction | wc -c)
+echo -n $killreaction | /usr/bin/eeprom_rw write -addr 0x2E0 -size $size -blank 0x1F
+
+shift
+hitstokill=$1
+size=$(echo $hitstokill | wc -c)
+echo -n $hitstokill | /usr/bin/eeprom_rw write -addr 0x2C0 -size $size -blank 0x1F
+
+shift
+hitstobob=$1
+size=$(echo $hitstobob | wc -c)
+echo -n $hitstobob | /usr/bin/eeprom_rw write -addr 0x460 -size $size -blank 0x0F
+
+shift
+sensitivity=$1
+size=$(echo $sensitivity | wc -c)
+echo -n $sensitivity | /usr/bin/eeprom_rw write -addr 0x108 -size $size -blank 0x08
+
+shift
+delay=$1
+size=$(echo $delay | wc -c)
+echo -n $delay | /usr/bin/eeprom_rw write -addr 0x110 -size $size -blank 0x08
+
+shift
+minrnd=$1
+size=$(echo $minrnd | wc -c)
+echo -n $minrnd | /usr/bin/eeprom_rw write -addr 0x734 -size $size -blank 0x04
+
+shift
+maxrnd=$1
+size=$(echo $maxrnd | wc -c)
+echo -n $maxrnd | /usr/bin/eeprom_rw write -addr 0x738 -size $size -blank 0x04
+
+/usr/bin/be_network

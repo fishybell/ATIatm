@@ -1,0 +1,4 @@
+echo -n "Enter High Bob Time in tenths of sec: "
+read maxrnd
+size=$(echo $maxrnd | wc -c)
+echo -n $maxrnd | /usr/bin/eeprom_rw write -addr 0x738 -size $size -blank 0x4

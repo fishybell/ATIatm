@@ -1,0 +1,4 @@
+echo -n "Enter Low Bob Time in tenths of sec: "
+read minrnd
+size=$(echo $minrnd | wc -c)
+echo -n $minrnd | /usr/bin/eeprom_rw write -addr 0x734 -size $size -blank 0x4

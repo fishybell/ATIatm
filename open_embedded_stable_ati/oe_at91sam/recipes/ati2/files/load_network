@@ -5,6 +5,7 @@ def_progs() {
 
    # clean up old firmware files
    rm -f /home/root/atifirmware*
+   rm -f /home/root/atibobber*
 
    # set the version
    /usr/bin/be_version
