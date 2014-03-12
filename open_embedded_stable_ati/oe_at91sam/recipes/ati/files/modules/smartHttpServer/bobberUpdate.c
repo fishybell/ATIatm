@@ -124,10 +124,11 @@ sprintf(caTmp, "\nvalidNUM 2 -%s-\n", ptr); fwrite(caTmp, strlen(caTmp), 1, op);
 void doHeader(char *h, char*b){
 //   printf("1.1 200 OK\r\n");
 //   printf("%s 200 OK\r\n", getenv((char *)"SERVER_PROTOCOL"));
+   printf("%s\r\n", h);
 //   printf("Connection: keep-alive\r\n");
+   printf("Connection: close\r\n");
    printf("Server: %s\r\n", getenv((char *)"SERVER_NAME"));
    printf("Date: Wed, 18 Feb 2014 09:32:03 GMT\r\n");
-   printf("%s\r\n", h);
 //   printf("Vary:\r\n");
    printf("Content-Length: %d\r\n", strlen(b) + 1);
    printf("\r\n\r\n");
@@ -264,7 +265,7 @@ sprintf(caTmp, "\nmain 2 -%s- -%s-\n", ptr, ptr2 + 1); fwrite(caTmp, strlen(caTm
    }
    
    sprintf(Buffff + strlen(Buffff), "\r\n\r\n");
-   sprintf(contentType, "Content-Type: %s", html ? "text/html": "application/json");
+   sprintf(contentType, "Content-Type: %s", html ? "text/html": "application/json; charset=utf-8");
    doHeader(contentType, Buffff);
    printf("%s\r\n", Buffff);
 //   printf("\r\n\r\n");
